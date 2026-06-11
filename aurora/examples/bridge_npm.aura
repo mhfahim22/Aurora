@@ -1,0 +1,108 @@
+import "stdio"
+
+# ── npm Bridge Demo ──
+# Shows how to call npm/Node.js packages from Aurora using QuickJS bridge DLLs.
+# Bridge function naming: <package>_<func>() — e.g. moment_require, moment_call1
+#
+# QuickJS engine is embedded in the DLL — no Node.js needed for pure JS packages.
+# Packages with native addons (N-API/node-gyp) use a subprocess bridge with Node.js.
+#
+# Prerequisites:
+#   npm install moment lodash chalk
+#   voss bridge npm moment
+#   voss bridge npm lodash
+
+function main():
+    printf("=== npm Bridge Demo ===\n\n")
+
+    # ── 1. Require a module ──
+    # npm bridges export _require() which calls require() in QuickJS.
+    printf("--- 1. moment.require() ---\n")
+    mod = moment_require()
+    if mod == 0:
+        printf("FAILED: moment_require()\n")
+        printf("Run: voss bridge npm moment\n")
+        return 1
+    printf("OK: moment module loaded\n")
+
+    # ── 2. Call a function via _call1(mod, "fn", arg_json) ──
+    # moment.now() returns current timestamp.
+    printf("--- 2. moment.now() ---\n")
+    now = moment_call1(mod, "now", 0)
+    if now != 0:
+        printf("Current time: %s\n", moment_to_cstr(now))
+        moment_free(now)
+    else:
+        printf("FAILED: moment.now()\n")
+
+    # ── 3. Call with arguments — moment.format(fmt) ──
+    printf("--- 3. moment().format() ---\n")
+    fmt = moment_str("\"YYYY-MM-DD HH:mm:ss\"")
+    m = moment_call1(mod, "", 0)          # moment() -> moment object
+    if m != 0:
+        formatted = moment_call1(m, "format", fmt)
+        if formatted != 0:
+            printf("Formatted: %s\n", moment_to_cstr(formatted))
+            moment_free(formatted)
+        moment_free(m)
+    moment_free(fmt)
+
+    # ── 4. Value helpers: _str, _int, _float ──
+    printf("--- 4. Value helpers ---\n")
+    vs = moment_str("hello world")
+    vi = moment_int(42)
+    vf = moment_float(3.14)
+    printf("str=%s int=%s float=%s\n", moment_to_cstr(vs), moment_to_cstr(vi), moment_to_cstr(vf))
+    moment_free(vs); moment_free(vi); moment_free(vf)
+
+    # ── 5. Access properties via _getattr ──
+    printf("--- 5. moment.version ---\n")
+    ver = moment_getattr(mod, "version")
+    if ver != 0:
+        printf("moment version: %s\n", moment_to_cstr(ver))
+        moment_free(ver)
+
+    # ── 6. lodash example (another npm package) ──
+    printf("--- 6. lodash example ---\n")
+    lod = lodash_require()
+    if lod == 0:
+        printf("SKIP: lodash bridge not found\n")
+        printf("Run: voss bridge npm lodash\n")
+    else:
+        printf("OK: lodash module loaded\n")
+        arr = lodash_str('"[3, 1, 4, 1, 5, 9, 2, 6]"')
+        sorted = lodash_call1(lod, "sortBy", arr)
+        if sorted != 0:
+            printf("sorted=%s\n", lodash_to_cstr(sorted))
+            lodash_free(sorted)
+        arr2 = lodash_str('"[1, 2, 3, 4, 5]"')
+        sum_val = lodash_call1(lod, "sum", arr2)
+        if sum_val != 0:
+            printf("sum=%s\n", lodash_to_cstr(sum_val))
+            lodash_free(sum_val)
+        lodash_free(arr); lodash_free(arr2)
+        lodash_free(lod)
+
+    # ── 7. Tuple and dict helpers ──
+    printf("--- 7. Tuple / Dict ---\n")
+    t2 = moment_tuple2(moment_str("a"), moment_int(1))
+    printf("tuple2=%s\n", moment_to_cstr(t2))
+    moment_free(t2)
+
+    d = moment_dict()
+    moment_dict_set(d, "name", moment_str("Aurora"))
+    moment_dict_set(d, "count", moment_int(100))
+    printf("dict=%s\n", moment_to_cstr(d))
+    moment_free(d)
+
+    # ── 8. Performance stats ──
+    printf("--- 8. Performance ---\n")
+    stats = moment_get_perf_stats()
+    if stats != 0:
+        printf("Perf stats: %s\n", stats)
+    else:
+        printf("No perf stats available\n")
+
+    moment_free(mod)
+    printf("\n=== npm Bridge Demo Complete ===\n")
+    return 0

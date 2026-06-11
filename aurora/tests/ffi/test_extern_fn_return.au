@@ -1,0 +1,10 @@
+
+extern struct Vec3 { x: float, y: float, z: float }
+
+extern "math" function cross(a: Vec3, b: Vec3) -> Vec3
+
+extern "math" function add_vec(a: Vec3, b: Vec3) -> Vec3
+
+extern "math" function zero_vec() -> Vec3
+
+extern "math" function scale_vec(v: Vec3, s: float) -> Vec3

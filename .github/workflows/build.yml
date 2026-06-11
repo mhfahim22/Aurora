@@ -1,0 +1,221 @@
+name: Aurora CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup LLVM
+      run: |
+        choco install llvm --version=19.1.0 -y --no-progress
+        echo "LLVM_HOME=C:\Program Files\LLVM" >> $env:GITHUB_ENV
+        echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+
+    - name: Setup Visual Studio
+      uses: microsoft/setup-msbuild@v2
+      with:
+        vs-version: '[18,19)'
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp --target aurora_bindgen --target aurora_cppwrap -j2
+
+    - name: Build All Test Targets
+      run: |
+        cmake --build build --config Release --target test_unified_type_system --target test_ffi_memory_safety --target test_universal_bridge --target bench_native_speed --target test_bridge_e2e --target test_pypi_thread_safety --target test_integration_http --target bench_npm_bridge -j2
+
+    - name: Run Bridge & FFI Test Suite
+      run: |
+        Write-Host "--- test_bridge_e2e ---"
+        build\Release\test_bridge_e2e.exe
+        Write-Host "--- test_ffi_memory_safety ---"
+        build\Release\test_ffi_memory_safety.exe
+        Write-Host "--- test_pypi_thread_safety ---"
+        build\Release\test_pypi_thread_safety.exe
+        Write-Host "--- test_integration_http ---"
+        build\Release\test_integration_http.exe
+
+    - name: Run Aurora Language Tests
+      run: |
+        .\run_all_tests.ps1
+
+    - name: Verify Documentation Files
+      run: |
+        $docs = @(
+          "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md",
+          "VERSION", "RELEASE.md", "PRODUCTION_PLAN.md",
+          "aurora/docs/language.md", "aurora/docs/bridge_security.md",
+          "aurora/examples/bridge_pypi.aura", "aurora/examples/bridge_npm.aura",
+          "aurora/examples/bridge_cargo.aura"
+        )
+        $all_ok = $true
+        foreach ($f in $docs) {
+          if (Test-Path -LiteralPath $f) {
+            Write-Host "  ✅ $f"
+          } else {
+            Write-Host "  ❌ $f"
+            $all_ok = $false
+          }
+        }
+        if (-not $all_ok) { throw "Missing documentation files" }
+
+    - name: ASAN Build (AddressSanitizer)
+      run: |
+        cmake -B build_asan -DCMAKE_BUILD_TYPE=Debug `
+          -DCMAKE_CXX_FLAGS_DEBUG="/fsanitize=address /MDd /Od /Zi /D_ITERATOR_DEBUG_LEVEL=0" `
+          -DCMAKE_EXE_LINKER_FLAGS_DEBUG="/DEBUG" `
+          -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
+        cmake --build build_asan --config Debug `
+          --target test_ffi_memory_safety `
+          --target bench_npm_bridge -j2
+
+    - name: Run ASAN Memory Tests
+      run: |
+        # Find ASAN runtime DLL
+        $asanDll = Get-ChildItem -Recurse "C:\Program Files\Microsoft Visual Studio" -Filter "clang_rt.asan_dbg_dynamic-x86_64.dll" | Select-Object -First 1 -ExpandProperty DirectoryName
+        if ($asanDll) { $env:Path = "$asanDll;$env:Path" }
+        build_asan\Debug\test_ffi_memory_safety.exe
+
+    - name: Verify Build Output
+      run: |
+        $files = @(
+          "build\Release\aurorac.exe",
+          "build\Release\aurora_runtime.lib",
+          "build\Release\voss.exe",
+          "build\Release\aurora_lsp.exe",
+          "build\Release\aurora_bindgen.exe",
+          "build\Release\aurora_cppwrap.exe"
+        )
+        $all_ok = $true
+        foreach ($f in $files) {
+          if (Test-Path -LiteralPath $f) {
+            Write-Host "  ✅ $f"
+          } else {
+            Write-Host "  ❌ $f"
+            $all_ok = $false
+          }
+        }
+        if (-not $all_ok) {
+          throw "Missing build artifacts"
+        }
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      run: |
+        wget -q https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 19
+        sudo apt-get install -y liblld-19-dev
+        echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y cmake g++ libcurl4-openssl-dev
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc)
+
+    - name: Build Test Targets
+      run: |
+        cmake --build build --config Release --target test_unified_type_system --target test_universal_bridge -j$(nproc)
+
+    - name: Run C++ Tests (non-bridge)
+      run: |
+        build/Release/test_unified_type_system
+
+    - name: Verify Documentation Files
+      run: |
+        for f in README.md CONTRIBUTING.md SECURITY.md CHANGELOG.md \
+                 VERSION RELEASE.md PRODUCTION_PLAN.md \
+                 aurora/docs/language.md aurora/docs/bridge_security.md \
+                 aurora/examples/bridge_pypi.aura \
+                 aurora/examples/bridge_npm.aura \
+                 aurora/examples/bridge_cargo.aura; do
+          if [ -f "$f" ]; then
+            echo "  ✅ $f"
+          else
+            echo "  ❌ $f"
+            exit 1
+          fi
+        done
+
+    - name: Verify Build Output
+      run: |
+        files="build/Release/aurorac build/Release/libaurora_runtime.a build/Release/voss build/Release/aurora_lsp"
+        for f in $files; do
+          if [ -f "$f" ]; then
+            echo "  ✅ $f"
+          else
+            echo "  ❌ $f"
+            exit 1
+          fi
+        done
+
+    - name: Cross-platform npm bridge build test
+      run: |
+        set -e
+        # Generate a test bridge using voss, then compile with gcc
+        # Since we don't have network in CI, compile directly from quickjs sources
+        cat > /tmp/test_bridge.c << 'CEOF'
+#include "quickjs.h"
+#include <string.h>
+static JSValue js_hello(JSContext *ctx, JSValueConst this_val,
+                        int argc, JSValueConst *argv) {
+    return JS_NewString(ctx, "hello from bridge!");
+}
+static int g_inited=0;
+static JSRuntime *g_rt=NULL;
+static JSContext *g_ctx=NULL;
+__attribute__((constructor))
+static void init() {
+    if(g_inited)return;g_rt=JS_NewRuntime();if(!g_rt)return;
+    g_ctx=JS_NewContext(g_rt);if(!g_ctx){JS_FreeRuntime(g_rt);g_rt=NULL;return;}
+    JSValue g=JS_GetGlobalObject(g_ctx);
+    JS_SetPropertyStr(g_ctx,g,"hello",JS_NewCFunction(g_ctx,js_hello,"hello",0));
+    JS_FreeValue(g_ctx,g);g_inited=1;
+}
+JSValue hello_world() {
+    if(!g_ctx||!g_inited)return JS_NULL;
+    return JS_Call(g_ctx,JS_GetPropertyStr(g_ctx,JS_GetGlobalObject(g_ctx),"hello"),
+                   JS_UNDEFINED,0,NULL);
+}
+CEOF
+        qjs_dir="${{ github.workspace }}/quickjs"
+        gcc -shared -fPIC -o /tmp/test_bridge.so /tmp/test_bridge.c \
+            "$qjs_dir/quickjs.c" "$qjs_dir/cutils.c" \
+            "$qjs_dir/libregexp.c" "$qjs_dir/libunicode.c" "$qjs_dir/dtoa.c" \
+            -I"$qjs_dir" -include "$qjs_dir/quickjs_config.h" \
+            -lpthread -ldl -lm 2>&1
+        echo "  ✅ test_bridge.so compiled successfully"
+        file /tmp/test_bridge.so

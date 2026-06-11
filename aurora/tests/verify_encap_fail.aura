@@ -1,0 +1,8 @@
+class Person
+    public name = "unknown"
+    private age = 0
+
+p = Person("Alice")
+# This should fail: trying to access private field
+p.age = 25
+output("Age: " + p.age)

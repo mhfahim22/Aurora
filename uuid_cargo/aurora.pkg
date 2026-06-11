@@ -1,0 +1,6 @@
+name: uuid-cargo
+version: 1.23.3
+description: "cargo bridge: A library to generate and parse UUIDs."
+entry: uuid.au
+dependencies:
+  - rust-std

@@ -1,0 +1,38 @@
+import MrCode
+
+## First MoE model
+output("--- Model 1 ---\n")
+m1 = model_create("sequential")
+add(m1, moe(4, 8))
+add(m1, dense(1, "sigmoid"))
+set_loss(m1, "binary_crossentropy")
+set_optimizer(m1, "adam")
+set_lr(m1, 0.1)
+set_batch_size(m1, 20)
+set_epochs(m1, 1)
+set_validation_split(m1, 0.0)
+set_verbose(m1, 0)
+d = csv("test.csv")
+train(m1, d)
+output("loss 1: ")
+output(model_loss(m1))
+output("\n")
+
+## Second MoE model
+output("--- Model 2 ---\n")
+m2 = model_create("sequential")
+add(m2, moe(4, 8))
+add(m2, dense(1, "sigmoid"))
+set_loss(m2, "binary_crossentropy")
+set_optimizer(m2, "adam")
+set_lr(m2, 0.1)
+set_batch_size(m2, 20)
+set_epochs(m2, 1)
+set_validation_split(m2, 0.0)
+set_verbose(m2, 0)
+train(m2, d)
+output("loss 2: ")
+output(model_loss(m2))
+output("\n")
+
+output(" === ALL PASSED ===\n")

@@ -1,0 +1,23 @@
+# ── OOP Basics ──
+
+class Person
+    name = "unknown"
+    age = 0
+    function greet()
+        output("Hi, I am " + self.name)
+    function have_birthday()
+        self.age = self.age + 1
+
+p = Person("Alice", 30)
+p.greet()
+p.have_birthday()
+output(p.age)
+
+class Student extends Person
+    school = "unknown"
+    function study()
+        output(self.name + " is studying")
+
+s = Student("Bob", 20, "Aurora High")
+s.greet()
+s.study()

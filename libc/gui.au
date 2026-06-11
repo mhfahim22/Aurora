@@ -1,0 +1,44 @@
+## Native GUI bindings
+## Usage: import "gui.au"
+##
+## Example:
+##   import "gui.au"
+##   function main():
+##     win = gui_window_new("Hello", 400, 300)
+##     btn = gui_button_new(win, "Click Me", 10, 10, 100, 30)
+##     gui_set_callback(btn, on_click)
+##     gui_window_show(win)
+##     gui_run()
+##
+##   function on_click(id, evt, p1, p2):
+##     gui_quit()
+
+extern function gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function gui_window_set_title(win: pointer, title: cstring)
+extern function gui_window_resize(win: pointer, w: int, h: int)
+extern function gui_window_show(win: pointer)
+extern function gui_window_hide(win: pointer)
+extern function gui_window_destroy(win: pointer)
+
+extern function gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function gui_button_set_text(btn: pointer, text: cstring)
+extern function gui_button_get_text(btn: pointer) -> cstring
+
+extern function gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function gui_label_set_text(lbl: pointer, text: cstring)
+extern function gui_label_get_text(lbl: pointer) -> cstring
+
+extern function gui_textbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function gui_textbox_set_text(tb: pointer, text: cstring)
+extern function gui_textbox_get_text(tb: pointer) -> cstring
+
+extern function gui_listbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function gui_listbox_add_item(lb: pointer, item: cstring)
+extern function gui_listbox_clear(lb: pointer)
+extern function gui_listbox_get_selected(lb: pointer) -> int
+extern function gui_listbox_get_item(lb: pointer, idx: int) -> cstring
+extern function gui_listbox_count(lb: pointer) -> int
+
+extern function gui_run()
+extern function gui_quit()
+extern function gui_set_callback(widget: pointer, cb: callback(int, int, int, int))

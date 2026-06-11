@@ -1,0 +1,126 @@
+# ════════════════════════════════════════════════════════════════
+# Aurora GC Detection & Allocation Strategy Verification
+# ════════════════════════════════════════════════════════════════
+# Tests:
+#   A: Single owner  → RAII
+#   B: 2+ shared refs, no cycle → ARC
+#   C: Reference cycle exists  → GC
+#   D: @performance + cycle    → compiler error (commented, separate file)
+# ════════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════════════════════════════
+# Section A: Single Owner → RAII
+# ════════════════════════════════════════════════════════════════
+
+function a_single():
+    x = 42
+    output(x)
+
+# ════════════════════════════════════════════════════════════════
+# Section B: 2+ Shared Refs, No Cycle → ARC
+# shared creates 2+ owners but no alias cycle → ARC
+# ════════════════════════════════════════════════════════════════
+
+function b_two_shared():
+    root = 777
+    shared a = root
+    shared b = root
+    output(a + b)
+
+function b_three_shared():
+    root = 100
+    shared x = root
+    shared y = root
+    shared z = root
+    output(x + y + z)
+
+function b_four_shared():
+    base = 50
+    shared p = base
+    shared q = base
+    shared r = base
+    shared s = base
+    output(p + q + r + s)
+
+# ════════════════════════════════════════════════════════════════
+# Section C: Reference Cycle → GC
+# Chained assignments create directed alias cycle:
+#   a → b → c → a (cycle!)
+# After propagation all become Shared → cycle detected → GC
+# ════════════════════════════════════════════════════════════════
+
+function c_three_var_cycle():
+    a = 10
+    b = a
+    c = b
+    a = c
+    output(a + b + c)
+
+function c_four_var_cycle():
+    p = 1
+    q = p
+    r = q
+    s = r
+    p = s
+    output(p + q + r + s)
+
+# ════════════════════════════════════════════════════════════════
+# Section D: ARC + GC Mixed
+# root_var has 2 shared refs → ARC
+# cycle_var is in a cycle → GC
+# ════════════════════════════════════════════════════════════════
+
+function d_mixed_strategies():
+    root_var = 999
+    shared arc_ref1 = root_var
+    shared arc_ref2 = root_var
+    output(root_var + arc_ref1 + arc_ref2)
+
+    x = 1
+    y = x
+    z = y
+    x = z
+    output(x + y + z)
+
+# ════════════════════════════════════════════════════════════════
+# Main: run all sections
+# ════════════════════════════════════════════════════════════════
+
+function main():
+    output("=== GC Detection Tests ===")
+
+    output("--- A: Single owner ---")
+    a_single()
+
+    output("--- B1: Two shared (ARC) ---")
+    b_two_shared()
+
+    output("--- B2: Three shared (ARC) ---")
+    b_three_shared()
+
+    output("--- B3: Four shared (ARC) ---")
+    b_four_shared()
+
+    output("--- C1: Three-var cycle (GC) ---")
+    c_three_var_cycle()
+
+    output("--- C2: Four-var cycle (GC) ---")
+    c_four_var_cycle()
+
+    output("--- D: Mixed ARC + GC ---")
+    d_mixed_strategies()
+
+    output("=== All GC Tests Complete ===")
+
+# ════════════════════════════════════════════════════════════════
+# @performance + Cycle → Compiler Error (FOR REFERENCE ONLY)
+# Uncomment the section below in a separate file to test.
+# See verify_gc_perf_error.aura
+#
+# @performance function perf_with_cycle():
+#     a = 1
+#     b = a
+#     c = b
+#     a = c
+#     output(a + b + c)
+# ════════════════════════════════════════════════════════════════

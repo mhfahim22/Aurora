@@ -1,0 +1,3 @@
+import demo_bindings
+function main():
+  output("hello")

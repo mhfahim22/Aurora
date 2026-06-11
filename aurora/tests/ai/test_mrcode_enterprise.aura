@@ -1,0 +1,20 @@
+import MrCode
+
+output("=== MrCode Enterprise Test ===")
+
+## Create a tensor manually
+t = tensor(5, 3, 0)  ## 5 rows, 3 cols, empty array
+output("tensor created: ")
+output(t)
+
+m = model_create("sequential")
+output("model: ")
+output(m)
+
+set_loss(m, "binary_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.01)
+output("configured")
+
+## train would need proper data, skip for now
+output("Skip")

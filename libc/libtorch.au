@@ -1,0 +1,52 @@
+extern "libtorch_c_api" function tensor_1d(d1: i64, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_2d(d1: i64, d2: i64, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_3d(d1: i64, d2: i64, d3: i64, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_create(shape: pointer, ndim: i32, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_from_blob(data: pointer, shape: pointer, ndim: i32, dtype: i32, numel: i64) -> pointer
+extern "libtorch_c_api" function tensor_randn(shape: pointer, ndim: i32, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_zeros(shape: pointer, ndim: i32, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_ones(shape: pointer, ndim: i32, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_randn_2d(rows: i64, cols: i64) -> pointer
+extern "libtorch_c_api" function tensor_zeros_2d(rows: i64, cols: i64) -> pointer
+extern "libtorch_c_api" function tensor_ones_2d(rows: i64, cols: i64) -> pointer
+extern "libtorch_c_api" function tensor_full(shape: pointer, ndim: i32, value: f64, dtype: i32) -> pointer
+extern "libtorch_c_api" function tensor_arange(start: i64, end: i64, step: i64) -> pointer
+extern "libtorch_c_api" function tensor_data_ptr(tensor: pointer) -> pointer
+extern "libtorch_c_api" function tensor_item_float(tensor: pointer) -> f64
+extern "libtorch_c_api" function tensor_item_int(tensor: pointer) -> i64
+extern "libtorch_c_api" function tensor_destroy(tensor: pointer) -> void
+extern "libtorch_c_api" function tensor_clone(tensor: pointer) -> pointer
+extern "libtorch_c_api" function tensor_ndim(tensor: pointer) -> i32
+extern "libtorch_c_api" function tensor_size(tensor: pointer, dim: i32) -> i64
+extern "libtorch_c_api" function tensor_numel(tensor: pointer) -> i64
+extern "libtorch_c_api" function tensor_print(tensor: pointer) -> void
+extern "libtorch_c_api" function tensor_print_shape(tensor: pointer) -> void
+extern "libtorch_c_api" function tensor_print_data(tensor: pointer, count: i32) -> void
+extern "libtorch_c_api" function tensor_add(a: pointer, b: pointer) -> pointer
+extern "libtorch_c_api" function tensor_sub(a: pointer, b: pointer) -> pointer
+extern "libtorch_c_api" function tensor_mul(a: pointer, b: pointer) -> pointer
+extern "libtorch_c_api" function tensor_div(a: pointer, b: pointer) -> pointer
+extern "libtorch_c_api" function tensor_add_scalar(a: pointer, s: f64) -> pointer
+extern "libtorch_c_api" function tensor_mul_scalar(a: pointer, s: f64) -> pointer
+extern "libtorch_c_api" function tensor_matmul(a: pointer, b: pointer) -> pointer
+extern "libtorch_c_api" function tensor_dot(a: pointer, b: pointer) -> pointer
+extern "libtorch_c_api" function tensor_transpose_2d(a: pointer) -> pointer
+extern "libtorch_c_api" function tensor_relu(a: pointer) -> pointer
+extern "libtorch_c_api" function tensor_sigmoid(a: pointer) -> pointer
+extern "libtorch_c_api" function tensor_tanh(a: pointer) -> pointer
+extern "libtorch_c_api" function tensor_softmax(a: pointer, dim: i32) -> pointer
+extern "libtorch_c_api" function tensor_reshape(a: pointer, shape: pointer, ndim: i32) -> pointer
+extern "libtorch_c_api" function tensor_view(a: pointer, shape: pointer, ndim: i32) -> pointer
+extern "libtorch_c_api" function tensor_transpose(a: pointer, dim0: i32, dim1: i32) -> pointer
+extern "libtorch_c_api" function tensor_flatten(a: pointer) -> pointer
+extern "libtorch_c_api" function tensor_to_device(a: pointer, device_type: i32, device_index: i32) -> pointer
+extern "libtorch_c_api" function tensor_to_cpu(a: pointer) -> pointer
+extern "libtorch_c_api" function module_load(path: cstring) -> pointer
+extern "libtorch_c_api" function module_forward(module: pointer, input: pointer) -> pointer
+extern "libtorch_c_api" function module_destroy(module: pointer) -> void
+extern "libtorch_c_api" function optimizer_sgd(params: pointer, lr: f64, momentum: f64) -> pointer
+extern "libtorch_c_api" function optimizer_zero_grad(optimizer: pointer) -> void
+extern "libtorch_c_api" function optimizer_step(optimizer: pointer) -> void
+extern "libtorch_c_api" function optimizer_destroy(optimizer: pointer) -> void
+extern "libtorch_c_api" function cuda_is_available() -> i32
+extern "libtorch_c_api" function cuda_device_count() -> i32

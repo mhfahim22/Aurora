@@ -1,0 +1,9 @@
+class Person
+    name = "unknown"
+    age = 0
+    function get_name()
+        return self.name
+
+p = Person("Alice", 30)
+output("name: " + p.get_name())
+output("DONE")

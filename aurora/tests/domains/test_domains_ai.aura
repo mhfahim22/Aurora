@@ -1,0 +1,23 @@
+# Test: Domain-specific — AI/ML
+# Covers: ai, train, predict, tensor, neural
+
+function run_ai_tests()
+    output("--- AI/ML Tests ---")
+
+    ai model:
+        output("ai block started")
+
+        train trainer:
+            output("training loop")
+
+        predict mypred:
+            output("prediction")
+
+        tensor t:
+            output("tensor created")
+
+        neural layer:
+            output("neural forward")
+
+run_ai_tests()
+output("ai tests passed")

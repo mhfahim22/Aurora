@@ -1,0 +1,31 @@
+import MrCode
+
+output("=== Transformer Debug ===\n")
+
+m = model_create("sequential")
+e = embedding(10, 8)
+add(m, e)
+ln1 = layernorm()
+add(m, ln1)
+attn = mha(2)
+add(m, attn)
+ln2 = layernorm()
+add(m, ln2)
+f1 = dense(16, "relu")
+add(m, f1)
+f2 = dense(8, "linear")
+add(m, f2)
+u = unembed()
+add(m, u)
+
+output(model_info(m))
+
+## Generate multiple times
+output("run1:")
+output(generate_tokens(m, 1, 20))
+output("run2:")
+output(generate_tokens(m, 1, 20))
+output("run3:")
+output(generate_tokens(m, 1, 20))
+
+output("\n=== DONE ===")

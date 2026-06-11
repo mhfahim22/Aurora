@@ -1,0 +1,8 @@
+function first_item(flag)
+    temp = [11, 22, 33]
+    if flag > 0
+        return temp[0]
+    return temp[2]
+
+output(first_item(1))
+output(first_item(0))

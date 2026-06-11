@@ -1,0 +1,16 @@
+
+extern struct Point { x: int, y: int }
+
+extern struct Rect { x: int, y: int, w: int, h: int }
+
+extern "graphics" function make_point(x: int, y: int) -> Point
+
+extern "graphics" function format_point(p: Point) -> string
+
+extern "graphics" function move_point(p: Point, dx: int, dy: int) -> Point
+
+extern "graphics" function point_distance(p1: Point, p2: Point) -> float
+
+extern "graphics" function point_x(p: Point) -> int
+
+extern "graphics" function make_rect(x: int, y: int, w: int, h: int) -> Rect

@@ -1,0 +1,27 @@
+class Node
+    value = 0
+    next = 0
+
+function build(depth)
+    first = Node()
+    curr = first
+    i = 0
+    while i < depth
+        next = Node()
+        curr.next = next
+        curr = next
+        i = i + 1
+    return first
+
+root = build(50000)
+
+total = 0
+
+for i in 100000000
+    total += i
+
+shared a = root
+shared b = root
+shared c = root
+
+output(total)

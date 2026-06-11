@@ -1,0 +1,11 @@
+extern function strlen(s: cstring) -> i64
+extern function strcmp(a: cstring, b: cstring) -> i64
+extern function atoi(s: cstring) -> i64
+extern function atof(s: cstring) -> float
+extern function puts(s: cstring) -> i64
+extern function getenv(name: cstring) -> cstring
+extern struct Point { x: int, y: int }
+extern "graphics" function format_point(p: Point, fmt: cstring) -> cstring
+
+/* Non-literal cstring conversion test: pass Aurora string to C function */
+extern "stdlib" function system(cmd: cstring) -> i64

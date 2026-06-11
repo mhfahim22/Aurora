@@ -1,0 +1,4 @@
+import MrCode
+
+d = csv("test.csv")
+output(d)

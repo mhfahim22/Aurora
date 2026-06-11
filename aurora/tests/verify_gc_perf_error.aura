@@ -1,0 +1,12 @@
+# ════════════════════════════════════════════════════════════════
+# @performance function test
+# ════════════════════════════════════════════════════════════════
+
+@performance function perf_calc():
+    a = 10
+    b = 20
+    c = a + b
+    output(c)
+
+function main():
+    perf_calc()

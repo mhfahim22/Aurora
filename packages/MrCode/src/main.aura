@@ -1,0 +1,236 @@
+## MrCode v0.1.0 — Third-party AI/ML library for Aurora
+## Usage: import MrCode then call predict(), train(), etc.
+
+## ─── Data Loading ───────────────────────────────────────
+extern function data(path: cstring) -> ptr
+extern function csv(path: cstring) -> ptr
+extern function p_json(path: cstring) -> cstring
+extern function image(path: cstring) -> cstring
+extern function text(path: cstring) -> cstring
+extern function audio(path: cstring) -> cstring
+extern function video(path: cstring) -> cstring
+
+## ─── Data Processing ────────────────────────────────────
+extern function clean(data: ptr) -> ptr
+extern function shuffle(data: ptr) -> ptr
+extern function normalize(data: ptr) -> ptr
+extern function standard(data: ptr) -> ptr
+extern function remove_null(data: ptr) -> ptr
+extern function split_data(data: ptr, ratio: float) -> ptr
+extern function tensor(rows: int, cols: int, data: int) -> ptr
+
+## ─── Model Management ───────────────────────────────────
+extern function model_create(type: cstring) -> ptr
+extern function model_load(path: cstring) -> ptr
+extern function model_save(model: ptr, path: cstring) -> int
+extern function model_copy(model: ptr) -> ptr
+
+## ─── Training ───────────────────────────────────────────
+extern function train(model: ptr, data: ptr) -> int
+extern function fit(model: ptr, x: ptr, y: ptr) -> int
+extern function test(model: ptr, data: ptr) -> int
+extern function predict(model: ptr, input: ptr) -> ptr
+extern function retrain(model: ptr) -> int
+
+## ─── Layers ─────────────────────────────────────────────
+extern function dense(units: int, activation: cstring) -> ptr
+extern function add(model: ptr, layer: ptr) -> int
+extern function conv(filters: int, kernel_size: int, stride: int) -> ptr
+extern function lstm(units: int) -> ptr
+extern function gru(units: int) -> ptr
+extern function dropout(rate: float) -> ptr
+extern function batchnorm() -> ptr
+extern function attention() -> ptr
+extern function transformer() -> ptr
+extern function swiglu_ffn(hidden: int, out_units: int) -> ptr
+
+## ─── Computer Vision ────────────────────────────────────
+extern function detect(img: cstring) -> cstring
+extern function classify_image(img: cstring) -> cstring
+extern function segment(img: cstring) -> cstring
+extern function face(img: cstring) -> cstring
+extern function ocr(img: cstring) -> cstring
+
+## ─── NLP ────────────────────────────────────────────────
+extern function generate(prompt: cstring) -> cstring
+extern function explain(code: cstring) -> cstring
+extern function complete(text: cstring) -> cstring
+extern function tokens(text: cstring) -> int
+extern function summary(text: cstring) -> cstring
+extern function sentiment(text: cstring) -> cstring
+extern function keywords(text: cstring) -> int
+extern function create_embed(text: cstring) -> ptr
+
+## ─── Vector Search ──────────────────────────────────────
+extern function similar(a: ptr, b: ptr) -> float
+extern function nearest(v: ptr, k: int) -> ptr
+extern function index_create(data: ptr) -> ptr
+extern function retrieve(query: ptr) -> ptr
+extern function add_doc(doc: ptr) -> int
+extern function remove_doc(id: int) -> int
+
+## ─── Agent ──────────────────────────────────────────────
+extern function agent() -> ptr
+extern function train_agent(agent: ptr) -> int
+extern function reward(agent: ptr, value: float) -> int
+
+## ─── Agent Ops ──────────────────────────────────────────
+extern function ag_run(task: cstring) -> ptr
+extern function ag_memory() -> cstring
+extern function ag_tools() -> ptr
+extern function ag_stop() -> int
+extern function ag_add_tool() -> int
+extern function ag_remove_tool() -> int
+extern function ag_history() -> cstring
+extern function ag_reset() -> int
+
+## ─── Chat ───────────────────────────────────────────────
+extern function chat_new() -> ptr
+extern function chat_system(session: ptr, prompt: cstring) -> int
+extern function chat_send(session: ptr, prompt: cstring) -> cstring
+extern function chat_reset(session: ptr) -> int
+
+## ─── Params ─────────────────────────────────────────────
+extern function temperature(val: float) -> int
+extern function top_p(val: float) -> int
+extern function max_tokens(val: int) -> int
+
+## ─── Device ─────────────────────────────────────────────
+extern function gpu() -> int
+extern function gpu_mem() -> int
+extern function gpu_info() -> cstring
+extern function gpu_count() -> int
+extern function gpu_backend() -> cstring
+extern function device() -> cstring
+
+## ─── Model Info ─────────────────────────────────────────
+extern function model_info(model: ptr) -> cstring
+extern function model_size(model: ptr) -> int
+extern function model_accuracy(model: ptr) -> float
+extern function model_loss(model: ptr) -> float
+extern function bench_model(model: ptr) -> int
+extern function model_metrics(model: ptr, data: ptr) -> cstring
+
+## ─── Model Configuration ────────────────────────────────
+extern function set_loss(model: ptr, name: cstring) -> int
+extern function set_optimizer(model: ptr, name: cstring) -> int
+extern function set_lr(model: ptr, lr: float) -> int
+extern function set_batch_size(model: ptr, bs: int) -> int
+extern function set_epochs(model: ptr, ep: int) -> int
+extern function set_validation_split(model: ptr, split: float) -> int
+extern function set_early_stop(model: ptr, patience: int) -> int
+extern function set_checkpoint_interval(model: ptr, interval: int) -> int
+extern function set_verbose(model: ptr, v: int) -> int
+extern function set_augment(model: ptr, val: int) -> int
+extern function set_gradient_clip(model: ptr, val: float) -> int
+extern function set_lr_factor(model: ptr, val: float) -> int
+extern function set_min_lr(model: ptr, val: float) -> int
+extern function set_dtype(model: ptr, dtype: cstring) -> int
+
+## ─── Media Generation ───────────────────────────────────
+extern function image_gen(prompt: cstring) -> cstring
+extern function audio_gen(prompt: cstring) -> cstring
+extern function video_gen(prompt: cstring) -> cstring
+extern function music_gen(prompt: cstring) -> cstring
+
+## ─── Model Ops ──────────────────────────────────────────
+extern function quantize(model: ptr) -> int
+extern function compile(model: ptr) -> int
+extern function onnx(model: ptr, path: cstring) -> int
+extern function serve(model: ptr) -> int
+extern function monitor_model(model: ptr) -> int
+
+## ─── Auto ML ────────────────────────────────────────────
+extern function auto_train(data: ptr) -> ptr
+extern function auto_tune(model: ptr) -> int
+extern function best_model(data: ptr) -> ptr
+
+## ─── Vector DB ──────────────────────────────────────────
+extern function vector_db(name: cstring) -> ptr
+extern function vector_insert(db: ptr, vec: cstring) -> int
+extern function vector_del(db: ptr, id: cstring) -> int
+extern function vector_query(db: ptr, query: cstring) -> cstring
+
+## ─── Training Callbacks ─────────────────────────────────
+extern function on_epoch() -> int
+extern function on_batch() -> int
+extern function early_stop() -> int
+extern function checkpoint() -> int
+
+## ─── Autograd / Optimizers ──────────────────────────────
+extern function autograd() -> int
+extern function gradient_clc(model: ptr) -> int
+extern function backward() -> int
+extern function optimizer(type: cstring) -> int
+extern function adam() -> int
+extern function sgd() -> int
+extern function rmsprop() -> int
+
+## ─── Transformer Builder ──────────────────────────────
+extern function embedding(vocab: int, dim: int) -> ptr
+extern function layernorm() -> ptr
+extern function pos_encoding() -> ptr
+extern function rope() -> ptr
+extern function mul() -> ptr
+extern function mha(num_heads: int) -> ptr
+extern function unembed() -> ptr
+extern function tie_weights(model: ptr, src: int, dst: int) -> int
+extern function generate_tokens(model: ptr, start: int, max_tokens: int) -> cstring
+extern function moe(num_experts: int, hidden_dim: int) -> ptr
+extern function quantize(model: ptr) -> int
+
+## ─── BPE Tokenizer ──────────────────────────────────────
+extern function bpe_train(text: cstring, vocab_size: int) -> ptr
+extern function bpe_encode(tok: ptr, text: cstring) -> ptr
+extern function bpe_decode(tok: ptr, ids: ptr, n: int) -> cstring
+extern function bpe_free(tok: ptr) -> int
+
+## ─── Speculative Decoding ─────────────────────────────
+extern function speculative_decode_builtin(target: ptr, draft: ptr, start: int, max_tokens: int, K: int) -> cstring
+
+## ─── Enhanced Quantization ───────────────────────────
+extern function quantize_groupwise_builtin(model: ptr, group_size: int) -> int
+extern function quantize_kv_cache_builtin(model: ptr) -> int
+
+## ─── Distributed Training ──────────────────────────────
+extern function distributed_init() -> int
+extern function distributed_rank() -> int
+extern function distributed_size() -> int
+extern function distributed_barrier() -> void
+extern function distributed_finalize() -> void
+extern function distributed_broadcast_model(model: ptr, root: int) -> int
+
+## ─── Weight Loaders ────────────────────────────────────
+extern function loader_load_nanogpt(path: cstring) -> ptr
+extern function loader_get_config(idx: int) -> int
+
+## ─── Mixed Precision / LoRA ──────────────────────────
+extern function model_cast_to_lowp(model: ptr, low_dtype: int) -> int
+extern function model_add_lora(model: ptr, rank: int, alpha: float, dropout: float) -> int
+extern function model_sync_weights_from_master(model: ptr) -> int
+extern function model_sync_weights_to_master(model: ptr) -> int
+
+## ─── Simple AI ──────────────────────────────────────────
+extern function ai(input: cstring) -> cstring
+extern function chat(msg: cstring) -> cstring
+extern function embed(data: cstring) -> ptr
+extern function classify(input: cstring, model: cstring) -> cstring
+extern function translate(text: cstring, lang: cstring) -> cstring
+extern function summarize(text: cstring) -> cstring
+extern function code(prompt: cstring) -> cstring
+
+## ─── Enterprise AI Features ─────────────────────────
+extern function dataset(path: cstring, batch_size: int, shuffle: int) -> ptr
+extern function dataset_next_batch(ds: ptr) -> ptr
+extern function dataset_reset(ds: ptr) -> void
+extern function dataset_len(ds: ptr) -> int
+extern function dataset_free(ds: ptr) -> void
+extern function metrics(model: ptr, X: ptr, y: ptr) -> cstring
+extern function lr_scheduler(model: ptr, type: cstring) -> int
+extern function regularizer(model: ptr, type: cstring, lambda: float) -> int
+extern function model_freeze(model: ptr) -> int
+extern function model_unfreeze(model: ptr) -> int
+extern function cross_validate(data: ptr, k: int, epochs: int, batch_size: int, lr: float) -> cstring
+extern function model_prune(model: ptr, amount: float) -> int
+extern function model_export(model: ptr, path: cstring, format: cstring) -> int
+extern function download(name: cstring) -> ptr

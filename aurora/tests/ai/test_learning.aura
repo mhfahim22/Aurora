@@ -1,0 +1,43 @@
+import MrCode
+
+output("=== ML Learning Test ===\n")
+
+d = csv("test.csv")
+m = model_create("sequential")
+set_loss(m, "binary_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.1)
+set_batch_size(m, 20)
+set_epochs(m, 50)
+set_validation_split(m, 0.0)
+set_verbose(m, 1)
+
+train(m, d)
+
+output("final loss:")
+output(model_loss(m))
+output("final acc:")
+output(model_accuracy(m))
+output("metrics:")
+output(model_metrics(m, d))
+
+output("\n--- manual layers ---")
+m2 = model_create("sequential")
+l1 = dense(16, "relu")
+l2 = dense(8, "relu")
+l3 = dense(1, "sigmoid")
+add(m2, l1)
+add(m2, l2)
+add(m2, l3)
+set_loss(m2, "binary_crossentropy")
+set_optimizer(m2, "adam")
+set_lr(m2, 0.1)
+set_batch_size(m2, 20)
+set_epochs(m2, 50)
+set_validation_split(m2, 0.0)
+set_verbose(m2, 1)
+train(m2, d)
+output("manual model info:")
+output(model_info(m2))
+
+output("\n=== DONE ===")

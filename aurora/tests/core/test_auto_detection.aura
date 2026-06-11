@@ -1,0 +1,415 @@
+# ════════════════════════════════════════════════════════════════
+# Aurora Allocation Strategy Auto-Detection — Comprehensive Test
+# ════════════════════════════════════════════════════════════════
+# Tests every strategy the analysis engine should auto-detect:
+#   Stack → Arena → RAII → ARC → GC
+# Plus edge cases: borrow, move, escape, nested scopes
+# ════════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════════════════════════════
+# Section A: Auto Stack Detection
+# Single owner, no escape, small locals
+# ════════════════════════════════════════════════════════════════
+
+# A1: Basic scalar stack
+function a1_basic_stack():
+    x = 1
+    y = 2
+    output(x + y)
+
+# A2: Multiple scalars, no sharing
+function a2_multi_scalar():
+    a = 10
+    b = 20
+    c = 30
+    d = 40
+    output(a + b + c + d)
+
+# A3: Loop counter (should be stack)
+function a3_loop_counter():
+    total = 0
+    for i in 10:
+        total = total + i
+    output(total)
+
+# A4: Conditional branches with locals
+function a4_conditional():
+    flag = 1
+    result = 0
+    if flag == 1:
+        result = 100
+    else:
+        result = 200
+    output(result)
+
+# A5: Borrowed reference (should stay stack)
+function a5_borrow():
+    data = 42
+    ref = data
+    output(data + ref)
+
+# A6: Moved variable (source becomes stack poison)
+function a6_move():
+    source = 555
+    target = source
+    output(target)
+
+# ════════════════════════════════════════════════════════════════
+# Section B: Auto Arena Detection
+# Large or bulk allocations, same-scope lifetime
+# ════════════════════════════════════════════════════════════════
+
+# B1: Multiple large-ish same-type locals
+function b1_bulk_like():
+    buf1 = 1000
+    buf2 = 2000
+    buf3 = 3000
+    buf4 = 4000
+    output(buf1 + buf2 + buf3 + buf4)
+
+# B2: Chained computation (arena-like pattern)
+function b2_chained():
+    a = 10
+    b = a * 2
+    c = b * 3
+    d = c * 4
+    e = d * 5
+    output(e)
+
+# B3: Large numeric value
+function b3_large_value():
+    big = 999999
+    output(big)
+
+# ════════════════════════════════════════════════════════════════
+# Section C: Auto RAII Detection
+# Function calls create deterministic destruction needs
+# ════════════════════════════════════════════════════════════════
+
+# C1: Function return captured
+function c1_helper():
+    val = 123
+    return val
+
+function c1_capture_return():
+    result = c1_helper()
+    output(result)
+
+# C2: Nested function returns
+function c2_inner():
+    return 42
+
+function c2_outer():
+    return c2_inner()
+
+function c2_deep():
+    val = c2_outer()
+    output(val)
+
+# C3: Multiple function calls in one scope
+function c3_add(a, b):
+    return a + b
+
+function c3_multi_call():
+    x = c3_add(10, 20)
+    y = c3_add(x, 30)
+    z = c3_add(y, 40)
+    output(z)
+
+# ════════════════════════════════════════════════════════════════
+# Section D: Auto ARC Detection
+# Shared ownership via `shared dest = source` keyword
+# ════════════════════════════════════════════════════════════════
+
+# D1: Simple shared ref (2 refs to same source)
+function d1_simple_shared():
+    original = 777
+    shared a = original
+    shared b = original
+    output(a + b)
+
+# D2: Three-way shared (no cycle risk → ARC)
+function d2_three_shared():
+    root = 10
+    shared x = root
+    shared y = root
+    shared z = root
+    output(x + y + z)
+
+# D3: Shared through function boundary
+function d3_shared_via_call():
+    base = 50
+    shared a = base
+    shared b = base
+    output(a + b)
+
+# D4: ARC with reassignment after share
+function d4_shared_mutate():
+    val = 100
+    shared ref1 = val
+    shared ref2 = val
+    val = 200
+    output(ref1 + ref2 + val)
+
+# ════════════════════════════════════════════════════════════════
+# Section E: Auto GC Detection
+# 3+ shared refs to same root → cycle risk → GC
+# ════════════════════════════════════════════════════════════════
+
+# E1: 3+ shared refs on same root (cycle risk → GC)
+function e1_three_plus_shared():
+    root = 1000
+    shared a = root
+    shared b = root
+    shared c = root
+    shared d = root
+    output(a + b + c + d)
+
+# E2: Shared refs across function boundaries
+function e2_produce():
+    value = 777
+    return value
+
+function e2_consume():
+    one = e2_produce()
+    shared two = one
+    shared three = one
+    shared four = one
+    output(one + two + three + four)
+
+# E3: 5 shared refs with computation
+function e3_shared_compute():
+    base = 50
+    shared a = base
+    shared b = base
+    shared c = base
+    shared d = base
+    shared e = base
+    total = a + b + c + d + e
+    output(total)
+
+# ════════════════════════════════════════════════════════════════
+# Section F: Priority Chain — Mixed Strategies in One Function
+# ════════════════════════════════════════════════════════════════
+
+# F1: All five strategies in one function
+function f1_all_strategies():
+    s = 1
+    bulk1 = 100
+    bulk2 = 200
+    result = helper_f1()
+    shared s1 = result
+    shared s2 = result
+    shared s3 = result
+    output(s + bulk1 + bulk2 + s1 + s2 + s3)
+
+function helper_f1():
+    return 42
+
+# F2: Stack + ARC mixed
+function f2_stack_arc_mix():
+    local = 5
+    root_val = 10
+    shared a = root_val
+    shared b = root_val
+    output(local + a + b)
+
+# ════════════════════════════════════════════════════════════════
+# Section G: Forced Attribute Override Detection
+# @attr should override auto-detection
+# ════════════════════════════════════════════════════════════════
+
+# G1: @stack on a value (normally stack anyway)
+function g1_stack_override():
+    @stack val = 100
+    @stack two = val
+    output(val + two)
+
+# G2: @gc overrides stack
+function g2_gc_override():
+    @gc data = 999
+    output(data)
+
+# G3: @arc on single-ref (normally stack)
+function g3_arc_override():
+    @arc single = 50
+    output(single)
+
+# G4: @arena on small value (normally stack)
+function g4_arena_override():
+    @arena tiny = 7
+    output(tiny)
+
+# ════════════════════════════════════════════════════════════════
+# Section H: Edge Cases
+# ════════════════════════════════════════════════════════════════
+
+# H1: Zero value
+function h1_zero():
+    zero = 0
+    output(zero)
+
+# H2: Negative numbers
+function h2_negative():
+    neg = -100
+    output(neg)
+
+# H3: Chained moves
+function h3_chained_move():
+    a = 1
+    b = a
+    c = b
+    d = c
+    output(d)
+
+# H4: Loop with live variable inside
+function h4_loop_live():
+    outer = 10
+    for i in 5:
+        outer = outer + 1
+    output(outer)
+
+# H5: Nested if-else with allocations
+function h5_nested_if():
+    level = 2
+    if level > 0:
+        x = 10
+        if level > 1:
+            y = 20
+            x = x + y
+        else:
+            z = 30
+            x = x + z
+        output(x)
+    else:
+        output(0)
+
+# ════════════════════════════════════════════════════════════════
+# Section I: Cross-Function Analysis
+# ════════════════════════════════════════════════════════════════
+
+# I1: Deep call chain with return propagation
+function i1_deep1():
+    return 5
+
+function i1_deep2():
+    return i1_deep1() * 2
+
+function i1_deep3():
+    return i1_deep2() + 3
+
+function i1_chain():
+    val = i1_deep3()
+    output(val)
+
+# I2: Multiple params passed through
+function i2_add(a, b, c):
+    return a + b + c
+
+function i2_multi_param():
+    result = i2_add(10, 20, 30)
+    output(result)
+
+# ════════════════════════════════════════════════════════════════
+# Main: run all tests
+# ════════════════════════════════════════════════════════════════
+function main():
+    output("=== Aurora Auto-Detection Test Suite ===")
+
+    output("--- A1: Basic stack ---")
+    a1_basic_stack()
+
+    output("--- A2: Multi scalar ---")
+    a2_multi_scalar()
+
+    output("--- A3: Loop counter ---")
+    a3_loop_counter()
+
+    output("--- A4: Conditional ---")
+    a4_conditional()
+
+    output("--- A5: Borrow ---")
+    a5_borrow()
+
+    output("--- A6: Move ---")
+    a6_move()
+
+    output("--- B1: Bulk-like ---")
+    b1_bulk_like()
+
+    output("--- B2: Chained ---")
+    b2_chained()
+
+    output("--- B3: Large value ---")
+    b3_large_value()
+
+    output("--- C1: Capture return ---")
+    c1_capture_return()
+
+    output("--- C2: Deep return ---")
+    c2_deep()
+
+    output("--- C3: Multi call ---")
+    c3_multi_call()
+
+    output("--- D1: Simple shared ---")
+    d1_simple_shared()
+
+    output("--- D2: Three shared ---")
+    d2_three_shared()
+
+    output("--- D3: Shared via call ---")
+    d3_shared_via_call()
+
+    output("--- D4: Shared mutate ---")
+    d4_shared_mutate()
+
+    output("--- E1: Three-plus shared ---")
+    e1_three_plus_shared()
+
+    output("--- E2: Shared across functions ---")
+    e2_consume()
+
+    output("--- E3: Shared compute ---")
+    e3_shared_compute()
+
+    output("--- F1: All strategies ---")
+    f1_all_strategies()
+
+    output("--- F2: Stack + ARC mix ---")
+    f2_stack_arc_mix()
+
+    output("--- G1: @stack override ---")
+    g1_stack_override()
+
+    output("--- G2: @gc override ---")
+    g2_gc_override()
+
+    output("--- G3: @arc override ---")
+    g3_arc_override()
+
+    output("--- G4: @arena override ---")
+    g4_arena_override()
+
+    output("--- H1: Zero ---")
+    h1_zero()
+
+    output("--- H2: Negative ---")
+    h2_negative()
+
+    output("--- H3: Chained move ---")
+    h3_chained_move()
+
+    output("--- H4: Loop live ---")
+    h4_loop_live()
+
+    output("--- H5: Nested if ---")
+    h5_nested_if()
+
+    output("--- I1: Deep chain ---")
+    i1_chain()
+
+    output("--- I2: Multi param ---")
+    i2_multi_param()
+
+    output("=== All Auto-Detection Tests Complete ===")

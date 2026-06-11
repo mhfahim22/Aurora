@@ -1,0 +1,106 @@
+import MrCode
+
+output("=== MrCode v0.2.0 Feature Test ===\n")
+
+## ─── 1. Manual Layer Building ───
+output("-- 1. Manual Layer Building --")
+m = model_create("sequential")
+l1 = dense(16, "relu")
+l2 = dense(8, "relu")
+l3 = dense(1, "sigmoid")
+add(m, l1)
+add(m, l2)
+add(m, l3)
+output("layers added")
+info = model_info(m)
+output(info)
+
+## ─── 2. Train with manual layers ───
+output("\n-- 2. Training --")
+d = csv("test.csv")
+set_loss(m, "binary_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.01)
+set_batch_size(m, 20)
+set_epochs(m, 2)
+set_validation_split(m, 0.2)
+set_verbose(m, 1)
+r = train(m, d)
+output("train result:")
+output(r)
+
+## ─── 3. Predict + Test ───
+output("\n-- 3. Predict & Test --")
+pr = predict(m, d)
+output("predict pointer:")
+output(pr)
+tr = test(m, d)
+output("test result:")
+output(tr)
+
+## ─── 4. Model Metrics ───
+output("\n-- 4. Model Metrics --")
+mm = model_metrics(m, d)
+output("metrics:")
+output(mm)
+
+## ─── 5. Bench ───
+output("\n-- 5. Bench --")
+bm = bench_model(m)
+output("inferences/sec:")
+output(bm)
+
+## ─── 6. GPU Detection ───
+output("\n-- 6. GPU --")
+g = gpu()
+output("gpu available:")
+output(g)
+gm = gpu_mem()
+output("gpu mem MB:")
+output(gm)
+
+## ─── 7. Conv2D Layer ───
+output("\n-- 7. Conv2D --")
+c = conv(8, 3, 1)
+output("conv layer:")
+output(c)
+
+## ─── 8. LSTM Layer ───
+output("\n-- 8. LSTM --")
+lst = lstm(16)
+output("lstm layer:")
+output(lst)
+
+## ─── 9. GRU Layer ───
+output("\n-- 9. GRU --")
+gr = gru(16)
+output("gru layer:")
+output(gr)
+
+## ─── 10. Config setters ───
+output("\n-- 10. New Config --")
+r1 = set_augment(m, 1)
+r2 = set_gradient_clip(m, 1.0)
+r3 = set_lr_factor(m, 0.5)
+r4 = set_min_lr(m, 0.0001)
+output(r1)
+output(r2)
+output(r3)
+output(r4)
+
+## ─── 11. Model Save/Load ───
+output("\n-- 11. Model Save & Load --")
+sv = model_save(m, "test_model.mrc")
+output("save:")
+output(sv)
+ld = model_load("test_model.mrc")
+output("load:")
+output(ld)
+
+## ─── 12. ONNX Export ───
+output("\n-- 12. ONNX --")
+on = onnx(m, "test_model.onnx")
+output("onnx:")
+output(on)
+
+output("\n=== ALL PASS ===")

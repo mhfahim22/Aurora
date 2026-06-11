@@ -1,0 +1,53 @@
+import "npm:moment"
+
+extern "npm_moment" function moment_require() -> pointer
+extern "npm_moment" function moment_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+extern "npm_moment" function moment_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern "npm_moment" function moment_str(s: cstring) -> pointer
+extern "npm_moment" function moment_int(v: i64) -> pointer
+extern "npm_moment" function moment_float(v: f64) -> pointer
+extern "npm_moment" function moment_to_cstr(obj: pointer) -> pointer
+extern "npm_moment" function moment_getattr(obj: pointer, name: cstring) -> pointer
+extern "npm_moment" function moment_free(handle: pointer)
+extern "npm_moment" function moment_free_cstr(handle: pointer)
+extern "npm_moment" function moment_tuple2(a: pointer, b: pointer) -> pointer
+
+function main():
+    output("--- npm Bridge End-to-End Test ---")
+    mod = moment_require()
+    if mod == 0:
+        output("FAIL: moment_require() returned null")
+        output("note: run 'voss bridge npm moment' first")
+        return 1
+    output("PASS: moment_require() ok")
+
+    now = moment_call(mod, "now", 0)
+    ts_str = moment_to_cstr(now)
+    if ts_str != 0:
+        output("PASS: moment.now() ok")
+    else:
+        output("FAIL: moment.now() returned null")
+        return 1
+
+    ver = moment_getattr(mod, "version")
+    if ver != 0:
+        ver_str = moment_to_cstr(ver)
+        if ver_str != 0:
+            output("PASS: moment.version ok")
+            moment_free_cstr(ver_str)
+        moment_free(ver)
+
+    s = moment_str("hello npm")
+    result = moment_call1(mod, "isString", s)
+    result_str = moment_to_cstr(result)
+    if result_str != 0:
+        output("PASS: moment.isString ok")
+        moment_free_cstr(result_str)
+
+    moment_free_cstr(ts_str)
+    moment_free(now)
+    moment_free(result)
+    moment_free(s)
+    moment_free(mod)
+    output("--- All npm Bridge Tests Passed ---")
+    return 0

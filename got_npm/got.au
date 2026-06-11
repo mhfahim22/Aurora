@@ -1,0 +1,73 @@
+/* ════════════════════════════════════════════════════════════
+   npm Bridge — Auto-generated Aurora FFI Bindings
+   Package: got@15.0.5
+   ════════════════════════════════════════════════════════════ */
+
+/* Module init */
+@cost(zero)
+extern "npm_got" function got_require() -> pointer
+
+/* FFI entry points */
+@cost(zero)
+extern "npm_got" function got_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+@cost(zero)
+extern "npm_got" function got_free(handle: pointer)
+@cost(zero)
+extern "npm_got" function got_free_cstr(handle: pointer)
+
+/* Value conversion helpers */
+@cost(alloc)
+extern "npm_got" function got_str(s: cstring) -> pointer
+@cost(alloc)
+extern "npm_got" function got_int(v: i64) -> pointer
+@cost(alloc)
+extern "npm_got" function got_float(v: f64) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call_kw(mod: pointer, fn: cstring, args: pointer, kwargs: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_getattr(obj: pointer, name: cstring) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call3(mod: pointer, fn: cstring, a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call4(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call5(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_call6(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer, a6: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_tuple2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_tuple3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_tuple4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_list2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_list3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_list4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_to_cstr(obj: pointer) -> pointer
+@cost(alloc)
+extern "npm_got" function got_dict() -> pointer
+@cost(alloc)
+extern "npm_got" function got_dict_set(d: pointer, key: cstring, val: pointer) -> i32
+/* Diagnostics */
+@cost(zero)
+extern "npm_got" function got_get_perf_stats() -> cstring
+@cost(zero)
+extern "npm_got" function got_get_last_error() -> cstring
+
+/* Usage:
+     import "got"
+     let mod = got_require()
+     let name = got_str("world")
+     let result = got_call1(mod, "fn", name)
+     printf("%s
+", got_to_cstr(result))
+     got_free(result)
+*/

@@ -1,0 +1,17 @@
+import MrCode
+
+output("-- Test: MoE 3 epochs --")
+m3 = model_create("sequential")
+add(m3, moe(4, 8))
+add(m3, dense(1, "sigmoid"))
+set_loss(m3, "binary_crossentropy")
+set_optimizer(m3, "adam")
+set_lr(m3, 0.1)
+set_batch_size(m3, 20)
+set_epochs(m3, 3)
+set_validation_split(m3, 0.0)
+set_verbose(m3, 0)
+d = csv("test.csv")
+train(m3, d)
+output(model_loss(m3))
+output(" === ALL PASSED ===\n")

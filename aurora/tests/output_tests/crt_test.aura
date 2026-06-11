@@ -1,0 +1,4 @@
+extern "c" function printf(fmt: cstring, ...) -> i32
+function main():
+  ret = printf("Hello from CRT via FFI\n")
+  return 0

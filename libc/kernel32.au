@@ -1,0 +1,74 @@
+/* ════════════════════════════════════════════════════════════
+   Kernel32 Windows API bindings
+   Library: kernel32
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Process & Thread ── */
+extern "stdcall" "kernel32" function GetTickCount() -> u32
+extern "stdcall" "kernel32" function Sleep(ms: u32)
+extern "stdcall" "kernel32" function GetCurrentProcessId() -> u32
+extern "stdcall" "kernel32" function GetCurrentThreadId() -> u32
+extern "stdcall" "kernel32" function ExitProcess(code: u32)
+extern "stdcall" "kernel32" function GetLastError() -> u32
+extern "stdcall" "kernel32" function SetLastError(err: u32)
+
+/* ── Module Loading ── */
+extern "stdcall" "kernel32" function LoadLibraryA(name: cstring) -> pointer
+extern "stdcall" "kernel32" function LoadLibraryW(name: pointer) -> pointer
+extern "stdcall" "kernel32" function GetModuleHandleA(name: cstring) -> pointer
+extern "stdcall" "kernel32" function GetModuleHandleW(name: pointer) -> pointer
+extern "stdcall" "kernel32" function GetProcAddress(module: pointer, name: cstring) -> pointer
+extern "stdcall" "kernel32" function FreeLibrary(module: pointer) -> i32
+
+/* ── File I/O ── */
+extern "stdcall" "kernel32" function CreateFileA(path: cstring, access: u32, share: u32, sec: pointer, disp: u32, flags: u32, tmpl: pointer) -> pointer
+extern "stdcall" "kernel32" function CreateFileW(path: pointer, access: u32, share: u32, sec: pointer, disp: u32, flags: u32, tmpl: pointer) -> pointer
+extern "stdcall" "kernel32" function ReadFile(handle: pointer, buf: pointer, bytes: u32, read: pointer, overlapped: pointer) -> i32
+extern "stdcall" "kernel32" function WriteFile(handle: pointer, buf: pointer, bytes: u32, written: pointer, overlapped: pointer) -> i32
+extern "stdcall" "kernel32" function CloseHandle(handle: pointer) -> i32
+extern "stdcall" "kernel32" function GetFileSize(handle: pointer, high: pointer) -> u32
+extern "stdcall" "kernel32" function SetFilePointer(handle: pointer, dist: i32, dist_high: pointer, method: u32) -> u32
+extern "stdcall" "kernel32" function DeleteFileA(path: cstring) -> i32
+extern "stdcall" "kernel32" function DeleteFileW(path: pointer) -> i32
+
+/* ── Console ── */
+extern "stdcall" "kernel32" function GetStdHandle(std: u32) -> pointer
+extern "stdcall" "kernel32" function SetConsoleTitleA(title: cstring) -> i32
+extern "stdcall" "kernel32" function SetConsoleTitleW(title: pointer) -> i32
+
+/* ── Memory ── */
+extern "stdcall" "kernel32" function VirtualAlloc(addr: pointer, size: u64, type: u32, prot: u32) -> pointer
+extern "stdcall" "kernel32" function VirtualFree(addr: pointer, size: u64, free_type: u32) -> i32
+extern "stdcall" "kernel32" function VirtualProtect(addr: pointer, size: u64, new_prot: u32, old_prot: pointer) -> i32
+extern "stdcall" "kernel32" function GetProcessHeap() -> pointer
+extern "stdcall" "kernel32" function HeapAlloc(heap: pointer, flags: u32, size: u64) -> pointer
+extern "stdcall" "kernel32" function HeapFree(heap: pointer, flags: u32, mem: pointer) -> i32
+
+/* ── Environment ── */
+extern "stdcall" "kernel32" function GetCommandLineA() -> cstring
+extern "stdcall" "kernel32" function GetCommandLineW() -> pointer
+extern "stdcall" "kernel32" function GetEnvironmentVariableA(name: cstring, buf: cstring, size: u32) -> u32
+extern "stdcall" "kernel32" function GetEnvironmentVariableW(name: pointer, buf: pointer, size: u32) -> u32
+extern "stdcall" "kernel32" function SetEnvironmentVariableA(name: cstring, val: cstring) -> i32
+extern "stdcall" "kernel32" function SetEnvironmentVariableW(name: pointer, val: pointer) -> i32
+
+/* ── System Info ── */
+extern "stdcall" "kernel32" function GetSystemInfo(info: pointer)
+extern "stdcall" "kernel32" function GetNativeSystemInfo(info: pointer)
+extern "stdcall" "kernel32" function GetComputerNameA(buf: cstring, size: pointer) -> i32
+extern "stdcall" "kernel32" function GetComputerNameW(buf: pointer, size: pointer) -> i32
+
+/* ── Timing ── */
+extern "stdcall" "kernel32" function QueryPerformanceCounter(out: pointer) -> i32
+extern "stdcall" "kernel32" function QueryPerformanceFrequency(out: pointer) -> i32
+extern "stdcall" "kernel32" function GetTickCount64() -> u64
+
+/* ── Error Handling ── */
+extern "stdcall" "kernel32" function FormatMessageA(flags: u32, src: pointer, id: u32, lang: u32, buf: cstring, size: u32, args: pointer) -> u32
+extern "stdcall" "kernel32" function FormatMessageW(flags: u32, src: pointer, id: u32, lang: u32, buf: pointer, size: u32, args: pointer) -> u32
+
+/* ── Fiber (for coroutines/async) ── */
+extern "stdcall" "kernel32" function ConvertThreadToFiber(param: pointer) -> pointer
+extern "stdcall" "kernel32" function CreateFiber(size: u64, start: pointer, param: pointer) -> pointer
+extern "stdcall" "kernel32" function SwitchToFiber(fiber: pointer)
+extern "stdcall" "kernel32" function DeleteFiber(fiber: pointer)

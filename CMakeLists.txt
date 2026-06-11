@@ -1,0 +1,513 @@
+# aurora_restructured/CMakeLists.txt (updated)
+cmake_minimum_required(VERSION 3.20)
+project(Aurora LANGUAGES CXX)
+
+# ── Read VERSION file and generate version.h ──
+file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" AURORA_VERSION_STR)
+string(STRIP "${AURORA_VERSION_STR}" AURORA_VERSION_STR)
+string(REPLACE "." ";" AURORA_VERSION_LIST "${AURORA_VERSION_STR}")
+list(GET AURORA_VERSION_LIST 0 AURORA_VERSION_MAJOR)
+list(GET AURORA_VERSION_LIST 1 AURORA_VERSION_MINOR)
+list(GET AURORA_VERSION_LIST 2 AURORA_VERSION_PATCH)
+configure_file(
+    "${CMAKE_SOURCE_DIR}/aurora/include/runtime/version.h.in"
+    "${CMAKE_SOURCE_DIR}/aurora/include/runtime/version.h"
+    @ONLY
+)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ── Force Release to match LLVM libs (built with MD) ──────────
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    # LLVM libs are Release (/MD). Override CMake's /MDd→/MD in Debug
+    # so aurorac, aurora_runtime, and all test targets match LLVM's
+    # RuntimeLibrary metadata and avoid LNK2038.
+    add_compile_options($<$<CONFIG:Debug>:/MD>)
+    add_compile_definitions($<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)
+endif()
+
+# ── Find LLVM ────────────────────────────────────────────────
+find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+
+# ── Global include path ───────────────────────────────────────
+include_directories(${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ── Compiler (aurorac) ────────────────────────────────────────
+add_executable(aurorac
+    aurora/src/compiler/main.cpp
+    aurora/src/compiler/lexer/lexer.cpp
+    aurora/src/compiler/lexer/token.cpp
+    aurora/src/compiler/parser/parser.cpp
+    aurora/src/compiler/parser/parse_stmt.cpp
+    aurora/src/compiler/parser/parse_expr.cpp
+    aurora/src/compiler/parser/parse_class.cpp
+    aurora/src/compiler/parser/parse_struct.cpp
+    aurora/src/compiler/parser/parse_enum.cpp
+    aurora/src/compiler/parser/parse_interface.cpp
+    aurora/src/compiler/parser/parse_type_alias.cpp
+    aurora/src/compiler/semantic/typechecker.cpp
+    aurora/src/compiler/semantic/typechecker_oop.cpp
+    aurora/src/compiler/semantic/typechecker_types.cpp
+    aurora/src/compiler/semantic/ownership_checker.cpp
+    aurora/src/compiler/semantic/memory_analyzer.cpp
+    aurora/src/compiler/semantic/escape_analyzer.cpp
+    aurora/src/compiler/semantic/lifetime_analyzer.cpp
+    aurora/src/compiler/semantic/ownership_analyzer.cpp
+    aurora/src/compiler/semantic/allocation_strategy.cpp
+    aurora/src/compiler/semantic/allocation_profiler.cpp
+    aurora/src/compiler/semantic/benchmark_suite.cpp
+    aurora/src/compiler/semantic/module_resolver.cpp
+    aurora/src/compiler/codegen/codegen_core.cpp
+    aurora/src/compiler/codegen/codegen_stmt.cpp
+    aurora/src/compiler/codegen/codegen_expr.cpp
+    aurora/src/compiler/codegen/codegen_try.cpp
+    aurora/src/compiler/codegen/codegen_function.cpp
+    aurora/src/compiler/codegen/codegen_oop.cpp
+    aurora/src/compiler/codegen/codegen_types.cpp
+    aurora/src/compiler/codegen/codegen_builtins.cpp
+    aurora/src/compiler/codegen/codegen_builtins_section1.cpp
+    aurora/src/compiler/codegen/codegen_builtins_section2.cpp
+    aurora/src/compiler/codegen/codegen_builtins_section3.cpp
+    aurora/src/compiler/codegen/codegen_builtins_section4.cpp
+    aurora/src/compiler/codegen/codegen_builtins_section5.cpp
+    aurora/src/compiler/codegen/codegen_ai.cpp
+    aurora/src/compiler/codegen/llvm_codegen.cpp
+    aurora/src/compiler/codegen/optimized_codegen.cpp
+    aurora/src/compiler/aurora_optimizer.cpp
+    aurora/src/compiler/optimizer/const_fold.cpp
+    aurora/src/compiler/optimizer/dead_code.cpp
+    aurora/src/compiler/optimizer/strength_reduce.cpp
+    aurora/src/compiler/runtime_exports_init.cpp
+    aurora/src/compiler/package_manager.cpp
+    aurora/src/compiler/doc_generator.cpp
+)
+
+llvm_map_components_to_libnames(LLVM_LIBS
+    core support irreader passes analysis
+    x86codegen x86asmparser x86info
+    orcjit native nativecodegen
+)
+target_link_libraries(aurorac PRIVATE ${LLVM_LIBS})
+
+
+if(UNIX)
+    target_link_options(aurorac PRIVATE -rdynamic)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Static Runtime library
+# ═══════════════════════════════════════════════════════════════
+add_library(aurora_runtime STATIC
+    aurora/src/runtime/core/memory.cpp
+    aurora/src/runtime/core/aurora_str.cpp
+    aurora/src/runtime/core/io.cpp
+    aurora/src/runtime/core/array.cpp
+    aurora/src/runtime/core/string.cpp
+    aurora/src/runtime/core/util.cpp
+    aurora/src/runtime/core/crash.cpp
+    aurora/src/runtime/core/ffi.cpp
+    aurora/src/runtime/interop/type_ir.cpp
+    aurora/src/runtime/interop/type_mapping.cpp
+    aurora/src/runtime/interop/type_serializer.cpp
+    aurora/src/runtime/builtins/builtins.cpp
+    aurora/src/runtime/builtins/io_builtins.cpp
+    aurora/src/runtime/builtins/std_builtins.cpp
+    aurora/src/runtime/builtins/backend_builtins.cpp
+    aurora/src/runtime/builtins/ai_builtins.cpp
+    aurora/src/runtime/ai/ai_layers.cpp
+    aurora/src/runtime/ai/ai_train.cpp
+    aurora/src/runtime/ai/ai_model.cpp
+    aurora/src/runtime/ai/ai_gen.cpp
+    aurora/src/runtime/ai/ai_distributed.cpp
+    aurora/src/runtime/ai/ai_paged_attention.cpp
+    aurora/src/runtime/ai/ai_onnx.cpp
+    aurora/src/runtime/ai/ai_loaders.cpp
+    aurora/src/runtime/ai/ai_gpu.cpp
+    aurora/src/runtime/ai/dml_matmul.cpp
+    aurora/src/runtime/ai/ai_speculative.cpp
+    aurora/src/runtime/ai/tokenizer.cpp
+    aurora/src/runtime/async/task.cpp
+    aurora/src/runtime/async/scheduler.cpp
+    aurora/src/runtime/std/collections.cpp
+    aurora/src/runtime/ai/tensor.cpp
+    aurora/src/runtime/ai/tensor_v2.cpp
+    aurora/src/runtime/ai/dataloader.cpp
+    aurora/src/runtime/ai/predict.cpp
+    aurora/src/runtime/ai/ai_enterprise.cpp
+    aurora/src/runtime/ui/render.cpp
+    aurora/src/runtime/ui/component.cpp
+    aurora/src/runtime/game/engine.cpp
+    aurora/src/runtime/backend/server.cpp
+    aurora/src/std/math.cpp
+    aurora/src/std/json.cpp
+    aurora/src/std/fs.cpp
+    aurora/src/std/net.cpp
+    aurora/src/std/regex.cpp
+    aurora/src/std/gui.cpp
+)
+
+target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ── Link runtime to compiler ────────────────
+target_link_libraries(aurorac PRIVATE aurora_runtime)
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: CUDA support
+# ═══════════════════════════════════════════════════════════════
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+    message(STATUS "Found CUDA ${CUDAToolkit_VERSION}")
+    enable_language(CUDA)
+    target_sources(aurora_runtime PRIVATE aurora/src/runtime/ai/cuda_matmul.cu)
+    target_include_directories(aurora_runtime PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+    set_property(TARGET aurora_runtime PROPERTY CUDA_ARCHITECTURES "75;80;86;89")
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_CUDA=1)
+else()
+    message(STATUS "CUDA not found — building without GPU matmul")
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_CUDA=0)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: ROCm/HIP support
+# ═══════════════════════════════════════════════════════════════
+find_package(hip QUIET)
+if(hip_FOUND)
+    message(STATUS "Found ROCm/HIP")
+    target_sources(aurora_runtime PRIVATE aurora/src/runtime/ai/hip_matmul.hip)
+    target_include_directories(aurora_runtime PRIVATE ${hip_INCLUDE_DIRS})
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_HIP=1)
+    set_property(TARGET aurora_runtime PROPERTY HIP_ARCHITECTURES "gfx908;gfx90a;gfx942")
+else()
+    message(STATUS "ROCm/HIP not found")
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_HIP=0)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# DirectML — GPU matmul for any DX12 GPU (runtime-loaded)
+# ═══════════════════════════════════════════════════════════════
+if(WIN32)
+    target_sources(aurora_runtime PRIVATE aurora/src/runtime/ai/dml_matmul.cpp)
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_DML=1)
+else()
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_DML=0)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# OpenMP — parallel CPU matmul (works on AMD/Intel CPUs)
+# ═══════════════════════════════════════════════════════════════
+find_package(OpenMP QUIET)
+if(OpenMP_CXX_FOUND)
+    message(STATUS "Found OpenMP — parallel CPU matmul enabled")
+    target_link_libraries(aurora_runtime PRIVATE OpenMP::OpenMP_CXX)
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_OPENMP=1)
+else()
+    message(STATUS "OpenMP not found — building without parallel matmul")
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: MPI support (distributed CPU training)
+# ═══════════════════════════════════════════════════════════════
+find_package(MPI QUIET)
+if(MPI_CXX_FOUND)
+    message(STATUS "Found MPI — distributed training enabled")
+    target_link_libraries(aurora_runtime PRIVATE MPI::MPI_CXX)
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_MPI=1)
+else()
+    message(STATUS "MPI not found — distributed training will use single-process mode")
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: NCCL support (GPU distributed training)
+# ═══════════════════════════════════════════════════════════════
+if(CUDAToolkit_FOUND)
+    find_path(NCCL_INCLUDE_DIR nccl.h PATHS
+        ${CUDAToolkit_INCLUDE_DIRS}
+        /usr/include
+        /usr/local/include
+        /opt/nccl/include
+        "C:/Program Files/NVIDIA GPU Computing Toolkit/NCCL"
+    )
+    find_library(NCCL_LIBRARY nccl
+        PATHS ${CUDAToolkit_LIBRARY_DIR} /usr/lib /usr/local/lib /opt/nccl/lib
+        "C:/Program Files/NVIDIA GPU Computing Toolkit/NCCL/lib"
+    )
+    if(NCCL_INCLUDE_DIR AND NCCL_LIBRARY)
+        message(STATUS "Found NCCL — GPU distributed training enabled")
+        target_include_directories(aurora_runtime PRIVATE ${NCCL_INCLUDE_DIR})
+        target_link_libraries(aurora_runtime PRIVATE ${NCCL_LIBRARY})
+        target_compile_definitions(aurora_runtime PRIVATE AURORA_NCCL=1)
+    else()
+        message(STATUS "NCCL not found — GPU distributed training disabled")
+    endif()
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: RCCL support (AMD GPU distributed)
+# ═══════════════════════════════════════════════════════════════
+find_package(hip QUIET)
+if(hip_FOUND)
+    find_path(RCCL_INCLUDE_DIR rccl/rccl.h
+        PATHS /opt/rocm/include /opt/rocm/rccl/include)
+    find_library(RCCL_LIBRARY rccl
+        PATHS /opt/rocm/lib /opt/rocm/rccl/lib)
+    if(RCCL_INCLUDE_DIR AND RCCL_LIBRARY)
+        message(STATUS "Found RCCL — AMD GPU distributed training enabled")
+        target_include_directories(aurora_runtime PRIVATE ${RCCL_INCLUDE_DIR})
+        target_link_libraries(aurora_runtime PRIVATE ${RCCL_LIBRARY})
+        target_compile_definitions(aurora_runtime PRIVATE AURORA_RCCL=1)
+    else()
+        message(STATUS "RCCL not found — AMD GPU distributed training disabled")
+    endif()
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: LibTorch (PyTorch C++ API) support
+# ═══════════════════════════════════════════════════════════════
+find_package(Torch QUIET)
+if(Torch_FOUND)
+    message(STATUS "Found LibTorch ${Torch_VERSION} — building libtorch_c_api")
+    add_library(libtorch_c_api SHARED
+        aurora/src/runtime/cpp_interop/libtorch_api.cpp
+    )
+    target_include_directories(libtorch_c_api PRIVATE
+        ${CMAKE_SOURCE_DIR}/aurora/include
+        ${TORCH_INCLUDE_DIRS}
+    )
+    target_link_libraries(libtorch_c_api PRIVATE ${TORCH_LIBRARIES})
+    set_property(TARGET libtorch_c_api PROPERTY CXX_STANDARD 17)
+    if(MSVC)
+        set_property(TARGET libtorch_c_api PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    endif()
+    target_compile_definitions(libtorch_c_api PRIVATE AURORA_LIBTORCH=1)
+else()
+    message(STATUS "LibTorch not found — skip libtorch_c_api (install PyTorch with C++ support)")
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# C++ Interop Test Library (self-contained, no external deps)
+# ═══════════════════════════════════════════════════════════════
+add_library(cpp_interop_test SHARED
+    aurora/tests/cpp_interop/cpp_test_lib.cpp
+)
+set_property(TARGET cpp_interop_test PROPERTY CXX_STANDARD 17)
+if(MSVC)
+    set_property(TARGET cpp_interop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+target_include_directories(cpp_interop_test PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# voss — standalone Aurora Package Manager
+# ═══════════════════════════════════════════════════════════════
+add_executable(voss
+    aurora/tools/voss/voss.cpp
+    aurora/tools/voss/io.cpp
+    aurora/tools/voss/commands_core.cpp
+    aurora/tools/voss/commands_deps.cpp
+    aurora/tools/voss/commands_config.cpp
+    aurora/tools/voss/commands_advanced.cpp
+    aurora/tools/voss/bridge_main.cpp
+    aurora/tools/voss/bridge_pypi.cpp
+    aurora/tools/voss/bridge_npm.cpp
+    aurora/tools/voss/bridge_cargo.cpp
+    aurora/tools/voss/bridge_native.cpp
+    aurora/tools/voss/tool_detection.cpp
+    aurora/tools/voss/registry_source.cpp
+    aurora/src/runtime/interop/type_ir.cpp
+    aurora/src/runtime/interop/type_mapping.cpp
+)
+target_include_directories(voss PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+if(WIN32)
+    target_link_libraries(voss PRIVATE winhttp.lib)
+endif()
+
+set_target_properties(voss PROPERTIES OUTPUT_NAME "voss")
+
+# ═══════════════════════════════════════════════════════════════
+# Cross-platform bridge build support
+# ═══════════════════════════════════════════════════════════════
+# Generates a target that compiles a QuickJS npm bridge .c wrapper
+# into a shared library (.so / .dylib) for the current platform.
+# Usage: add_npm_bridge(<name> <pkg> <c_file>)
+function(add_npm_bridge name pkg c_file)
+    set(qjs_dir "${CMAKE_SOURCE_DIR}/quickjs")
+    set(qjs_sources
+        "${qjs_dir}/quickjs.c"
+        "${qjs_dir}/cutils.c"
+        "${qjs_dir}/libregexp.c"
+        "${qjs_dir}/libunicode.c"
+        "${qjs_dir}/dtoa.c"
+    )
+    if(NOT EXISTS "${c_file}")
+        message(STATUS "npm bridge '${name}': ${c_file} not found — skipping")
+        return()
+    endif()
+    if(WIN32)
+        add_library(${name} SHARED ${c_file} ${qjs_sources})
+        target_include_directories(${name} PRIVATE "${qjs_dir}")
+        if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+            set_property(TARGET ${name} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+        endif()
+        target_link_libraries(${name} PRIVATE bcrypt)
+    else()
+        add_library(${name} SHARED ${c_file} ${qjs_sources})
+        target_include_directories(${name} PRIVATE "${qjs_dir}")
+        target_compile_options(${name} PRIVATE -fPIC)
+        if(APPLE)
+            set_target_properties(${name} PROPERTIES
+                SUFFIX ".dylib"
+                INSTALL_RENAME "${CMAKE_SHARED_LIBRARY_PREFIX}${pkg}_npm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            )
+        else()
+            set_target_properties(${name} PROPERTIES
+                OUTPUT_NAME "${pkg}_npm"
+            )
+            target_link_libraries(${name} PRIVATE pthread dl m)
+        endif()
+    endif()
+    # Rename output to <pkg>_npm.<ext>
+    set_target_properties(${name} PROPERTIES
+        PREFIX ""
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bridges"
+    )
+endfunction()
+
+# Example bridges (built only if the generated .c files exist)
+add_npm_bridge(bridge_moment  moment  "${CMAKE_SOURCE_DIR}/bridges/moment/moment_npm.c")
+add_npm_bridge(bridge_lodash  lodash  "${CMAKE_SOURCE_DIR}/bridges/lodash/lodash_npm.c")
+add_npm_bridge(bridge_chalk   chalk   "${CMAKE_SOURCE_DIR}/bridges/chalk/chalk_npm.c")
+
+# ═══════════════════════════════════════════════════════════════
+# aurora-lsp — Language Server Protocol implementation
+# ═══════════════════════════════════════════════════════════════
+add_executable(aurora_lsp
+    aurora/tools/lsp/lsp.cpp
+)
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: aurora-bindgen (only if libclang is available)
+# ═══════════════════════════════════════════════════════════════
+find_package(Clang QUIET)
+if(Clang_FOUND)
+    message(STATUS "Found Clang — building aurora-bindgen")
+    add_executable(aurora_bindgen
+        aurora/tools/bindgen/bindgen.cpp
+    )
+    target_include_directories(aurora_bindgen PRIVATE ${CLANG_INCLUDE_DIRS})
+    target_link_libraries(aurora_bindgen PRIVATE libclang)
+else()
+    message(STATUS "Clang not found — skipping aurora-bindgen")
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: aurora-cppwrap (C++ → extern "C" wrapper generator)
+# ═══════════════════════════════════════════════════════════════
+if(Clang_FOUND)
+    message(STATUS "Found Clang — building aurora-cppwrap")
+    add_executable(aurora_cppwrap
+        aurora/tools/cppwrap/cppwrap.cpp
+    )
+    target_include_directories(aurora_cppwrap PRIVATE ${CLANG_INCLUDE_DIRS})
+    target_link_libraries(aurora_cppwrap PRIVATE libclang)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 1: Unified Type System — Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_unified_type_system
+    aurora/tests/test_unified_type_system.cpp
+)
+target_link_libraries(test_unified_type_system PRIVATE aurora_runtime)
+target_include_directories(test_unified_type_system PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 4: Cross-Language Memory Safety — Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_ffi_memory_safety
+    aurora/tests/test_ffi_memory_safety.cpp
+)
+target_include_directories(test_ffi_memory_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 5: Universal Package Bridge — Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_universal_bridge
+    aurora/tests/test_universal_bridge.cpp
+)
+target_link_libraries(test_universal_bridge PRIVATE aurora_runtime)
+target_include_directories(test_universal_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Native Speed Benchmark — 1B iterations across all phases
+# ═══════════════════════════════════════════════════════════════
+add_executable(bench_native_speed
+    aurora/tests/bench_native_speed.cpp
+)
+target_link_libraries(bench_native_speed PRIVATE aurora_runtime)
+target_include_directories(bench_native_speed PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Focused fast-path benchmark
+# ═══════════════════════════════════════════════════════════════
+add_executable(bench_fast
+    aurora/tests/bench_fast.cpp
+)
+target_link_libraries(bench_fast PRIVATE aurora_runtime)
+target_include_directories(bench_fast PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Integration Test — Real HTTPS + JSON + Bridge Pipeline
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_integration_http
+    aurora/tests/test_integration_http.cpp
+)
+target_include_directories(test_integration_http PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+if(WIN32)
+    target_link_libraries(test_integration_http PRIVATE winhttp.lib)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# End-to-End Bridge Integration Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_bridge_e2e
+    aurora/tests/test_bridge_e2e.cpp
+)
+target_link_libraries(test_bridge_e2e PRIVATE aurora_runtime)
+target_include_directories(test_bridge_e2e PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# PyPI Bridge Thread Safety Test (Phase 1: GIL & Thread Safety)
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_pypi_thread_safety
+    aurora/tests/test_pypi_thread_safety.cpp
+)
+target_link_libraries(test_pypi_thread_safety PRIVATE aurora_runtime)
+target_include_directories(test_pypi_thread_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# TLS SChannel Integration Test (Windows native TLS)
+# ═══════════════════════════════════════════════════════════════
+if(WIN32)
+add_executable(test_tls_schannel
+    aurora/tests/test_tls_schannel.cpp
+)
+target_link_libraries(test_tls_schannel PRIVATE ws2_32.lib)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# npm Bridge Performance Benchmarks
+# ═══════════════════════════════════════════════════════════════
+add_executable(bench_npm_bridge
+    aurora/tests/bench_npm_bridge.cpp
+)
+target_link_libraries(bench_npm_bridge PRIVATE aurora_runtime)
+target_include_directories(bench_npm_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)

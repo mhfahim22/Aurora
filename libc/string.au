@@ -1,0 +1,25 @@
+extern function memcpy(dst: pointer, src: pointer, n: i64) -> pointer
+extern function memmove(dst: pointer, src: pointer, n: i64) -> pointer
+extern function memset(ptr: pointer, value: i32, n: i64) -> pointer
+extern function memcmp(lhs: pointer, rhs: pointer, n: i64) -> i32
+extern function memchr(ptr: pointer, value: i32, n: i64) -> pointer
+
+extern function strlen(str: cstring) -> i64
+extern function strcmp(lhs: cstring, rhs: cstring) -> i32
+extern function strncmp(lhs: cstring, rhs: cstring, n: i64) -> i32
+extern function strcpy(dst: cstring, src: cstring) -> cstring
+extern function strncpy(dst: cstring, src: cstring, n: i64) -> cstring
+extern function strcat(dst: cstring, src: cstring) -> cstring
+extern function strncat(dst: cstring, src: cstring, n: i64) -> cstring
+extern function strchr(str: cstring, ch: i32) -> cstring
+extern function strrchr(str: cstring, ch: i32) -> cstring
+extern function strstr(haystack: cstring, needle: cstring) -> cstring
+extern function strspn(str: cstring, accept: cstring) -> i64
+extern function strcspn(str: cstring, reject: cstring) -> i64
+extern function strpbrk(str: cstring, accept: cstring) -> cstring
+extern function strtok(str: cstring, delim: cstring) -> cstring
+extern function strdup(str: cstring) -> cstring
+extern function strndup(str: cstring, n: i64) -> cstring
+extern function strerror(errnum: i32) -> cstring
+extern function strcoll(lhs: cstring, rhs: cstring) -> i32
+extern function strxfrm(dst: cstring, src: cstring, n: i64) -> i64

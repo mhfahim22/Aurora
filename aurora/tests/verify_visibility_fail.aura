@@ -1,0 +1,8 @@
+class Person
+    public name = "unknown"
+    private age = 0
+
+p = Person("Alice", 30)
+output(p.name)
+output(p.age)
+output("DONE")

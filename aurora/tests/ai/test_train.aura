@@ -1,0 +1,36 @@
+import MrCode
+
+output("--- Loading CSV ---")
+d = csv("test.csv")
+output("CSV loaded:")
+output(d)
+
+output("--- Creating Model ---")
+m = model_create("sequential")
+output(m)
+
+output("--- Configuring ---")
+set_loss(m, "binary_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.01)
+set_batch_size(m, 8)
+set_epochs(m, 5)
+set_validation_split(m, 0.2)
+set_verbose(m, 1)
+output("configured")
+
+output("--- Training ---")
+r = train(m, d)
+output("train result:")
+output(r)
+
+output("--- Model Info ---")
+info = model_info(m)
+output("Model Info:")
+output(info)
+
+output("--- Predict ---")
+p = predict(m, d)
+output("Prediction done")
+
+output("--- Done ---")

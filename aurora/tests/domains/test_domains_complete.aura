@@ -1,0 +1,43 @@
+# Test: Domain-specific codegen features
+
+function compute_sum(a, b)
+    return a + b
+
+s = compute_sum(10, 20)
+output(s)
+
+# ── Signal / Emit ──
+signal on_update
+emit on_update
+
+# ── Sleep ──
+sleep(100)
+
+# ── AI ──
+ai mymodel:
+    t = 42
+    output(t)
+
+# ── Game Engine ──
+scene my_scene:
+    entity player:
+        output("player")
+    physics step:
+        output("physics")
+    audio music:
+        output("music")
+
+# ── Backend ──
+server my_server:
+    route "/":
+        output("root handler")
+
+# ── UI ──
+component my_comp:
+    state count = 0
+    style button:
+        output("styled")
+    theme dark:
+        output("dark")
+    route "/":
+        output("home")

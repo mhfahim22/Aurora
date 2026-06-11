@@ -1,0 +1,6 @@
+name: got-npm
+version: 15.0.5
+description: "npm bridge: Simplified HTTP/HTTPS GET requests"
+entry: got.au
+dependencies:
+  - quickjs

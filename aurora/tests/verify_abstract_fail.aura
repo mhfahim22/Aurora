@@ -1,0 +1,7 @@
+abstract class Animal
+    function make_sound()
+        output("...")
+
+# This should fail: cannot instantiate abstract class
+a = Animal()
+a.make_sound()

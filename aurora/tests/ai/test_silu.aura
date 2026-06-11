@@ -1,0 +1,18 @@
+import MrCode
+
+## Test SiLU + GELU activations
+m = model_create("sequential")
+add(m, dense(8, "silu"))
+add(m, dense(4, "gelu"))
+add(m, dense(1, "sigmoid"))
+set_loss(m, "binary_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.1)
+set_batch_size(m, 20)
+set_epochs(m, 3)
+set_validation_split(m, 0.0)
+set_verbose(m, 0)
+d = csv("test.csv")
+train(m, d)
+output(model_loss(m))
+output(" === ALL PASSED ===\n")

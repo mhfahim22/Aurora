@@ -1,0 +1,73 @@
+/* ════════════════════════════════════════════════════════════
+   npm Bridge — Auto-generated Aurora FFI Bindings
+   Package: moment@2.30.1
+   ════════════════════════════════════════════════════════════ */
+
+/* Module init */
+@cost(zero)
+extern "npm_moment" function moment_require() -> pointer
+
+/* FFI entry points */
+@cost(zero)
+extern "npm_moment" function moment_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+@cost(zero)
+extern "npm_moment" function moment_free(handle: pointer)
+@cost(zero)
+extern "npm_moment" function moment_free_cstr(handle: pointer)
+
+/* Value conversion helpers */
+@cost(alloc)
+extern "npm_moment" function moment_str(s: cstring) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_int(v: i64) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_float(v: f64) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call_kw(mod: pointer, fn: cstring, args: pointer, kwargs: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_getattr(obj: pointer, name: cstring) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call3(mod: pointer, fn: cstring, a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call4(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call5(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_call6(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer, a6: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_tuple2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_tuple3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_tuple4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_list2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_list3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_list4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_to_cstr(obj: pointer) -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_dict() -> pointer
+@cost(alloc)
+extern "npm_moment" function moment_dict_set(d: pointer, key: cstring, val: pointer) -> i32
+/* Diagnostics */
+@cost(zero)
+extern "npm_moment" function moment_get_perf_stats() -> cstring
+@cost(zero)
+extern "npm_moment" function moment_get_last_error() -> cstring
+
+/* Usage:
+     import "moment"
+     let mod = moment_require()
+     let name = moment_str("world")
+     let result = moment_call1(mod, "fn", name)
+     printf("%s
+", moment_to_cstr(result))
+     moment_free(result)
+*/

@@ -1,0 +1,34 @@
+extern function malloc(size: i64) -> pointer
+extern function calloc(count: i64, size: i64) -> pointer
+extern function realloc(ptr: pointer, size: i64) -> pointer
+extern function free(ptr: pointer)
+
+extern function atoi(str: cstring) -> i32
+extern function atol(str: cstring) -> i64
+extern function atoll(str: cstring) -> i64
+extern function atof(str: cstring) -> f64
+extern function strtol(str: cstring, endptr: pointer, base: i32) -> i64
+extern function strtoul(str: cstring, endptr: pointer, base: i32) -> i64
+extern function strtoll(str: cstring, endptr: pointer, base: i32) -> i64
+extern function strtoull(str: cstring, endptr: pointer, base: i32) -> i64
+extern function strtod(str: cstring, endptr: pointer) -> f64
+extern function strtof(str: cstring, endptr: pointer) -> f32
+
+extern function rand() -> i32
+extern function srand(seed: i64)
+
+extern function exit(code: i32)
+extern function _Exit(code: i32)
+extern function atexit(func: pointer) -> i32
+extern function abort()
+extern function quick_exit(code: i32)
+
+extern function abs(n: i64) -> i64
+extern function labs(n: i64) -> i64
+extern function llabs(n: i64) -> i64
+
+extern function qsort(base: pointer, count: i64, size: i64, comp: pointer)
+extern function bsearch(key: pointer, base: pointer, count: i64, size: i64, comp: pointer) -> pointer
+
+extern function getenv(name: cstring) -> cstring
+extern function system(command: cstring) -> i32

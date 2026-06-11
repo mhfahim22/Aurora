@@ -1,0 +1,45 @@
+# Test: Domain-specific — Backend Framework
+# Covers: server, api, database, cache, session, auth,
+#         middleware, model, request, response, query, token
+
+function run_backend_tests()
+    output("--- Backend Framework Tests ---")
+
+    server my_server = 3000:
+        output("server initialized")
+
+    api "api/v1":
+        output("api route registered")
+
+    database db = "sqlite://test.db":
+        output("database connected")
+
+    cache mem:
+        output("cache initialized")
+
+    session sess:
+        output("session created")
+
+    auth login:
+        output("auth configured")
+
+    middleware logger:
+        output("middleware registered")
+
+    model user:
+        output("model defined")
+
+    request 42
+    output("request stored")
+
+    response "ok"
+    output("response stored")
+
+    query "SELECT 1"
+    output("query executed")
+
+    token "user_abc"
+    output("token generated")
+
+run_backend_tests()
+output("backend tests passed")

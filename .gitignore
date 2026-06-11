@@ -1,0 +1,99 @@
+# ── Zig cross-compiler (345 MB — download on demand) ──
+tools/zig/
+
+# ── Build Output ──
+build/
+build_asan/
+output/
+crash/
+
+# ── Rust target directories (2GB rebuildable artifacts) ──
+bitflags_cargo/target/
+chrono_cargo/target/
+crossbeam_cargo/target/
+either_cargo/target/
+ffi_test/target/
+hello_rust_cargo/target/
+indexmap_cargo/target/
+itertools_cargo/target/
+log_cargo/target/
+num_traits_cargo/target/
+once_cell_cargo/target/
+parking_lot_cargo/target/
+rand_cargo/target/
+regex_cargo/target/
+serde_cargo/target/
+serde_json_cargo/target/
+smallvec_cargo/target/
+spin_cargo/target/
+strsim_cargo/target/
+thread_local_cargo/target/
+tokio_cargo/target/
+tokio_test/target/
+uuid_cargo/target/
+
+# ── Node.js ──
+node_modules/
+chalk_npm/node_modules/
+got_npm/node_modules/
+uuid_npm/node_modules/
+execa_npm/node_modules/
+lodash_npm/node_modules/
+left-pad_npm/node_modules/
+mobx_npm/node_modules/
+moment_npm/node_modules/
+
+# ── QuickJS build ──
+quickjs/build/
+
+# ── Compiled object files ──
+*.obj
+*.o
+*.rlib
+*.rmeta
+
+# ── Windows DLL build artifacts ──
+*.exp
+*.lib
+*.pdb
+*.ilk
+*.dll
+!build/Release/*.dll
+!build/Release/*.lib
+!build/Release/*.exp
+
+# ── Exes (keep only specific build outputs) ──
+*.exe
+!build/Release/*.exe
+
+# ── Release artifacts (regeneratable) ──
+dist/
+
+# ── Test/temp output files ──
+*.txt
+!CMakeLists.txt
+!*.md
+voss_cargo_*.txt
+voss_lodash*.txt
+voss_moment*.txt
+test_out*.txt
+test_err*.txt
+test_std*.txt
+test_min*.txt
+
+# ── Model/ML files ──
+*.bin
+*.onnx
+*.mrc
+
+# ── IDE / Editor ──
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db

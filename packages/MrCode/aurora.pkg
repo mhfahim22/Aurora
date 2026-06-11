@@ -1,0 +1,5 @@
+name: MrCode
+version: 0.1.0
+author: MrCode AI
+description: Third-party AI/ML library for Aurora
+entry: src/main.aura

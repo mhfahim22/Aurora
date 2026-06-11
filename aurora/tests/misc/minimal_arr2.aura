@@ -1,0 +1,2 @@
+arr = [1, 2.5, "hello", 42]
+output(arr)

@@ -1,0 +1,84 @@
+import "stdio"
+
+# ── Cargo Bridge Demo ──
+# Shows how to call Rust crates from Aurora via auto-generated Rust bridge DLLs.
+# Bridge function naming: <package>_<func>() — e.g. hello_rust_import, hello_rust_call1
+#
+# Rust bridge DLLs are statically linked against Rust std — no runtime needed.
+#
+# Prerequisites:
+#   voss bridge cargo hello_rust
+#   (or: cargo build --release inside the generated hello_rust_cargo/ directory)
+
+function main():
+    printf("=== Cargo Bridge Demo ===\n\n")
+
+    # ── 1. Import a Rust module ──
+    # Cargo bridges export _import() which returns a module handle.
+    printf("--- 1. Import hello_rust ---\n")
+    mod = hello_rust_import()
+    if mod == 0:
+        printf("FAILED: hello_rust_import()\n")
+        printf("Run: voss bridge cargo hello_rust\n")
+        return 1
+    printf("OK: hello_rust module loaded at %p\n", mod)
+
+    # ── 2. Call a function via _call1(mod, "fn", arg_json) ──
+    # Arguments are passed as JSON strings. Use _str() helper.
+    printf("--- 2. hello_rust.greet(name) ---\n")
+    name = hello_rust_str("\"Aurora\"")
+    greeting = hello_rust_call1(mod, "greet", name)
+    if greeting != 0:
+        printf("greet(\"Aurora\") = %s\n", hello_rust_to_cstr(greeting))
+        hello_rust_free(greeting)
+    else:
+        printf("FAILED: greet()\n")
+    hello_rust_free(name)
+
+    # ── 3. Call a function with multiple args ──
+    printf("--- 3. call with struct args ---\n")
+    a = hello_rust_int(42)
+    b = hello_rust_str("\"world\"")
+    result = hello_rust_call2(mod, "some_fn", a, b)
+    if result != 0:
+        printf("result = %s\n", hello_rust_to_cstr(result))
+        hello_rust_free(result)
+    else:
+        printf("(SKIP: some_fn may not exist in all bridges)\n")
+    hello_rust_free(a)
+    hello_rust_free(b)
+
+    # ── 4. Access Rust constants via _getattr ──
+    printf("--- 4. Module attributes ---\n")
+    ver = hello_rust_getattr(mod, "version")
+    if ver != 0:
+        printf("version = %s\n", hello_rust_to_cstr(ver))
+        hello_rust_free(ver)
+    else:
+        printf("(version attribute may not exist)\n")
+
+    # ── 5. Value conversion helpers ──
+    printf("--- 5. Value helpers ---\n")
+    s = hello_rust_str("\"hello\"")
+    i = hello_rust_int(42)
+    f = hello_rust_float(3.14)
+    printf("str=%s int=%s float=%s\n", hello_rust_to_cstr(s), hello_rust_to_cstr(i), hello_rust_to_cstr(f))
+    hello_rust_free(s); hello_rust_free(i); hello_rust_free(f)
+
+    # ── 6. Dict helpers ──
+    printf("--- 6. Dict ---\n")
+    d = hello_rust_dict()
+    hello_rust_dict_set(d, "key1", hello_rust_str("\"val1\""))
+    hello_rust_dict_set(d, "count", hello_rust_int(100))
+    printf("dict=%s\n", hello_rust_to_cstr(d))
+    hello_rust_free(d)
+
+    # ── 7. Performance stats ──
+    printf("--- 7. Diagnostics ---\n")
+    err = hello_rust_last_error()
+    if err != 0:
+        printf("last_error = %s\n", err)
+
+    hello_rust_free(mod)
+    printf("\n=== Cargo Bridge Demo Complete ===\n")
+    return 0

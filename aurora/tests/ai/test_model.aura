@@ -1,0 +1,3 @@
+import MrCode
+m = model_create("dense")
+output(m)

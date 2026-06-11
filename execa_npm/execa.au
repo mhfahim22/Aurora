@@ -1,0 +1,73 @@
+/* ════════════════════════════════════════════════════════════
+   npm Bridge — Auto-generated Aurora FFI Bindings
+   Package: execa@9.6.1
+   ════════════════════════════════════════════════════════════ */
+
+/* Module init */
+@cost(zero)
+extern "npm_execa" function execa_require() -> pointer
+
+/* FFI entry points */
+@cost(zero)
+extern "npm_execa" function execa_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+@cost(zero)
+extern "npm_execa" function execa_free(handle: pointer)
+@cost(zero)
+extern "npm_execa" function execa_free_cstr(handle: pointer)
+
+/* Value conversion helpers */
+@cost(alloc)
+extern "npm_execa" function execa_str(s: cstring) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_int(v: i64) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_float(v: f64) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call_kw(mod: pointer, fn: cstring, args: pointer, kwargs: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_getattr(obj: pointer, name: cstring) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call3(mod: pointer, fn: cstring, a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call4(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call5(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_call6(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer, a6: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_tuple2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_tuple3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_tuple4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_list2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_list3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_list4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_to_cstr(obj: pointer) -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_dict() -> pointer
+@cost(alloc)
+extern "npm_execa" function execa_dict_set(d: pointer, key: cstring, val: pointer) -> i32
+/* Diagnostics */
+@cost(zero)
+extern "npm_execa" function execa_get_perf_stats() -> cstring
+@cost(zero)
+extern "npm_execa" function execa_get_last_error() -> cstring
+
+/* Usage:
+     import "execa"
+     let mod = execa_require()
+     let name = execa_str("world")
+     let result = execa_call1(mod, "fn", name)
+     printf("%s
+", execa_to_cstr(result))
+     execa_free(result)
+*/

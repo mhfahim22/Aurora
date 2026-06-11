@@ -1,0 +1,6 @@
+name: moment-npm
+version: 2.30.1
+description: "npm bridge: Moment.js is a javascript date library that helps create, manipulate, and format dates without extending the `Date` prototype."
+entry: moment.au
+dependencies:
+  - quickjs

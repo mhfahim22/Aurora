@@ -1,0 +1,6 @@
+total = 0
+
+for i in 100000000
+    total = total + i
+
+output(total)

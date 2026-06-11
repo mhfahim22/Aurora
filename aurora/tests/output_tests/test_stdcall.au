@@ -1,0 +1,1 @@
+extern "stdcall" function test_stdcall_fn(x: int) -> int

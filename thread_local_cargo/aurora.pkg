@@ -1,0 +1,6 @@
+name: thread_local-cargo
+version: 1.1.9
+description: "cargo bridge: Per-object thread-local storage"
+entry: thread_local.au
+dependencies:
+  - rust-std

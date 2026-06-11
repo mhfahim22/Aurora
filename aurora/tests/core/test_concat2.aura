@@ -1,0 +1,7 @@
+class Person
+    name = "unknown"
+    age = 0
+
+p = Person("Alice", 30)
+output("hello " + p.name)
+output("DONE")
