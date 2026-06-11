@@ -81,10 +81,10 @@ static void test_native_bridge() {
 static void test_npm_bridge() {
     printf("\n=== npm Bridge Test (moment) ===\n");
     char path[512];
-    snprintf(path, sizeof(path), "../../moment_npm/moment_npm.dll");
+    snprintf(path, sizeof(path), "../../packages/bridges/npm/moment_npm/moment_npm.dll");
     void* lib = dl_open(path);
     if (!lib) {
-        snprintf(path, sizeof(path), "moment_npm/moment_npm.dll");
+        snprintf(path, sizeof(path), "packages/bridges/npm/moment_npm/moment_npm.dll");
         lib = dl_open(path);
     }
     if (!lib) { printf("  SKIP: moment_npm bridge not found\n"); return; }
@@ -180,10 +180,10 @@ static void test_cargo_bridge() {
     printf("\n=== Cargo Bridge Test (hello_rust) ===\n");
     char path[512];
     /* Try from build/Debug (../../) and from root dir */
-    snprintf(path, sizeof(path), "../../hello_rust_cargo/hello_rust_cargo.dll");
+    snprintf(path, sizeof(path), "../../packages/bridges/cargo/hello_rust_cargo/hello_rust_cargo.dll");
     void* lib = dl_open(path);
     if (!lib) {
-        snprintf(path, sizeof(path), "hello_rust_cargo/hello_rust_cargo.dll");
+        snprintf(path, sizeof(path), "packages/bridges/cargo/hello_rust_cargo/hello_rust_cargo.dll");
         lib = dl_open(path);
     }
     if (!lib) { printf("  SKIP: hello_rust_cargo bridge not found\n"); return; }
@@ -312,7 +312,7 @@ static void test_pypi_flask() {
 static void test_npm_lodash() {
     printf("\n=== npm Bridge Test (lodash) ===\n");
     char path[512];
-    snprintf(path,sizeof(path),"lodash_npm/lodash_npm.dll");
+    snprintf(path,sizeof(path),"packages/bridges/npm/lodash_npm/lodash_npm.dll");
     void* lib = dl_open(path);
     if(!lib){printf("  SKIP: lodash_npm bridge not found\n");return;}
 
@@ -331,7 +331,7 @@ static void test_npm_lodash() {
 static void test_npm_chalk() {
     printf("\n=== npm Bridge Test (chalk@5) ===\n");
     char path[512];
-    snprintf(path,sizeof(path),"chalk_npm/chalk_npm.dll");
+    snprintf(path,sizeof(path),"packages/bridges/npm/chalk_npm/chalk_npm.dll");
     void* lib = dl_open(path);
     if(!lib){printf("  SKIP: chalk_npm bridge not found\n");return;}
 
@@ -351,7 +351,7 @@ static void test_npm_chalk() {
 static void test_npm_execa() {
     printf("\n=== npm Bridge Test (execa) ===\n");
     char path[512];
-    snprintf(path,sizeof(path),"execa_npm/execa_npm.dll");
+    snprintf(path,sizeof(path),"packages/bridges/npm/execa_npm/execa_npm.dll");
     void* lib = dl_open(path);
     if(!lib){printf("  SKIP: execa_npm bridge not found\n");return;}
 
@@ -371,7 +371,7 @@ static void test_npm_execa() {
 static void test_npm_got() {
     printf("\n=== npm Bridge Test (got) ===\n");
     char path[512];
-    snprintf(path,sizeof(path),"got_npm/got_npm.dll");
+    snprintf(path,sizeof(path),"packages/bridges/npm/got_npm/got_npm.dll");
     void* lib = dl_open(path);
     if(!lib){printf("  SKIP: got_npm bridge not found\n");return;}
 
@@ -437,10 +437,10 @@ static void test_cross_ecosystem() {
 static void test_npm_stress() {
     printf("\n=== Stress Test (rapid require + API calls) ===\n");
     char path[512];
-    snprintf(path, sizeof(path), "../../moment_npm/moment_npm.dll");
+    snprintf(path, sizeof(path), "../../packages/bridges/npm/moment_npm/moment_npm.dll");
     void* lib = dl_open(path);
     if (!lib) {
-        snprintf(path, sizeof(path), "moment_npm/moment_npm.dll");
+        snprintf(path, sizeof(path), "packages/bridges/npm/moment_npm/moment_npm.dll");
         lib = dl_open(path);
     }
     if (!lib) { printf("  SKIP: moment_npm bridge not found\n"); return; }
@@ -514,10 +514,10 @@ static void test_cross_ecosystem_chain() {
 
     /* ── Load Cargo bridge (Rust) ── */
     char path[512];
-    snprintf(path, sizeof(path), "../../hello_rust_cargo/hello_rust_cargo.dll");
+    snprintf(path, sizeof(path), "../../packages/bridges/cargo/hello_rust_cargo/hello_rust_cargo.dll");
     void* rs_lib = dl_open(path);
     if (!rs_lib) {
-        snprintf(path, sizeof(path), "hello_rust_cargo/hello_rust_cargo.dll");
+        snprintf(path, sizeof(path), "packages/bridges/cargo/hello_rust_cargo/hello_rust_cargo.dll");
         rs_lib = dl_open(path);
     }
     if (!rs_lib) { printf("  SKIP: hello_rust_cargo not found\n"); return; }
@@ -554,10 +554,10 @@ static void test_cross_ecosystem_chain() {
     if (!py_mod) { dl_close(rs_lib); dl_close(py_lib); printf("  SKIP: Python import failed\n"); return; }
 
     /* ── Load npm bridge (JS) ── */
-    snprintf(path, sizeof(path), "../../moment_npm/moment_npm.dll");
+    snprintf(path, sizeof(path), "../../packages/bridges/npm/moment_npm/moment_npm.dll");
     void* js_lib = dl_open(path);
     if (!js_lib) {
-        snprintf(path, sizeof(path), "moment_npm/moment_npm.dll");
+        snprintf(path, sizeof(path), "packages/bridges/npm/moment_npm/moment_npm.dll");
         js_lib = dl_open(path);
     }
     void* js_mod = NULL;

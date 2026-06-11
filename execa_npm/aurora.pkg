@@ -1,6 +1,0 @@
-name: execa-npm
-version: 9.6.1
-description: "npm bridge: A better child_process.{execFile,exec}"
-entry: execa.au
-dependencies:
-  - quickjs

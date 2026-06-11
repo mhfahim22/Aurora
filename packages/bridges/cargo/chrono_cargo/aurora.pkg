@@ -1,0 +1,6 @@
+name: chrono-cargo
+version: 0.4.45
+description: "cargo bridge: Date and time library for Rust"
+entry: chrono.au
+dependencies:
+  - rust-std

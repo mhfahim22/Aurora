@@ -1,6 +1,0 @@
-name: serde_json-cargo
-version: 1.0.150
-description: "cargo bridge: A JSON serialization file format"
-entry: serde_json.au
-dependencies:
-  - rust-std

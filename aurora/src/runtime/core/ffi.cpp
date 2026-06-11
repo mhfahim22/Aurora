@@ -263,7 +263,10 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
 #else
         snprintf(buf, sizeof(buf), "lib%s_npm.so", pkg);
 #endif
-        /* Try bridge dir (new-style: lodash_npm/) */
+        /* Try bridge dir (new-style: packages/bridges/npm/lodash_npm/) */
+        snprintf(buf, sizeof(buf), "packages/bridges/npm/%s_npm/%s_npm.dll", pkg, pkg);
+        lib = aurora_dl_open(buf);
+        /* Try bridge dir (old-style: lodash_npm/) */
         snprintf(buf, sizeof(buf), "%s_npm/%s_npm.dll", pkg, pkg);
         lib = aurora_dl_open(buf);
         /* Try bridge dir (old-style: lodash_npm_bridge/) */

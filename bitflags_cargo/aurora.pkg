@@ -1,6 +1,0 @@
-name: bitflags-cargo
-version: 2.13.0
-description: "cargo bridge: A macro to generate structures which behave like bitflags.\n"
-entry: bitflags.au
-dependencies:
-  - rust-std

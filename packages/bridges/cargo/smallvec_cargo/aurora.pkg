@@ -1,0 +1,6 @@
+name: smallvec-cargo
+version: 1.15.1
+description: "cargo bridge: 'Small vector' optimization: store up to a small number of items on the stack"
+entry: smallvec.au
+dependencies:
+  - rust-std

@@ -1,0 +1,6 @@
+name: tokio-cargo
+version: 1.52.3
+description: "cargo bridge: An event-driven, non-blocking I/O platform for writing asynchronous I/O\nbacked applications.\n"
+entry: tokio.au
+dependencies:
+  - rust-std

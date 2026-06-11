@@ -1,6 +1,0 @@
-name: log-cargo
-version: 0.4.32
-description: "cargo bridge: A lightweight logging facade for Rust\n"
-entry: log.au
-dependencies:
-  - rust-std

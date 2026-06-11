@@ -1,0 +1,6 @@
+name: strsim-cargo
+version: 0.11.1
+description: "cargo bridge: Implementations of string similarity metrics. Includes Hamming, Levenshtein,\nOSA, Damerau-Levenshtein, Jaro, Jaro-Winkler, and Sørensen-Dice.\n"
+entry: strsim.au
+dependencies:
+  - rust-std

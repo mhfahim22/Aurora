@@ -1,6 +1,0 @@
-name: serde-cargo
-version: 1.0.228
-description: "cargo bridge: A generic serialization/deserialization framework"
-entry: serde.au
-dependencies:
-  - rust-std

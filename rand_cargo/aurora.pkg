@@ -1,6 +1,0 @@
-name: rand-cargo
-version: 0.10.1
-description: "cargo bridge: Random number generators and other randomness functionality.\n"
-entry: rand.au
-dependencies:
-  - rust-std

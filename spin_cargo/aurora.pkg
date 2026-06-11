@@ -1,6 +1,0 @@
-name: spin-cargo
-version: 0.12.0
-description: "cargo bridge: Spin-based synchronization primitives"
-entry: spin.au
-dependencies:
-  - rust-std

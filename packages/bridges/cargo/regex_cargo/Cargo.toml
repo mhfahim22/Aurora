@@ -1,0 +1,13 @@
+[package]
+name = "regex_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = "1"
+serde_json = "1"
+futures = "0.3"
+regex = { version = "1.12.4", features = ["perf-literal", "std"] }

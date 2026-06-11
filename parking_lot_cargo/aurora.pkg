@@ -1,6 +1,0 @@
-name: parking_lot-cargo
-version: 0.12.5
-description: "cargo bridge: More compact and efficient implementations of the standard synchronization primitives."
-entry: parking_lot.au
-dependencies:
-  - rust-std

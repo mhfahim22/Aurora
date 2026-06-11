@@ -1,6 +1,0 @@
-name: uuid-npm
-version: 14.0.0
-description: "npm bridge: Simple libuuid bindings to allow UUIDs to be generated from JS."
-entry: uuid.au
-dependencies:
-  - quickjs

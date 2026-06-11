@@ -1,6 +1,0 @@
-name: regex-cargo
-version: 1.12.4
-description: "cargo bridge: An implementation of regular expressions for Rust. This implementation uses\nfinite automata and guarantees linear time matching on all inputs.\n"
-entry: regex.au
-dependencies:
-  - rust-std

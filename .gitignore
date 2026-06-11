@@ -5,43 +5,15 @@ tools/zig/
 build/
 build_asan/
 output/
+Testing/
 crash/
 
 # ── Rust target directories (2GB rebuildable artifacts) ──
-bitflags_cargo/target/
-chrono_cargo/target/
-crossbeam_cargo/target/
-either_cargo/target/
-ffi_test/target/
-hello_rust_cargo/target/
-indexmap_cargo/target/
-itertools_cargo/target/
-log_cargo/target/
-num_traits_cargo/target/
-once_cell_cargo/target/
-parking_lot_cargo/target/
-rand_cargo/target/
-regex_cargo/target/
-serde_cargo/target/
-serde_json_cargo/target/
-smallvec_cargo/target/
-spin_cargo/target/
-strsim_cargo/target/
-thread_local_cargo/target/
-tokio_cargo/target/
-tokio_test/target/
-uuid_cargo/target/
+packages/bridges/cargo/*/target/
 
 # ── Node.js ──
 node_modules/
-chalk_npm/node_modules/
-got_npm/node_modules/
-uuid_npm/node_modules/
-execa_npm/node_modules/
-lodash_npm/node_modules/
-left-pad_npm/node_modules/
-mobx_npm/node_modules/
-moment_npm/node_modules/
+packages/bridges/npm/*/node_modules/
 
 # ── QuickJS build ──
 quickjs/build/
@@ -65,9 +37,6 @@ quickjs/build/
 # ── Exes (keep only specific build outputs) ──
 *.exe
 !build/Release/*.exe
-
-# ── Release artifacts (regeneratable) ──
-dist/
 
 # ── Test/temp output files ──
 *.txt

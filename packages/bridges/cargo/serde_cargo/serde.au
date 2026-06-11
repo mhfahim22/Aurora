@@ -1,0 +1,80 @@
+/* ==================================================
+   Cargo Bridge — Auto-generated Aurora FFI Bindings
+   Package: serde@1.0.228
+   ================================================== */
+
+/* Module init */
+@cost(zero)
+extern "cargo_serde" function serde_import() -> pointer
+
+/* FFI entry points */
+@cost(zero)
+extern "cargo_serde" function serde_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+@cost(zero)
+extern "cargo_serde" function serde_free(handle: pointer)
+@cost(zero)
+extern "cargo_serde" function serde_free_cstr(handle: pointer)
+
+/* Value conversion helpers */
+@cost(alloc)
+extern "cargo_serde" function serde_str(s: cstring) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_int(v: i64) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_float(v: f64) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call_kw(mod: pointer, fn: cstring, args: pointer, kwargs: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_getattr(obj: pointer, name: cstring) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call2(mod: pointer, fn: cstring, arg1: pointer, arg2: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call3(mod: pointer, fn: cstring, arg1: pointer, arg2: pointer, arg3: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call4(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call5(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call6(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer, a6: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_list(items: pointer, count: i32) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_tuple(items: pointer, count: i32) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_tuple2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_tuple3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_tuple4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_list2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_list3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_list4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_to_cstr(obj: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_dict() -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_dict_set(d: pointer, key: cstring, val: pointer) -> i32
+
+/* Type instance API — construct, call method, destroy */
+@cost(alloc)
+extern "cargo_serde" function serde_construct(type_name: cstring, ctor: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "cargo_serde" function serde_call_method(handle: pointer, type_name: cstring, method: cstring, args: pointer) -> pointer
+@cost(zero)
+extern "cargo_serde" function serde_free_type(handle: pointer, type_name: cstring)
+@cost(zero)
+extern "cargo_serde" function serde_last_error() -> cstring
+
+/* Usage:
+     import "serde"
+     let mod = serde_import()
+     let args = serde_tuple2(a, b)
+     let result = serde_call(mod, "fn_name", args)
+     serde_free(result)
+*/

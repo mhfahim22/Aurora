@@ -31,10 +31,10 @@ int main() {
     printf("=== npm Bridge Performance Benchmark ===\n\n");
 
     char buf[512];
-    snprintf(buf, sizeof(buf), "moment_npm_bridge/moment_npm.dll");
+    snprintf(buf, sizeof(buf), "packages/bridges/npm/moment_npm_bridge/moment_npm.dll");
     void* lib = dl_open(buf);
     if (!lib) {
-        snprintf(buf, sizeof(buf), "../build/moment_npm_bridge/moment_npm.dll");
+        snprintf(buf, sizeof(buf), "../build/packages/bridges/npm/moment_npm_bridge/moment_npm.dll");
         lib = dl_open(buf);
     }
     if (!lib) {

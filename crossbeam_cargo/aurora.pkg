@@ -1,6 +1,0 @@
-name: crossbeam-cargo
-version: 0.8.4
-description: "cargo bridge: Tools for concurrent programming"
-entry: crossbeam.au
-dependencies:
-  - rust-std

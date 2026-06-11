@@ -1,0 +1,6 @@
+name: itertools-cargo
+version: 0.14.0
+description: "cargo bridge: Extra iterator adaptors, iterator methods, free functions, and macros."
+entry: itertools.au
+dependencies:
+  - rust-std

@@ -1,6 +1,0 @@
-name: lodash-npm
-version: 4.18.1
-description: "npm bridge: A drop-in replacement for Underscore.js that delivers up to 8x performance improvements, bug fixes, and additional features."
-entry: lodash.au
-dependencies:
-  - quickjs

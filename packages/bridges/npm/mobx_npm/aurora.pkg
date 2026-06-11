@@ -1,0 +1,6 @@
+name: mobx-npm
+version: 6.16.1
+description: "npm bridge: Observable data. Reactive functions. Simple code."
+entry: mobx.au
+dependencies:
+  - quickjs

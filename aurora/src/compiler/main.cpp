@@ -73,6 +73,9 @@ static std::string find_import_file(const std::string& name, const std::string& 
         } else if (prefix == "pypi" || prefix == "npm" || prefix == "cargo" || prefix == "native") {
             /* pypi|npm|cargo|native:name — check for cached bridge */
             auto check_eco = [&](const fs::path& base) -> std::string {
+                /* new-style: packages/bridges/npm/name_npm/name.au */
+                auto p = base / "packages" / "bridges" / prefix / (rest + "_" + prefix) / (rest + ".au");
+                if (fs::exists(p)) return fs::absolute(p).string();
                 /* new-style: lodash_npm/ */
                 auto p = base / (rest + "_" + prefix) / (rest + ".au");
                 if (fs::exists(p)) return fs::absolute(p).string();
@@ -130,6 +133,9 @@ static std::string find_import_file(const std::string& name, const std::string& 
     auto check_eco_bridge = [&](const fs::path& base) -> std::string {
         const char* ecosystems[] = {"pypi", "npm", "cargo", "native"};
         for (auto eco : ecosystems) {
+            /* new-style: packages/bridges/npm/name_npm/name.au */
+            auto p = base / "packages" / "bridges" / eco / (name + "_" + eco) / (name + ".au");
+            if (fs::exists(p)) return fs::absolute(p).string();
             /* new-style: lodash_npm/ */
             auto p = base / (name + "_" + eco) / (name + ".au");
             if (fs::exists(p)) return fs::absolute(p).string();

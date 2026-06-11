@@ -1,6 +1,0 @@
-name: indexmap-cargo
-version: 2.14.0
-description: "cargo bridge: A hash table with consistent order and fast iteration."
-entry: indexmap.au
-dependencies:
-  - rust-std

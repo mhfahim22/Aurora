@@ -1,6 +1,0 @@
-name: hello_rust-cargo
-version: 0.1.0
-description: "cargo bridge: This is hello word program written in Rust"
-entry: hello_rust.au
-dependencies:
-  - rust-std

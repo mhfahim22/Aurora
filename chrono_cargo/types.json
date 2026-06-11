@@ -1,9 +1,0 @@
-// Type IR cost annotations for chrono
-// Auto-generated — used by Aurora compiler for zero-cost interop
-{
-  "types": {
-    "Rs_i32":    {"ir": "i32",   "cost": "zero"},
-    "Rs_f64":    {"ir": "f64",   "cost": "zero"},
-    "Rs_String": {"ir": "String", "cost": "alloc"}
-  }
-}

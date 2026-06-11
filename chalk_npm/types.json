@@ -1,9 +1,0 @@
-// Type IR cost annotations for chalk
-// Auto-generated — used by Aurora compiler for zero-cost interop
-{
-  "types": {
-    "JS_number": {"ir": "f64",   "cost": "zero"},
-    "JS_string": {"ir": "String", "cost": "alloc"},
-    "JS_object": {"ir": "pointer","cost": "indirection"}
-  }
-}

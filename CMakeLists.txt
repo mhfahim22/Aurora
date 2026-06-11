@@ -382,9 +382,9 @@ function(add_npm_bridge name pkg c_file)
 endfunction()
 
 # Example bridges (built only if the generated .c files exist)
-add_npm_bridge(bridge_moment  moment  "${CMAKE_SOURCE_DIR}/bridges/moment/moment_npm.c")
-add_npm_bridge(bridge_lodash  lodash  "${CMAKE_SOURCE_DIR}/bridges/lodash/lodash_npm.c")
-add_npm_bridge(bridge_chalk   chalk   "${CMAKE_SOURCE_DIR}/bridges/chalk/chalk_npm.c")
+add_npm_bridge(bridge_moment  moment  "${CMAKE_SOURCE_DIR}/packages/bridges/npm/moment_npm/moment_npm.c")
+add_npm_bridge(bridge_lodash  lodash  "${CMAKE_SOURCE_DIR}/packages/bridges/npm/lodash_npm/lodash_npm.c")
+add_npm_bridge(bridge_chalk   chalk   "${CMAKE_SOURCE_DIR}/packages/bridges/npm/chalk_npm/chalk_npm.c")
 
 # ═══════════════════════════════════════════════════════════════
 # aurora-lsp — Language Server Protocol implementation
