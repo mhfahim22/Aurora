@@ -170,33 +170,33 @@ llvm::Value* codegen_builtin_section5(
     }
 
     /* ── Model operations ── */
-    if (name == "add" && node->args) {
+    if (name == "ml_add" && node->args) {
         llvm::Value* m = gen_expr(node->args.get());
         llvm::Value* layer = gen_expr(node->args->next.get());
         return builder.CreateCall(builtins.add_fn, { m, layer }, "add_ret");
     }
-    if (name == "train" && node->args) {
+    if (name == "ml_train" && node->args) {
         llvm::Value* m = gen_expr(node->args.get());
         llvm::Value* d = gen_expr(node->args->next.get());
         return builder.CreateCall(builtins.train_fn, { m, d }, "train_ret");
     }
-    if (name == "fit" && node->args) {
+    if (name == "ml_fit" && node->args) {
         llvm::Value* m = gen_expr(node->args.get());
         llvm::Value* x = gen_expr(node->args->next.get());
         llvm::Value* y = gen_expr(node->args->next->next.get());
         return builder.CreateCall(builtins.fit_fn, { m, x, y }, "fit_ret");
     }
-    if (name == "test" && node->args) {
+    if (name == "ml_test" && node->args) {
         llvm::Value* m = gen_expr(node->args.get());
         llvm::Value* d = gen_expr(node->args->next.get());
         return builder.CreateCall(builtins.test_fn, { m, d }, "test_ret");
     }
-    if (name == "predict" && node->args) {
+    if (name == "ml_predict" && node->args) {
         llvm::Value* m = gen_expr(node->args.get());
         llvm::Value* input = gen_expr(node->args->next.get());
         return builder.CreateCall(builtins.predict_fn, { m, input }, "pred_ret");
     }
-    if (name == "retrain" && node->args) {
+    if (name == "ml_retrain" && node->args) {
         llvm::Value* m = gen_expr(node->args.get());
         return builder.CreateCall(builtins.retrain_fn, { m }, "retrain_ret");
     }

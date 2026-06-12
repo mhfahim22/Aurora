@@ -705,12 +705,12 @@ void register_builtins(llvm::Module* module, llvm::LLVMContext& ctx,
     builtins.layernorm_fn = llvm::Function::Create(ft_i64_void, llvm::Function::ExternalLinkage, "layernorm", module);
 
     /* Model operations */
-    builtins.add_fn     = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "add", module);
-    builtins.train_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "train", module);
-    builtins.fit_fn     = llvm::Function::Create(ft_i64_i64_i64_i64, llvm::Function::ExternalLinkage, "fit", module);
-    builtins.test_fn    = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "test", module);
-    builtins.predict_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "predict", module);
-    builtins.retrain_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "retrain", module);
+    builtins.add_fn     = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "ml_add", module);
+    builtins.train_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "ml_train", module);
+    builtins.fit_fn     = llvm::Function::Create(ft_i64_i64_i64_i64, llvm::Function::ExternalLinkage, "ml_fit", module);
+    builtins.test_fn    = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "ml_test", module);
+    builtins.predict_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "ml_predict", module);
+    builtins.retrain_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "ml_retrain", module);
 }
 
 static llvm::Value* to_ptr(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx,
