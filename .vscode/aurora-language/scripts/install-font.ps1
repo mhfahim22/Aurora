@@ -1,41 +1,42 @@
-param(
-    [switch]$Silent
-)
+param([switch]$Silent)
 
-$FontName = "JetBrains Mono"
 $FontDir = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
 $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Fonts"
+
+# Create registry key if it doesn't exist
+if (-not (Test-Path $RegPath)) {
+    $null = New-Item -Path $RegPath -Force
+}
 $TempZip = "$env:TEMP\jetbrains-mono.zip"
 $ExtractDir = "$env:TEMP\jetbrains-mono"
 
-# ── Check if already installed ──
-$installed = Get-ItemProperty -Path $RegPath -Name "*JetBrains Mono*" -ErrorAction SilentlyContinue
-if ($installed) {
-    if (-not $Silent) { Write-Host "✓ JetBrains Mono already installed" -ForegroundColor Green }
-    return $true
+$found = $false
+try {
+    $regVal = Get-ItemProperty -Path $RegPath -Name "*JetBrains Mono*" -ErrorAction Stop
+    if ($regVal) { $found = $true }
+} catch {}
+if ($found) {
+    if (-not $Silent) { Write-Host "OK JetBrains Mono already installed" -ForegroundColor Green }
+    exit 0
 }
 
-# Font dir may not exist
 if (-not (Test-Path $FontDir)) { New-Item -ItemType Directory -Path $FontDir -Force | Out-Null }
 
-# ── Download JetBrains Mono from GitHub ──
 $Url = "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip"
-if (-not $Silent) {
-    Write-Host "Downloading JetBrains Mono..." -ForegroundColor Cyan
-}
+if (-not $Silent) { Write-Host "Downloading JetBrains Mono..." -ForegroundColor Cyan }
+
 try {
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
     $wc = New-Object System.Net.WebClient
     $wc.DownloadFile($Url, $TempZip)
 } catch {
-    if (-not $Silent) { Write-Host "✗ Download failed: $_" -ForegroundColor Red }
-    return $false
+    if (-not $Silent) { Write-Host "FAIL Download failed: $_" -ForegroundColor Red }
+    exit 1
 }
 
-# ── Extract ──
 if (Test-Path $ExtractDir) { Remove-Item -Recurse -Force $ExtractDir }
 Expand-Archive -Path $TempZip -DestinationPath $ExtractDir -Force | Out-Null
 
-# ── Find variable TTF files (woff2 are for web) ──
 $ttfFiles = Get-ChildItem -Path $ExtractDir -Recurse -Filter "*.ttf" | Where-Object {
     $_.Name -like "JetBrainsMono-*" -and $_.Name -notlike "*NL*"
 }
@@ -45,7 +46,6 @@ foreach ($font in $ttfFiles) {
     $dest = Join-Path $FontDir $font.Name
     Copy-Item -Path $font.FullName -Destination $dest -Force
 
-    # Register in registry so apps detect it
     $regName = "JetBrains Mono (TrueType)"
     if ($font.Name -match "Italic") { $regName = "JetBrains Mono Italic (TrueType)" }
     elseif ($font.Name -match "Bold") { $regName = "JetBrains Mono Bold (TrueType)" }
@@ -59,13 +59,12 @@ foreach ($font in $ttfFiles) {
     $count++
 }
 
-# ── Clean up ──
 Remove-Item -Path $TempZip -Force -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force $ExtractDir -ErrorAction SilentlyContinue
 
 if (-not $Silent) {
-    Write-Host "✓ JetBrains Mono installed ($count font files)" -ForegroundColor Green
+    Write-Host "OK JetBrains Mono installed ($count font files)" -ForegroundColor Green
     Write-Host "  Location: $FontDir" -ForegroundColor Cyan
-    Write-Host "`nRestart VS Code to apply the font." -ForegroundColor Yellow
+    Write-Host " Restart VS Code to apply the font." -ForegroundColor Yellow
 }
-return $true
+exit 0
