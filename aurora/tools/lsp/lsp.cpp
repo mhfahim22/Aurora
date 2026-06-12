@@ -11,6 +11,209 @@
 #include <set>
 #include <regex>
 #include <cstdio>
+#include <cstdlib>
+#include <cmath>
+
+/* ════════════════════════════════════════════════════════════
+   JsonValue implementation
+   ════════════════════════════════════════════════════════════ */
+
+JsonValue JsonValue::get(const std::string& key) const {
+    if (type == Object) {
+        auto it = members.find(key);
+        if (it != members.end()) return it->second;
+    }
+    return {};
+}
+
+JsonValue JsonValue::get(int index) const {
+    if (type == Array && index >= 0 && index < (int)items.size())
+        return items[index];
+    return {};
+}
+
+std::string JsonValue::as_string(const std::string& def) const {
+    if (type == StringVal) return str;
+    if (type == Number) return std::to_string((long long)num);
+    return def;
+}
+
+int JsonValue::as_int(int def) const {
+    return type == Number ? (int)num : def;
+}
+
+bool JsonValue::as_bool(bool def) const {
+    return type == Bool ? boolean : def;
+}
+
+bool JsonValue::has(const std::string& key) const {
+    return type == Object && members.find(key) != members.end();
+}
+
+/* ════════════════════════════════════════════════════════════
+   Recursive-descent JSON parser
+   ════════════════════════════════════════════════════════════ */
+
+void JsonParser::skip_ws() {
+    while (pos < s.size() && (s[pos] == ' ' || s[pos] == '\t' ||
+                              s[pos] == '\n' || s[pos] == '\r'))
+        pos++;
+}
+
+JsonValue JsonParser::parse_value() {
+    skip_ws();
+    if (pos >= s.size()) return {};
+    if (s[pos] == '"') return parse_string();
+    if (s[pos] == '{') return parse_object();
+    if (s[pos] == '[') return parse_array();
+    if (s[pos] == 't' || s[pos] == 'f' || s[pos] == 'n')
+        return parse_bool_or_null();
+    return parse_number();
+}
+
+JsonValue JsonParser::parse_string() {
+    JsonValue v;
+    v.type = JsonValue::StringVal;
+    pos++; /* skip opening " */
+    while (pos < s.size() && s[pos] != '"') {
+        if (s[pos] == '\\') {
+            pos++;
+            if (pos >= s.size()) break;
+            switch (s[pos]) {
+                case '"': v.str += '"'; break;
+                case '\\': v.str += '\\'; break;
+                case '/': v.str += '/'; break;
+                case 'b': v.str += '\b'; break;
+                case 'f': v.str += '\f'; break;
+                case 'n': v.str += '\n'; break;
+                case 'r': v.str += '\r'; break;
+                case 't': v.str += '\t'; break;
+                default: v.str += s[pos]; break;
+            }
+            pos++;
+        } else {
+            v.str += s[pos++];
+        }
+    }
+    if (pos < s.size()) pos++; /* skip closing " */
+    return v;
+}
+
+JsonValue JsonParser::parse_number() {
+    JsonValue v;
+    v.type = JsonValue::Number;
+    size_t start = pos;
+    if (pos < s.size() && s[pos] == '-') pos++;
+    while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
+    if (pos < s.size() && s[pos] == '.') {
+        pos++;
+        while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
+    }
+    if (pos < s.size() && (s[pos] == 'e' || s[pos] == 'E')) {
+        pos++;
+        if (pos < s.size() && (s[pos] == '+' || s[pos] == '-')) pos++;
+        while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
+    }
+    v.num = std::strtod(s.substr(start, pos - start).c_str(), nullptr);
+    return v;
+}
+
+JsonValue JsonParser::parse_object() {
+    JsonValue v;
+    v.type = JsonValue::Object;
+    pos++; /* skip { */
+    skip_ws();
+    if (pos < s.size() && s[pos] == '}') { pos++; return v; }
+    while (pos < s.size()) {
+        skip_ws();
+        JsonValue key = parse_string();
+        skip_ws();
+        if (pos < s.size() && s[pos] == ':') pos++;
+        JsonValue val = parse_value();
+        v.members[key.str] = val;
+        skip_ws();
+        if (pos < s.size() && s[pos] == '}') { pos++; return v; }
+        if (pos < s.size() && s[pos] == ',') { pos++; }
+    }
+    return v;
+}
+
+JsonValue JsonParser::parse_array() {
+    JsonValue v;
+    v.type = JsonValue::Array;
+    pos++; /* skip [ */
+    skip_ws();
+    if (pos < s.size() && s[pos] == ']') { pos++; return v; }
+    while (pos < s.size()) {
+        v.items.push_back(parse_value());
+        skip_ws();
+        if (pos < s.size() && s[pos] == ']') { pos++; return v; }
+        if (pos < s.size() && s[pos] == ',') { pos++; }
+    }
+    return v;
+}
+
+JsonValue JsonParser::parse_bool_or_null() {
+    JsonValue v;
+    if (s.substr(pos, 4) == "true") {
+        v.type = JsonValue::Bool; v.boolean = true; pos += 4;
+    } else if (s.substr(pos, 5) == "false") {
+        v.type = JsonValue::Bool; v.boolean = false; pos += 5;
+    } else if (s.substr(pos, 4) == "null") {
+        pos += 4;
+    }
+    return v;
+}
+
+JsonValue JsonParser::parse(const std::string& json) {
+    JsonParser p(json);
+    return p.parse_value();
+}
+
+static void json_stringify_value(std::ostringstream& out, const JsonValue& v) {
+    switch (v.type) {
+        case JsonValue::Null: out << "null"; break;
+        case JsonValue::Bool: out << (v.boolean ? "true" : "false"); break;
+        case JsonValue::Number: out << v.num; break;
+        case JsonValue::StringVal:
+            out << '"';
+            for (char c : v.str) {
+                switch (c) {
+                    case '"': out << "\\\""; break;
+                    case '\\': out << "\\\\"; break;
+                    case '\n': out << "\\n"; break;
+                    case '\r': out << "\\r"; break;
+                    case '\t': out << "\\t"; break;
+                    default: out << c;
+                }
+            }
+            out << '"';
+            break;
+        case JsonValue::Array:
+            out << '[';
+            for (size_t i = 0; i < v.items.size(); i++) {
+                if (i > 0) out << ',';
+                json_stringify_value(out, v.items[i]);
+            }
+            out << ']';
+            break;
+        case JsonValue::Object:
+            out << '{';
+            for (auto it = v.members.begin(); it != v.members.end(); ++it) {
+                if (it != v.members.begin()) out << ',';
+                out << '"' << it->first << '"' << ':';
+                json_stringify_value(out, it->second);
+            }
+            out << '}';
+            break;
+    }
+}
+
+std::string JsonParser::stringify(const JsonValue& v) {
+    std::ostringstream out;
+    json_stringify_value(out, v);
+    return out.str();
+}
 
 /* ════════════════════════════════════════════════════════════
    JsonBuilder
@@ -586,34 +789,65 @@ std::vector<LspSymbol> LspServer::get_symbols(const std::string& text) {
 void LspServer::update_diagnostics(const std::string& uri, const std::string& text) {
     auto diags = analyze(text);
 
-    /* Build diagnostic JSON array */
-    std::string diag_json = "[";
-    for (size_t i = 0; i < diags.size(); i++) {
-        auto& d = diags[i];
-        JsonBuilder jb;
-        JsonBuilder range;
-        range.add_int("start", d.range.start.line);
-        range.add_int("start", d.range.start.character);
-        /* Nested position objects */
-        std::string rng = "{\"start\":{\"line\":" + std::to_string(d.range.start.line) +
-                          ",\"character\":" + std::to_string(d.range.start.character) + "}" +
-                          ",\"end\":{\"line\":" + std::to_string(d.range.end.line) +
-                          ",\"character\":" + std::to_string(d.range.end.character) + "}}";
-        JsonBuilder diag_jb;
-        diag_jb.add_raw("range", rng);
-        diag_jb.add_int("severity", d.severity);
-        diag_jb.add("message", escape_json(d.message));
-        diag_jb.add("source", d.source);
-        if (i > 0) diag_json += ",";
-        diag_json += diag_jb.str();
+    /* Build diagnostic JSON array using JsonValue */
+    JsonValue diag_arr;
+    diag_arr.type = JsonValue::Array;
+    for (auto& d : diags) {
+        JsonValue diag;
+        diag.type = JsonValue::Object;
+
+        JsonValue range;
+        range.type = JsonValue::Object;
+        JsonValue start, end;
+        start.type = JsonValue::Object;
+        start.members["line"] = JsonValue();
+        start.members["line"].type = JsonValue::Number;
+        start.members["line"].num = d.range.start.line;
+        start.members["character"] = JsonValue();
+        start.members["character"].type = JsonValue::Number;
+        start.members["character"].num = d.range.start.character;
+        end.type = JsonValue::Object;
+        end.members["line"] = JsonValue();
+        end.members["line"].type = JsonValue::Number;
+        end.members["line"].num = d.range.end.line;
+        end.members["character"] = JsonValue();
+        end.members["character"].type = JsonValue::Number;
+        end.members["character"].num = d.range.end.character;
+        range.members["start"] = start;
+        range.members["end"] = end;
+        diag.members["range"] = range;
+
+        JsonValue sev;
+        sev.type = JsonValue::Number;
+        sev.num = d.severity;
+        diag.members["severity"] = sev;
+
+        JsonValue msg_val;
+        msg_val.type = JsonValue::StringVal;
+        msg_val.str = d.message;
+        diag.members["message"] = msg_val;
+
+        JsonValue src_val;
+        src_val.type = JsonValue::StringVal;
+        src_val.str = d.source;
+        diag.members["source"] = src_val;
+
+        diag_arr.items.push_back(diag);
     }
-    diag_json += "]";
+
+    std::string diag_json = JsonParser::stringify(diag_arr);
 
     /* Send textDocument/publishDiagnostics notification */
-    JsonBuilder params;
-    params.add("uri", uri);
-    params.add_raw("diagnostics", diag_json);
-    send_message(make_notification("textDocument/publishDiagnostics", params.str()));
+    JsonValue notif_params;
+    notif_params.type = JsonValue::Object;
+    JsonValue uri_val;
+    uri_val.type = JsonValue::StringVal;
+    uri_val.str = uri;
+    notif_params.members["uri"] = uri_val;
+    notif_params.members["diagnostics"] = diag_arr;
+
+    std::string params_str = JsonParser::stringify(notif_params);
+    send_message(make_notification("textDocument/publishDiagnostics", params_str));
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -621,117 +855,93 @@ void LspServer::update_diagnostics(const std::string& uri, const std::string& te
    ════════════════════════════════════════════════════════════ */
 
 void LspServer::handle_message(const std::string& json) {
-    std::string method = get_json_field(json, "method");
-    std::string id = get_json_field(json, "id");
-    std::string params;
-    auto pos = json.find("\"params\"");
-    if (pos != std::string::npos) {
-        /* Extract raw params object */
-        auto colon = json.find(':', pos + 8);
-        if (colon != std::string::npos) {
-            /* Find matching braces */
-            auto start = json.find_first_not_of(" \t\r\n", colon + 1);
-            if (start != std::string::npos && json[start] == '{') {
-                int depth = 1;
-                size_t end = start + 1;
-                while (end < json.size() && depth > 0) {
-                    if (json[end] == '{') depth++;
-                    else if (json[end] == '}') depth--;
-                    end++;
-                }
-                params = json.substr(start, end - start);
-            }
-        }
-    }
+    JsonValue msg = JsonParser::parse(json);
+    std::string method = msg.get("method").as_string();
+    current_msg_id_ = msg.get("id").as_string();
+    JsonValue params = msg.get("params");
 
     std::string response;
 
     if (method == "initialize") {
-        response = handle_initialize(params);
+        response = handle_initialize(JsonParser::stringify(params));
     } else if (method == "shutdown") {
         response = handle_shutdown();
+    } else if (method == "exit") {
+        shutdown_ = true;
+        return;
     } else if (method == "textDocument/completion") {
-        response = handle_completion(params);
+        response = handle_completion(JsonParser::stringify(params));
     } else if (method == "textDocument/definition") {
-        response = handle_definition(params);
+        response = handle_definition(JsonParser::stringify(params));
     } else if (method == "textDocument/hover") {
-        response = handle_hover(params);
+        response = handle_hover(JsonParser::stringify(params));
     } else if (method == "textDocument/references") {
-        response = handle_references(params);
+        response = handle_references(JsonParser::stringify(params));
     } else if (method == "textDocument/documentSymbol") {
-        response = handle_document_symbol(params);
+        response = handle_document_symbol(JsonParser::stringify(params));
+    } else if (method == "textDocument/signatureHelp") {
+        response = handle_signature_help(JsonParser::stringify(params));
     } else if (method == "textDocument/didOpen") {
-        handle_did_open(params);
-        return; /* No response for notifications */
+        handle_did_open(JsonParser::stringify(params));
+        return;
     } else if (method == "textDocument/didChange") {
-        handle_did_change(params);
+        handle_did_change(JsonParser::stringify(params));
         return;
     } else if (method == "textDocument/didSave") {
-        handle_did_save(params);
+        handle_did_save(JsonParser::stringify(params));
         return;
     } else if (method == "textDocument/didClose") {
-        handle_did_close(params);
+        handle_did_close(JsonParser::stringify(params));
         return;
     } else if (method == "initialized") {
-        return; /* No response needed */
+        return;
     } else {
-        /* Unknown method — return null */
-        if (!id.empty())
-            response = make_response(id, "null");
+        if (!current_msg_id_.empty())
+            response = make_response(current_msg_id_, "null");
         else
             return;
     }
 
-    if (!id.empty() && !response.empty())
+    if (!current_msg_id_.empty() && !response.empty())
         send_message(response);
 }
 
 std::string LspServer::handle_initialize(const std::string& params) {
     initialized_ = true;
 
-    /* Extract rootUri */
-    auto pos = params.find("\"rootUri\"");
-    if (pos != std::string::npos) {
-        auto colon = params.find(':', pos + 9);
-        auto start = params.find('"', colon + 1);
-        auto end = params.find('"', start + 1);
-        if (start != std::string::npos && end != std::string::npos)
-            workspace_root_ = params.substr(start + 1, end - start - 1);
-    }
+    JsonValue p = JsonParser::parse(params);
+    workspace_root_ = p.get("rootUri").as_string();
 
-    /* Capabilities */
+    /* Capabilities — use object-style textDocumentSync per spec */
     std::string caps = R"({
-        "textDocumentSync":2,
+        "textDocumentSync":{"openClose":true,"change":2,"save":true},
         "completionProvider":{"triggerCharacters":[".","@"]},
         "definitionProvider":true,
         "hoverProvider":true,
         "referencesProvider":true,
-        "documentSymbolProvider":true
+        "documentSymbolProvider":true,
+        "signatureHelpProvider":{"triggerCharacters":["("]}
     })";
 
     JsonBuilder result;
     result.add_raw("capabilities", caps);
-    result.add("serverInfo", "{\"name\":\"aurora-lsp\",\"version\":\"0.1.0\"}");
-    return make_response(get_json_field(params, "id"), result.str());
+    JsonBuilder info;
+    info.add("name", "aurora-lsp");
+    info.add("version", "0.1.0");
+    result.add_raw("serverInfo", info.str());
+    return make_response(current_msg_id_, result.str());
 }
 
 std::string LspServer::handle_shutdown() {
-    return make_response("null", "null");
+    shutdown_ = true;
+    return make_response(current_msg_id_, "null");
 }
 
 std::string LspServer::handle_completion(const std::string& params) {
-    /* Extract position */
-    int line = 0, col = 0;
-    std::smatch m;
-    std::regex line_re("\"line\"\\s*:\\s*(\\d+)");
-    std::regex col_re("\"character\"\\s*:\\s*(\\d+)");
-    if (std::regex_search(params, m, line_re)) line = std::stoi(m[1]);
-    if (std::regex_search(params, m, col_re)) col = std::stoi(m[1]);
-
-    /* Extract URI */
-    std::string uri;
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    int line = p.get("position").get("line").as_int();
+    int col = p.get("position").get("character").as_int();
 
     std::string text = open_documents_[uri];
     auto items = get_completions(text, line, col);
@@ -755,20 +965,14 @@ std::string LspServer::handle_completion(const std::string& params) {
     JsonBuilder result;
     result.add_bool("isIncomplete", false);
     result.add_raw("items", items_json);
-    return make_response(get_json_field(params, "id"), result.str());
+    return make_response(current_msg_id_, result.str());
 }
 
 std::string LspServer::handle_definition(const std::string& params) {
-    std::string uri;
-    std::smatch m;
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
-
-    int line = 0, col = 0;
-    std::regex line_re("\"line\"\\s*:\\s*(\\d+)");
-    std::regex col_re("\"character\"\\s*:\\s*(\\d+)");
-    if (std::regex_search(params, m, line_re)) line = std::stoi(m[1]);
-    if (std::regex_search(params, m, col_re)) col = std::stoi(m[1]);
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    int line = p.get("position").get("line").as_int();
+    int col = p.get("position").get("character").as_int();
 
     /* Get word under cursor */
     std::string text = open_documents_[uri];
@@ -788,15 +992,13 @@ std::string LspServer::handle_definition(const std::string& params) {
     }
 
     if (!word.empty()) {
-        /* Search for definition across all open documents */
-        /* Match patterns: "word =", "function word(", "class word", "word =" */
         std::regex def_re(R"((?:^|\s+)(?:function\s+|class\s+|struct\s+|enum\s+|interface\s+|extern\s+(?:\"[^\"]*\"\s+)?function\s+)?)" + word +
                           R"(\s*(?:\(|=|:))");
         for (auto& [doc_uri, doc_text] : open_documents_) {
-            std::istringstream stream(doc_text);
+            std::istringstream ds(doc_text);
             std::string ln;
             int ln_num = 0;
-            while (std::getline(stream, ln)) {
+            while (std::getline(ds, ln)) {
                 std::smatch dm;
                 if (std::regex_search(ln, dm, def_re)) {
                     JsonBuilder jb;
@@ -806,27 +1008,21 @@ std::string LspServer::handle_definition(const std::string& params) {
                                       ",\"end\":{\"line\":" + std::to_string(ln_num) +
                                       ",\"character\":" + std::to_string((int)ln.length()) + "}}";
                     jb.add_raw("range", rng);
-                    return make_response(get_json_field(params, "id"), jb.str());
+                    return make_response(current_msg_id_, jb.str());
                 }
                 ln_num++;
             }
         }
     }
 
-    return make_response(get_json_field(params, "id"), "null");
+    return make_response(current_msg_id_, "null");
 }
 
 std::string LspServer::handle_hover(const std::string& params) {
-    std::string uri;
-    std::smatch m;
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
-
-    int line = 0, col = 0;
-    std::regex line_re("\"line\"\\s*:\\s*(\\d+)");
-    std::regex col_re("\"character\"\\s*:\\s*(\\d+)");
-    if (std::regex_search(params, m, line_re)) line = std::stoi(m[1]);
-    if (std::regex_search(params, m, col_re)) col = std::stoi(m[1]);
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    int line = p.get("position").get("line").as_int();
+    int col = p.get("position").get("character").as_int();
 
     /* Get word under cursor */
     std::string text = open_documents_[uri];
@@ -835,7 +1031,6 @@ std::string LspServer::handle_hover(const std::string& params) {
     int cur_line = 0;
     while (cur_line < line && std::getline(stream, ln)) cur_line++;
     if (cur_line == line) {
-        /* Extract word at col */
         std::string word;
         int start = col;
         while (start > 0 && (isalnum(ln[start-1]) || ln[start-1] == '_')) start--;
@@ -844,26 +1039,62 @@ std::string LspServer::handle_hover(const std::string& params) {
         if (start < end) word = ln.substr(start, end - start);
 
         if (!word.empty()) {
+            std::string hover_text = "```\n" + word + "\n```";
+
+            /* Look up word as a function definition */
+            std::regex func_def_re(R"((?:^|\s*)function\s+)" + word +
+                                   R"(\s*\(([^)]*)\)\s*(?::\s*(\w+))?)");
+            for (auto& [doc_uri, doc_text] : open_documents_) {
+                std::istringstream ds(doc_text);
+                std::string dl;
+                int dln = 0;
+                while (std::getline(ds, dl)) {
+                    std::smatch fm;
+                    if (std::regex_search(dl, fm, func_def_re)) {
+                        std::string sig = "function " + word + "(" + fm[1].str() + ")";
+                        if (fm[2].matched) sig += ": " + fm[2].str();
+                        hover_text += "\n---\n" + sig + "\n*Defined at " + doc_uri + ":" + std::to_string(dln + 1) + "*";
+                        break;
+                    }
+                    dln++;
+                }
+                if (hover_text.find("*Defined") != std::string::npos) break;
+            }
+
+            /* Look up as variable definition */
+            if (hover_text.find("*Defined") == std::string::npos) {
+                std::regex var_def_re(R"((?:^|\s*)(?:let\s+|var\s+|const\s+)?)" +
+                                      word + R"(\s*(?::\s*\w+)?\s*=[^=])");
+                for (auto& [doc_uri, doc_text] : open_documents_) {
+                    std::istringstream ds(doc_text);
+                    std::string dl;
+                    int dln = 0;
+                    while (std::getline(ds, dl)) {
+                        std::smatch vm;
+                        if (std::regex_search(dl, vm, var_def_re)) {
+                            hover_text += "\n---\n*Variable defined at " + doc_uri + ":" + std::to_string(dln + 1) + "*";
+                            break;
+                        }
+                        dln++;
+                    }
+                    if (hover_text.find("*Variable defined") != std::string::npos) break;
+                }
+            }
+
             JsonBuilder jb;
-            jb.add("contents", "```\n" + word + "\n```");
-            return make_response(get_json_field(params, "id"), jb.str());
+            jb.add("contents", escape_json(hover_text));
+            return make_response(current_msg_id_, jb.str());
         }
     }
 
-    return make_response(get_json_field(params, "id"), "{\"contents\":[]}");
+    return make_response(current_msg_id_, "{\"contents\":[]}");
 }
 
 std::string LspServer::handle_references(const std::string& params) {
-    std::string uri;
-    std::smatch m;
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
-
-    int line = 0, col = 0;
-    std::regex line_re("\"line\"\\s*:\\s*(\\d+)");
-    std::regex col_re("\"character\"\\s*:\\s*(\\d+)");
-    if (std::regex_search(params, m, line_re)) line = std::stoi(m[1]);
-    if (std::regex_search(params, m, col_re)) col = std::stoi(m[1]);
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    int line = p.get("position").get("line").as_int();
+    int col = p.get("position").get("character").as_int();
 
     /* Get word under cursor */
     std::string text = open_documents_[uri];
@@ -887,10 +1118,10 @@ std::string LspServer::handle_references(const std::string& params) {
     if (!word.empty()) {
         std::regex word_re("\\b" + word + "\\b");
         for (auto& [doc_uri, doc_text] : open_documents_) {
-            std::istringstream stream(doc_text);
+            std::istringstream ds(doc_text);
             std::string ln;
             int ln_num = 0;
-            while (std::getline(stream, ln)) {
+            while (std::getline(ds, ln)) {
                 std::smatch rm;
                 std::string::const_iterator search_start = ln.cbegin();
                 while (std::regex_search(search_start, ln.cend(), rm, word_re)) {
@@ -914,14 +1145,12 @@ std::string LspServer::handle_references(const std::string& params) {
     }
     refs_json += "]";
 
-    return make_response(get_json_field(params, "id"), refs_json);
+    return make_response(current_msg_id_, refs_json);
 }
 
 std::string LspServer::handle_document_symbol(const std::string& params) {
-    std::string uri;
-    std::smatch m;
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
 
     std::string text = open_documents_[uri];
     auto symbols = get_symbols(text);
@@ -943,17 +1172,139 @@ std::string LspServer::handle_document_symbol(const std::string& params) {
     }
     sym_json += "]";
 
-    return make_response(get_json_field(params, "id"), sym_json);
+    return make_response(current_msg_id_, sym_json);
+}
+
+std::string LspServer::handle_signature_help(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    int line = p.get("position").get("line").as_int();
+    int col = p.get("position").get("character").as_int();
+
+    std::string text = open_documents_[uri];
+    std::istringstream stream(text);
+    std::string ln;
+    int cur_line = 0;
+    while (cur_line < line && std::getline(stream, ln)) cur_line++;
+
+    if (cur_line != line) {
+        return make_response(current_msg_id_, "null");
+    }
+
+    /* Find the function name before the cursor — look backwards for '(' */
+    int paren = (int)ln.rfind('(', col);
+    if (paren == std::string::npos) {
+        return make_response(current_msg_id_, "null");
+    }
+
+    /* Extract function name before '(' */
+    int name_end = paren;
+    int name_start = name_end;
+    while (name_start > 0 && (isalnum(ln[name_start-1]) || ln[name_start-1] == '_'))
+        name_start--;
+
+    std::string func_name = ln.substr(name_start, name_end - name_start);
+
+    if (func_name.empty() || func_name == " ") {
+        return make_response(current_msg_id_, "null");
+    }
+
+    /* Count how many commas before this paren to determine active parameter */
+    /* First, find the matching opening paren for this closing paren if nested */
+    /* Start from the beginning of this call's argument list */
+    int active_param = 0;
+    int depth = 0;
+    bool found_start = false;
+    for (int i = paren + 1; i < col; i++) {
+        if (i >= (int)ln.size()) break;
+        if (ln[i] == '(') { depth++; found_start = true; }
+        else if (ln[i] == ')') { depth--; }
+        else if (ln[i] == ',' && depth == 0) { active_param++; }
+    }
+
+    /* Search for function definition across open documents */
+    std::regex func_re(R"((?:^|\s*)function\s+)" + func_name +
+                       R"(\s*\(([^)]*)\)\s*(?::\s*(\w+))?)");
+
+    for (auto& [doc_uri, doc_text] : open_documents_) {
+        std::istringstream ds(doc_text);
+        std::string dl;
+        int dln = 0;
+        while (std::getline(ds, dl)) {
+            std::smatch fm;
+            if (std::regex_search(dl, fm, func_re)) {
+                std::string params_str = fm[1].str();
+                std::string return_type = fm[2].matched ? fm[2].str() : "";
+
+                /* Parse individual parameters */
+                std::vector<std::string> param_names;
+                std::vector<std::string> param_types;
+                std::istringstream ps(params_str);
+                std::string param;
+                while (std::getline(ps, param, ',')) {
+                    /* Trim */
+                    size_t s = param.find_first_not_of(" ");
+                    size_t e = param.find_last_not_of(" ");
+                    if (s != std::string::npos && e != std::string::npos)
+                        param = param.substr(s, e - s + 1);
+                    else
+                        param.clear();
+
+                    /* Split on ':' to get name and type */
+                    auto colon_pos = param.find(':');
+                    if (colon_pos != std::string::npos) {
+                        param_names.push_back(param.substr(0, colon_pos));
+                        // trim type
+                        std::string ptype = param.substr(colon_pos + 1);
+                        size_t ts = ptype.find_first_not_of(" ");
+                        if (ts != std::string::npos) ptype = ptype.substr(ts);
+                        param_types.push_back(ptype);
+                    } else {
+                        param_names.push_back(param);
+                        param_types.push_back("");
+                    }
+                }
+
+                /* Build signature information */
+                std::string label = func_name + "(";
+                for (size_t i = 0; i < param_names.size(); i++) {
+                    if (i > 0) label += ", ";
+                    label += param_names[i];
+                    if (!param_types[i].empty()) label += ": " + param_types[i];
+                }
+                label += ")";
+                if (!return_type.empty()) label += ": " + return_type;
+
+                std::string sig_json = R"({
+                    "signatures":[{
+                        "label":")" + escape_json(label) + R"(",
+                        "parameters":[)";
+
+                for (size_t i = 0; i < param_names.size(); i++) {
+                    if (i > 0) sig_json += ",";
+                    std::string plabel = param_names[i];
+                    if (!param_types[i].empty()) plabel += ": " + param_types[i];
+                    sig_json += R"({"label":")" + escape_json(plabel) + R"("})";
+                }
+                sig_json += R"(],
+                        "activeParameter":)" + std::to_string(active_param) + R"(
+                    }],
+                    "activeSignature":0
+                })";
+
+                return make_response(current_msg_id_, sig_json);
+            }
+            dln++;
+        }
+    }
+
+    return make_response(current_msg_id_, "null");
 }
 
 void LspServer::handle_did_open(const std::string& params) {
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    std::regex text_re("\"text\"\\s*:\\s*\"([^\"]+)\"");
-    std::smatch m;
-    std::string uri, text;
-
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
-    if (std::regex_search(params, m, text_re)) text = m[1];
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    std::string text = p.get("textDocument").get("text").as_string();
 
     if (!uri.empty()) {
         open_documents_[uri] = text;
@@ -962,53 +1313,38 @@ void LspServer::handle_did_open(const std::string& params) {
 }
 
 void LspServer::handle_did_change(const std::string& params) {
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    std::smatch m;
-    std::string uri;
-
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
 
     if (!uri.empty() && open_documents_.count(uri)) {
-        /* Find the full text in the params */
-        auto pos = params.find("\"text\"");
-        if (pos != std::string::npos) {
-            auto start = params.find('"', pos + 7);
-            if (start != std::string::npos) {
-                start++;
-                auto end = params.find('"', start);
-                if (end != std::string::npos) {
-                    open_documents_[uri] = params.substr(start, end - start);
-                    /* For simplicity, use the entire params as text if extraction fails */
-                }
-            }
+        /* Get full text from contentChanges array (last entry has the full text) */
+        JsonValue changes = p.get("contentChanges");
+        if (changes.type == JsonValue::Array && !changes.items.empty()) {
+            open_documents_[uri] = changes.items.back().get("text").as_string();
         }
         update_diagnostics(uri, open_documents_[uri]);
     }
 }
 
 void LspServer::handle_did_save(const std::string& params) {
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    std::smatch m;
-    std::string uri;
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
     if (!uri.empty() && open_documents_.count(uri))
         update_diagnostics(uri, open_documents_[uri]);
 }
 
 void LspServer::handle_did_close(const std::string& params) {
-    std::regex uri_re("\"uri\"\\s*:\\s*\"([^\"]+)\"");
-    std::smatch m;
-    std::string uri;
-    if (std::regex_search(params, m, uri_re)) uri = m[1];
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
     if (!uri.empty()) open_documents_.erase(uri);
 }
 
 void LspServer::run() {
-    /* Send initialized notification on startup */
     while (true) {
         std::string msg = read_message();
         if (msg.empty()) break;
         handle_message(msg);
+        if (shutdown_) break;
     }
 }
 

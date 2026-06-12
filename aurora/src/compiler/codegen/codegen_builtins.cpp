@@ -283,6 +283,37 @@ void register_builtins(llvm::Module* module, llvm::LLVMContext& ctx,
         llvm::FunctionType::get(i64, { i64 }, false),
         llvm::Function::ExternalLinkage, "builtin_recv", module);
 
+    /* ── Fiber builtins ── */
+    builtins.fiber_create_fn = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, i64 }, false),
+        llvm::Function::ExternalLinkage, "builtin_fiber_create", module);
+    builtins.fiber_resume_fn = llvm::Function::Create(
+        llvm::FunctionType::get(v, { i64 }, false),
+        llvm::Function::ExternalLinkage, "builtin_fiber_resume", module);
+    builtins.fiber_yield_fn = llvm::Function::Create(
+        llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "builtin_fiber_yield", module);
+    builtins.fiber_is_done_fn = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { i64 }, false),
+        llvm::Function::ExternalLinkage, "builtin_fiber_is_done", module);
+    builtins.fiber_get_result_fn = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { i64 }, false),
+        llvm::Function::ExternalLinkage, "builtin_fiber_get_result", module);
+    builtins.fiber_destroy_fn = llvm::Function::Create(
+        llvm::FunctionType::get(v, { i64 }, false),
+        llvm::Function::ExternalLinkage, "builtin_fiber_destroy", module);
+
+    /* ── Event bus builtins ── */
+    builtins.event_on_fn = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "builtin_event_on", module);
+    builtins.event_off_fn = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "builtin_event_off", module);
+    builtins.event_emit_fn = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "builtin_event_emit", module);
+
     /* ── Performance builtins ── */
     builtins.measure_fn = llvm::Function::Create(
         llvm::FunctionType::get(i64, {}, false),
@@ -623,6 +654,63 @@ void register_builtins(llvm::Module* module, llvm::LLVMContext& ctx,
     builtins.step_fn = llvm::Function::Create(
         llvm::FunctionType::get(i64, { ptr }, false),
         llvm::Function::ExternalLinkage, "builtin_step", module);
+
+    /* ── AI/ML functional builtins ── */
+    auto* ft_i64_void = llvm::FunctionType::get(i64, {}, false);
+    auto* ft_i64_i64 = llvm::FunctionType::get(i64, { i64 }, false);
+    auto* ft_i64_i64_i64 = llvm::FunctionType::get(i64, { i64, i64 }, false);
+    auto* ft_i64_i64_i64_i64 = llvm::FunctionType::get(i64, { i64, i64, i64 }, false);
+    auto* ft_i64_i64_dbl = llvm::FunctionType::get(i64, { i64, dbl }, false);
+    auto* ft_i64_i64_ptr = llvm::FunctionType::get(i64, { i64, ptr }, false);
+    auto* ft_i64_ptr = llvm::FunctionType::get(i64, { ptr }, false);
+    auto* ft_i64_dbl = llvm::FunctionType::get(i64, { dbl }, false);
+    auto* ft_i64_i64_i64_i64_i64 = llvm::FunctionType::get(i64, { i64, i64, i64, i64 }, false);
+
+    /* Data loading */
+    builtins.csv_fn        = llvm::Function::Create(ft_i64_ptr, llvm::Function::ExternalLinkage, "csv", module);
+    builtins.data_fn       = llvm::Function::Create(ft_i64_ptr, llvm::Function::ExternalLinkage, "data", module);
+
+    /* Data processing */
+    builtins.clean_fn      = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "clean", module);
+    builtins.normalize_fn  = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "normalize", module);
+    builtins.standard_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "standard", module);
+    builtins.shuffle_fn    = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "shuffle", module);
+    builtins.split_data_fn = llvm::Function::Create(ft_i64_i64_dbl, llvm::Function::ExternalLinkage, "split_data", module);
+
+    /* Model lifecycle */
+    builtins.model_create_fn = llvm::Function::Create(ft_i64_ptr, llvm::Function::ExternalLinkage, "model_create", module);
+    builtins.model_save_fn   = llvm::Function::Create(ft_i64_i64_ptr, llvm::Function::ExternalLinkage, "model_save", module);
+    builtins.model_load_fn   = llvm::Function::Create(ft_i64_ptr, llvm::Function::ExternalLinkage, "model_load", module);
+
+    /* Model config */
+    builtins.set_loss_fn         = llvm::Function::Create(ft_i64_i64_ptr, llvm::Function::ExternalLinkage, "set_loss", module);
+    builtins.set_optimizer_fn    = llvm::Function::Create(ft_i64_i64_ptr, llvm::Function::ExternalLinkage, "set_optimizer", module);
+    builtins.set_lr_fn           = llvm::Function::Create(ft_i64_i64_dbl, llvm::Function::ExternalLinkage, "set_lr", module);
+    builtins.set_batch_size_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "set_batch_size", module);
+    builtins.set_epochs_fn       = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "set_epochs", module);
+    builtins.set_validation_split_fn = llvm::Function::Create(ft_i64_i64_dbl, llvm::Function::ExternalLinkage, "set_validation_split", module);
+    builtins.set_verbose_fn      = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "set_verbose", module);
+    builtins.set_early_stop_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "set_early_stop", module);
+
+    /* Layer creation */
+    builtins.dense_fn  = llvm::Function::Create(ft_i64_i64_ptr, llvm::Function::ExternalLinkage, "dense", module);
+    builtins.conv_fn   = llvm::Function::Create(ft_i64_i64_i64_i64, llvm::Function::ExternalLinkage, "conv", module);
+    builtins.lstm_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "lstm", module);
+    builtins.gru_fn    = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "gru", module);
+    builtins.dropout_fn = llvm::Function::Create(ft_i64_dbl, llvm::Function::ExternalLinkage, "dropout", module);
+    builtins.batchnorm_fn   = llvm::Function::Create(ft_i64_void, llvm::Function::ExternalLinkage, "batchnorm", module);
+    builtins.attention_fn   = llvm::Function::Create(ft_i64_void, llvm::Function::ExternalLinkage, "attention", module);
+    builtins.transformer_fn = llvm::Function::Create(ft_i64_void, llvm::Function::ExternalLinkage, "transformer", module);
+    builtins.embedding_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "embedding", module);
+    builtins.layernorm_fn = llvm::Function::Create(ft_i64_void, llvm::Function::ExternalLinkage, "layernorm", module);
+
+    /* Model operations */
+    builtins.add_fn     = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "add", module);
+    builtins.train_fn   = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "train", module);
+    builtins.fit_fn     = llvm::Function::Create(ft_i64_i64_i64_i64, llvm::Function::ExternalLinkage, "fit", module);
+    builtins.test_fn    = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "test", module);
+    builtins.predict_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "predict", module);
+    builtins.retrain_fn = llvm::Function::Create(ft_i64_i64_i64, llvm::Function::ExternalLinkage, "retrain", module);
 }
 
 static llvm::Value* to_ptr(llvm::IRBuilder<>& builder, llvm::LLVMContext& ctx,
@@ -657,6 +745,9 @@ llvm::Value* codegen_builtin_call(
     if (ret) return ret;
 
     ret = codegen_builtin_section4(name, node, builder, ctx, builtins, gen_expr, module);
+    if (ret) return ret;
+
+    ret = codegen_builtin_section5(name, node, builder, ctx, builtins, gen_expr, module);
     if (ret) return ret;
 
     return nullptr;

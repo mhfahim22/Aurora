@@ -92,11 +92,27 @@ add_executable(aurorac
     aurora/src/compiler/doc_generator.cpp
 )
 
-llvm_map_components_to_libnames(LLVM_LIBS
+# LLVM components: native + nativecodegen auto-detect the host architecture
+# (X86 on x86, AArch64 on ARM64, etc.)
+set(AURORA_LLVM_COMPONENTS
     core support irreader passes analysis
-    x86codegen x86asmparser x86info
-    orcjit native nativecodegen
+    native nativecodegen
+    orcjit
 )
+
+# Conditionally add ASM parser for the host architecture
+# (native/nativecodegen auto-selects CodeGen + AsmPrinter but not AsmParser)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|X86|x86|amd64")
+    list(APPEND AURORA_LLVM_COMPONENTS X86AsmParser)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+    list(APPEND AURORA_LLVM_COMPONENTS AArch64AsmParser)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|ARM")
+    list(APPEND AURORA_LLVM_COMPONENTS ARMAsmParser)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64|RISCV64")
+    list(APPEND AURORA_LLVM_COMPONENTS RISCVAsmParser)
+endif()
+
+llvm_map_components_to_libnames(LLVM_LIBS ${AURORA_LLVM_COMPONENTS})
 target_link_libraries(aurorac PRIVATE ${LLVM_LIBS})
 
 
@@ -138,6 +154,9 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/ai/tokenizer.cpp
     aurora/src/runtime/async/task.cpp
     aurora/src/runtime/async/scheduler.cpp
+    aurora/src/runtime/async/channel.cpp
+    aurora/src/runtime/async/event_bus.cpp
+    aurora/src/runtime/async/fiber.cpp
     aurora/src/runtime/std/collections.cpp
     aurora/src/runtime/ai/tensor.cpp
     aurora/src/runtime/ai/tensor_v2.cpp
@@ -153,8 +172,14 @@ add_library(aurora_runtime STATIC
     aurora/src/std/fs.cpp
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
-    aurora/src/std/gui.cpp
 )
+if(APPLE)
+    target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
+    target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
+    set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX)
+else()
+    target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp)
+endif()
 
 target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
@@ -351,16 +376,15 @@ function(add_npm_bridge name pkg c_file)
         message(STATUS "npm bridge '${name}': ${c_file} not found — skipping")
         return()
     endif()
+    add_library(${name} SHARED ${c_file} ${qjs_sources})
+    set_target_properties(${name} PROPERTIES LINKER_LANGUAGE C)
+    target_include_directories(${name} PRIVATE "${qjs_dir}")
     if(WIN32)
-        add_library(${name} SHARED ${c_file} ${qjs_sources})
-        target_include_directories(${name} PRIVATE "${qjs_dir}")
         if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
             set_property(TARGET ${name} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
         endif()
         target_link_libraries(${name} PRIVATE bcrypt)
     else()
-        add_library(${name} SHARED ${c_file} ${qjs_sources})
-        target_include_directories(${name} PRIVATE "${qjs_dir}")
         target_compile_options(${name} PRIVATE -fPIC)
         if(APPLE)
             set_target_properties(${name} PROPERTIES
@@ -511,3 +535,25 @@ add_executable(bench_npm_bridge
 )
 target_link_libraries(bench_npm_bridge PRIVATE aurora_runtime)
 target_include_directories(bench_npm_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 8: Parser Fuzz Test Harness
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_fuzz_parser
+    aurora/tests/test_fuzz_parser.cpp
+)
+if(WIN32)
+    target_link_libraries(test_fuzz_parser PRIVATE kernel32)
+endif()
+target_include_directories(test_fuzz_parser PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 8: Compiler Performance Benchmarks
+# ═══════════════════════════════════════════════════════════════
+add_executable(bench_compiler
+    aurora/tests/bench_compiler.cpp
+)
+if(WIN32)
+    target_link_libraries(bench_compiler PRIVATE kernel32)
+endif()
+target_include_directories(bench_compiler PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)

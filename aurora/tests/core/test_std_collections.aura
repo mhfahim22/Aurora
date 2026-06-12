@@ -1,0 +1,36 @@
+# ── List ──
+lst = list(10, 20, 30)
+output(list_get(lst, 0))
+output(list_get(lst, 1))
+output(list_get(lst, 2))
+output(list_len(lst))
+list_free(lst)
+
+# ── Map ──
+m = map("a", 1, "b", 2)
+output(map_get(m, "a"))
+output(map_get(m, "b"))
+output(map_has(m, "a"))
+output(map_has(m, "c"))
+map_free(m)
+
+# ── Set ──
+s = set(1, 2, 3)
+output(set_has(s, 1))
+output(set_has(s, 4))
+set_free(s)
+
+# ── Stack ──
+st = stack(10, 20)
+output(stack_pop(st))
+output(stack_pop(st))
+output(stack_empty(st))
+stack_free(st)
+
+# ── Queue ──
+q = queue(1, 2)
+output(queue_dequeue(q))
+output(queue_dequeue(q))
+queue_free(q)
+
+output(666)

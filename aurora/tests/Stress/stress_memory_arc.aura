@@ -1,0 +1,52 @@
+# Phase 8: ARC (Automatic Reference Counting) stress test
+# Tests shared references and cross-function borrowing
+
+@arc
+function arc_share_chain(n)
+    if n <= 0
+        return 0
+    shared_data = [n]
+    # Multiple references to same data
+    ref1 = shared_data
+    ref2 = shared_data
+    ref3 = shared_data
+    result = ref1[0] + ref2[0] + ref3[0]
+    return result + arc_share_chain(n - 1)
+
+@arc
+function arc_cross_fn(x)
+    return [x[0] + 1]
+
+@arc
+function arc_pipeline(n)
+    total = 0
+    for i in n
+        data = [i, i+1]
+        data2 = arc_cross_fn(data)
+        total = total + data2[0]
+    return total
+
+@arc
+function arc_shared_update(n)
+    counter = [0]
+    for i in n
+        c = counter
+        c[0] = c[0] + 1
+    return counter[0]
+
+@arc
+function arc_multi_share(n)
+    root = [n]
+    a = root
+    b = root
+    c = root
+    d = [a[0]]
+    e = [b[0]]
+    f = [c[0]]
+    return a[0] + b[0] + c[0] + d[0] + e[0] + f[0]
+
+output(arc_share_chain(200))
+output(arc_pipeline(5000))
+output(arc_shared_update(10000))
+output(arc_multi_share(100))
+output("ARC_OK")

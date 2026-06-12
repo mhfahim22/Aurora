@@ -74,14 +74,14 @@ static std::string find_import_file(const std::string& name, const std::string& 
             /* pypi|npm|cargo|native:name — check for cached bridge */
             auto check_eco = [&](const fs::path& base) -> std::string {
                 /* new-style: packages/bridges/npm/name_npm/name.au */
-                auto p = base / "packages" / "bridges" / prefix / (rest + "_" + prefix) / (rest + ".au");
-                if (fs::exists(p)) return fs::absolute(p).string();
+                auto p1 = base / "packages" / "bridges" / prefix / (rest + "_" + prefix) / (rest + ".au");
+                if (fs::exists(p1)) return fs::absolute(p1).string();
                 /* new-style: lodash_npm/ */
-                auto p = base / (rest + "_" + prefix) / (rest + ".au");
-                if (fs::exists(p)) return fs::absolute(p).string();
+                auto p2 = base / (rest + "_" + prefix) / (rest + ".au");
+                if (fs::exists(p2)) return fs::absolute(p2).string();
                 /* old-style: lodash_npm_bridge/ */
-                p = base / (rest + "_" + prefix + "_bridge") / (rest + ".au");
-                return fs::exists(p) ? fs::absolute(p).string() : "";
+                auto p3 = base / (rest + "_" + prefix + "_bridge") / (rest + ".au");
+                return fs::exists(p3) ? fs::absolute(p3).string() : "";
             };
             auto r = check_eco(fs::current_path());
             if (!r.empty()) return r;
@@ -134,14 +134,14 @@ static std::string find_import_file(const std::string& name, const std::string& 
         const char* ecosystems[] = {"pypi", "npm", "cargo", "native"};
         for (auto eco : ecosystems) {
             /* new-style: packages/bridges/npm/name_npm/name.au */
-            auto p = base / "packages" / "bridges" / eco / (name + "_" + eco) / (name + ".au");
-            if (fs::exists(p)) return fs::absolute(p).string();
+            auto p1 = base / "packages" / "bridges" / eco / (name + "_" + eco) / (name + ".au");
+            if (fs::exists(p1)) return fs::absolute(p1).string();
             /* new-style: lodash_npm/ */
-            auto p = base / (name + "_" + eco) / (name + ".au");
-            if (fs::exists(p)) return fs::absolute(p).string();
+            auto p2 = base / (name + "_" + eco) / (name + ".au");
+            if (fs::exists(p2)) return fs::absolute(p2).string();
             /* old-style: lodash_npm_bridge/ */
-            p = base / (name + "_" + eco + "_bridge") / (name + ".au");
-            if (fs::exists(p)) return fs::absolute(p).string();
+            auto p3 = base / (name + "_" + eco + "_bridge") / (name + ".au");
+            if (fs::exists(p3)) return fs::absolute(p3).string();
         }
         return "";
     };
@@ -422,22 +422,11 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
 }
 
 /* ── Emit object file using LLVM TargetMachine ── */
-extern "C" {
-    void LLVMInitializeX86TargetInfo();
-    void LLVMInitializeX86Target();
-    void LLVMInitializeX86TargetMC();
-    void LLVMInitializeX86AsmPrinter();
-    void LLVMInitializeX86AsmParser();
-}
-
 static bool emit_object_file(llvm::Module* module, const std::string& obj_path) {
-    LLVMInitializeX86TargetInfo();
-    LLVMInitializeX86Target();
-    LLVMInitializeX86TargetMC();
-    LLVMInitializeX86AsmPrinter();
-    LLVMInitializeX86AsmParser();
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
 
-    std::string target_triple = "x86_64-pc-windows-msvc";
+    std::string target_triple = llvm::sys::getProcessTriple();
     module->setTargetTriple(target_triple);
 
     std::string error;
@@ -492,18 +481,12 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path) 
     return true;
 }
 
-/* ── Auto-detect MSVC & Windows SDK library paths ── */
+#ifdef _WIN32
+/* ── Auto-detect MSVC & Windows SDK library paths (Windows only) ── */
 static std::vector<std::string> detect_msvc_lib_paths() {
     std::vector<std::string> paths;
     char buf[512];
 
-    /* Try vswhere first */
-    std::string vs_where = std::string(std::getenv("ProgramFiles(x86)") ? "" : "") 
-        + "\\Microsoft Visual Studio\\Installer\\vswhere.exe";
-
-    /* Fallback: check common VS 2022 install paths */
-    std::vector<std::string> vs_bases;
-    // Actually let's just use _popen
     FILE* pipe = _popen(
         "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\" "
         "-latest -property installationPath -format value 2>nul", "r");
@@ -523,7 +506,6 @@ static std::vector<std::string> detect_msvc_lib_paths() {
     }
 
     if (vs_install.empty()) {
-        /* Try well-known paths */
         const char* candidates[] = {
             "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community",
             "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools",
@@ -537,14 +519,13 @@ static std::vector<std::string> detect_msvc_lib_paths() {
 
     if (vs_install.empty()) return paths;
 
-    /* Find MSVC toolchain version under VC/Tools/MSVC */
     std::string msvc_root = vs_install + "\\VC\\Tools\\MSVC";
     if (fs::exists(msvc_root)) {
         std::string msvc_ver;
         for (auto& entry : fs::directory_iterator(msvc_root)) {
             if (entry.is_directory()) {
                 msvc_ver = entry.path().filename().string();
-                break; /* take highest version (first sorted) */
+                break;
             }
         }
         if (!msvc_ver.empty()) {
@@ -553,7 +534,6 @@ static std::vector<std::string> detect_msvc_lib_paths() {
         }
     }
 
-    /* Find Windows SDK paths */
     std::string kits_root = "C:\\Program Files (x86)\\Windows Kits\\10\\Lib";
     if (!fs::exists(kits_root))
         kits_root = "C:\\Program Files\\Windows Kits\\10\\Lib";
@@ -575,34 +555,35 @@ static std::vector<std::string> detect_msvc_lib_paths() {
 
     return paths;
 }
+#endif
 
-/* ── Link object file into executable ── */
+/* ── Link object file into executable (cross-platform) ── */
 static bool link_exe(const std::string& obj_path, const std::string& exe_path,
                      const std::string& exe_dir,
                      const std::vector<std::string>& link_libs,
                      const std::vector<std::string>& lib_paths) {
-    /* Find runtime lib beside compiler or in build/Release */
+    std::string cmd;
+
+#ifdef _WIN32
+    /* ── Windows: lld-link (COFF) ── */
     std::string rt_lib = exe_dir + "/aurora_runtime.lib";
     if (!fs::exists(rt_lib))
         rt_lib = exe_dir + "/../build/Release/aurora_runtime.lib";
     if (!fs::exists(rt_lib))
         rt_lib = "aurora_runtime.lib";
 
-    std::string cmd = "lld-link \"" + obj_path + "\" \"" + rt_lib + "\" /OUT:\"" + exe_path
+    cmd = "lld-link \"" + obj_path + "\" \"" + rt_lib + "\" /OUT:\"" + exe_path
         + "\" /NOLOGO /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE";
 
-    /* Add user-specified library search paths */
     for (auto& lp : lib_paths)
         cmd += " /LIBPATH:\"" + lp + "\"";
 
-    /* Auto-detect MSVC paths if no user paths given */
     if (lib_paths.empty()) {
         auto msvc_paths = detect_msvc_lib_paths();
         for (auto& p : msvc_paths)
             cmd += " /LIBPATH:\"" + p + "\"";
     }
 
-    /* Add libraries (also auto-link msvcrt) */
     cmd += " msvcrt.lib";
     for (auto& lib : link_libs) {
         std::string l = lib;
@@ -611,6 +592,37 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
         else
             cmd += " \"" + l + ".lib\"";
     }
+
+#elif __APPLE__
+    /* ── macOS: ld64.lld or clang++ ── */
+    std::string rt_lib = exe_dir + "/libaurora_runtime.a";
+    if (!fs::exists(rt_lib))
+        rt_lib = exe_dir + "/../build/libaurora_runtime.a";
+    if (!fs::exists(rt_lib))
+        rt_lib = "libaurora_runtime.a";
+
+    cmd = "ld64.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"";
+    for (auto& lp : lib_paths)
+        cmd += " -L\"" + lp + "\"";
+    for (auto& lib : link_libs)
+        cmd += " -l\"" + lib + "\"";
+    cmd += " -lc -lc++";
+
+#else
+    /* ── Linux/Unix: ld.lld (ELF) ── */
+    std::string rt_lib = exe_dir + "/libaurora_runtime.a";
+    if (!fs::exists(rt_lib))
+        rt_lib = exe_dir + "/../build/libaurora_runtime.a";
+    if (!fs::exists(rt_lib))
+        rt_lib = "libaurora_runtime.a";
+
+    cmd = "ld.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"";
+    for (auto& lp : lib_paths)
+        cmd += " -L\"" + lp + "\"";
+    for (auto& lib : link_libs)
+        cmd += " -l\"" + lib + "\"";
+    cmd += " -lc -lc++ -lm";
+#endif
 
     std::cout << "aurora: linking " << exe_path << "\n";
     int ret = std::system(cmd.c_str());
@@ -928,7 +940,7 @@ int main(int argc, char** argv) {
                     features_str += f.first();
                 }
             }
-            module->setTargetTriple("x86_64-pc-windows-msvc");
+            module->setTargetTriple(llvm::sys::getProcessTriple());
 
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;

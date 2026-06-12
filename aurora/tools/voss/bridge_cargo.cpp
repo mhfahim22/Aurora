@@ -31,7 +31,37 @@ static const ConcreteSubst known_concrete_types[] = {
     {"serde_json", "Deserializer", "serde_json::Value"},
     {"serde_json", "StreamDeserializer", "serde_json::Value, serde_json::Value"},
     {"serde_json", "LineColIterator", "String"},
-    /* serde: Serializer<...> is trait-level, skip */
+    {"serde_json", "Serializer", "serde_json::Value"},
+    {"serde_json", "Formatter", "serde_json::Value"},
+    {"serde_json", "PrettyFormatter", "serde_json::Value"},
+    {"serde_json", "CompactFormatter", "serde_json::Value"},
+    /* serde: Serializer<...> trait with downstream concrete serializer */
+    {"serde", "Serializer", "serde_json::Serializer<Vec<u8>>"},
+    {"serde", "Deserializer", "serde_json::Deserializer<std::io::Cursor<Vec<u8>>>"},
+    {"serde", "SerializeSeq", "serde_json::ser::SerializeSeq<serde_json::Serializer<Vec<u8>>>"},
+    {"serde", "SerializeMap", "serde_json::ser::SerializeMap<serde_json::Serializer<Vec<u8>>>"},
+    {"serde", "SerializeStruct", "serde_json::ser::SerializeStruct<serde_json::Serializer<Vec<u8>>>"},
+    /* rand: distribution/RNG generics with trait bounds */
+    {"rand", "DistIter", "rand::distributions::Standard, rand::rngs::ThreadRng"},
+    {"rand", "Uniform", "f64"},
+    {"rand", "WeightedIndex", "f64"},
+    {"rand", "WeightedAliasIndex", "f64"},
+    {"rand", "Alphanumeric", ""},
+    {"rand", "Standard", ""},
+    {"rand", "Open01", ""},
+    {"rand", "OpenClosed01", ""},
+    {"rand", "Bernoulli", ""},
+    /* rand: RNG types (no bound generics, but included for completeness) */
+    {"rand", "StdRng", ""},
+    {"rand", "SmallRng", ""},
+    {"rand", "ThreadRng", ""},
+    /* regex: Match, Captures have lifetime params only; RegexSet/bytes are concrete */
+    {"regex", "Match", "str"},
+    {"regex", "Captures", "str"},
+    {"regex", "SubCaptureMatches", "str"},
+    {"regex", "Matches", "str, str"},
+    {"regex", "Split", "str"},
+    {"regex", "SplitN", "str"},
 };
 
 static std::string lookup_concrete_type(const std::string& pkg,
@@ -2328,6 +2358,12 @@ CargoDiscovery discover_cargo_functions(const std::string& pkg,
                     "Serializer",
                     "PrettyFormatter", "CompactFormatter",
                     "Formatter",
+                    /* rand crate types */
+                    "DistIter", "Uniform", "WeightedIndex", "WeightedAliasIndex",
+                    "Alphanumeric", "Standard", "Open01", "OpenClosed01",
+                    /* regex crate types */
+                    "Match", "Captures", "SubCaptureMatches", "Matches", "Split", "SplitN",
+                    "NoExpand",
                 };
                 bool has_trait_bounds = false;
                 for (auto* bt : bounded_generic_types) {
@@ -2698,6 +2734,16 @@ void gen_cargo_rust_wrapper(const std::string& pkg, const std::string& ver,
         rs << "}\n\n";
         rs << "unsafe fn retrieve<'a>(ptr: *mut c_void) -> &'a mut serde_json::Value {\n";
         rs << "    &mut *(ptr as *mut serde_json::Value)\n";
+        rs << "}\n\n";
+
+        /***** rust_bridge_get_fns — C-discoverable function registry *****/
+        rs << "#[no_mangle]\n";
+        rs << "pub extern \"C\" fn rust_bridge_get_fns() -> *mut HashMap<String, RustFn> {\n";
+        rs << "    Box::into_raw(Box::new(registry().lock().unwrap().clone()))\n";
+        rs << "}\n\n";
+        rs << "#[no_mangle]\n";
+        rs << "pub extern \"C\" fn rust_bridge_type_registry() -> *mut HashMap<String, HashMap<String, MethodFn>> {\n";
+        rs << "    Box::into_raw(Box::new(type_registry().lock().unwrap().clone()))\n";
         rs << "}\n\n";
 
         /***** _import *****/

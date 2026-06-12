@@ -1,0 +1,93 @@
+# Async & Concurrency Demo
+# Demonstrates async/await, spawn/parallel, channels, fibers, and event bus
+
+async function fetch_data(url)
+    output("Fetching: " + url)
+    result = http_get(url)
+    return result
+
+async function process_data(data)
+    output("Processing " + len(data) + " bytes")
+    cleaned = clean(data)
+    return normalize(cleaned)
+
+function main()
+    # Sequential async
+    output("=== Sequential Async ===")
+
+    task1 = spawn fetch_data("https://api.example.com/users")
+    task2 = spawn fetch_data("https://api.example.com/posts")
+    task3 = spawn fetch_data("https://api.example.com/comments")
+
+    users = await task1
+    posts = await task2
+    comments = await task3
+
+    output("Fetched " + len(users) + " users")
+    output("Fetched " + len(posts) + " posts")
+    output("Fetched " + len(comments) + " comments")
+
+    # Parallel execution
+    output("=== Parallel ===")
+
+    parallel
+        result1 = fetch_data("https://api1.example.com")
+        result2 = fetch_data("https://api2.example.com")
+        result3 = fetch_data("https://api3.example.com")
+
+    output("All parallel tasks complete")
+
+    # Channels
+    output("=== Channels ===")
+
+    ch = chan()
+
+    spawn lambda()
+        for i in 5
+            send(ch, "message " + i)
+            sleep(100)
+        send(ch, "done")
+
+    while true
+        msg = recv(ch)
+        if msg == "done"
+            break
+        output("Received: " + msg)
+
+    # Event bus
+    output("=== Event Bus ===")
+
+    function on_user_login(data)
+        output("User logged in: " + data.user)
+        audit("user.login", data)
+
+    function on_user_logout(data)
+        output("User logged out: " + data.user)
+
+    event_on("user.login", on_user_login)
+    event_on("user.logout", on_user_logout)
+
+    event_emit("user.login", {"user": "Alice", "time": stamp()})
+    event_emit("user.logout", {"user": "Alice"})
+
+    event_off("user.login", on_user_login)
+
+    # Fibers
+    output("=== Fibers ===")
+
+    function fiber_task()
+        output("Fiber step 1")
+        fiber_yield("midway")
+        output("Fiber step 2")
+        return "done"
+
+    f = fiber_create(fiber_task)
+    result = fiber_resume(f)
+    output("Fiber yielded: " + result)
+    result = fiber_get_result(f)
+    output("Fiber result: " + result)
+    fiber_destroy(f)
+
+    output("All async demos complete!")
+
+main()

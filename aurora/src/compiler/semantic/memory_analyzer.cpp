@@ -37,7 +37,7 @@ void MemoryAnalyzer::analyse(const ASTNode* root) {
     apply_ownership_results();
 
     /* ── Phase 8: Run allocation strategy engine ── */
-    apply_allocation_strategy();
+    apply_allocation_strategy(root);
 
     /* ── Phase 9: Run allocation profiler ── */
     allocation_profiler_.analyse(root, *this);
@@ -789,7 +789,11 @@ void MemoryAnalyzer::print_alias_graph() const {
    Apply Allocation Strategy (Phase 5)
    ════════════════════════════════════════════════════════════ */
 
-void MemoryAnalyzer::apply_allocation_strategy() {
+void MemoryAnalyzer::apply_allocation_strategy(const ASTNode* root) {
+    /* Run the AllocationStrategyEngine for sophisticated decision logic */
+    allocation_engine_.analyse(root);
+    allocation_engine_.print_allocation_report();
+
     /* Check if any function is in performance mode */
     bool any_perf_mode = false;
     for (const auto& [func_name, result] : results_) {

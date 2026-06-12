@@ -144,9 +144,41 @@ void Codegen::generate(const ASTNode* root) {
 
 llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
                                               llvm::Type* ty,
-                                              OwnershipState state) {
-    llvm::Value* ptr = create_entry_alloca(name, ty);
+                                              OwnershipState state,
+                                              AllocStrategy strategy) {
     llvm::PointerType* ptr_ty = llvm::PointerType::getUnqual(ctx_);
+
+    /* Resolve forced strategies to base */
+    if (is_forced_strategy(strategy))
+        strategy = forced_to_base(strategy);
+
+    /* Strategy-specific allocation */
+    switch (strategy) {
+        case AllocStrategy::Arena: {
+            /* Arena allocation: call aurora_arena_alloc */
+            llvm::Value* size = llvm::ConstantExpr::getSizeOf(ty);
+            size = builder_->CreateZExtOrTrunc(size, i64_ty());
+            llvm::Value* raw = builder_->CreateCall(fn_arena_alloc_, { size },
+                                                     name + "_arena");
+            llvm::Value* ptr = create_entry_alloca(name, ptr_ty);
+            builder_->CreateStore(raw, ptr);
+            return ptr;
+        }
+        case AllocStrategy::GC: {
+            /* GC allocation: call aurora_gc_alloc */
+            llvm::Value* size = llvm::ConstantExpr::getSizeOf(ty);
+            size = builder_->CreateZExtOrTrunc(size, i64_ty());
+            llvm::Value* raw = builder_->CreateCall(fn_gc_alloc_, { size },
+                                                     name + "_gc");
+            llvm::Value* ptr = create_entry_alloca(name, ptr_ty);
+            builder_->CreateStore(raw, ptr);
+            return ptr;
+        }
+        default:
+            break;
+    }
+
+    llvm::Value* ptr = create_entry_alloca(name, ty);
 
     /* Emit ownership-specific setup based on state */
     switch (state) {
@@ -231,6 +263,21 @@ void Codegen::declare_runtime_helpers() {
         llvm::FunctionType::get(void_ty(), { i8ptr_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_gc_unregister_root", module_.get());
 
+    /* i8* aurora_arena_alloc(i64 size) */
+    fn_arena_alloc_ = llvm::Function::Create(
+        llvm::FunctionType::get(i8ptr_ty(), { i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_arena_alloc", module_.get());
+
+    /* i8* aurora_gc_alloc(i64 size) */
+    fn_gc_alloc_ = llvm::Function::Create(
+        llvm::FunctionType::get(i8ptr_ty(), { i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_gc_alloc", module_.get());
+
+    /* void aurora_gc_free(i8* ptr) */
+    fn_gc_free_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { i8ptr_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_gc_free", module_.get());
+
     /* void aurora_print_int(i64 val) */
     fn_printf_ = llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { i64_ty() }, false),
@@ -275,6 +322,16 @@ void Codegen::declare_runtime_helpers() {
     fn_str_concat_ = llvm::Function::Create(
         llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty(), i8ptr_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_str_concat", module_.get());
+
+    /* AuroraStr* aurora_substr(AuroraStr*, i64 start, i64 len) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty(), i64_ty(), i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_substr", module_.get());
+
+    /* i64 aurora_str_index(AuroraStr*, AuroraStr*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i64_ty(), { i8ptr_ty(), i8ptr_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_str_index", module_.get());
 
     /* AuroraStr* aurora_int_to_str(i64) — convert integer to AuroraStr */
     fn_int_to_str_ = llvm::Function::Create(
@@ -413,6 +470,76 @@ void Codegen::declare_runtime_helpers() {
         llvm::FunctionType::get(void_ty(), { fnptr_ty }, false),
         llvm::Function::ExternalLinkage, "aurora_wait", module_.get());
 
+    /* ── Channel runtime ── */
+    auto* chan_i32 = llvm::Type::getInt32Ty(ctx_);
+    /* AuroraChannel* aurora_chan_create(i32 capacity) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(fnptr_ty, { chan_i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_chan_create", module_.get());
+
+    /* void aurora_chan_destroy(AuroraChannel*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_chan_destroy", module_.get());
+
+    /* void aurora_chan_send(AuroraChannel*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty, fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_chan_send", module_.get());
+
+    /* i8* aurora_chan_recv(AuroraChannel*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(fnptr_ty, { fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_chan_recv", module_.get());
+
+    /* ── Event bus runtime ── */
+    /* void aurora_event_bus_init() */
+    fn_event_bus_init_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), {}, false),
+        llvm::Function::ExternalLinkage, "aurora_event_bus_init", module_.get());
+    /* void aurora_event_on(i8*, i8* (i8*)*, i8*) */
+    fn_event_on_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty, fnptr_ty, fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_event_on", module_.get());
+    /* void aurora_event_off(i8*, i8* (i8*)*) */
+    fn_event_off_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty, fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_event_off", module_.get());
+    /* void aurora_event_emit(i8*, i8*) */
+    fn_event_emit_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty, fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_event_emit", module_.get());
+    /* void aurora_event_bus_shutdown() */
+    fn_event_bus_shutdown_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), {}, false),
+        llvm::Function::ExternalLinkage, "aurora_event_bus_shutdown", module_.get());
+
+    /* ── Fiber runtime ── */
+    /* AuroraFiber* aurora_fiber_create(i8* (i8*)*, i8*) */
+    fn_fiber_create_ = llvm::Function::Create(
+        llvm::FunctionType::get(fnptr_ty, { fnptr_ty, fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_fiber_create", module_.get());
+    /* void aurora_fiber_destroy(AuroraFiber*) */
+    fn_fiber_destroy_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_fiber_destroy", module_.get());
+    /* void aurora_fiber_yield() */
+    fn_fiber_yield_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), {}, false),
+        llvm::Function::ExternalLinkage, "aurora_fiber_yield", module_.get());
+    /* void aurora_fiber_resume(AuroraFiber*) */
+    fn_fiber_resume_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_fiber_resume", module_.get());
+    /* i32 aurora_fiber_is_done(AuroraFiber*) */
+    fn_fiber_is_done_ = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt32Ty(ctx_), { fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_fiber_is_done", module_.get());
+    /* i8* aurora_fiber_get_result(AuroraFiber*) */
+    fn_fiber_get_result_ = llvm::Function::Create(
+        llvm::FunctionType::get(fnptr_ty, { fnptr_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_fiber_get_result", module_.get());
+
     /* ── Phase 2: Collection type constructors ── */
     auto* i32_ty = llvm::Type::getInt32Ty(ctx_);
     /* i8* list_new() */
@@ -535,6 +662,10 @@ void Codegen::declare_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { ptr, ptr, i64_ty() }, false),
         llvm::Function::ExternalLinkage, "json_set", module_.get());
+    /* i8* json_get(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "json_get", module_.get());
     /* void json_free(i8*) */
     llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { ptr }, false),
@@ -585,6 +716,18 @@ void Codegen::declare_domain_runtime_helpers() {
     entity_set_pos_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr, llvm::Type::getDoubleTy(*ctx), llvm::Type::getDoubleTy(*ctx), llvm::Type::getDoubleTy(*ctx) }, false),
         llvm::Function::ExternalLinkage, "aurora_entity_set_pos", mod);
+    /* entity_get_pos(i8*, double*, double*, double*) */
+    entity_get_pos_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_entity_get_pos", mod);
+    /* entity_set_velocity(i8*, double, double, double) */
+    entity_set_velocity_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, llvm::Type::getDoubleTy(*ctx), llvm::Type::getDoubleTy(*ctx), llvm::Type::getDoubleTy(*ctx) }, false),
+        llvm::Function::ExternalLinkage, "aurora_entity_set_velocity", mod);
+    /* entity_get_velocity(i8*, double*, double*, double*) */
+    entity_get_velocity_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_entity_get_velocity", mod);
 
     /* sprite_create(i8*, double, double) → i8* */
     sprite_create_ = llvm::Function::Create(
@@ -603,6 +746,10 @@ void Codegen::declare_domain_runtime_helpers() {
     physics_step_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { llvm::Type::getDoubleTy(*ctx) }, false),
         llvm::Function::ExternalLinkage, "aurora_physics_step", mod);
+    /* physics_set_gravity(double, double, double) */
+    physics_set_gravity_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { llvm::Type::getDoubleTy(*ctx), llvm::Type::getDoubleTy(*ctx), llvm::Type::getDoubleTy(*ctx) }, false),
+        llvm::Function::ExternalLinkage, "aurora_physics_set_gravity", mod);
 
     /* collision_check(i8*, i8*) → i32 */
     collision_check_ = llvm::Function::Create(
@@ -613,6 +760,10 @@ void Codegen::declare_domain_runtime_helpers() {
     audio_play_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_audio_play", mod);
+    /* audio_play_tone(i64, i64) */
+    audio_play_tone_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { i64, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_audio_play_tone", mod);
 
     /* animation_play(i8*, i8*, i64 duration) */
     animation_play_ = llvm::Function::Create(
@@ -638,6 +789,10 @@ void Codegen::declare_domain_runtime_helpers() {
     engine_delta_time_ = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getDoubleTy(*ctx), {}, false),
         llvm::Function::ExternalLinkage, "aurora_engine_delta_time", mod);
+    /* engine_poll_input() */
+    engine_poll_input_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_engine_poll_input", mod);
 
     /* ── Backend Framework ── */
     /* server_init(i64 port) → i8* */
@@ -744,6 +899,57 @@ void Codegen::declare_domain_runtime_helpers() {
     style_apply_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_style_apply", mod);
+
+    /* ── Component runtime ── */
+    /* AuroraComponent* aurora_component_create(i8* name, i32 x, i32 y, i32 w, i32 h) */
+    auto* i32 = llvm::Type::getInt32Ty(ctx_);
+    comp_create_ = llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, i32, i32, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_create", mod);
+    /* void aurora_component_destroy(AuroraComponent*) */
+    comp_destroy_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_destroy", mod);
+    /* void aurora_component_add_child(AuroraComponent*, AuroraComponent*) */
+    comp_add_child_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_add_child", mod);
+    /* void aurora_component_set_render_fn(AuroraComponent*, void(*)(void*,i32,i32,i32,i32)) */
+    comp_set_render_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_set_render_fn", mod);
+    /* void aurora_component_set_state(AuroraComponent*, void*) */
+    comp_set_state_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_set_state", mod);
+    /* void aurora_component_mount(AuroraComponent*) */
+    comp_mount_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_mount", mod);
+    /* void aurora_component_set_pos(AuroraComponent*, i32, i32) */
+    comp_set_pos_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_set_pos", mod);
+    /* void aurora_component_set_size(AuroraComponent*, i32, i32) */
+    comp_set_size_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_set_size", mod);
+    /* void aurora_component_show(AuroraComponent*) */
+    comp_show_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_show", mod);
+    /* void aurora_component_hide(AuroraComponent*) */
+    comp_hide_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_hide", mod);
+    /* void aurora_component_render_tree(AuroraComponent*) */
+    comp_render_tree_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_render_tree", mod);
+    /* void aurora_component_update_tree(AuroraComponent*, f64) */
+    comp_update_tree_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, llvm::Type::getDoubleTy(ctx_) }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_update_tree", mod);
 
     /* ── Utility ── */
     /* aurora_sleep(i64 ms) */
@@ -999,11 +1205,19 @@ void Codegen::gen_stmt(const ASTNode* node) {
             break;
         }
         case NodeType::Render: {
-            /* Render: emit UI render tree with child components */
-            auto* fn_render = module_->getFunction("aurora_ui_render");
-            if (fn_render) {
-                if (node->left) gen_expr(node->left.get());
-                builder_->CreateCall(fn_render, {});
+            /* Render: render the component tree */
+            if (node->left) gen_expr(node->left.get());
+            if (comp_render_tree_ && ui_init_) {
+                builder_->CreateCall(ui_init_, {});
+                /* Load root component from the last created component */
+                VarRecord* root_rec = lookup_var("__parent_comp");
+                if (root_rec && root_rec->alloca_ptr) {
+                    llvm::Value* root = builder_->CreateLoad(i8ptr_ty(), root_rec->alloca_ptr, "root_comp");
+                    builder_->CreateCall(comp_render_tree_, { root });
+                }
+            } else {
+                auto* fn_render = module_->getFunction("aurora_ui_render");
+                if (fn_render) builder_->CreateCall(fn_render, {});
             }
             if (node->body) gen_block(node->body.get());
             break;
@@ -1012,24 +1226,100 @@ void Codegen::gen_stmt(const ASTNode* node) {
         case NodeType::Theme:         gen_theme(node);         break;
         case NodeType::Route:         gen_route(node);         break;
         case NodeType::Page: {
-            /* Page: register route for this page component */
+            /* Page: create component and register route */
             std::string page_path = node->value.empty() ? "/" : "/" + node->value;
             llvm::Value* path_str = builder_->CreateGlobalStringPtr(page_path, "page_path");
-            auto* fn_route = module_->getFunction("aurora_route_register");
-            if (fn_route) {
-                auto* handler = llvm::ConstantPointerNull::get(i8ptr_ty());
-                builder_->CreateCall(fn_route, { path_str, handler });
+
+            if (comp_create_ && node->body) {
+                /* Create a component for the page body */
+                llvm::Value* name_str = builder_->CreateGlobalStringPtr(
+                    node->value.empty() ? "page" : node->value, "page_name");
+                auto* z32 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 0);
+                llvm::Value* comp = builder_->CreateCall(comp_create_,
+                    { name_str, z32, z32,
+                      llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 800),
+                      llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 600) },
+                    "page_comp");
+
+                /* Create render callback for the page */
+                static uint64_t page_id = 0;
+                std::string render_name = "_page_render_" + (node->value.empty() ? std::to_string(page_id++) : node->value);
+                auto* render_ty = llvm::FunctionType::get(void_ty(),
+                    { i8ptr_ty(), llvm::Type::getInt32Ty(ctx_),
+                      llvm::Type::getInt32Ty(ctx_), llvm::Type::getInt32Ty(ctx_),
+                      llvm::Type::getInt32Ty(ctx_) }, false);
+                auto* render_fn = llvm::Function::Create(
+                    render_ty, llvm::Function::InternalLinkage, render_name, module_.get());
+                auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", render_fn);
+                auto* saved_fn = cur_fn_;
+                auto saved_insert = builder_->saveIP();
+                auto* saved_cache_ptr = &literal_aurora_cache_;
+                builder_->SetInsertPoint(entry_bb);
+                cur_fn_ = render_fn;
+
+                gen_block(node->body.get());
+                builder_->CreateRetVoid();
+
+                literal_aurora_cache_ = std::move(*saved_cache_ptr);
+                cur_fn_ = saved_fn;
+                builder_->restoreIP(saved_insert);
+
+                auto* render_cast = builder_->CreateBitCast(render_fn, i8ptr_ty());
+                builder_->CreateCall(comp_set_render_, { comp, render_cast });
+                builder_->CreateCall(comp_mount_, { comp });
+
+                auto* handler_cast = builder_->CreateBitCast(render_fn, i8ptr_ty());
+                if (route_register_)
+                    builder_->CreateCall(route_register_, { path_str, handler_cast });
+            } else {
+                auto* fn_route = module_->getFunction("aurora_route_register");
+                if (fn_route) {
+                    auto* handler = llvm::ConstantPointerNull::get(i8ptr_ty());
+                    builder_->CreateCall(fn_route, { path_str, handler });
+                }
+                if (node->body) gen_block(node->body.get());
             }
-            if (node->body) gen_block(node->body.get());
             break;
         }
         case NodeType::Layout: {
-            /* Layout: set up layout container with children */
-            if (node->body) gen_block(node->body.get());
-            auto* fn_layout = module_->getFunction("aurora_gui_layout_vertical");
-            if (fn_layout && node->left) {
-                llvm::Value* children = gen_expr(node->left.get());
-                builder_->CreateCall(fn_layout, { children });
+            /* Layout: create a container component for children */
+            if (comp_create_) {
+                llvm::Value* name_str = builder_->CreateGlobalStringPtr(
+                    node->value.empty() ? "layout" : node->value, "layout_name");
+                auto* z32 = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 0);
+                llvm::Value* comp = builder_->CreateCall(comp_create_,
+                    { name_str, z32, z32,
+                      llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 800),
+                      llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 600) },
+                    "layout_comp");
+
+                /* Store as parent for children */
+                auto* comp_slot = create_entry_alloca("__parent_comp", i8ptr_ty());
+                builder_->CreateStore(comp, comp_slot);
+                declare_var("__parent_comp", comp_slot, OwnershipState::Owned);
+
+                if (node->body) gen_block(node->body.get());
+
+                /* Add layout to its parent if inside a component */
+                VarRecord* parent_rec = lookup_var("__parent_comp");
+                if (parent_rec && parent_rec->alloca_ptr && comp_add_child_) {
+                    llvm::Value* parent_comp = builder_->CreateLoad(i8ptr_ty(), parent_rec->alloca_ptr, "layout_parent");
+                    llvm::Value* is_parent = builder_->CreateICmpNE(parent_comp, comp);
+                    auto* add_bb = llvm::BasicBlock::Create(ctx_, "layout_add", cur_fn_);
+                    auto* skip_bb = llvm::BasicBlock::Create(ctx_, "layout_skip", cur_fn_);
+                    builder_->CreateCondBr(is_parent, add_bb, skip_bb);
+                    builder_->SetInsertPoint(add_bb);
+                    builder_->CreateCall(comp_add_child_, { parent_comp, comp });
+                    builder_->CreateBr(skip_bb);
+                    builder_->SetInsertPoint(skip_bb);
+                }
+            } else {
+                if (node->body) gen_block(node->body.get());
+                auto* fn_layout = module_->getFunction("aurora_gui_layout_vertical");
+                if (fn_layout && node->left) {
+                    llvm::Value* children = gen_expr(node->left.get());
+                    builder_->CreateCall(fn_layout, { children });
+                }
             }
             break;
         }
@@ -1037,13 +1327,29 @@ void Codegen::gen_stmt(const ASTNode* node) {
         case NodeType::Transition:    gen_transition(node);    break;
         case NodeType::Server:        gen_server(node);        break;
         case NodeType::Request: {
-            /* Request: parse HTTP request data (side-effect only) */
-            if (node->left) gen_expr(node->left.get());
+            /* Request: parse HTTP request data → calls aurora_http_parse_request */
+            if (http_parse_req_) {
+                llvm::Value* raw = llvm::ConstantPointerNull::get(i8ptr_ty());
+                if (node->left) {
+                    raw = gen_expr(node->left.get());
+                    if (raw->getType() != i8ptr_ty())
+                        raw = builder_->CreateBitCast(raw, i8ptr_ty());
+                }
+                builder_->CreateCall(http_parse_req_, { raw }, "req");
+            }
             break;
         }
         case NodeType::Response: {
-            /* Response: build HTTP response (side-effect only) */
-            if (node->left) gen_expr(node->left.get());
+            /* Response: build HTTP response → calls aurora_http_response_new + set_body */
+            if (http_resp_new_) {
+                llvm::Value* resp = builder_->CreateCall(http_resp_new_, {}, "resp");
+                if (node->left && http_resp_body_) {
+                    llvm::Value* body = gen_expr(node->left.get());
+                    if (body->getType() != i8ptr_ty())
+                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                    builder_->CreateCall(http_resp_body_, { resp, body });
+                }
+            }
             break;
         }
         case NodeType::Api:           gen_api(node);           break;
@@ -1168,7 +1474,9 @@ void Codegen::gen_stmt(const ASTNode* node) {
             break;
         }
         case NodeType::Update: {
-            /* Update: frame start, body, frame end, render */
+            /* Update: poll input, frame start, body, frame end, render */
+            if (engine_poll_input_)
+                builder_->CreateCall(engine_poll_input_, {});
             if (engine_frame_start_)
                 builder_->CreateCall(engine_frame_start_, {});
             if (node->body) gen_block(node->body.get());

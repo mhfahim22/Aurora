@@ -210,6 +210,19 @@ struct BuiltinFunctions {
     llvm::Function* serialize_fn        { nullptr };
     llvm::Function* deserialize_fn      { nullptr };
 
+    /* Fiber builtins */
+    llvm::Function* fiber_create_fn     { nullptr };
+    llvm::Function* fiber_resume_fn     { nullptr };
+    llvm::Function* fiber_yield_fn      { nullptr };
+    llvm::Function* fiber_is_done_fn    { nullptr };
+    llvm::Function* fiber_get_result_fn { nullptr };
+    llvm::Function* fiber_destroy_fn    { nullptr };
+
+    /* Event bus builtins */
+    llvm::Function* event_on_fn         { nullptr };
+    llvm::Function* event_off_fn        { nullptr };
+    llvm::Function* event_emit_fn       { nullptr };
+
     /* Event/PubSub */
     llvm::Function* event_fn            { nullptr };
     llvm::Function* emit_fn             { nullptr };
@@ -265,6 +278,42 @@ struct BuiltinFunctions {
     llvm::Function* workflow_fn         { nullptr };
     llvm::Function* pipeline_fn         { nullptr };
     llvm::Function* step_fn             { nullptr };
+
+    /* ── AI/ML functional builtins ── */
+    llvm::Function* csv_fn              { nullptr };
+    llvm::Function* data_fn             { nullptr };
+    llvm::Function* clean_fn            { nullptr };
+    llvm::Function* normalize_fn        { nullptr };
+    llvm::Function* standard_fn         { nullptr };
+    llvm::Function* shuffle_fn          { nullptr };
+    llvm::Function* split_data_fn       { nullptr };
+    llvm::Function* model_create_fn     { nullptr };
+    llvm::Function* model_save_fn       { nullptr };
+    llvm::Function* model_load_fn       { nullptr };
+    llvm::Function* set_loss_fn         { nullptr };
+    llvm::Function* set_optimizer_fn    { nullptr };
+    llvm::Function* set_lr_fn           { nullptr };
+    llvm::Function* set_batch_size_fn   { nullptr };
+    llvm::Function* set_epochs_fn       { nullptr };
+    llvm::Function* set_validation_split_fn { nullptr };
+    llvm::Function* set_verbose_fn      { nullptr };
+    llvm::Function* set_early_stop_fn   { nullptr };
+    llvm::Function* dense_fn            { nullptr };
+    llvm::Function* conv_fn             { nullptr };
+    llvm::Function* lstm_fn             { nullptr };
+    llvm::Function* gru_fn              { nullptr };
+    llvm::Function* dropout_fn          { nullptr };
+    llvm::Function* batchnorm_fn        { nullptr };
+    llvm::Function* attention_fn        { nullptr };
+    llvm::Function* transformer_fn      { nullptr };
+    llvm::Function* embedding_fn        { nullptr };
+    llvm::Function* layernorm_fn        { nullptr };
+    llvm::Function* add_fn              { nullptr };
+    llvm::Function* train_fn            { nullptr };
+    llvm::Function* fit_fn              { nullptr };
+    llvm::Function* test_fn             { nullptr };
+    llvm::Function* predict_fn          { nullptr };
+    llvm::Function* retrain_fn          { nullptr };
 };
 
 /* ── Register all built-in functions in the LLVM module ── */

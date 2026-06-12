@@ -16,13 +16,7 @@
   #include <windows.h>
   #include <commctrl.h>
   #pragma comment(lib, "comctl32.lib")
-#elif defined(__APPLE__)
-  #include <TargetConditionals.h>
-  #if TARGET_OS_MAC
-    /* Cocoa via Objective-C++ would need .mm — we use X11 as fallback or stub */
-    #define AURORA_GUI_STUB 1
-  #endif
-#else
+#elif defined(__linux__)
   /* Linux X11 */
   #include <X11/Xlib.h>
   #include <X11/Xutil.h>
@@ -47,13 +41,10 @@ struct GuiWidget {
 #if defined(_WIN32)
     HWND hwnd;
     HWND hwnd_parent;
-#elif defined(__linux__) && !defined(AURORA_GUI_STUB)
+#else
     Window xwindow;
     GC gc;
     int is_visible;
-#else
-    /* Stub mode — no platform handle needed */
-    int stub_val;
 #endif
 };
 
@@ -62,7 +53,7 @@ static int g_next_id = 1;
 static bool g_running = false;
 static std::map<int, GuiWidget*> g_id_map;
 
-#if defined(__linux__) && !defined(_WIN32) && !defined(AURORA_GUI_STUB)
+#ifndef _WIN32
 static Display* g_display = nullptr;
 static int g_screen;
 static Window g_root;
@@ -80,7 +71,7 @@ static GuiWidget* widget_new(int type, GuiWidget* parent) {
 #if defined(_WIN32)
     w->hwnd = nullptr;
     w->hwnd_parent = parent ? parent->hwnd : nullptr;
-#elif defined(__linux__) && !defined(AURORA_GUI_STUB)
+#else
     w->xwindow = 0;
     w->gc = nullptr;
     w->is_visible = 0;
@@ -336,7 +327,7 @@ void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) {
    X11 Backend (Linux)
    ════════════════════════════════════════════════════════════ */
 
-#elif defined(__linux__) && !defined(AURORA_GUI_STUB)
+#else
 
 /* ── Platform data for X11 widgets ── */
 struct X11WidgetData {
@@ -582,104 +573,6 @@ void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) {
     if (widget) ((GuiWidget*)widget)->callback = cb;
 }
 
-void aurora_gui_layout_horizontal(AuroraWidget, int) {}
-void aurora_gui_layout_vertical(AuroraWidget, int) {}
-
-/* ════════════════════════════════════════════════════════════
-   Stub Backend (macOS / fallback)
-   ════════════════════════════════════════════════════════════ */
-
-#else
-
-/* Stub implementation prints messages */
-#define STUB_LOG(...) fprintf(stdout, "[gui.stub] " __VA_ARGS__); fflush(stdout)
-
-AuroraWidget aurora_gui_window_new(const char* title, int width, int height) {
-    GuiWidget* w = widget_new(AURORA_WIDGET_WINDOW, nullptr);
-    w->text = title; w->w = width; w->h = height;
-    STUB_LOG("window '%s' %dx%d\n", title, width, height);
-    return (AuroraWidget)w;
-}
-
-void aurora_gui_window_set_title(AuroraWidget win, const char* title) {
-    ((GuiWidget*)win)->text = title;
-    STUB_LOG("window title: %s\n", title);
-}
-
-void aurora_gui_window_resize(AuroraWidget win, int w_, int h_) {
-    GuiWidget* w = (GuiWidget*)win; w->w = w_; w->h = h_;
-    STUB_LOG("window resize: %dx%d\n", w_, h_);
-}
-
-void aurora_gui_window_show(AuroraWidget win) { STUB_LOG("window show\n"); }
-void aurora_gui_window_hide(AuroraWidget win) { STUB_LOG("window hide\n"); }
-void aurora_gui_window_destroy(AuroraWidget win) { STUB_LOG("window destroy\n"); }
-
-AuroraWidget aurora_gui_button_new(AuroraWidget parent, const char* text, int x, int y, int w_, int h_) {
-    GuiWidget* p = (GuiWidget*)parent;
-    GuiWidget* btn = widget_new(AURORA_WIDGET_BUTTON, p);
-    btn->text = text; btn->x = x; btn->y = y; btn->w = w_; btn->h = h_;
-    STUB_LOG("button '%s' at %d,%d %dx%d\n", text, x, y, w_, h_);
-    return (AuroraWidget)btn;
-}
-
-void aurora_gui_button_set_text(AuroraWidget btn, const char* text) { ((GuiWidget*)btn)->text = text; }
-const char* aurora_gui_button_get_text(AuroraWidget btn) { return ((GuiWidget*)btn)->text.c_str(); }
-
-AuroraWidget aurora_gui_label_new(AuroraWidget parent, const char* text, int x, int y, int w_, int h_) {
-    GuiWidget* p = (GuiWidget*)parent;
-    GuiWidget* lbl = widget_new(AURORA_WIDGET_LABEL, p);
-    lbl->text = text; lbl->x = x; lbl->y = y; lbl->w = w_; lbl->h = h_;
-    STUB_LOG("label '%s' at %d,%d\n", text, x, y);
-    return (AuroraWidget)lbl;
-}
-
-void aurora_gui_label_set_text(AuroraWidget lbl, const char* text) { ((GuiWidget*)lbl)->text = text; }
-const char* aurora_gui_label_get_text(AuroraWidget lbl) { return ((GuiWidget*)lbl)->text.c_str(); }
-
-AuroraWidget aurora_gui_textbox_new(AuroraWidget parent, int x, int y, int w_, int h_) {
-    GuiWidget* p = (GuiWidget*)parent;
-    GuiWidget* tb = widget_new(AURORA_WIDGET_TEXTBOX, p);
-    tb->x = x; tb->y = y; tb->w = w_; tb->h = h_;
-    STUB_LOG("textbox at %d,%d %dx%d\n", x, y, w_, h_);
-    return (AuroraWidget)tb;
-}
-
-void aurora_gui_textbox_set_text(AuroraWidget tb, const char* text) { ((GuiWidget*)tb)->text = text; }
-const char* aurora_gui_textbox_get_text(AuroraWidget tb) { return ((GuiWidget*)tb)->text.c_str(); }
-
-AuroraWidget aurora_gui_listbox_new(AuroraWidget parent, int x, int y, int w_, int h_) {
-    GuiWidget* p = (GuiWidget*)parent;
-    GuiWidget* lb = widget_new(AURORA_WIDGET_LISTBOX, p);
-    lb->x = x; lb->y = y; lb->w = w_; lb->h = h_;
-    STUB_LOG("listbox at %d,%d %dx%d\n", x, y, w_, h_);
-    return (AuroraWidget)lb;
-}
-
-void aurora_gui_listbox_add_item(AuroraWidget lb, const char* item) { ((GuiWidget*)lb)->items.push_back(item); }
-void aurora_gui_listbox_clear(AuroraWidget lb) { ((GuiWidget*)lb)->items.clear(); }
-int aurora_gui_listbox_get_selected(AuroraWidget lb) { return ((GuiWidget*)lb)->selected_idx; }
-const char* aurora_gui_listbox_get_item(AuroraWidget lb, int idx) {
-    GuiWidget* w = (GuiWidget*)lb;
-    if (idx >= 0 && idx < (int)w->items.size()) return w->items[idx].c_str();
-    return nullptr;
-}
-int aurora_gui_listbox_count(AuroraWidget lb) { return (int)((GuiWidget*)lb)->items.size(); }
-
-void aurora_gui_run() {
-    g_running = true;
-    STUB_LOG("event loop started (press Ctrl+C to exit)\n");
-    while (g_running) {
-        /* In stub mode, sleep to avoid busy-wait */
-        struct timespec ts = {0, 100000000}; /* 100ms */
-        nanosleep(&ts, nullptr);
-    }
-}
-
-void aurora_gui_quit() { g_running = false; }
-void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) {
-    if (widget) ((GuiWidget*)widget)->callback = cb;
-}
 void aurora_gui_layout_horizontal(AuroraWidget, int) {}
 void aurora_gui_layout_vertical(AuroraWidget, int) {}
 

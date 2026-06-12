@@ -165,6 +165,10 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["starts"]        = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["ends"]          = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["reverse"]       = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
+    functions_["strlen"]        = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["strcat"]        = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::String};
+    functions_["substr"]        = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}, AuroraType::String};
+    functions_["index"]         = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
 
     /* ── Math builtins ── */
     functions_["abs"]           = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
@@ -196,6 +200,31 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["find"]          = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
     functions_["any"]           = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["all"]           = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
+
+    /* ── Collection utility functions (runtime-backed) ── */
+    functions_["list_get"]      = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
+    functions_["list_len"]      = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["list_push"]     = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["list_free"]     = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["map_get"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
+    functions_["map_has"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
+    functions_["map_set"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["map_free"]      = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["set_add"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["set_has"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
+    functions_["set_free"]      = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["stack_push"]    = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["stack_pop"]     = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["stack_empty"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Bool};
+    functions_["stack_free"]    = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["queue_enqueue"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["queue_dequeue"] = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["queue_empty"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Bool};
+    functions_["queue_free"]    = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["vector_x"]      = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
+    functions_["vector_y"]      = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
+    functions_["vector_z"]      = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
+    functions_["json_free"]     = FunctionTypeInfo{{AuroraType::Unknown}};
 
     /* ── File builtins ── */
     functions_["read"]          = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
@@ -253,6 +282,19 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["chan"]          = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
     functions_["send"]          = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
     functions_["recv"]          = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Unknown};
+
+    /* ── Event bus builtins ── */
+    functions_["event_on"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::Unknown}};
+    functions_["event_off"]     = FunctionTypeInfo{{AuroraType::String, AuroraType::Unknown}};
+    functions_["event_emit"]    = FunctionTypeInfo{{AuroraType::String, AuroraType::Unknown}};
+
+    /* ── Fiber builtins ── */
+    functions_["fiber_create"]  = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
+    functions_["fiber_resume"]  = FunctionTypeInfo{{AuroraType::Int}};
+    functions_["fiber_yield"]   = FunctionTypeInfo{{}};
+    functions_["fiber_is_done"] = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["fiber_get_result"] = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["fiber_destroy"] = FunctionTypeInfo{{AuroraType::Int}};
 
     /* ── Performance builtins ── */
     functions_["measure"]       = FunctionTypeInfo{{}, AuroraType::Int};
@@ -403,6 +445,53 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["pipeline"]        = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Bool};
     functions_["step"]            = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Bool};
 
+    /* ── AI/ML functional builtins ── */
+    /* Data loading */
+    functions_["csv"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["data"]  = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+
+    /* Data processing */
+    functions_["clean"]      = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["normalize"]  = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["standard"]   = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["shuffle"]    = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["split_data"] = FunctionTypeInfo{{AuroraType::Int, AuroraType::Float}, AuroraType::Int};
+
+    /* Model lifecycle */
+    functions_["model_create"] = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["model_save"]   = FunctionTypeInfo{{AuroraType::Int, AuroraType::Unknown}, AuroraType::Int};
+    functions_["model_load"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+
+    /* Model config */
+    functions_["set_loss"]             = FunctionTypeInfo{{AuroraType::Int, AuroraType::Unknown}, AuroraType::Int};
+    functions_["set_optimizer"]        = FunctionTypeInfo{{AuroraType::Int, AuroraType::Unknown}, AuroraType::Int};
+    functions_["set_lr"]               = FunctionTypeInfo{{AuroraType::Int, AuroraType::Float}, AuroraType::Int};
+    functions_["set_batch_size"]       = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["set_epochs"]           = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["set_validation_split"] = FunctionTypeInfo{{AuroraType::Int, AuroraType::Float}, AuroraType::Int};
+    functions_["set_verbose"]          = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["set_early_stop"]       = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+
+    /* Layer creation */
+    functions_["dense"]       = FunctionTypeInfo{{AuroraType::Int, AuroraType::Unknown}, AuroraType::Int};
+    functions_["conv"]        = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["lstm"]        = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["gru"]         = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["dropout"]     = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Int};
+    functions_["batchnorm"]   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["attention"]   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["transformer"] = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["embedding"]   = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["layernorm"]   = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* Model operations */
+    functions_["add"]     = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["train"]   = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["fit"]     = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["test"]    = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["predict"] = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["retrain"] = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+
     while (node) {
         if (node->type == NodeType::Function || node->type == NodeType::PerformanceFn) {
             FunctionTypeInfo info;
@@ -522,6 +611,36 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             break;
         }
 
+        case NodeType::Async: {
+            /* Async function: register callable name + walk body */
+            if (node->body && node->body->type == NodeType::Function) {
+                const ASTNode* fn = node->body.get();
+                std::string fname = fn->value;
+                /* Build param types from function args */
+                std::vector<AuroraType> param_types;
+                const ASTNode* p = fn->args.get();
+                while (p) {
+                    param_types.push_back(AuroraType::Unknown);
+                    p = p->next.get();
+                }
+                /* Register: async function returns Int (task handle) */
+                functions_[fname] = FunctionTypeInfo{param_types, AuroraType::Int};
+                /* Walk body for type inference */
+                push_scope();
+                const ASTNode* param = fn->args.get();
+                while (param) {
+                    define_var(param->value, AuroraType::Unknown);
+                    param = param->next.get();
+                }
+                if (fn->body) walk_block(fn->body.get());
+                pop_scope();
+            } else if (node->body) {
+                /* Plain async block: walk body */
+                walk_block(node->body.get());
+            }
+            break;
+        }
+
         case NodeType::UnsafeBlock:
         case NodeType::SafeBlock:
         case NodeType::Parallel:
@@ -583,6 +702,8 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             if (node->body) walk_block(node->body.get());
             break;
 
+        case NodeType::Spawn:
+        case NodeType::Wait:
         case NodeType::Thread:
         case NodeType::Signal:
         case NodeType::Emit:

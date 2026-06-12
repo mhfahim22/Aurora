@@ -1,0 +1,76 @@
+/* Phase 2 — Async / Concurrency Test */
+
+/* Test 1: spawn + wait */
+function worker(x):
+    output("Worker running")
+    return x * 2
+
+function test_spawn_wait():
+    output("--- test_spawn_wait ---")
+    spawn worker(21)
+    output("Spawn done")
+
+/* Test 2: channel send/recv */
+function test_channel():
+    output("--- test_channel ---")
+    ch = chan(5)
+    send(ch, 100)
+    val = recv(ch)
+    output("Received from channel:")
+    output(val)
+
+/* Test 3: channel with spawn */
+function producer(ch, x, y, z):
+    send(ch, x + 32)
+    send(ch, y * 2)
+    send(ch, z + 69)
+
+function test_concurrent_channel():
+    output("--- test_concurrent_channel ---")
+    ch = chan(3)
+    spawn producer(ch, 10, 20, 30)
+    a = recv(ch)
+    b = recv(ch)
+    c = recv(ch)
+    output("Received:")
+    output(a)
+    output(b)
+    output(c)
+    if a == 42 and c == 99:
+        output("Channel PASSED")
+    else:
+        output("Channel FAILED")
+
+/* Test 4: parallel block */
+function test_parallel():
+    output("--- test_parallel ---")
+    parallel:
+        output("Parallel body")
+    output("Parallel done")
+
+/* Test 5: async block */
+function test_async_block():
+    output("--- test_async_block ---")
+    async:
+        output("Async body")
+    output("Async block done")
+
+/* Test 6: async function */
+async function simple_async():
+    output("Inside simple_async")
+
+function test_async_func():
+    output("--- test_async_function ---")
+    t = simple_async()
+    wait t
+    output("Async function done")
+
+/* Main */
+output("=== Phase 2 Async Test ===")
+test_spawn_wait()
+test_channel()
+test_concurrent_channel()
+test_parallel()
+test_async_block()
+test_async_func()
+output("=== All done ===")

@@ -189,7 +189,7 @@ private:
     void apply_ownership_results();
 
     /* ── Allocation Strategy (Phase 5) ── */
-    void apply_allocation_strategy();
+    void apply_allocation_strategy(const ASTNode* root);
     bool can_use_stack_direct(const MemoryMetadata& meta) const;
     bool can_use_arena_direct(const MemoryMetadata& meta) const;
 

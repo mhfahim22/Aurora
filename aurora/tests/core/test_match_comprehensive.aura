@@ -1,0 +1,57 @@
+# ── Test 1: Integer literal matching ──
+x = 3
+match x
+    case 1
+        output(10)
+    case 2
+        output(20)
+    case 3
+        output(30)
+    default
+        output(99)
+
+# ── Test 2: Array destructuring ──
+arr = [1, 2, 3]
+match arr
+    case [1, 2, 3]
+        output(100)
+    case [a, b]
+        output(a + b)
+    default
+        output(0)
+
+# ── Test 3: Variable binding pattern ──
+y = 42
+match y
+    case z
+        output(z)
+    default
+        output(0)
+
+# ── Test 4: Switch keyword (same as match) ──
+w = 2
+switch w
+    case 1
+        output(10)
+    case 2
+        output(20)
+    default
+        output(99)
+
+# ── Test 5: Multiple match in loop ──
+for i in 5
+    match i
+        case 0
+            output(1000)
+        case 1
+            output(1001)
+        default
+            output(1999)
+
+# ── Test 6: Match with default only ──
+z = 99
+match z
+    default
+        output(777)
+
+output(555)

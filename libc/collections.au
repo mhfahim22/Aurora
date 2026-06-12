@@ -1,0 +1,32 @@
+# ════════════════════════════════════════════════════════════
+# Aurora Standard Library — Collections
+# Usage:  import "collections"  or  import libc:collections
+#
+# Constructors:
+#   list(v...)       map(k, v...)     set(v...)
+#   stack(v...)      queue(v...)      vector(x, y, z)
+#   json(k, v...)
+#
+# List:   list_get(lst, i)  list_len(lst)  list_push(lst, v)
+#         list_last(lst)    list_first(lst)  list_free(lst)
+#
+# Map:    map_get(m, k)     map_has(m, k)  map_set(m, k, v)
+#         map_free(m)
+#
+# Set:    set_has(s, v)     set_add(s, v)  set_free(s)
+#
+# Stack:  stack_push(s, v)  stack_pop(s)   stack_empty(s)
+#         stack_free(s)
+#
+# Queue:  queue_enqueue(q, v)  queue_dequeue(q)  queue_empty(q)
+#         queue_free(q)
+#
+# Vector: vector_x(v)  vector_y(v)  vector_z(v)
+# JSON:   json_free(j)
+# ════════════════════════════════════════════════════════════
+
+function list_last(lst)
+    return list_get(lst, list_len(lst) - 1)
+
+function list_first(lst)
+    return list_get(lst, 0)

@@ -1,0 +1,95 @@
+# Data Processing Pipeline
+# Demonstrates collections, file I/O, JSON, and functional programming
+
+function load_data(path)
+    if not exists(path)
+        output("File not found: " + path)
+        return []
+
+    raw = read(path)
+    lines = split(raw, "\n")
+    headers = split(lines[0], ",")
+
+    data = []
+    for i in 1..len(lines)
+        if len(lines[i]) > 0
+            values = split(lines[i], ",")
+            row = {}
+            for j in headers
+                map_set(row, j, values[j])
+            push(data, row)
+
+    return data
+
+function filter_by(data, key, value)
+    return filter(data, lambda(row) map_get(row, key) == value)
+
+function sort_by(data, key)
+    result = copy(data)
+    sort(result, lambda(a, b)
+        a_val = map_get(a, key)
+        b_val = map_get(b, key)
+        if a_val < b_val
+            return -1
+        elseif a_val > b_val
+            return 1
+        return 0
+    )
+    return result
+
+function summary(data, key)
+    values = map(data, lambda(row) int(map_get(row, key)))
+    return {
+        "count": len(values),
+        "sum": reduce(values, lambda(a, b) a + b, 0),
+        "min": reduce(values, lambda(a, b) if a < b then a else b, values[0]),
+        "max": reduce(values, lambda(a, b) if a > b then a else b, values[0]),
+        "avg": reduce(values, lambda(a, b) a + b, 0) / len(values)
+    }
+
+function main()
+    output("=== Data Processing Pipeline ===")
+
+    write("sample.csv", "name,age,city,score\nAlice,30,NYC,95\nBob,25,LA,87\nCharlie,35,Chicago,92\nDiana,28,NYC,88\nEve,32,LA,91")
+
+    data = load_data("sample.csv")
+    output("Loaded " + len(data) + " records")
+
+    output("\n=== Filter: NYC residents ===")
+    nyc = filter_by(data, "city", "NYC")
+    for row in nyc
+        output(map_get(row, "name") + " (" + map_get(row, "age") + ")")
+
+    output("\n=== Sorted by score ===")
+    sorted = sort_by(data, "score")
+    for row in sorted
+        output(map_get(row, "name") + ": " + map_get(row, "score"))
+
+    output("\n=== Score summary ===")
+    s = summary(data, "score")
+    output(encode(s))
+
+    output("\n=== Transformed data ===")
+    transformed = map(data, lambda(row)
+        name = map_get(row, "name")
+        score = int(map_get(row, "score"))
+        grade = ""
+        if score >= 90
+            grade = "A"
+        elseif score >= 80
+            grade = "B"
+        else
+            grade = "C"
+
+        return {"name": name, "score": score, "grade": grade, "senior": score >= 90}
+    )
+
+    for row in transformed
+        output(map_get(row, "name") + " -> " + map_get(row, "grade"))
+
+    output("\n=== High scorers ===")
+    top = filter(transformed, lambda(row) map_get(row, "senior"))
+    for row in top
+        output(map_get(row, "name") + ": " + map_get(row, "score"))
+
+main()

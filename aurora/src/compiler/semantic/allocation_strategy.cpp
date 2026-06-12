@@ -12,8 +12,61 @@
    ════════════════════════════════════════════════════════════ */
 
 void AllocationStrategyEngine::analyse(const ASTNode* root) {
-    /* This engine works on the results from other analyzers */
-    /* It's called after MemoryAnalyzer has collected all info */
+    decisions_.clear();
+    if (!root) return;
+
+    auto walk = [&](const ASTNode* node, auto&& self) -> void {
+        if (!node) return;
+
+        if (node->type == NodeType::Function ||
+            node->type == NodeType::PerformanceFn) {
+
+            current_func_name_ = node->value;
+            in_performance_mode_ = (node->type == NodeType::PerformanceFn);
+
+            auto walk_vars = [&](const ASTNode* n, auto&& wv) -> void {
+                if (!n) return;
+                if (n->type == NodeType::Var) {
+                    std::string var_name = n->value;
+                    if (!var_name.empty()) {
+                        MemoryMetadata meta = n->memory_meta;
+                        if (is_forced_strategy(meta.forced_strategy)) {
+                            AllocationDecision d;
+                            d.var_name = var_name;
+                            d.strategy = meta.forced_strategy;
+                            d.confidence = 100;
+                            d.reason = "forced by attribute";
+                            decisions_[current_func_name_ + "::" + var_name] = d;
+                        } else {
+                            AllocationDecision decision = decide_gc(var_name, meta);
+                            if (meta.size_estimate > 0 && meta.size_estimate <= 64 && !meta.has_borrows)
+                                decision = decide_stack(var_name, meta);
+                            else if (meta.ownership_type == OwnershipType::Single)
+                                decision = decide_raii(var_name, meta);
+                            else if (meta.ownership_type == OwnershipType::Shared)
+                                decision = decide_arc(var_name, meta);
+                            decisions_[current_func_name_ + "::" + var_name] = decision;
+                        }
+                    }
+                }
+                wv(n->left.get(), wv);
+                wv(n->right.get(), wv);
+                wv(n->body.get(), wv);
+                wv(n->orelse.get(), wv);
+                wv(n->next.get(), wv);
+                wv(n->args.get(), wv);
+            };
+            walk_vars(node, walk_vars);
+        }
+
+        self(node->left.get(), self);
+        self(node->right.get(), self);
+        self(node->body.get(), self);
+        self(node->orelse.get(), self);
+        self(node->next.get(), self);
+        self(node->args.get(), self);
+    };
+    walk(root, walk);
 }
 
 void AllocationStrategyEngine::set_performance_mode(bool val) {

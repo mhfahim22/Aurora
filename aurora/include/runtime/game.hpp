@@ -15,8 +15,10 @@ typedef struct AuroraEntity {
     int64_t   id;
     int64_t   type;
     double    x, y, z;
+    double    vx, vy, vz;
     double    rot_x, rot_y, rot_z;
     double    scale_x, scale_y, scale_z;
+    double    mass;
     int       active;
     void*     user_data;
 } AuroraEntity;
@@ -25,6 +27,8 @@ AuroraEntity* aurora_entity_create(int64_t type);
 void          aurora_entity_destroy(AuroraEntity* e);
 void          aurora_entity_set_pos(AuroraEntity* e, double x, double y, double z);
 void          aurora_entity_get_pos(AuroraEntity* e, double* x, double* y, double* z);
+void          aurora_entity_set_velocity(AuroraEntity* e, double vx, double vy, double vz);
+void          aurora_entity_get_velocity(AuroraEntity* e, double* vx, double* vy, double* vz);
 
 /* ── Sprite ── */
 typedef struct AuroraSprite {
@@ -53,6 +57,7 @@ int  aurora_collision_check(AuroraEntity* a, AuroraEntity* b);
 
 /* ── Audio ── */
 void aurora_audio_play(const char* clip_path);
+void aurora_audio_play_tone(int frequency, int duration_ms);
 void aurora_audio_stop_all(void);
 
 /* ── Frame timing / Render / Input ── */
@@ -61,6 +66,8 @@ void   aurora_engine_frame_end(void);
 void   aurora_engine_render(void);
 int    aurora_engine_is_key_down(int key_code);
 double aurora_engine_delta_time(void);
+void   aurora_engine_poll_input(void);
+void   aurora_physics_set_gravity(double gx, double gy, double gz);
 
 /* ── Animation ── */
 typedef struct AuroraAnimation {

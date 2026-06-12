@@ -2121,16 +2121,42 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  return NULL;}\n\n";
         cw << "/* ── bridge_npm_install — auto-download & extract npm package ── */\n";
         cw << "static JSValue bridge_npm_install(JSContext*ctx,const char*name){\n";
+        cw << "  /* Support scoped packages: @scope/pkg → URL-encode as @scope%2Fpkg */\n";
+        cw << "  char scope_encoded[4096];\n";
+        cw << "  const char*reg_name=name;\n";
+        cw << "  const char*slash_pos=strchr(name,'/');\n";
+        cw << "  if(slash_pos&&name[0]=='@'){\n";
+        cw << "    size_t slen=(size_t)(slash_pos-name);\n";
+        cw << "    if(slen+8<sizeof(scope_encoded)){\n";
+        cw << "      memcpy(scope_encoded,name,slen);\n";
+        cw << "      memcpy(scope_encoded+slen,\"%2F\",3);\n";
+        cw << "      strcpy(scope_encoded+slen+3,slash_pos+1);\n";
+        cw << "      reg_name=scope_encoded;\n";
+        cw << "    }\n";
+        cw << "  }\n";
         cw << "  /* Check CJS fallback for ESM-only packages */\n";
         cw << "  const char*pin=cjs_version(name);\n";
         cw << "  /* Fetch package metadata from npm registry */\n";
         cw << "  char url[4096];\n";
-        cw << "  if(pin)snprintf(url,sizeof(url),\"https://registry.npmjs.org/%s/%s\",name,pin);\n";
-        cw << "  else snprintf(url,sizeof(url),\"https://registry.npmjs.org/%s/latest\",name);\n";
-        cw << "  JSValueConst meta_args[1];meta_args[0]=JS_NewString(ctx,url);\n";
-        cw << "  JSValue meta=bridge_http_get(ctx,JS_NULL,1,meta_args);\n";
-        cw << "  JS_FreeValue(ctx,meta_args[0]);\n";
-        cw << "  if(JS_IsException(meta)||JS_IsNull(meta))return JS_FALSE;\n";
+        cw << "  if(pin)snprintf(url,sizeof(url),\"https://registry.npmjs.org/%s/%s\",reg_name,pin);\n";
+        cw << "  else snprintf(url,sizeof(url),\"https://registry.npmjs.org/%s/latest\",reg_name);\n";
+        cw << "  /* Retry loop for HTTP fetch (up to 3 attempts with backoff) */\n";
+        cw << "  JSValue meta=JS_NULL;\n";
+        cw << "  for(int attempt=0;attempt<3;attempt++){\n";
+        cw << "    if(attempt>0){int ms=500<<(attempt-1);\n";
+#ifdef _WIN32
+        cw << "      Sleep(ms);\n";
+#else
+        cw << "      usleep(ms*1000);\n";
+#endif
+        cw << "    }\n";
+        cw << "    JSValueConst meta_args[1];meta_args[0]=JS_NewString(ctx,url);\n";
+        cw << "    meta=bridge_http_get(ctx,JS_NULL,1,meta_args);\n";
+        cw << "    JS_FreeValue(ctx,meta_args[0]);\n";
+        cw << "    if(!JS_IsException(meta)&&!JS_IsNull(meta))break;\n";
+        cw << "    JS_FreeValue(ctx,meta);meta=JS_NULL;\n";
+        cw << "  }\n";
+        cw << "  if(JS_IsNull(meta)||JS_IsException(meta))return JS_FALSE;\n";
         cw << "  const char*ms=JS_ToCString(ctx,meta);if(!ms){JS_FreeValue(ctx,meta);return JS_FALSE;}\n";
         cw << "  JSValue po=JS_ParseJSON(ctx,ms,strlen(ms),\"<meta>\");JS_FreeCString(ctx,ms);JS_FreeValue(ctx,meta);\n";
         cw << "  if(JS_IsException(po))return JS_FALSE;\n";
@@ -2138,11 +2164,24 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  if(JS_IsUndefined(tv)){JS_FreeValue(ctx,tv);JS_FreeValue(ctx,po);return JS_FALSE;}\n";
         cw << "  const char*tarball=JS_ToCString(ctx,tv);\n";
         cw << "  if(!tarball){JS_FreeValue(ctx,tv);JS_FreeValue(ctx,po);return JS_FALSE;}\n";
-        cw << "  /* Download tarball */\n";
-        cw << "  JSValueConst dl_args[1];dl_args[0]=JS_NewString(ctx,tarball);\n";
-        cw << "  JSValue dl=bridge_http_get(ctx,JS_NULL,1,dl_args);\n";
-        cw << "  JS_FreeValue(ctx,dl_args[0]);JS_FreeCString(ctx,tarball);JS_FreeValue(ctx,tv);JS_FreeValue(ctx,po);\n";
-        cw << "  if(JS_IsException(dl)||JS_IsNull(dl))return JS_FALSE;\n";
+        cw << "  /* Download tarball (with retry) */\n";
+        cw << "  JSValue dl=JS_NULL;\n";
+        cw << "  for(int attempt=0;attempt<3;attempt++){\n";
+        cw << "    if(attempt>0){int ms=500<<(attempt-1);\n";
+#ifdef _WIN32
+        cw << "      Sleep(ms);\n";
+#else
+        cw << "      usleep(ms*1000);\n";
+#endif
+        cw << "    }\n";
+        cw << "    JSValueConst dl_args[1];dl_args[0]=JS_NewString(ctx,tarball);\n";
+        cw << "    dl=bridge_http_get(ctx,JS_NULL,1,dl_args);\n";
+        cw << "    JS_FreeValue(ctx,dl_args[0]);\n";
+        cw << "    if(!JS_IsException(dl)&&!JS_IsNull(dl))break;\n";
+        cw << "    JS_FreeValue(ctx,dl);dl=JS_NULL;\n";
+        cw << "  }\n";
+        cw << "  JS_FreeCString(ctx,tarball);JS_FreeValue(ctx,tv);JS_FreeValue(ctx,po);\n";
+        cw << "  if(JS_IsNull(dl)||JS_IsException(dl))return JS_FALSE;\n";
         cw << "  const char*tgz=JS_ToCString(ctx,dl);if(!tgz){JS_FreeValue(ctx,dl);return JS_FALSE;}\n";
         cw << "  /* Write tarball to temp file */\n";
         cw << "  char tmpfile[1024]=\"\";const char*td=getenv(\"TMPDIR\");if(!td)td=\"/tmp\";\n";
@@ -2156,9 +2195,19 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  /* Ensure node_modules and extract */\n";
 #ifdef _WIN32
         cw << "  _mkdir(\"node_modules\");\n";
+        cw << "  /* Create scope subdirectory for scoped packages */\n";
+        cw << "  if(slash_pos&&name[0]=='@'){\n";
+        cw << "    char scopedir[4096];snprintf(scopedir,sizeof(scopedir),\"node_modules/%.*s\",(int)(slash_pos-name),name);\n";
+        cw << "    _mkdir(scopedir);\n";
+        cw << "  }\n";
         cw << "  char cmd[65536];snprintf(cmd,sizeof(cmd),\"tar xzf \\\"%s\\\" -C node_modules 2>nul\",tmpfile);\n";
 #else
         cw << "  mkdir(\"node_modules\",0755);\n";
+        cw << "  /* Create scope subdirectory for scoped packages */\n";
+        cw << "  if(slash_pos&&name[0]=='@'){\n";
+        cw << "    char scopedir[4096];snprintf(scopedir,sizeof(scopedir),\"node_modules/%.*s\",(int)(slash_pos-name),name);\n";
+        cw << "    mkdir(scopedir,0755);\n";
+        cw << "  }\n";
         cw << "  char cmd[65536];snprintf(cmd,sizeof(cmd),\"tar xzf '%s' -C node_modules 2>/dev/null\",tmpfile);\n";
 #endif
         cw << "  int rc=system(cmd);remove(tmpfile);\n";

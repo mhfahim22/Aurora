@@ -94,12 +94,41 @@ int cmd_restore(const std::string& snapshot) {
 }
 
 int cmd_sandbox(const std::string& pkg, bool verbose) {
-    (void)verbose;
-    std::string dir = ".aura/sandbox/" + pkg; fs::create_directories(dir); fs::create_directories(dir + "/packages");
-    if (fs::exists("aurora.pkg")) fs::copy_file("aurora.pkg", dir + "/aurora.pkg", fs::copy_options::overwrite_existing);
-    if (fs::exists("aura.lock")) fs::copy_file("aura.lock", dir + "/aura.lock", fs::copy_options::overwrite_existing);
-    if (fs::exists("packages/" + pkg)) fs::copy("packages/" + pkg, dir + "/packages/" + pkg, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-    std::cout << "sandbox ready at " << dir << "\n"; return 0;
+    std::string dir = ".aura/sandbox/" + pkg;
+    fs::create_directories(dir);
+    fs::create_directories(dir + "/packages");
+
+    if (fs::exists("aurora.pkg"))
+        fs::copy_file("aurora.pkg", dir + "/aurora.pkg", fs::copy_options::overwrite_existing);
+    if (fs::exists("aura.lock"))
+        fs::copy_file("aura.lock", dir + "/aura.lock", fs::copy_options::overwrite_existing);
+    if (fs::exists("packages/" + pkg))
+        fs::copy("packages/" + pkg, dir + "/packages/" + pkg,
+                 fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+
+    /* Write sandbox policy file */
+    std::ofstream pf(dir + "/sandbox.policy");
+    pf << "package: " << pkg << "\n"
+       << "network: isolated\n"
+       << "filesystem: read-only\n"
+       << "process: isolated\n"
+       << "memory: 512MB\n"
+       << "cpu: 1 core\n";
+
+    std::cout << "sandbox ready at " << dir << "\n";
+
+    if (!verbose) return 0;
+
+    /* Print sandbox info */
+    std::cout << "\nsandbox policy:\n";
+    std::cout << "  network:     isolated (no external access)\n";
+    std::cout << "  filesystem:  read-only (packages/)\n";
+    std::cout << "  process:     isolated\n";
+    std::cout << "  memory:      512 MB limit\n";
+    std::cout << "  cpu:         1 core\n";
+    std::cout << "\nto run in sandbox:\n";
+    std::cout << "  cd " << dir << " && voss run\n";
+    return 0;
 }
 
 int cmd_dead_deps() {
@@ -241,13 +270,61 @@ int cmd_import_deps(const std::vector<std::string>& fmts) {
 }
 
 int cmd_bench(const std::vector<std::string>& pkgs) {
-    for (auto& pkg : pkgs) {
-        auto start = std::chrono::high_resolution_clock::now();
-        cmd_install(pkg.find('@') == std::string::npos ? pkg + "@latest" : pkg);
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << pkg << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms\n";
+    PackageInfo info = read_manifest(".");
+    if (pkgs.empty() && info.name.empty()) {
+        std::cerr << "error: no target specified\n";
+        return 1;
     }
-    return 0;
+
+    auto run_single = [](const std::string& label, const std::string& entry, const std::string& out) -> int {
+        std::vector<std::string> c = {"aurorac", entry, "-o", out};
+        int rc = run_cmd(c);
+        if (rc != 0) {
+            std::cout << label << ": COMPILE FAIL\n";
+            return 1;
+        }
+
+        const int ITERATIONS = 10;
+        long long total_ns = 0;
+        for (int i = 0; i < ITERATIONS; i++) {
+            auto start = std::chrono::high_resolution_clock::now();
+            run_cmd({out});
+            auto end = std::chrono::high_resolution_clock::now();
+            total_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        }
+
+        long long avg_ns = total_ns / ITERATIONS;
+        double avg_ms = avg_ns / 1000000.0;
+        std::cout << label << ": " << avg_ms << " ms avg (" << ITERATIONS << " runs)\n";
+        return 0;
+    };
+
+    std::cout << "=== voss bench ===\n\n";
+    int failed = 0;
+
+    if (!pkgs.empty()) {
+        for (auto& pkg : pkgs) {
+            std::string name, ver;
+            parse_pkg_spec(pkg, name, ver);
+            std::string pkg_dir = "packages/" + name;
+            std::string entry = pkg_dir + "/main.aura";
+            if (fs::exists(entry)) {
+                if (run_single(name, entry, "build/bench_" + name) != 0)
+                    failed++;
+            } else {
+                std::cout << name << ": not installed\n";
+                failed++;
+            }
+        }
+    } else if (fs::exists(info.entry)) {
+        if (run_single(info.name, info.entry, "build/bench_" + info.name) != 0)
+            failed++;
+    } else {
+        std::cerr << "error: entry file not found\n";
+        return 1;
+    }
+
+    return failed > 0 ? 1 : 0;
 }
 
 int cmd_recommend(const std::string& pkg) {

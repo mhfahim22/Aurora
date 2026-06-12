@@ -195,6 +195,10 @@ int main(int argc, char* argv[]) {
     }
     if (cmd == "repair" || cmd == "fix") return cmd_repair();
 
+    /* Package signing */
+    if (cmd == "sign") { if (argc <= off) { std::cerr << "usage: voss sign <pkg>[@<version>]\n"; return 1; } return cmd_sign(argv[off]); }
+    if (cmd == "verify" || cmd == "verify-pkg") { if (argc <= off) { std::cerr << "usage: voss verify <pkg>[@<version>]\n"; return 1; } return cmd_verify(argv[off]); }
+
     /* Roadmap batch 2 */
     if (cmd == "graph" || cmd == "depgraph") return cmd_graph();
     if (cmd == "freeze") { if (is_frozen()) { std::cout << "already frozen\n"; return 0; } return cmd_freeze(); }

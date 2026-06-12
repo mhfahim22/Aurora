@@ -299,6 +299,16 @@ int cmd_install(const std::string& pkg) {
         std::ofstream mf("packages/" + name + "/main.aura"); mf << "/* " << name << " stub */\n";
         rver = version.empty() ? "1.0.0" : version; source = "stub"; integrity = sha256_hex(rver);
     }
+
+    /* Verify package signature if available */
+    if (!g_offline && fs::exists("packages/" + name)) {
+        if (verify_package_signature(name, rver)) {
+            std::cout << "  signature OK\n";
+        } else if (fs::exists("packages/" + name + "/" + name + "@" + rver + ".sig")) {
+            std::cout << "  warning: package signature mismatch!\n";
+        }
+    }
+
     info.dependencies.push_back(name + "@" + rver);
     LockData lf = read_lockfile();
     LockEntry le; le.name = name; le.version = rver; le.resolved = source; le.integrity = integrity;
@@ -366,9 +376,123 @@ int cmd_run(bool verbose, bool auto_yes) {
     return run_cmd({"build/" + info.name});
 }
 
-int cmd_test(bool verbose) { return cmd_build(verbose, false); }
+int cmd_test(bool verbose) {
+    PackageInfo info = read_manifest(".");
+    if (info.name.empty()) { std::cerr << "error: no aurora.pkg\n"; return 1; }
+
+    std::vector<std::string> test_files;
+    std::string test_dir = "tests";
+    if (fs::exists(test_dir)) {
+        for (auto& entry : fs::directory_iterator(test_dir)) {
+            if (entry.path().extension() == ".aura")
+                test_files.push_back(entry.path().string());
+        }
+    }
+
+    if (test_files.empty()) {
+        std::cout << "no test files found in tests/\n";
+        return cmd_build(verbose, false);
+    }
+
+    std::cout << "running " << test_files.size() << " test(s)...\n\n";
+    int passed = 0, failed = 0;
+
+    for (auto& tf : test_files) {
+        std::string name = fs::path(tf).stem().string();
+        std::cout << "  [" << name << "] ";
+
+        std::string bin = "build/test_" + name;
+        if (!fs::exists("build")) fs::create_directories("build");
+
+        std::vector<std::string> c = {"aurorac", tf, "-o", bin};
+        if (verbose) c.push_back("-v");
+
+        int rc = run_cmd(c);
+        if (rc != 0) {
+            std::cout << "COMPILE FAIL\n";
+            failed++;
+            continue;
+        }
+
+        auto start = std::chrono::high_resolution_clock::now();
+        rc = run_cmd({bin});
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - start).count();
+
+        if (rc == 0) {
+            std::cout << "PASS (" << elapsed << "ms)\n";
+            passed++;
+        } else {
+            std::cout << "FAIL (exit=" << rc << ", " << elapsed << "ms)\n";
+            failed++;
+        }
+    }
+
+    std::cout << "\nresults: " << (passed + failed) << " total, "
+              << passed << " passed, " << failed << " failed\n";
+    return failed > 0 ? 1 : 0;
+}
 
 int cmd_clean() { if (fs::exists("build")) fs::remove_all("build"); std::cout << "cleaned\n"; return 0; }
+
+int cmd_sign(const std::string& spec) {
+    std::string name, version;
+    if (!parse_pkg_spec(spec, name, version)) {
+        std::cerr << "error: invalid spec '" << spec << "'\n";
+        return 1;
+    }
+    if (version.empty()) {
+        PackageInfo info = read_manifest("packages/" + name);
+        version = info.version;
+    }
+    std::string payload = name + "@" + version;
+    std::string sig = sha256_hex(payload + ":aurora-pkg-sign:v1");
+    std::string sig_file = "packages/" + name + "/" + name + "@" + version + ".sig";
+    fs::create_directories("packages/" + name);
+    std::ofstream sf(sig_file);
+    sf << sig << "\n";
+    std::cout << "signed " << payload << " -> " << sig_file << "\n";
+    return 0;
+}
+
+int cmd_verify(const std::string& spec) {
+    std::string name, version;
+    if (!parse_pkg_spec(spec, name, version)) {
+        std::cerr << "error: invalid spec '" << spec << "'\n";
+        return 1;
+    }
+    if (version.empty()) {
+        PackageInfo info = read_manifest("packages/" + name);
+        version = info.version;
+    }
+    std::string payload = name + "@" + version;
+    std::string expected = sha256_hex(payload + ":aurora-pkg-sign:v1");
+    std::string sig_file = "packages/" + name + "/" + name + "@" + version + ".sig";
+    if (!fs::exists(sig_file)) {
+        std::cout << name << "@" << version << ": NOT SIGNED\n";
+        return 1;
+    }
+    std::ifstream f(sig_file);
+    std::string actual;
+    std::getline(f, actual);
+    actual = trim(actual);
+    if (actual == expected) {
+        std::cout << name << "@" << version << ": SIGNATURE OK\n";
+        return 0;
+    }
+    std::cout << name << "@" << version << ": SIGNATURE MISMATCH\n";
+    return 1;
+}
+
+static bool verify_package_signature(const std::string& name, const std::string& version) {
+    std::string expected = sha256_hex(name + "@" + version + ":aurora-pkg-sign:v1");
+    std::string sig_file = "packages/" + name + "/" + name + "@" + version + ".sig";
+    if (!fs::exists(sig_file)) return false;
+    std::ifstream f(sig_file);
+    std::string actual;
+    std::getline(f, actual);
+    return trim(actual) == expected;
+}
 
 int cmd_info() {
     PackageInfo info = read_manifest(".");

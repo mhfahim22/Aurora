@@ -114,14 +114,15 @@ void Codegen::gen_assign(const ASTNode* node) {
         init_state = OwnershipState::Borrowed;
     }
 
+    /* Determine allocation strategy from forced/auto-detected */
+    AllocStrategy strat = node->memory_meta.forced_strategy;
+    if (strat == AllocStrategy::Unknown)
+        strat = node->memory_meta.alloc_strategy;
+
     if (!rec) {
         llvm::Value* slot;
-        /* Use strategy-based allocation for non-Owned states */
-        if (init_state != OwnershipState::Owned) {
-            slot = gen_allocation_for_var(name, val->getType(), init_state);
-        } else {
-            slot = create_entry_alloca(name, val->getType());
-        }
+        /* Use strategy-based allocation */
+        slot = gen_allocation_for_var(name, val->getType(), init_state, strat);
         builder_->CreateStore(val, slot);
         declare_var(name, slot, init_state);
         auto* r = lookup_var(name);
@@ -147,9 +148,6 @@ void Codegen::gen_assign(const ASTNode* node) {
         rec->struct_type = node->right->value;
 
     /* Register with GC if forced or auto-detected */
-    AllocStrategy strat = node->memory_meta.forced_strategy;
-    if (strat == AllocStrategy::Unknown)
-        strat = node->memory_meta.alloc_strategy;
     if (strat == AllocStrategy::ForcedGC || strat == AllocStrategy::GC) {
         rec->is_gc_root = true;
         if (val->getType()->isPointerTy()) {
@@ -1003,28 +1001,59 @@ void Codegen::gen_async(const ASTNode* node) {
 
     /* Save current function/builder state */
     auto* saved_fn = cur_fn_;
-
-    /* Gen body inside wrapper by temporarily switching builder target */
     auto saved_insert = builder_->saveIP();
     auto saved_cache  = std::move(literal_aurora_cache_);
     builder_->SetInsertPoint(entry_bb);
     cur_fn_ = wrapper;
 
-    gen_block(node->body.get());
+    /* ── Async function: register a callable function ── */
+    bool is_async_function = (node->body->type == NodeType::Function);
+    std::string func_name;
+    llvm::Function* async_callee = nullptr;
 
-    /* If no terminator was emitted, add ret null */
-    if (!entry_bb->getTerminator())
-        builder_->CreateRet(llvm::ConstantPointerNull::get(i8ptr_ty()));
+    if (is_async_function) {
+        func_name = node->body->value;
+        ASTNode* params = node->body->args.get();
+
+        /* Generate wrapper body: pass arguments through arg struct pointer */
+        /* For simplicity, the wrapper receives void* and casts to first arg type */
+        if (!entry_bb->getTerminator())
+            builder_->CreateRet(llvm::ConstantPointerNull::get(i8ptr_ty()));
+
+        /* Create the callable async function: i8* name(i8* arg) -> task handle */
+        auto* fn_ty = llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false);
+        async_callee = llvm::Function::Create(
+            fn_ty, llvm::Function::ExternalLinkage, func_name, module_.get());
+        auto* callee_bb = llvm::BasicBlock::Create(ctx_, "entry", async_callee);
+        llvm::IRBuilder<> cb(callee_bb);
+
+        /* In the callable: create task from wrapper, spawn, return task handle */
+        llvm::Value* arg_ptr = &(*async_callee->arg_begin());
+        auto* task = cb.CreateCall(fn_task_create_,
+            { wrapper, arg_ptr }, "task");
+        cb.CreateCall(fn_spawn_, { task });
+        cb.CreateRet(task);
+    }
+
+    /* ── Plain async block: generate body inside wrapper ── */
+    if (!is_async_function) {
+        gen_block(node->body.get());
+
+        if (!entry_bb->getTerminator())
+            builder_->CreateRet(llvm::ConstantPointerNull::get(i8ptr_ty()));
+    }
 
     /* Restore builder to main function */
     literal_aurora_cache_ = std::move(saved_cache);
     cur_fn_ = saved_fn;
     builder_->restoreIP(saved_insert);
 
-    /* Spawn the task from the main function */
-    auto* task = builder_->CreateCall(fn_task_create_,
-        { wrapper, llvm::ConstantPointerNull::get(i8ptr_ty()) }, "async_task");
-    builder_->CreateCall(fn_spawn_, { task });
+    /* Plain async block: spawn immediately (statement context) */
+    if (!is_async_function) {
+        auto* task = builder_->CreateCall(fn_task_create_,
+            { wrapper, llvm::ConstantPointerNull::get(i8ptr_ty()) }, "async_task");
+        builder_->CreateCall(fn_spawn_, { task });
+    }
 }
 
 /* ── wait expr — wait for task completion and get result ── */
@@ -1339,11 +1368,70 @@ void Codegen::gen_auth(const ASTNode* node) {
    ════════════════════════════════════════════════════════════ */
 
 void Codegen::gen_component(const ASTNode* node) {
+    if (!comp_create_) return;
     if (ui_init_)
         builder_->CreateCall(ui_init_, {});
-    gen_block(node->body.get());
-    if (ui_render_)
-        builder_->CreateCall(ui_render_, {});
+
+    std::string comp_name = node->value.empty() ? "comp" : node->value;
+    llvm::Value* name_str = builder_->CreateGlobalStringPtr(comp_name, "comp_name");
+    auto* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 0);
+    llvm::Value* comp = builder_->CreateCall(comp_create_,
+        { name_str, zero, zero,
+          llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 800),
+          llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 600) },
+        comp_name + "_ptr");
+
+    /* Create render callback if there's a body */
+    if (node->body) {
+        static uint64_t comp_id = 0;
+        std::string render_name = "_comp_render_" + comp_name + "_" + std::to_string(comp_id++);
+        auto* render_ty = llvm::FunctionType::get(void_ty(),
+            { i8ptr_ty(), llvm::Type::getInt32Ty(ctx_),
+              llvm::Type::getInt32Ty(ctx_), llvm::Type::getInt32Ty(ctx_),
+              llvm::Type::getInt32Ty(ctx_) }, false);
+        auto* render_fn = llvm::Function::Create(
+            render_ty, llvm::Function::InternalLinkage, render_name, module_.get());
+        auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", render_fn);
+        auto* saved_fn = cur_fn_;
+        auto saved_insert = builder_->saveIP();
+        auto saved_cache  = std::move(literal_aurora_cache_);
+        builder_->SetInsertPoint(entry_bb);
+        cur_fn_ = render_fn;
+
+        /* Store the component pointer in a scope variable so children can add_child */
+        auto* comp_slot = create_entry_alloca("__parent_comp", i8ptr_ty());
+        builder_->CreateStore(comp, comp_slot);
+        declare_var("__parent_comp", comp_slot, OwnershipState::Owned);
+
+        gen_block(node->body.get());
+        builder_->CreateRetVoid();
+
+        literal_aurora_cache_ = std::move(saved_cache);
+        cur_fn_ = saved_fn;
+        builder_->restoreIP(saved_insert);
+
+        auto* render_cast = builder_->CreateBitCast(render_fn, i8ptr_ty());
+        builder_->CreateCall(comp_set_render_, { comp, render_cast });
+    }
+
+    /* Store component in scope for parent add_child */
+    auto* comp_var_slot = create_entry_alloca(comp_name + "_obj", i8ptr_ty());
+    builder_->CreateStore(comp, comp_var_slot);
+
+    /* Check if we're inside a parent component — if so, add as child */
+    VarRecord* parent_rec = lookup_var("__parent_comp");
+    if (parent_rec && parent_rec->alloca_ptr && comp_add_child_) {
+        llvm::Value* parent_comp = builder_->CreateLoad(i8ptr_ty(), parent_rec->alloca_ptr, "parent_comp");
+        llvm::Value* is_parent = builder_->CreateICmpNE(parent_comp,
+            llvm::ConstantPointerNull::get(i8ptr_ty()));
+        auto* add_child_bb = llvm::BasicBlock::Create(ctx_, "add_child", cur_fn_);
+        auto* skip_child_bb = llvm::BasicBlock::Create(ctx_, "skip_child", cur_fn_);
+        builder_->CreateCondBr(is_parent, add_child_bb, skip_child_bb);
+        builder_->SetInsertPoint(add_child_bb);
+        builder_->CreateCall(comp_add_child_, { parent_comp, comp });
+        builder_->CreateBr(skip_child_bb);
+        builder_->SetInsertPoint(skip_child_bb);
+    }
 }
 
 void Codegen::gen_style(const ASTNode* node) {
@@ -1590,15 +1678,11 @@ void Codegen::gen_thread(const ASTNode* node) {
 }
 
 void Codegen::gen_signal(const ASTNode* node) {
-    /* Register a signal handler — create a global signal slot */
+    /* Register a signal handler via the runtime event bus */
     std::string sig_name = node->value.empty() ? "_signal_" : node->value;
-    auto* fn_ptr = i8ptr_ty();
-    auto* slot = new llvm::GlobalVariable(
-        *module_, fn_ptr, false,
-        llvm::GlobalValue::InternalLinkage,
-        llvm::ConstantPointerNull::get(fn_ptr),
-        sig_name + "_slot");
-    /* If there's a body, wrap it as the signal handler */
+    llvm::Value* sig_cstr = builder_->CreateGlobalStringPtr(sig_name, "sig_name");
+
+    /* If there's a body, wrap it as the signal handler function */
     if (node->body) {
         static uint64_t sig_id = 0;
         std::string handler_name = "_sig_handler_" + std::to_string(sig_id++);
@@ -1617,37 +1701,24 @@ void Codegen::gen_signal(const ASTNode* node) {
         literal_aurora_cache_ = std::move(saved_cache);
         cur_fn_ = saved_fn;
         builder_->restoreIP(saved_insert);
-        builder_->CreateStore(builder_->CreateBitCast(handler, fn_ptr), slot);
+
+        /* Call aurora_event_on(sig_name, handler, null) */
+        auto* handler_cast = builder_->CreateBitCast(handler, i8ptr_ty());
+        auto* null_user = llvm::ConstantPointerNull::get(i8ptr_ty());
+        if (fn_event_on_)
+            builder_->CreateCall(fn_event_on_, { sig_cstr, handler_cast, null_user });
     }
 }
 
 void Codegen::gen_emit(const ASTNode* node) {
     if (!node->left) return;
-    /* Emit (dispatch) a signal — look up signal slot and call handler */
+    /* Emit (dispatch) a signal via the runtime event bus */
     std::string sig_name = node->value.empty() ? "_signal_" : node->value;
-    auto* slot = module_->getGlobalVariable(sig_name + "_slot");
-    if (!slot) {
-        /* Unresolved signal — evaluate the expression anyway */
-        gen_expr(node->left.get());
-        return;
-    }
-    llvm::Value* handler = builder_->CreateLoad(i8ptr_ty(), slot, "handler");
-    auto* zero = llvm::ConstantPointerNull::get(i8ptr_ty());
-    llvm::Value* is_null = builder_->CreateICmpEQ(handler, zero);
-    auto* dispatch_bb = llvm::BasicBlock::Create(ctx_, "emit_dispatch", cur_fn_);
-    auto* done_bb = llvm::BasicBlock::Create(ctx_, "emit_done", cur_fn_);
-    builder_->CreateCondBr(is_null, done_bb, dispatch_bb);
-    builder_->SetInsertPoint(dispatch_bb);
+    llvm::Value* sig_cstr = builder_->CreateGlobalStringPtr(sig_name, "sig_name");
     llvm::Value* arg = gen_expr(node->left.get());
     if (!arg) arg = llvm::ConstantPointerNull::get(i8ptr_ty());
-    auto* casted = builder_->CreateBitCast(handler,
-        llvm::PointerType::getUnqual(
-            llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false)));
-    builder_->CreateCall(
-        llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
-        casted, { arg });
-    builder_->CreateBr(done_bb);
-    builder_->SetInsertPoint(done_bb);
+    if (fn_event_emit_)
+        builder_->CreateCall(fn_event_emit_, { sig_cstr, arg });
 }
 
 /* ════════════════════════════════════════════════════════════

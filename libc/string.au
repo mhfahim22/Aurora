@@ -1,25 +1,34 @@
-extern function memcpy(dst: pointer, src: pointer, n: i64) -> pointer
-extern function memmove(dst: pointer, src: pointer, n: i64) -> pointer
-extern function memset(ptr: pointer, value: i32, n: i64) -> pointer
-extern function memcmp(lhs: pointer, rhs: pointer, n: i64) -> i32
-extern function memchr(ptr: pointer, value: i32, n: i64) -> pointer
+# ════════════════════════════════════════════════════════════
+# Aurora Standard Library — String
+# Usage:  import "string"  or  import libc:string
+#
+# String builtins:
+#   len(s), strlen(s)      → length (i64)
+#   strcat(a, b)           → concatenate a + b
+#   substr(s, i, n)        → substring from i, length n
+#   index(s, sub)          → first index of sub (-1 if none)
+#   has(s, sub)            → contains sub?
+#   starts(s, pre)         → starts with prefix?
+#   ends(s, suf)           → ends with suffix?
+#   upper(s), lower(s)     → case conversion
+#   trim(s)                → trim whitespace
+#   replace(s, old, new)   → replace all
+#   split(s, delim)        → split to array
+#   join(arr, sep)         → array to string
+#   reverse(s)             → reversed copy
+#
+# Conversion:  str(v),  int(s),  float(s),  bool(s)
+# ════════════════════════════════════════════════════════════
 
-extern function strlen(str: cstring) -> i64
-extern function strcmp(lhs: cstring, rhs: cstring) -> i32
-extern function strncmp(lhs: cstring, rhs: cstring, n: i64) -> i32
-extern function strcpy(dst: cstring, src: cstring) -> cstring
-extern function strncpy(dst: cstring, src: cstring, n: i64) -> cstring
-extern function strcat(dst: cstring, src: cstring) -> cstring
-extern function strncat(dst: cstring, src: cstring, n: i64) -> cstring
-extern function strchr(str: cstring, ch: i32) -> cstring
-extern function strrchr(str: cstring, ch: i32) -> cstring
-extern function strstr(haystack: cstring, needle: cstring) -> cstring
-extern function strspn(str: cstring, accept: cstring) -> i64
-extern function strcspn(str: cstring, reject: cstring) -> i64
-extern function strpbrk(str: cstring, accept: cstring) -> cstring
-extern function strtok(str: cstring, delim: cstring) -> cstring
-extern function strdup(str: cstring) -> cstring
-extern function strndup(str: cstring, n: i64) -> cstring
-extern function strerror(errnum: i32) -> cstring
-extern function strcoll(lhs: cstring, rhs: cstring) -> i32
-extern function strxfrm(dst: cstring, src: cstring, n: i64) -> i64
+function str_is_empty(s)
+    return strlen(s) == 0
+
+function str_repeat(s, n)
+    result = s
+    i = 1
+    loop
+        if i >= n
+            break
+        result = strcat(result, s)
+        i = i + 1
+    return result

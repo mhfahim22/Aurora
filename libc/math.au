@@ -1,49 +1,12 @@
-extern function sin(x: f64) -> f64
-extern function cos(x: f64) -> f64
-extern function tan(x: f64) -> f64
-extern function asin(x: f64) -> f64
-extern function acos(x: f64) -> f64
-extern function atan(x: f64) -> f64
-extern function atan2(y: f64, x: f64) -> f64
-
-extern function sinh(x: f64) -> f64
-extern function cosh(x: f64) -> f64
-extern function tanh(x: f64) -> f64
-extern function asinh(x: f64) -> f64
-extern function acosh(x: f64) -> f64
-extern function atanh(x: f64) -> f64
-
-extern function exp(x: f64) -> f64
-extern function exp2(x: f64) -> f64
-extern function expm1(x: f64) -> f64
-extern function log(x: f64) -> f64
-extern function log2(x: f64) -> f64
-extern function log10(x: f64) -> f64
-extern function log1p(x: f64) -> f64
-
-extern function pow(x: f64, y: f64) -> f64
-extern function sqrt(x: f64) -> f64
-extern function cbrt(x: f64) -> f64
-extern function hypot(x: f64, y: f64) -> f64
-
-extern function floor(x: f64) -> f64
-extern function ceil(x: f64) -> f64
-extern function round(x: f64) -> f64
-extern function trunc(x: f64) -> f64
-extern function fabs(x: f64) -> f64
-extern function fmod(x: f64, y: f64) -> f64
-
-extern function fmin(x: f64, y: f64) -> f64
-extern function fmax(x: f64, y: f64) -> f64
-extern function fdim(x: f64, y: f64) -> f64
-extern function fma(x: f64, y: f64, z: f64) -> f64
-
-extern function frexp(x: f64, exp: pointer) -> f64
-extern function ldexp(x: f64, exp: i32) -> f64
-extern function modf(x: f64, iptr: pointer) -> f64
-extern function scalbn(x: f64, n: i32) -> f64
-
-extern function erf(x: f64) -> f64
-extern function erfc(x: f64) -> f64
-extern function tgamma(x: f64) -> f64
-extern function lgamma(x: f64) -> f64
+# ════════════════════════════════════════════════════════════
+# Aurora Standard Library — Math
+# Usage:  import "math"  or  import libc:math
+#
+# Builtins:
+#   abs(x)     sqrt(x)     floor(x)    ceil(x)
+#   round(x)   pow(x, y)   clamp(x, lo, hi)
+#   rand()                  → random integer
+#
+# Conversion:
+#   int(x), float(x), str(x), bool(x)
+# ════════════════════════════════════════════════════════════

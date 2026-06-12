@@ -1,0 +1,54 @@
+# Parser expression tests — verify operator precedence and associativity
+# Operator precedence: ** > unary > * / // > + - > << >> > & > ^ > | > comparison > not > and > or > range
+
+function test_arith()
+    a = 2 + 3 * 4    # 14
+    output(a == 14)
+    b = (1 + 2) * 3  # 9
+    output(b == 9)
+    c = 10 / 2 - 3   # 2
+    output(c == 2)
+    d = 2 ** 3 * 2   # 16
+    output(d == 16)
+    e = 10 - 2 - 3   # 5 (left associativity)
+    output(e == 5)
+
+function test_compare()
+    x = 5
+    y = 10
+    output(x < y)
+    output(y > x)
+    output(x <= 5)
+    output(y >= 10)
+    output(x == 5)
+    output(x != 6)
+
+function test_bool()
+    output(true && true)
+    output(false || true)
+    output(!false)
+    output(!false && true)
+
+function test_bitwise()
+    a = 5 & 3    # 1
+    output(a == 1)
+    b = 5 | 3    # 7
+    output(b == 7)
+    c = 5 ^ 3    # 6
+    output(c == 6)
+    d = 1 << 2   # 4
+    output(d == 4)
+    e = 8 >> 2   # 2
+    output(e == 2)
+
+function test_mixed()
+    result = (10 + 20) * (30 - 15) / 3
+    output(result == 150)
+
+output(0)
+test_arith()
+test_compare()
+test_bool()
+test_bitwise()
+test_mixed()
+output("PARSER_EXPR_OK")

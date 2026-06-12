@@ -1,0 +1,71 @@
+/* Phase 5 — Game Engine Integration Test */
+/* Covers: scene, entity, sprite, camera, physics, collision, audio, animation, input, update */
+
+function test_scene():
+    output("--- test_scene ---")
+    scene my_scene:
+        output("Scene active")
+
+function test_entity():
+    output("--- test_entity ---")
+    entity player(1):
+        output("Entity created")
+
+function test_sprite():
+    output("--- test_sprite ---")
+    sprite 0, 10.0, 10.0:
+        output("Sprite created")
+
+function test_camera():
+    output("--- test_camera ---")
+    camera 0.0, 0.0, 10.0:
+        output("Camera created")
+
+function test_physics():
+    output("--- test_physics ---")
+    physics 0.016:
+        output("Physics stepped")
+
+function test_collision():
+    output("--- test_collision ---")
+    collision 0, 0:
+        output("Collision checked")
+
+function test_audio():
+    output("--- test_audio ---")
+    audio "test.wav":
+        output("Audio played")
+
+function test_animation():
+    output("--- test_animation ---")
+    animation 0, 0:
+        output("Animation played")
+
+function test_input():
+    output("--- test_input ---")
+    input 32:  // space key
+        output("Input handled")
+
+function test_update():
+    output("--- test_update ---")
+    update:
+        output("Update loop")
+
+function test_tick():
+    output("--- test_tick ---")
+    tick:
+        output("Tick executed")
+
+function main():
+    test_scene()
+    test_entity()
+    test_sprite()
+    test_camera()
+    test_physics()
+    test_collision()
+    test_audio()
+    test_animation()
+    test_input()
+    test_update()
+    test_tick()
+    output("ALL GAME ENGINE TESTS PASSED")

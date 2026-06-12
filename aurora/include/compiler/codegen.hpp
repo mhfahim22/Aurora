@@ -197,6 +197,9 @@ private:
     llvm::Function* fn_weak_release_ { nullptr };
     llvm::Function* fn_gc_register_root_   { nullptr };
     llvm::Function* fn_gc_unregister_root_ { nullptr };
+    llvm::Function* fn_arena_alloc_    { nullptr };
+    llvm::Function* fn_gc_alloc_       { nullptr };
+    llvm::Function* fn_gc_free_        { nullptr };
     llvm::Function* fn_printf_       { nullptr };
     llvm::Function* fn_print_str_    { nullptr };
     llvm::Function* fn_print_float_  { nullptr };
@@ -217,6 +220,21 @@ private:
     llvm::Function* fn_spawn_       { nullptr };
     llvm::Function* fn_wait_        { nullptr };
 
+    /* ── Event bus runtime ── */
+    llvm::Function* fn_event_bus_init_{ nullptr };
+    llvm::Function* fn_event_on_      { nullptr };
+    llvm::Function* fn_event_off_     { nullptr };
+    llvm::Function* fn_event_emit_    { nullptr };
+    llvm::Function* fn_event_bus_shutdown_{ nullptr };
+
+    /* ── Fiber runtime ── */
+    llvm::Function* fn_fiber_create_      { nullptr };
+    llvm::Function* fn_fiber_destroy_     { nullptr };
+    llvm::Function* fn_fiber_yield_       { nullptr };
+    llvm::Function* fn_fiber_resume_      { nullptr };
+    llvm::Function* fn_fiber_is_done_     { nullptr };
+    llvm::Function* fn_fiber_get_result_  { nullptr };
+
     /* ── AI / Tensor runtime functions ── */
     llvm::Function* tensor_new_     { nullptr };
     llvm::Function* tensor_free_    { nullptr };
@@ -233,23 +251,29 @@ private:
     llvm::Function* predict_        { nullptr };
 
     /* ── Game Engine runtime functions ── */
-    llvm::Function* scene_init_        { nullptr };
-    llvm::Function* scene_shutdown_    { nullptr };
-    llvm::Function* entity_create_     { nullptr };
-    llvm::Function* entity_destroy_    { nullptr };
-    llvm::Function* entity_set_pos_    { nullptr };
-    llvm::Function* sprite_create_     { nullptr };
-    llvm::Function* camera_create_     { nullptr };
-    llvm::Function* physics_init_      { nullptr };
-    llvm::Function* physics_step_      { nullptr };
-    llvm::Function* collision_check_   { nullptr };
-    llvm::Function* audio_play_        { nullptr };
-    llvm::Function* animation_play_    { nullptr };
-    llvm::Function* engine_frame_start_{ nullptr };
-    llvm::Function* engine_frame_end_  { nullptr };
-    llvm::Function* engine_render_     { nullptr };
-    llvm::Function* engine_is_key_down_{ nullptr };
-    llvm::Function* engine_delta_time_ { nullptr };
+    llvm::Function* scene_init_            { nullptr };
+    llvm::Function* scene_shutdown_        { nullptr };
+    llvm::Function* entity_create_         { nullptr };
+    llvm::Function* entity_destroy_        { nullptr };
+    llvm::Function* entity_set_pos_        { nullptr };
+    llvm::Function* entity_get_pos_        { nullptr };
+    llvm::Function* entity_set_velocity_   { nullptr };
+    llvm::Function* entity_get_velocity_   { nullptr };
+    llvm::Function* sprite_create_         { nullptr };
+    llvm::Function* camera_create_         { nullptr };
+    llvm::Function* physics_init_          { nullptr };
+    llvm::Function* physics_step_          { nullptr };
+    llvm::Function* physics_set_gravity_   { nullptr };
+    llvm::Function* collision_check_       { nullptr };
+    llvm::Function* audio_play_            { nullptr };
+    llvm::Function* audio_play_tone_       { nullptr };
+    llvm::Function* animation_play_        { nullptr };
+    llvm::Function* engine_frame_start_    { nullptr };
+    llvm::Function* engine_frame_end_      { nullptr };
+    llvm::Function* engine_render_         { nullptr };
+    llvm::Function* engine_is_key_down_    { nullptr };
+    llvm::Function* engine_delta_time_     { nullptr };
+    llvm::Function* engine_poll_input_     { nullptr };
 
     /* ── Backend Framework runtime functions ── */
     llvm::Function* server_init_     { nullptr };
@@ -280,6 +304,18 @@ private:
     llvm::Function* ui_render_      { nullptr };
     llvm::Function* route_register_ { nullptr };
     llvm::Function* style_apply_    { nullptr };
+    llvm::Function* comp_create_    { nullptr };
+    llvm::Function* comp_destroy_   { nullptr };
+    llvm::Function* comp_add_child_ { nullptr };
+    llvm::Function* comp_set_render_{ nullptr };
+    llvm::Function* comp_set_state_ { nullptr };
+    llvm::Function* comp_mount_     { nullptr };
+    llvm::Function* comp_set_pos_   { nullptr };
+    llvm::Function* comp_set_size_  { nullptr };
+    llvm::Function* comp_show_      { nullptr };
+    llvm::Function* comp_hide_      { nullptr };
+    llvm::Function* comp_render_tree_{ nullptr };
+    llvm::Function* comp_update_tree_{ nullptr };
 
     /* ── Utility runtime functions ── */
     llvm::Function* fn_sleep_       { nullptr };
@@ -415,7 +451,8 @@ private:
     /* Strategy-based allocation — emits ownership-specific wrappers */
     llvm::Value* gen_allocation_for_var(const std::string& name,
                                         llvm::Type* ty,
-                                        OwnershipState state);
+                                        OwnershipState state,
+                                        AllocStrategy strategy = AllocStrategy::Stack);
 
     /* ══════════════════════════════════════════
        Emission helpers

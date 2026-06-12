@@ -126,6 +126,74 @@ llvm::Value* codegen_builtin_section3(
         return builder.CreateCall(builtins.recv_fn, { ch }, "recv_ret");
     }
 
+    /* ── fiber_create(fn, arg) ── */
+    if (name == "fiber_create" && node->args && node->args->next) {
+        llvm::Value* fn = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* arg = gen_expr(node->args->next.get());
+        if (arg->getType()->isDoubleTy())
+            arg = builder.CreateFPToSI(arg, i64, "fptosi");
+        return builder.CreateCall(builtins.fiber_create_fn, { fn, arg }, "fiber_ret");
+    }
+    /* ── fiber_resume(fiber) ── */
+    if (name == "fiber_resume" && node->args) {
+        llvm::Value* f = gen_expr(node->args.get());
+        if (f->getType()->isDoubleTy())
+            f = builder.CreateFPToSI(f, i64, "fptosi");
+        builder.CreateCall(builtins.fiber_resume_fn, { f });
+        return llvm::ConstantInt::get(i64, 0);
+    }
+    /* ── fiber_yield() ── */
+    if (name == "fiber_yield" && !node->args) {
+        builder.CreateCall(builtins.fiber_yield_fn, {});
+        return llvm::ConstantInt::get(i64, 0);
+    }
+    /* ── fiber_is_done(fiber) ── */
+    if (name == "fiber_is_done" && node->args) {
+        llvm::Value* f = gen_expr(node->args.get());
+        if (f->getType()->isDoubleTy())
+            f = builder.CreateFPToSI(f, i64, "fptosi");
+        return builder.CreateCall(builtins.fiber_is_done_fn, { f }, "fiber_done");
+    }
+    /* ── fiber_get_result(fiber) ── */
+    if (name == "fiber_get_result" && node->args) {
+        llvm::Value* f = gen_expr(node->args.get());
+        if (f->getType()->isDoubleTy())
+            f = builder.CreateFPToSI(f, i64, "fptosi");
+        return builder.CreateCall(builtins.fiber_get_result_fn, { f }, "fiber_result");
+    }
+    /* ── fiber_destroy(fiber) ── */
+    if (name == "fiber_destroy" && node->args) {
+        llvm::Value* f = gen_expr(node->args.get());
+        if (f->getType()->isDoubleTy())
+            f = builder.CreateFPToSI(f, i64, "fptosi");
+        builder.CreateCall(builtins.fiber_destroy_fn, { f });
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
+    /* ── event_on(name, handler) ── */
+    if (name == "event_on" && node->args && node->args->next) {
+        llvm::Value* ev_name = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* handler = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        builder.CreateCall(builtins.event_on_fn, { ev_name, handler });
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
+    /* ── event_off(name, handler) ── */
+    if (name == "event_off" && node->args && node->args->next) {
+        llvm::Value* ev_name = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* handler = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        builder.CreateCall(builtins.event_off_fn, { ev_name, handler });
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
+    /* ── event_emit(name, arg) ── */
+    if (name == "event_emit" && node->args && node->args->next) {
+        llvm::Value* ev_name = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* arg = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        builder.CreateCall(builtins.event_emit_fn, { ev_name, arg });
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
     /* ── measure() ── */
     if (name == "measure" && !node->args) {
         return builder.CreateCall(builtins.measure_fn, {}, "measure_ret");

@@ -710,47 +710,80 @@ AuroraStr* builtin_char(const void* str_a) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Channel implementation (simple bounded channel)
+   Channel implementation (blocking bounded queue)
    ════════════════════════════════════════════════════════════ */
 
-struct AuroraChannel {
-    std::queue<int64_t> queue;
-    std::mutex mtx;
-    int64_t capacity;
-    bool closed;
-};
-
-static std::vector<AuroraChannel*>& channels() {
-    static std::vector<AuroraChannel*> cs;
-    return cs;
-}
-
 int64_t builtin_chan(int64_t capacity) {
-    if (capacity <= 0) capacity = 1;
-    auto* ch = new AuroraChannel();
-    ch->capacity = capacity;
-    ch->closed = false;
-    channels().push_back(ch);
+    auto* ch = aurora_chan_create((int32_t)capacity);
     return (int64_t)(uintptr_t)ch;
 }
 
 void builtin_send(int64_t ch_ptr, int64_t val) {
-    auto* ch = (AuroraChannel*)(uintptr_t)ch_ptr;
-    if (!ch) return;
-    std::lock_guard<std::mutex> lock(ch->mtx);
-    if (ch->closed) return;
-    if ((int64_t)ch->queue.size() >= ch->capacity) return;
-    ch->queue.push(val);
+    aurora_chan_send((AuroraChannel*)(uintptr_t)ch_ptr, (void*)(uintptr_t)val);
 }
 
 int64_t builtin_recv(int64_t ch_ptr) {
-    auto* ch = (AuroraChannel*)(uintptr_t)ch_ptr;
-    if (!ch) return 0;
-    std::lock_guard<std::mutex> lock(ch->mtx);
-    if (ch->queue.empty()) return 0;
-    int64_t val = ch->queue.front();
-    ch->queue.pop();
-    return val;
+    void* val = aurora_chan_recv((AuroraChannel*)(uintptr_t)ch_ptr);
+    return (int64_t)(uintptr_t)val;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Fiber builtins
+   ════════════════════════════════════════════════════════════ */
+
+int64_t builtin_fiber_create(void* fn_ptr, int64_t arg) {
+    auto* func = (void* (*)(void*))fn_ptr;
+    auto* fiber = aurora_fiber_create(func, (void*)(uintptr_t)arg);
+    return (int64_t)(uintptr_t)fiber;
+}
+
+void builtin_fiber_resume(int64_t fiber_ptr) {
+    auto* fiber = (AuroraFiber*)(uintptr_t)fiber_ptr;
+    aurora_fiber_resume(fiber);
+}
+
+void builtin_fiber_yield() {
+    aurora_fiber_yield();
+}
+
+int64_t builtin_fiber_is_done(int64_t fiber_ptr) {
+    auto* fiber = (AuroraFiber*)(uintptr_t)fiber_ptr;
+    return (int64_t)aurora_fiber_is_done(fiber);
+}
+
+int64_t builtin_fiber_get_result(int64_t fiber_ptr) {
+    auto* fiber = (AuroraFiber*)(uintptr_t)fiber_ptr;
+    return (int64_t)(uintptr_t)aurora_fiber_get_result(fiber);
+}
+
+void builtin_fiber_destroy(int64_t fiber_ptr) {
+    auto* fiber = (AuroraFiber*)(uintptr_t)fiber_ptr;
+    aurora_fiber_destroy(fiber);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Event bus builtins
+   ════════════════════════════════════════════════════════════ */
+
+void builtin_event_on(void* name_str, void* handler_fn) {
+    if (!name_str || !handler_fn) return;
+    auto* name = (AuroraStr*)name_str;
+    if (!name->ptr) return;
+    aurora_event_on(name->ptr, (void(*)(void*))handler_fn, nullptr);
+}
+
+void builtin_event_off(void* name_str, void* handler_fn) {
+    if (!name_str || !handler_fn) return;
+    auto* name = (AuroraStr*)name_str;
+    if (!name->ptr) return;
+    aurora_event_off(name->ptr, (void(*)(void*))handler_fn);
+}
+
+void builtin_event_emit(void* name_str, void* arg) {
+    if (!name_str) return;
+    auto* name = (AuroraStr*)name_str;
+    if (!name->ptr) return;
+    aurora_event_emit(name->ptr, arg);
 }
 
 /* ════════════════════════════════════════════════════════════

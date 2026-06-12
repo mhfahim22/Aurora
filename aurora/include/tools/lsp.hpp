@@ -4,6 +4,42 @@
 #include <map>
 #include <functional>
 #include <sstream>
+#include <memory>
+
+/* ── JSON value type ── */
+struct JsonValue {
+    enum Type { Null, Bool, Number, StringVal, Array, Object };
+    Type type = Null;
+    std::string str;
+    double num = 0;
+    bool boolean = false;
+    std::vector<JsonValue> items;
+    std::map<std::string, JsonValue> members;
+    JsonValue get(const std::string& key) const;
+    JsonValue get(int index) const;
+    std::string as_string(const std::string& def = "") const;
+    int as_int(int def = 0) const;
+    bool as_bool(bool def = false) const;
+    bool has(const std::string& key) const;
+};
+
+/* ── Simple JSON parser (recursive-descent) ── */
+class JsonParser {
+public:
+    static JsonValue parse(const std::string& json);
+    static std::string stringify(const JsonValue& v);
+private:
+    JsonParser(const std::string& input) : s(input), pos(0) {}
+    void skip_ws();
+    JsonValue parse_value();
+    JsonValue parse_string();
+    JsonValue parse_number();
+    JsonValue parse_object();
+    JsonValue parse_array();
+    JsonValue parse_bool_or_null();
+    const std::string& s;
+    size_t pos;
+};
 
 /* ── LSP types ── */
 struct LspPosition { int line; int character; };
@@ -52,6 +88,7 @@ private:
     std::string handle_hover(const std::string& params);
     std::string handle_references(const std::string& params);
     std::string handle_document_symbol(const std::string& params);
+    std::string handle_signature_help(const std::string& params);
     void handle_did_open(const std::string& params);
     void handle_did_change(const std::string& params);
     void handle_did_save(const std::string& params);
@@ -67,12 +104,13 @@ private:
     /* JSON helpers */
     std::string get_json_field(const std::string& json, const std::string& field);
     std::string escape_json(const std::string& s);
-    std::string escape_regex(const std::string& s);
 
     /* State */
     std::map<std::string, std::string> open_documents_; /* uri -> text */
     bool initialized_ = false;
+    bool shutdown_ = false;
     std::string workspace_root_;
+    std::string current_msg_id_;
 };
 
 /* ── Simple JSON builder ── */

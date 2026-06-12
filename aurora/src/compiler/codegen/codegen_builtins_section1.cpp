@@ -263,6 +263,45 @@ llvm::Value* codegen_builtin_section1(
         return llvm::ConstantInt::get(i64, 0);
     }
 
+    /* ── strlen(str) — alias for len(str) ── */
+    if (name == "strlen" && node->args && !node->args->next) {
+        llvm::Value* val = gen_expr(node->args.get());
+        if (!val) return llvm::ConstantInt::get(i64, 0);
+        if (val->getType()->isPointerTy())
+            return builder.CreateCall(builtins.strlen_fn, { val }, "len_ret");
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
+    /* ── strcat(a, b) — string concatenation ── */
+    if (name == "strcat" && node->args && node->args->next && !node->args->next->next) {
+        llvm::Value* a = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* b = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        llvm::Function* append_fn = module->getFunction("aurora_str_append");
+        if (append_fn) return builder.CreateCall(append_fn, { a, b }, "strcat_ret");
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
+    /* ── substr(str, start, len) — substring ── */
+    if (name == "substr" && node->args && node->args->next && node->args->next->next && !node->args->next->next->next) {
+        llvm::Value* s     = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* start = gen_expr(node->args->next.get());
+        llvm::Value* len   = gen_expr(node->args->next->next.get());
+        if (!start) start = llvm::ConstantInt::get(i64, 0);
+        if (!len)   len   = llvm::ConstantInt::get(i64, 0);
+        llvm::Function* substr_fn = module->getFunction("aurora_substr");
+        if (substr_fn) return builder.CreateCall(substr_fn, { s, start, len }, "substr_ret");
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
+    /* ── index(str, sub) — find first index of substring ── */
+    if (name == "index" && node->args && node->args->next && !node->args->next->next) {
+        llvm::Value* s   = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* sub = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        llvm::Function* idx_fn = module->getFunction("aurora_str_index");
+        if (idx_fn) return builder.CreateCall(idx_fn, { s, sub }, "index_ret");
+        return llvm::ConstantInt::get(i64, -1);
+    }
+
     /* ── Type conversion builtins ── */
     if (name == "str" && node->args) {
         llvm::Value* val = gen_expr(node->args.get());

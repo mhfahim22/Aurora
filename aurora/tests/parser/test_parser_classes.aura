@@ -1,0 +1,82 @@
+# Parser class/struct/enum tests
+
+function test_basic_class()
+    class Animal
+        name = ""
+        function speak()
+            return "..."
+    a = Animal("cat")
+    output(a.name == "cat")
+
+function test_inheritance()
+    class Animal
+        function speak()
+            return "?"
+    class Dog extends Animal
+        function speak()
+            return "woof!"
+    d = Dog()
+    output(d.speak() == "woof!")
+
+function test_abstract()
+    class Shape
+        abstract function area()
+    class Circle extends Shape
+        r = 0
+        function area()
+            return 3 * self.r * self.r
+    c = Circle(5)
+    output(c.area() > 0)
+
+function test_encapsulation()
+    class Person
+        public name = ""
+        private age = 0
+        function set_age(a)
+            self.age = a
+        function get_age()
+            return self.age
+    p = Person("alice")
+    p.set_age(30)
+    output(p.get_age() == 30)
+
+function test_interface()
+    interface Greeter
+        function greet()
+    class EnglishGreeter implements Greeter
+        function greet()
+            return "hello"
+    g = EnglishGreeter()
+    output(g.greet() == "hello")
+
+function test_struct()
+    struct Point
+        x
+        y
+    p = Point(3, 4)
+    output(p.x == 3)
+    output(p.y == 4)
+
+function test_enum()
+    enum Color
+        Red
+        Green
+        Blue
+    c = Color(1)
+    output(c == 1)
+
+function test_typealias()
+    type Age = int
+    a = 25
+    output(a == 25)
+
+output(0)
+test_basic_class()
+test_inheritance()
+test_abstract()
+test_encapsulation()
+test_interface()
+test_struct()
+test_enum()
+test_typealias()
+output("PARSER_CLASS_OK")

@@ -1,0 +1,69 @@
+/* Phase 2 — Event Bus / Signal / Fiber Test */
+
+/* ── Test 1: emit signal keyword (safe no-op) ── */
+function test_signal_emit():
+    output("--- test_signal_emit ---")
+    signal my_signal
+    emit my_signal(42)
+    output("Emit done (safe no-op)")
+
+/* ── Test 2: event_on/event_emit builtins ── */
+function my_handler(arg):
+    output("Handler called:")
+    output(arg)
+
+function test_event_bus():
+    output("--- test_event_bus ---")
+    event_on("test_event", my_handler)
+    event_emit("test_event", 999)
+    output("Event bus done")
+
+/* ── Test 3: event_off builtin ── */
+function test_event_off():
+    output("--- test_event_off ---")
+    event_on("removable", my_handler)
+    event_emit("removable", 111)
+    event_off("removable", my_handler)
+    event_emit("removable", 222)
+    output("Event off done")
+
+/* ── Test 4: multiple handlers on same event ── */
+function handler_a(arg):
+    output("Handler A")
+
+function handler_b(arg):
+    output("Handler B")
+
+function test_multi_handler():
+    output("--- test_multi_handler ---")
+    event_on("multi", handler_a)
+    event_on("multi", handler_b)
+    event_emit("multi", 0)
+    output("Multi handler done")
+
+/* ── Test 5: fiber with lambda ── */
+function test_fiber_basic():
+    output("--- test_fiber_basic ---")
+    fib_fn = lambda(arg):
+        output("Fiber worker running")
+        return 77
+    end
+    f = fiber_create(fib_fn, 0)
+    fiber_resume(f)
+    done = fiber_is_done(f)
+    output("Fiber done:")
+    output(done)
+    result = fiber_get_result(f)
+    output("Result:")
+    output(result)
+    fiber_destroy(f)
+    output("Fiber test done")
+
+/* ── Main ── */
+output("=== Phase 2 Event/Fiber Test ===")
+test_signal_emit()
+test_event_bus()
+test_event_off()
+test_multi_handler()
+test_fiber_basic()
+output("=== All event/fiber tests done ===")

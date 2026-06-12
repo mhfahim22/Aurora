@@ -1,0 +1,13 @@
+# ── Enum Declaration ──
+enum Color
+    Red
+    Green
+    Blue
+
+output("enum declared")
+
+# ── Enum in variable ──
+c = 0
+output(c)
+
+output(222)
