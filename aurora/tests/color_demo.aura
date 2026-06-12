@@ -1,0 +1,82 @@
+# ════════════════════════════════════════════════
+# Aurora Language — Color Demo
+# Open this file in VS Code with Aurora Synthwave theme
+# ════════════════════════════════════════════════
+
+@performance
+@inline
+
+# ── Comments are muted blue italic ──
+
+# ── Constants are hot pink ──
+true false null
+
+# ── Numbers are soft purple ──
+42  3.14  -7  1.5e10
+
+# ── Strings are lemon yellow ──
+"hello world"  'single quotes'  "escape: \n\t\r\\"
+
+# ── Control flow: hot pink ──
+if x == 1:
+    return "one"
+elseif x == 2:
+    return "two"
+else:
+    for i in 10:
+        while condition:
+            break
+    match value:
+        case 1: output("one")
+        case _: output("other")
+
+# ── Function definition: neon green name ──
+function greet(name, age):
+    return "Hello " + name
+
+# ── Class definition: neon green ──
+class Animal:
+    public name
+    private age
+
+    function speak(self):
+        output("rawr")
+
+# ── Lambda ──
+lambda x, y: x + y
+
+# ── Method call: cyan method name ──
+obj.speak()
+
+# ── Attributes: gold bold ──
+@performance
+@inline
+
+# ── Builtins: bright cyan ──
+output("hello")
+len(arr)
+push(arr, 42)
+
+# ── Async keywords: cyan ──
+async function fetch_data():
+    result = await request
+    spawn worker
+    parallel:
+        task1()
+        task2()
+
+# ── OOP keywords: lavender ──
+public class MyClass extends Base:
+    abstract function render()
+    final function cleanup()
+
+# ── Memory keywords: peach ──
+shared ptr = new Data
+weak ref = ptr
+delete ptr
+copy source -> dest
+move temp -> perm
+
+# ── AI/ML builtins: lavender ──
+model = ml_train(data)
+result = ml_predict(model, input)
