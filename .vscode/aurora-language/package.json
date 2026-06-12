@@ -1,0 +1,38 @@
+{
+  "name": "aurora-language",
+  "displayName": "Aurora Language",
+  "description": "Aurora language support — syntax highlighting, snippets, and a vibrant theme",
+  "version": "1.0.0",
+  "publisher": "aurora-lang",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Themes"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "aurora",
+        "aliases": ["Aurora", "aurora"],
+        "extensions": [".aura"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "aurora",
+        "scopeName": "source.aurora",
+        "path": "./syntaxes/aurora.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Aurora Synthwave",
+        "uiTheme": "vs-dark",
+        "path": "./themes/aurora-color-theme.json"
+      }
+    ]
+  }
+}
