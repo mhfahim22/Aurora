@@ -1,7 +1,7 @@
 {
   "name": "aurora-language",
   "displayName": "Aurora Language",
-  "description": "Aurora language support — syntax highlighting, JetBrains Mono auto-install",
+  "description": "Aurora language support — syntax highlighting + Aurora Twilight theme (opt-in)",
   "version": "1.0.0",
   "publisher": "aurora-lang",
   "engines": {
@@ -9,6 +9,7 @@
   },
   "categories": [
     "Programming Languages",
+    "Themes",
     "Other"
   ],
   "activationEvents": [
@@ -36,6 +37,13 @@
         "language": "aurora",
         "scopeName": "source.aurora",
         "path": "./syntaxes/aurora.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Aurora Twilight",
+        "uiTheme": "vs-dark",
+        "path": "./themes/aurora-color-theme.json"
       }
     ]
   }
