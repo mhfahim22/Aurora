@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <stdexcept>
 
 /* ════════════════════════════════════════════════════════════
@@ -56,7 +57,7 @@ struct ClassMethodInfo {
     bool                     is_abstract { false }; /* Abstraction */
     bool                     is_final    { false }; /* Abstraction */
     int                      vtable_index { -1 };   /* Polymorphism: index in vtable */
-    bool                     returns_string { true }; /* set by codegen: true if return expr is a string type */
+    bool                     returns_string { false }; /* set by typechecker: true if the method returns a string */
 };
 
 /* ── Full class definition ── */
@@ -285,6 +286,13 @@ private:
 inline ClassRegistry& global_class_registry() {
     static ClassRegistry reg;
     return reg;
+}
+
+/* Global set of Aurora functions that return strings.
+   Populated during typechecking, checked during codegen. */
+inline std::unordered_set<std::string>& global_string_fns() {
+    static std::unordered_set<std::string> fns;
+    return fns;
 }
 
 /* ════════════════════════════════════════════════════════════

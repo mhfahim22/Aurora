@@ -331,6 +331,8 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
                 if (!val) val = i64(0);
                 if (val->getType()->isDoubleTy())
                     builder_->CreateCall(fn_print_float_, { val });
+                else if (val->getType()->isPointerTy())
+                    builder_->CreateCall(fn_print_str_, { val });
                 else
                     builder_->CreateCall(fn_printf_, { val });
             }
@@ -802,9 +804,12 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         }
         ret = builder_->CreateCall(fn_str_from_cstr_, { ret }, "cstr_wrap");
     }
-    /* If function returns i8*, bitcast to i64 for internal use */
-    else if (ret->getType()->isPointerTy())
-        ret = builder_->CreatePtrToInt(ret, i64_ty(), "ret_unbox");
+    /* If function returns i8* and is not known to return a string, bitcast to i64 */
+    else if (ret->getType()->isPointerTy()) {
+        bool is_str_fn = (global_string_fns().count(node->value) > 0);
+        if (!is_str_fn)
+            ret = builder_->CreatePtrToInt(ret, i64_ty(), "ret_unbox");
+    }
 
     /* Extend smaller integer types to i64 for Aurora's internal representation */
     else if (ret->getType()->isIntegerTy() && ret->getType()->getIntegerBitWidth() < 64)

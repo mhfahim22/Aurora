@@ -431,7 +431,7 @@ static llvm::Value* oop_gen_method_call_impl(
         }
 
         llvm::Value* ret = builder.CreateCall(fn_ty, method_ptr, call_args, method_name + "_virt_ret");
-        if (ret->getType()->isPointerTy())
+        if (ret->getType()->isPointerTy() && !method->returns_string)
             ret = builder.CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx), "ret_unbox");
         return ret;
     }
@@ -451,7 +451,7 @@ static llvm::Value* oop_gen_method_call_impl(
     }
 
     llvm::Value* ret = builder.CreateCall(fn, call_args, method_name + "_ret");
-    if (ret->getType()->isPointerTy())
+    if (ret->getType()->isPointerTy() && !method->returns_string)
         ret = builder.CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx), "ret_unbox");
     return ret;
 }

@@ -128,6 +128,23 @@ void oop_register_class(const ASTNode* node) {
         }
     }
 
+    /* Helper: check if a method returns a string based on its body */
+    auto method_returns_string = [&](const ASTNode* fn_node) -> bool {
+        const ASTNode* s = fn_node->body.get();
+        while (s) {
+            if (s->type == NodeType::Return && s->left) {
+                if (s->left->type == NodeType::Attribute && s->left->left &&
+                    s->left->left->value == "self") {
+                    const std::string& fname = s->left->value;
+                    for (auto& f : info.fields)
+                        if (f.name == fname && f.is_string) return true;
+                }
+            }
+            s = s->next.get();
+        }
+        return false;
+    };
+
     /* Parse implements */
     if (node->right) {
         info.interface_names.push_back(node->right->value);
@@ -239,6 +256,8 @@ void oop_register_class(const ASTNode* node) {
             if (needs_virtual && method.vtable_index < 0) {
                 method.vtable_index = next_vtable_idx++;
             }
+
+            method.returns_string = method_returns_string(stmt);
 
             info.methods.push_back(method);
         }

@@ -561,7 +561,35 @@ void TypeChecker::register_functions(const ASTNode* node) {
         if (node->type == NodeType::TypeAlias) {
             register_type_alias(node);
         }
+
+        /* For user-defined functions, analyze return type */
+        if (node->type == NodeType::Function && node->body) {
+            const ASTNode* s = node->body.get();
+            while (s) {
+                if (s->type == NodeType::Return && s->left) {
+                    bool is_str = false;
+                    if (s->left->type == NodeType::Str)
+                        is_str = true;
+                    else if (s->left->type == NodeType::Attribute)
+                        is_str = true;
+                    else if (s->left->type == NodeType::BinOp && s->left->value == "+")
+                        is_str = true;
+                    if (is_str) {
+                        global_string_fns().insert(node->value);
+                        break;
+                    }
+                }
+                s = s->next.get();
+            }
+        }
+
         node = node->next.get();
+    }
+
+    /* Register built-in functions that return strings */
+    for (auto& [name, info] : functions_) {
+        if (info.result == AuroraType::String)
+            global_string_fns().insert(name);
     }
 }
 
