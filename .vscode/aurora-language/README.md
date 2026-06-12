@@ -37,26 +37,29 @@ Same JetBrains Mono family, different weight/style per token type:
 | Comments | *Italic* | Classic style |
 | Escape characters | **Bold** | Stands out |
 
-## Color Palette
+## Color Palette (Aurora Twilight)
+
+A modern, aesthetic palette — warm deep-indigo background with curated pastel accents.
 
 | Token | Color | Hex |
 |-------|-------|-----|
-| Control flow keywords | Hot Pink | `#ff79c6` |
-| Logic keywords | Hot Pink | `#ff79c6` |
-| Operators | Hot Pink | `#ff79c6` |
-| `function` / `class` | Neon Green | `#50fa7b` |
-| Types | Neon Green | `#50fa7b` |
-| Function calls | Neon Green | `#50fa7b` |
-| Strings | Lemon Yellow | `#f1fa8c` |
-| Attributes | Gold bold | `#f1fa8c` |
-| Builtins | Bright Cyan | `#8be9fd` |
-| Async keywords | Bright Cyan | `#8be9fd` |
-| Numbers | Soft Purple | `#bd93f9` |
-| `true`/`false`/`null` | Hot Pink bold | `#ff79c6` |
-| Comments | Muted Blue italic | `#6272a4` |
-| OOP/module keywords | Lavender bold | `#c79aff` |
-| Memory keywords | Peach bold | `#ffb86c` |
-| Parameters | Peach italic | `#ffb86c` |
-| Variables | Soft White | `#d4d6e8` |
+| **Background** | Deep Indigo Night | `#1a1b2e` |
+| **Foreground** | Warm Soft White | `#cdd6f4` |
+| **Comments** | Muted Gray *italic* | `#585b70` |
+| **Control flow / Logic** | Soft Lavender **bold** | `#cba6f7` |
+| **Exceptions** | Soft Rose **bold** | `#f38ba8` |
+| `function` / `class` | Soft Blue ***bold italic*** | `#89b4fa` |
+| **Function calls** | Soft Blue *italic* | `#89b4fa` |
+| **Types** | Soft Teal **bold** | `#94e2d5` |
+| **Strings** | Sage Green | `#a6e3a1` |
+| **Numbers** | Warm Peach | `#fab387` |
+| **Parameters** | Warm Peach *italic* | `#fab387` |
+| `true` / `false` / `null` | Soft Rose **bold** | `#f38ba8` |
+| **Operators** | Light Cyan | `#89dceb` |
+| **Builtins** | Sky Blue | `#74c7ec` |
+| **Async keywords** | Light Cyan **bold** | `#89dceb` |
+| **OOP / Module** | Periwinkle **bold** | `#b4befe` |
+| **Memory keywords** | Soft Cream **bold** | `#f9e2af` |
+| **Attributes** (`@name`) | Soft Cream **bold underline** | `#f9e2af` |
 
-To activate theme: `Ctrl+K Ctrl+T` → **Aurora Synthwave**
+To activate theme: `Ctrl+K Ctrl+T` → **Aurora Twilight**

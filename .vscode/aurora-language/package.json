@@ -41,7 +41,7 @@
     ],
     "themes": [
       {
-        "label": "Aurora Synthwave",
+        "label": "Aurora Twilight",
         "uiTheme": "vs-dark",
         "path": "./themes/aurora-color-theme.json"
       }
