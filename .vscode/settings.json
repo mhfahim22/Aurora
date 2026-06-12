@@ -13,6 +13,7 @@
   "editor.guides.bracketPairs": true,
   "editor.renderWhitespace": "selection",
   "editor.semanticHighlighting.enabled": true,
+  "workbench.colorTheme": "Aurora Twilight",
   "workbench.fontAliasing": "antialiased",
   "terminal.integrated.fontFamily": "'JetBrains Mono', 'monospace'",
   "terminal.integrated.fontSize": 13,
