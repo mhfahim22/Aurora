@@ -4,8 +4,12 @@ $FontDir = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
 $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Fonts"
 
 # Create registry key if it doesn't exist
+$regParent = Split-Path $RegPath -Parent
+$regLeaf = Split-Path $RegPath -Leaf
 if (-not (Test-Path $RegPath)) {
-    $null = New-Item -Path $RegPath -Force
+    if (Test-Path $regParent) {
+        $null = New-Item -Path $regParent -Name $regLeaf -Force
+    }
 }
 $TempZip = "$env:TEMP\jetbrains-mono.zip"
 $ExtractDir = "$env:TEMP\jetbrains-mono"
@@ -38,7 +42,7 @@ if (Test-Path $ExtractDir) { Remove-Item -Recurse -Force $ExtractDir }
 Expand-Archive -Path $TempZip -DestinationPath $ExtractDir -Force | Out-Null
 
 $ttfFiles = Get-ChildItem -Path $ExtractDir -Recurse -Filter "*.ttf" | Where-Object {
-    $_.Name -like "JetBrainsMono-*" -and $_.Name -notlike "*NL*"
+    $_.Name -like "JetBrainsMono-*" -and $_.Name -notlike "*NL*" -and $_.Name -notlike "*NerdFont*"
 }
 
 $count = 0
