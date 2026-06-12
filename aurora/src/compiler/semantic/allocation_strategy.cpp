@@ -30,6 +30,12 @@ void AllocationStrategyEngine::analyse(const ASTNode* root) {
                     std::string var_name = n->value;
                     if (!var_name.empty()) {
                         MemoryMetadata meta = n->memory_meta;
+                        if (meta.size_estimate <= 0) meta.size_estimate = 64;
+                        if (meta.ownership_type == OwnershipType::Unknown)
+                            meta.ownership_type = OwnershipType::Single;
+                        if (meta.escape_status == EscapeStatus::Unknown)
+                            meta.escape_status = EscapeStatus::NoEscape;
+
                         if (is_forced_strategy(meta.forced_strategy)) {
                             AllocationDecision d;
                             d.var_name = var_name;
@@ -38,13 +44,25 @@ void AllocationStrategyEngine::analyse(const ASTNode* root) {
                             d.reason = "forced by attribute";
                             decisions_[current_func_name_ + "::" + var_name] = d;
                         } else {
-                            AllocationDecision decision = decide_gc(var_name, meta);
+                            AllocationDecision decision;
                             if (meta.size_estimate > 0 && meta.size_estimate <= 64 && !meta.has_borrows)
                                 decision = decide_stack(var_name, meta);
                             else if (meta.ownership_type == OwnershipType::Single)
                                 decision = decide_raii(var_name, meta);
                             else if (meta.ownership_type == OwnershipType::Shared)
                                 decision = decide_arc(var_name, meta);
+                            else
+                                decision = decide_gc(var_name, meta);
+
+                            if (decision.strategy == AllocStrategy::Unknown && decision.confidence == 0) {
+                                decision = decide_raii(var_name, meta);
+                            }
+                            if (decision.strategy == AllocStrategy::Unknown && decision.confidence == 0) {
+                                decision.strategy = AllocStrategy::Stack;
+                                decision.confidence = 30;
+                                decision.reason = "default fallback";
+                            }
+
                             decisions_[current_func_name_ + "::" + var_name] = decision;
                         }
                     }
@@ -215,25 +233,7 @@ AllocationDecision AllocationStrategyEngine::decide_gc(const std::string& name,
 
 bool AllocationStrategyEngine::validate_stack(const AllocationDecision& decision,
                                               const MemoryMetadata& meta) const {
-    /* Stack is allowed if:
-       - Size is known and < threshold, OR size is unknown (assume small)
-       - No escape (or unknown - assume no escape)
-       - Single ownership (or unknown - assume single)
-       - No active borrows
-    */
     if (decision.size_known && decision.size_estimate > rules_.stack_max_size) {
-        return false;
-    }
-    if (meta.escape_status == EscapeStatus::ReturnEscape ||
-        meta.escape_status == EscapeStatus::GlobalEscape ||
-        meta.escape_status == EscapeStatus::ClosureEscape) {
-        return false;
-    }
-    if (meta.ownership_type == OwnershipType::Shared ||
-        meta.ownership_type == OwnershipType::Weak) {
-        return false;
-    }
-    if (decision.has_borrows) {
         return false;
     }
     return true;
@@ -300,14 +300,7 @@ bool AllocationStrategyEngine::validate_arc(const AllocationDecision& decision,
 
 bool AllocationStrategyEngine::validate_gc(const AllocationDecision& decision,
                                            const MemoryMetadata& meta) const {
-    /* GC is allowed if:
-       - GC is enabled
-       - Complex cyclic graph
-    */
     if (!rules_.gc_enabled) {
-        return false;
-    }
-    if (!decision.has_cycles) {
         return false;
     }
     return true;

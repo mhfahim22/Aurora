@@ -1822,6 +1822,12 @@ ASTNode::Ptr Parser::parse_stmt() {
         return make_node(NodeType::Pass, "", ln);
     }
 
+    /* ── end (block terminator, no-op) ── */
+    if (t0.is_keyword("end")) {
+        advance();
+        return make_node(NodeType::Pass, "", ln);
+    }
+
     std::ostringstream msg;
     msg << "Line " << ln << ": unsupported statement starting with '" << t0.value << "'";
     throw std::runtime_error(msg.str());

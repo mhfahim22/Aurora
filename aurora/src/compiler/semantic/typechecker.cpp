@@ -567,13 +567,14 @@ void TypeChecker::register_functions(const ASTNode* node) {
             const ASTNode* s = node->body.get();
             while (s) {
                 if (s->type == NodeType::Return && s->left) {
+                    const ASTNode* e = s->left.get();
                     bool is_str = false;
-                    if (s->left->type == NodeType::Str)
-                        is_str = true;
-                    else if (s->left->type == NodeType::Attribute)
-                        is_str = true;
-                    else if (s->left->type == NodeType::BinOp && s->left->value == "+")
-                        is_str = true;
+                    if (e->type == NodeType::Str) is_str = true;
+                    else if (e->type == NodeType::Attribute) is_str = true;
+                    else if (e->type == NodeType::BinOp && e->value == "+") is_str = true;
+                    else if (e->type == NodeType::Var) is_str = true;
+                    else if (e->type == NodeType::Call &&
+                             global_string_fns().count(e->value) > 0) is_str = true;
                     if (is_str) {
                         global_string_fns().insert(node->value);
                         break;

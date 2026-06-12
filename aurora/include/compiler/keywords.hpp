@@ -59,7 +59,7 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
 
         /* misc */
         "typeof", "sizeof", "convert", "clone",
-        "using", "yield", "pass",
+        "using", "yield", "pass", "end",
 
         /* UI/Frontend */
         "component", "state", "properties", "render",
