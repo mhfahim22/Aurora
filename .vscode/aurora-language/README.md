@@ -1,48 +1,41 @@
 # Aurora Language — VS Code Extension
 
+Auto-installs **JetBrains Mono** font and provides full Aurora language support with a vibrant neon theme.
+
 ## Installation
 
 ```powershell
-# Copy to VS Code extensions folder
 Copy-Item -Recurse ".vscode\aurora-language" "$env:USERPROFILE\.vscode\extensions\"
 ```
 
-Restart VS Code. Open any `.aura` file — syntax highlighting activates automatically.
+Restart VS Code. Open any `.aura` file.
 
-## Font Setup (JetBrains Mono)
+## Font Auto-Install
 
-This extension uses **variable font** properties — same JetBrains Mono family, different weights and styles per token type:
+When you open your first `.aura` file, the extension checks if **JetBrains Mono** is installed:
 
-| Token type | Font style | Visual effect |
-|------------|-----------|---------------|
-| Keywords (if, for, return...) | **Bold** | Strong, commanding |
-| Declarations (function, class) | ***Bold Italic*** | Important + dynamic |
-| Function calls | *Italic* | Light, active |
-| Parameters | *Italic* | Softer, secondary |
-| Attributes (@name) | **Bold Underline** | Distinctive, special |
-| Comments | *Italic* | Classic comment style |
-| Strings, Numbers, Variables | Regular | Clean, readable |
-| Escape characters | **Bold** | Stand out in strings |
+- **Not installed** → A notification pops up: *"Install JetBrains Mono? "*
+- Click **Install Font** → downloads + installs automatically
+- Restart VS Code when done
+- **Already installed** → no prompt, works silently
 
-### Install JetBrains Mono
+You can also trigger install manually anytime via:
+- Command Palette (`Ctrl+Shift+P`) → **Aurora: Install JetBrains Mono Font**
 
-1. Download from: https://www.jetbrains.com/lp/mono/
-2. Install the font (Windows: right-click → Install)
-3. VS Code will auto-use it via the project `.vscode/settings.json`
+## Variable Font Design
 
-If JetBrains Mono isn't installed, it falls back to Cascadia Code → Fira Code → Source Code Pro → Consolas.
+Same JetBrains Mono family, different weight/style per token type:
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Syntax highlighting** | Full TextMate grammar — all Aurora tokens |
-| **Variable font** | JetBrains Mono with weight/style variations |
-| **Auto-indent** | Increases indent after `:` |
-| **Bracket matching** | `()`, `[]`, `{}` — colorized pairs |
-| **Auto-closing** | Quotes and brackets auto-close |
-| **Comment toggling** | `#` line, `/* */` block |
-| **Custom theme** | **Aurora Synthwave** — dark neon, retina-popping colors |
+| Token type | Font style | Effect |
+|------------|-----------|--------|
+| Keywords (if, for, return...) | **Bold** | Strong presence |
+| Declarations (function, class) | ***Bold Italic*** | Most important |
+| Function/method calls | *Italic* | Active, dynamic |
+| Parameters | *Italic* | Secondary, lighter |
+| Attributes (`@name`) | **Bold Underline** | Special, unique |
+| Strings, Numbers, Vars | Regular | Clean, readable |
+| Comments | *Italic* | Classic style |
+| Escape characters | **Bold** | Stands out |
 
 ## Color Palette
 
@@ -50,25 +43,20 @@ If JetBrains Mono isn't installed, it falls back to Cascadia Code → Fira Code 
 |-------|-------|-----|
 | Control flow keywords | Hot Pink | `#ff79c6` |
 | Logic keywords | Hot Pink | `#ff79c6` |
-| Exception keywords | Hot Pink | `#ff79c6` |
 | Operators | Hot Pink | `#ff79c6` |
-| `function` / `class` / `lambda` | Neon Green | `#50fa7b` |
-| Types (int, string, list...) | Neon Green | `#50fa7b` |
-| Function definitions | Neon Green | `#50fa7b` |
+| `function` / `class` | Neon Green | `#50fa7b` |
+| Types | Neon Green | `#50fa7b` |
 | Function calls | Neon Green | `#50fa7b` |
 | Strings | Lemon Yellow | `#f1fa8c` |
-| Attributes | Gold (bold) | `#f1fa8c` |
-| Builtins (output, len, push...) | Bright Cyan | `#8be9fd` |
-| Async keywords (async, await...) | Bright Cyan | `#8be9fd` |
-| Methods | Bright Cyan | `#8be9fd` |
+| Attributes | Gold bold | `#f1fa8c` |
+| Builtins | Bright Cyan | `#8be9fd` |
+| Async keywords | Bright Cyan | `#8be9fd` |
 | Numbers | Soft Purple | `#bd93f9` |
-| `true` / `false` / `null` | Hot Pink | `#ff79c6` |
-| Comments | Muted Blue *italic* | `#6272a4` |
-| OOP keywords | Lavender bold | `#c79aff` |
-| Module keywords | Lavender bold | `#c79aff` |
+| `true`/`false`/`null` | Hot Pink bold | `#ff79c6` |
+| Comments | Muted Blue italic | `#6272a4` |
+| OOP/module keywords | Lavender bold | `#c79aff` |
 | Memory keywords | Peach bold | `#ffb86c` |
-| Parameters | Peach *italic* | `#ffb86c` |
+| Parameters | Peach italic | `#ffb86c` |
 | Variables | Soft White | `#d4d6e8` |
-| Escape chars | Hot Pink bold | `#ff79c6` |
 
-To activate the theme: `Ctrl+K Ctrl+T` → **Aurora Synthwave**
+To activate theme: `Ctrl+K Ctrl+T` → **Aurora Synthwave**

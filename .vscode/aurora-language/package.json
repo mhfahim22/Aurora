@@ -1,7 +1,7 @@
 {
   "name": "aurora-language",
   "displayName": "Aurora Language",
-  "description": "Aurora language support — syntax highlighting, snippets, and a vibrant theme",
+  "description": "Aurora language support — syntax highlighting, JetBrains Mono auto-install, and a vibrant theme",
   "version": "1.0.0",
   "publisher": "aurora-lang",
   "engines": {
@@ -9,9 +9,21 @@
   },
   "categories": [
     "Programming Languages",
-    "Themes"
+    "Themes",
+    "Other"
   ],
+  "activationEvents": [
+    "onLanguage:aurora",
+    "onCommand:aurora.installFont"
+  ],
+  "main": "./extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "aurora.installFont",
+        "title": "Aurora: Install JetBrains Mono Font"
+      }
+    ],
     "languages": [
       {
         "id": "aurora",
