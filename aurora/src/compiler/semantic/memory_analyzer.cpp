@@ -585,7 +585,6 @@ void MemoryAnalyzer::apply_escape_results() {
             /* Update ownership type based on escape status */
             if (meta.ownership_type == OwnershipType::Single) {
                 switch (escape_status) {
-                    case EscapeStatus::ReturnEscape:
                     case EscapeStatus::GlobalEscape:
                     case EscapeStatus::ClosureEscape:
                         /* These need shared ownership */
@@ -594,6 +593,11 @@ void MemoryAnalyzer::apply_escape_results() {
                     case EscapeStatus::ArgEscape:
                         /* Passed as argument - might need shared */
                         meta.ownership_type = OwnershipType::Shared;
+                        break;
+                    case EscapeStatus::ReturnEscape:
+                        /* Return values are transferred via inttoptr/ptrtoint,
+                           no SharedBox wrapper needed */
+                        meta.ownership_type = OwnershipType::Single;
                         break;
                     default:
                         break;

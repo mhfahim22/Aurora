@@ -160,9 +160,8 @@ llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
             size = builder_->CreateZExtOrTrunc(size, i64_ty());
             llvm::Value* raw = builder_->CreateCall(fn_arena_alloc_, { size },
                                                      name + "_arena");
-            llvm::Value* ptr = create_entry_alloca(name, ptr_ty);
-            builder_->CreateStore(raw, ptr);
-            return ptr;
+            /* Bitcast arena pointer to actual type so gen_assign can store directly */
+            return builder_->CreateBitCast(raw, ty->getPointerTo(), name);
         }
         case AllocStrategy::GC: {
             /* GC allocation: call aurora_gc_alloc */
@@ -170,9 +169,8 @@ llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
             size = builder_->CreateZExtOrTrunc(size, i64_ty());
             llvm::Value* raw = builder_->CreateCall(fn_gc_alloc_, { size },
                                                      name + "_gc");
-            llvm::Value* ptr = create_entry_alloca(name, ptr_ty);
-            builder_->CreateStore(raw, ptr);
-            return ptr;
+            /* Bitcast GC pointer to actual type so gen_assign can store directly */
+            return builder_->CreateBitCast(raw, ty->getPointerTo(), name);
         }
         default:
             break;
@@ -183,13 +181,15 @@ llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
     /* Emit ownership-specific setup based on state */
     switch (state) {
         case OwnershipState::Shared: {
-            /* Shared: allocate SharedBox wrapper */
-            llvm::Value* shared_box = builder_->CreateCall(
-                module_->getOrInsertFunction("aurora_shared_new",
-                    llvm::FunctionType::get(i8ptr_ty(),
-                        {i8ptr_ty(), i8ptr_ty()}, false)),
-                {ptr, llvm::ConstantPointerNull::get(ptr_ty)});
-            builder_->CreateStore(shared_box, ptr);
+            /* Shared: allocate SharedBox wrapper (only for pointer types) */
+            if (ty->isPointerTy()) {
+                llvm::Value* shared_box = builder_->CreateCall(
+                    module_->getOrInsertFunction("aurora_shared_new",
+                        llvm::FunctionType::get(i8ptr_ty(),
+                            {i8ptr_ty(), i8ptr_ty()}, false)),
+                    {ptr, llvm::ConstantPointerNull::get(ptr_ty)});
+                builder_->CreateStore(shared_box, ptr);
+            }
             break;
         }
         case OwnershipState::Weak: {

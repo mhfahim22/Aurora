@@ -143,7 +143,7 @@ bool Codegen::expr_is_string_type(const ASTNode* node) {
         case NodeType::Call: {
             auto dot = node->value.find('.');
             if (dot == std::string::npos)
-                return true; /* regular function call — returns ptr (string) */
+                return global_string_fns().count(node->value) > 0;
             std::string obj_name    = node->value.substr(0, dot);
             std::string method_name = node->value.substr(dot + 1);
             std::string cls_name = oop_class_of(obj_name);

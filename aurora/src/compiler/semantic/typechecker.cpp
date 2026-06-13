@@ -571,7 +571,6 @@ void TypeChecker::register_functions(const ASTNode* node) {
                     bool is_str = false;
                     if (e->type == NodeType::Str) is_str = true;
                     else if (e->type == NodeType::Attribute) is_str = true;
-                    else if (e->type == NodeType::Var) is_str = true;
                     else if (e->type == NodeType::Call &&
                              global_string_fns().count(e->value) > 0) is_str = true;
                     else if (e->type == NodeType::BinOp && e->value == "+") {
