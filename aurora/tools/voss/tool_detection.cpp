@@ -85,7 +85,11 @@ ToolInfo detect_c_compiler() {
         if (!p.empty()) {
             info.found = true;
             info.path = p;
-            info.version = cmd_output(std::string(candidates[i].exe) + " --version 2>&1 | head -1");
+            std::string ver_raw = cmd_output(std::string(candidates[i].exe) + " --version 2>&1");
+            /* Take only the first line (head -1 equivalent, portable) */
+            { size_t nl = ver_raw.find('\n'); if (nl != std::string::npos) ver_raw = ver_raw.substr(0, nl); }
+            { size_t cr = ver_raw.find('\r'); if (cr != std::string::npos) ver_raw = ver_raw.substr(0, cr); }
+            info.version = ver_raw;
             return info;
         }
     }
@@ -96,7 +100,12 @@ ToolInfo detect_python() {
     ToolInfo info;
     info.name = "Python";
 
-    const char* candidates[] = {"python3", "python", "python.exe", nullptr};
+#ifdef _WIN32
+    /* On Windows, prefer system Python (has pip) over msys64 python3 */
+    const char* candidates[] = {"python", "python.exe", "python3", nullptr};
+#else
+    const char* candidates[] = {"python3", "python", nullptr};
+#endif
     for (int i = 0; candidates[i]; i++) {
         std::string p = find_in_path(candidates[i]);
         if (!p.empty()) {

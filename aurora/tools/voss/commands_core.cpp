@@ -488,7 +488,7 @@ int cmd_verify(const std::string& spec) {
     return 1;
 }
 
-static bool verify_package_signature(const std::string& name, const std::string& version) {
+bool verify_package_signature(const std::string& name, const std::string& version) {
     std::string expected = sha256_hex(name + "@" + version + ":aurora-pkg-sign:v1");
     std::string sig_file = "packages/" + name + "/" + name + "@" + version + ".sig";
     if (!fs::exists(sig_file)) return false;
@@ -533,11 +533,20 @@ int cmd_add(const std::string& pkg, const std::string& version) {
         name = pkg;
     if (ver.empty()) ver = version.empty() ? "latest" : version;
 
-    std::cout << "[add] " << name << " @" << ver << "\n";
+    /* Parse eco:pkg prefix (e.g. "npm:moment" → eco="npm", name="moment") */
+    std::string eco_hint;
+    size_t colon = name.find(':');
+    if (colon != std::string::npos) {
+        eco_hint = name.substr(0, colon);
+        name = name.substr(colon + 1);
+        if (name.empty()) { std::cerr << "error: empty package name after '" << eco_hint << ":'\n"; return 1; }
+    }
+
+    std::cout << "[add] " << (eco_hint.empty() ? "" : eco_hint + ":") << name << " @" << ver << "\n";
 
     /* Step 1: Auto-detect ecosystem and generate bridge */
     std::cout << "[add] detecting ecosystem...\n";
-    int bridge_rc = cmd_bridge_auto(name, ver);
+    int bridge_rc = cmd_bridge_auto(name, ver, eco_hint);
 
     /* Step 2: Detect which ecosystem was found from bridge directory */
     std::string detected_eco;

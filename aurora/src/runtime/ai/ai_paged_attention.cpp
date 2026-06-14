@@ -95,7 +95,7 @@ void paged_sequence_free(PagedManager* pm, int64_t seq_id) {
     s->active = 0;
     s->length = 0;
     s->n_blocks = 0;
-    /* TODO: add block reuse via free list */
+    /* blocks already returned to free list by free_block() */
 }
 
 /* ── Append KV ── */

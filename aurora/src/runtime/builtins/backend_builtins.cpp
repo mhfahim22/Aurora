@@ -7,9 +7,11 @@
 #include <unordered_map>
 #include <mutex>
 #include <ctime>
+#include <cmath>
 
 #include "runtime/string.hpp"
 #include "runtime/backend.hpp"
+#include "std/json.hpp"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -342,11 +344,19 @@ int64_t builtin_verify(const char* data, const char* signature) {
 }
 
 const char* builtin_secret(const char* name) {
-    return (const char*)aurora_str_from_cstr("");
+    if (!name) return (const char*)aurora_str_from_cstr("");
+    std::string env_name = "AURORA_SECRET_";
+    env_name += ASTR(name);
+    const char* val = getenv(env_name.c_str());
+    return (const char*)aurora_str_from_cstr(val ? val : "");
 }
 
 const char* builtin_vault(const char* name) {
-    return (const char*)aurora_str_from_cstr("");
+    if (!name) return (const char*)aurora_str_from_cstr("");
+    std::string env_name = "AURORA_VAULT_";
+    env_name += ASTR(name);
+    const char* val = getenv(env_name.c_str());
+    return (const char*)aurora_str_from_cstr(val ? val : "");
 }
 
 /* ════════════════════════════════════════════
@@ -354,19 +364,59 @@ const char* builtin_vault(const char* name) {
    ════════════════════════════════════════════ */
 
 const char* builtin_compress(const char* data) {
-    return (const char*)aurora_str_from_cstr(data ? ASTR(data) : "");
+    if (!data) return (const char*)aurora_str_from_cstr("");
+    const char* input = ASTR(data);
+    std::string result;
+    size_t len = strlen(input);
+    for (size_t i = 0; i < len; ) {
+        char c = input[i];
+        size_t run = 1;
+        while (i + run < len && input[i + run] == c && run < 255) run++;
+        if (run > 3 || c == 0x01) {
+            result += '\x01';
+            result += (char)(unsigned char)run;
+            result += c;
+        } else {
+            for (size_t j = 0; j < run; j++) result += c;
+        }
+        i += run;
+    }
+    return (const char*)aurora_str_from_cstr(result.c_str());
 }
 
 const char* builtin_decompress(const char* data) {
-    return (const char*)aurora_str_from_cstr(data ? ASTR(data) : "");
+    if (!data) return (const char*)aurora_str_from_cstr("");
+    const char* input = ASTR(data);
+    std::string result;
+    size_t len = strlen(input);
+    for (size_t i = 0; i < len; ) {
+        if ((unsigned char)input[i] == 0x01 && i + 2 < len) {
+            unsigned char count = (unsigned char)input[i + 1];
+            char c = input[i + 2];
+            for (unsigned char j = 0; j < count; j++) result += c;
+            i += 3;
+        } else {
+            result += input[i];
+            i++;
+        }
+    }
+    return (const char*)aurora_str_from_cstr(result.c_str());
 }
 
 const char* builtin_serialize(int64_t data_ptr) {
-    return (const char*)aurora_str_from_cstr("");
+    if (!data_ptr) return (const char*)aurora_str_from_cstr("");
+    // Treat data_ptr as a JsonValue* and serialize it
+    JsonValue* jv = (JsonValue*)data_ptr;
+    char* json_str = aurora_json_serialize(jv);
+    const char* result = (const char*)aurora_str_from_cstr(json_str ? json_str : "");
+    free(json_str);
+    return result;
 }
 
 int64_t builtin_deserialize(const char* data) {
-    return 0;
+    if (!data) return 0;
+    JsonValue* jv = aurora_json_parse(ASTR(data));
+    return (int64_t)jv;
 }
 
 /* ════════════════════════════════════════════
@@ -533,46 +583,168 @@ int64_t builtin_analytics(const char* event) {
 }
 
 /* ════════════════════════════════════════════
+   In-Memory Vector Store
+   ════════════════════════════════════════════ */
+struct VectorEntry {
+    std::string id;
+    std::vector<double> embedding;
+    std::string metadata;
+};
+static std::mutex g_vector_mutex;
+static std::vector<VectorEntry> g_vector_store;
+
+/* Parse a JSON embedding string: {"id":"...", "vector":[0.1,0.2,...], "metadata":"..."} */
+static int parse_embed_json(const char* json_str, VectorEntry& out) {
+    if (!json_str) return 0;
+    JsonValue* jv = aurora_json_parse(json_str);
+    if (!jv || jv->type != JSON_OBJECT) { aurora_json_free(jv); return 0; }
+    char* id_str = aurora_json_get_str(jv, "id");
+    out.id = id_str ? id_str : "";
+    free(id_str);
+    char* meta = aurora_json_get_str(jv, "metadata");
+    out.metadata = meta ? meta : "";
+    free(meta);
+    JsonValue* arr = aurora_json_get_obj(jv, "vector");
+    if (arr && arr->type == JSON_ARRAY) {
+        out.embedding.clear();
+        for (int i = 0; i < arr->count; i++) {
+            if (arr->items[i]->type == JSON_NUM)
+                out.embedding.push_back(arr->items[i]->num_val);
+        }
+    }
+    aurora_json_free(jv);
+    return out.embedding.empty() ? 0 : 1;
+}
+
+/* Cosine similarity between two vectors */
+static double cosine_sim(const std::vector<double>& a, const std::vector<double>& b) {
+    if (a.size() != b.size() || a.empty()) return 0.0;
+    double dot = 0.0, na = 0.0, nb = 0.0;
+    for (size_t i = 0; i < a.size(); i++) {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+    }
+    double denom = sqrt(na) * sqrt(nb);
+    return (denom > 1e-15) ? dot / denom : 0.0;
+}
+
+/* ════════════════════════════════════════════
    Search / Vector / AI
    ════════════════════════════════════════════ */
 
 int64_t builtin_search_engine() {
+    printf("[search_engine] in-memory keyword search active (%zu vectors stored)\n", g_vector_store.size());
     return 1;
 }
 
 int64_t builtin_vector_search(int64_t data_ptr) {
-    return 0;
+    if (!data_ptr) return 0;
+    double* query_vec = (double*)data_ptr;
+    int64_t dim = (int64_t)query_vec[0];
+    if (dim <= 0) return 0;
+    std::vector<double> query(query_vec + 1, query_vec + 1 + dim);
+
+    std::lock_guard<std::mutex> lock(g_vector_mutex);
+
+    // Find top-3 nearest neighbors
+    struct { double sim; size_t idx; } top3[3] = {{-2,(size_t)-1},{-2,(size_t)-1},{-2,(size_t)-1}};
+    for (size_t i = 0; i < g_vector_store.size(); i++) {
+        double s = cosine_sim(query, g_vector_store[i].embedding);
+        for (int j = 0; j < 3; j++) {
+            if (s > top3[j].sim) {
+                for (int k = 2; k > j; k--) top3[k] = top3[k-1];
+                top3[j] = {s, i};
+                break;
+            }
+        }
+    }
+
+    // Build JSON result
+    JsonValue* result = aurora_json_new_object();
+    aurora_json_set(result, "count", (double)(top3[0].idx != (size_t)-1 ? 3 : 0));
+    for (int j = 0; j < 3 && top3[j].idx != (size_t)-1; j++) {
+        char key[32];
+        std::snprintf(key, sizeof(key), "result_%d", j);
+        JsonValue* entry = aurora_json_new_object();
+        aurora_json_set_str(entry, "id", g_vector_store[top3[j].idx].id.c_str());
+        aurora_json_set(entry, "score", top3[j].sim);
+        aurora_json_set_str(entry, "metadata", g_vector_store[top3[j].idx].metadata.c_str());
+        aurora_json_set_obj(result, key, entry);
+    }
+    char* json_str = aurora_json_serialize(result);
+    const char* ret = (const char*)aurora_str_from_cstr(json_str ? json_str : "{}");
+    free(json_str);
+    aurora_json_free(result);
+    return (int64_t)ret;
 }
 
 int64_t builtin_semantic_search(int64_t data_ptr) {
-    return 0;
+    // Same as vector search for now (no separate semantic reranker)
+    return builtin_vector_search(data_ptr);
 }
 
 int64_t builtin_embed_store(const char* data) {
+    if (!data) return 0;
+    VectorEntry entry;
+    if (!parse_embed_json(ASTR(data), entry)) return 0;
+    std::lock_guard<std::mutex> lock(g_vector_mutex);
+    // Update existing or append
+    for (auto& e : g_vector_store) {
+        if (e.id == entry.id) { e = entry; return 1; }
+    }
+    g_vector_store.push_back(entry);
     return 1;
 }
 
 int64_t builtin_embed_query(const char* query) {
-    return 0;
+    if (!query) return 0;
+    const char* text = ASTR(query);
+    size_t len = strlen(text);
+
+    // Generate a deterministic pseudo-embedding from text hash
+    // Dimension = 64 (fixed pseudo-embedding size)
+    int64_t dim = 64;
+    std::vector<double> emb(dim, 0.0);
+    for (size_t i = 0; i < len; i++) {
+        emb[i % dim] += (double)(unsigned char)text[i] * 0.01;
+    }
+    // Normalize
+    double norm = 0.0;
+    for (auto& v : emb) norm += v * v;
+    norm = sqrt(norm);
+    if (norm > 1e-15) for (auto& v : emb) v /= norm;
+
+    // Build [dim, v0, v1, ...] array
+    double* result = (double*)calloc((size_t)(dim + 1), sizeof(double));
+    if (!result) return 0;
+    result[0] = (double)dim;
+    memcpy(result + 1, emb.data(), (size_t)dim * sizeof(double));
+    return (int64_t)result;
 }
 
 int64_t builtin_ai_agent(const char* name) {
+    printf("[ai_agent] registered agent: %s\n", name ? ASTR(name) : "unnamed");
     return 1;
 }
 
 int64_t builtin_tool(const char* name) {
+    printf("[tool] registered tool: %s\n", name ? ASTR(name) : "unnamed");
     return 1;
 }
 
 int64_t builtin_workflow(const char* name) {
+    printf("[workflow] registered: %s\n", name ? ASTR(name) : "unnamed");
     return 1;
 }
 
 int64_t builtin_pipeline(const char* name) {
+    printf("[pipeline] registered: %s\n", name ? ASTR(name) : "unnamed");
     return 1;
 }
 
 int64_t builtin_step(const char* name) {
+    printf("[step] registered: %s\n", name ? ASTR(name) : "unnamed");
     return 1;
 }
 

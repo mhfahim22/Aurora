@@ -46,7 +46,7 @@ namespace fs = std::filesystem;
 static const char* AURA_VERSION = "0.3.0";
 static const int LOCK_VERSION = 1;
 static const int MAX_THREADS = 8;
-static const char* DEFAULT_REGISTRY_URL = "https://aurora-packages.example.com/api/v1";
+static const char* DEFAULT_REGISTRY_URL = "";
 extern bool g_offline;
 extern std::string g_cross_target; /* e.g. "aarch64-unknown-linux-gnu" */
 extern bool g_manual_mode;         /* --manual flag for cargo bridge */
@@ -485,7 +485,7 @@ std::string ai_generate_package(const std::string& desc);
 
 /* ── Ecosystem Bridges (Phase 3) ── */
 int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::string& version);
-int cmd_bridge_auto(const std::string& pkg, const std::string& version);
+int cmd_bridge_auto(const std::string& pkg, const std::string& version, const std::string& hint_eco = "");
 
 /* ── Automatic Binding Generator (Phase 2) ── */
 int cmd_bind(const std::string& library, const std::vector<std::string>& headers,

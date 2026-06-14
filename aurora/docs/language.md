@@ -566,7 +566,7 @@ event_off("user.login", handler)
 ### 13.1 Import Forms
 
 ```aura
-import "path/to/file.aufra"    # file path
+import "path/to/file.aura"    # file path
 import stdio                   # library module
 import kernel32                # FFI module
 import MrCode                  # third-party package
@@ -577,11 +577,11 @@ from "utils" import helper     # selective import
 
 Search order:
 1. Exact file path
-2. Path + `.aufra` extension
+2. Path + `.aura` extension
 3. Search path / name
-4. Search path / name.aufra
+4. Search path / name.aura
 5. Search path / lib / name
-6. Search path / lib / name.aufra
+6. Search path / lib / name.aura
 
 ### 13.3 Module / Package Declarations
 
@@ -632,7 +632,7 @@ extern union Data
     "version": "1.0.0",
     "author": "Alice",
     "description": "My Aurora application",
-    "entry": "main.aufra",
+    "entry": "main.aura",
     "depends": ["MrCode >= 2.0"]
 }
 ```
@@ -827,10 +827,10 @@ Message boxes, window management, window class registration, message loop, drawi
 ## 20. Compiler & Build
 
 ```bash
-.\aurora.bat file.aufra                   # compile and run
-.\aurora.bat file.aufra --emit-obj        # compile to object file
+.\aurora.bat file.aura                   # compile and run
+.\aurora.bat file.aura --emit-obj        # compile to object file
 .\aurora.bat build build                 # cmake build
-.\aurora.bat run tests/my_test.aufra      # run a specific test
+.\aurora.bat run tests/my_test.aura      # run a specific test
 ```
 
 Output modes: JIT execution, object file emission, linked executable.

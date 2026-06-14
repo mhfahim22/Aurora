@@ -286,8 +286,8 @@ void load_registries() {
         }
     }
     if (g_registries.empty()) {
-        g_registries.push_back({"aurora", DEFAULT_REGISTRY_URL});
-        std::cout << "info: no registries configured, using default: " << DEFAULT_REGISTRY_URL << "\n";
+        /* No registries configured — will fall back to GitHub search + direct API lookups */
+        std::cout << "info: no registries configured — using direct ecosystem APIs (npm/PyPI/Cargo)\n";
         std::cout << "info: configure registries via 'voss registry add <name> <url>' or edit aura.registry\n";
     }
 }

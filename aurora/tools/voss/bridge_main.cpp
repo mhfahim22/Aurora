@@ -2128,14 +2128,22 @@ after_build:
     return 0;
 }
 
-/* ── Auto-resolve: try pypi → npm → cargo, use first success ── */
-int cmd_bridge_auto(const std::string& pkg, const std::string& version) {
+/* ── Auto-resolve: try specified eco first, then pypi → npm → cargo ── */
+int cmd_bridge_auto(const std::string& pkg, const std::string& version, const std::string& hint_eco) {
     if (pkg.empty()) {
         std::cerr << "[bridge] ERROR: empty package name\n";
         return 1;
     }
+    /* If eco hint provided, try it first */
+    if (!hint_eco.empty()) {
+        std::cout << "[bridge] trying " << hint_eco << " for " << pkg << "\n";
+        int rc = cmd_bridge(hint_eco, pkg, version);
+        if (rc == 0) return 0;
+    }
+    /* Fallback: try all ecosystems */
     const char* ecosystems[] = {"pypi", "npm", "cargo"};
     for (auto eco : ecosystems) {
+        if (eco == hint_eco) continue; /* already tried */
         std::cout << "[bridge] trying " << eco << " for " << pkg << "\n";
         int rc = cmd_bridge(eco, pkg, version);
         if (rc == 0) return 0;

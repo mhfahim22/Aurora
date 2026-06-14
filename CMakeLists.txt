@@ -433,10 +433,15 @@ function(add_npm_bridge name pkg c_file)
     )
 endfunction()
 
-# Example bridges (built only if the generated .c files exist)
-add_npm_bridge(bridge_moment  moment  "${CMAKE_SOURCE_DIR}/packages/bridges/npm/moment_npm/moment_npm.c")
-add_npm_bridge(bridge_lodash  lodash  "${CMAKE_SOURCE_DIR}/packages/bridges/npm/lodash_npm/lodash_npm.c")
-add_npm_bridge(bridge_chalk   chalk   "${CMAKE_SOURCE_DIR}/packages/bridges/npm/chalk_npm/chalk_npm.c")
+# npm bridges (built only if the generated .c files exist)
+add_npm_bridge(bridge_moment     moment     "${CMAKE_SOURCE_DIR}/packages/bridges/npm/moment_npm/moment_npm.c")
+add_npm_bridge(bridge_lodash     lodash     "${CMAKE_SOURCE_DIR}/packages/bridges/npm/lodash_npm/lodash_npm.c")
+add_npm_bridge(bridge_chalk      chalk      "${CMAKE_SOURCE_DIR}/packages/bridges/npm/chalk_npm/chalk_npm.c")
+add_npm_bridge(bridge_execa      execa      "${CMAKE_SOURCE_DIR}/packages/bridges/npm/execa_npm/execa_npm.c")
+add_npm_bridge(bridge_got        got        "${CMAKE_SOURCE_DIR}/packages/bridges/npm/got_npm/got_npm.c")
+add_npm_bridge(bridge_leftpad    left-pad   "${CMAKE_SOURCE_DIR}/packages/bridges/npm/left-pad_npm/left-pad_npm.c")
+add_npm_bridge(bridge_mobx       mobx       "${CMAKE_SOURCE_DIR}/packages/bridges/npm/mobx_npm/mobx_npm.c")
+add_npm_bridge(bridge_uuid       uuid       "${CMAKE_SOURCE_DIR}/packages/bridges/npm/uuid_npm/uuid_npm.c")
 
 # ═══════════════════════════════════════════════════════════════
 # aurora-lsp — Language Server Protocol implementation

@@ -70,6 +70,13 @@ int     call_thru(void* fn, int x) {
     return f(x);
 }
 
+/* Struct return test: 4 x int64 = 32 bytes (hidden pointer on Win64) */
+typedef struct { int64_t a, b, c, d; } Quad;
+Quad make_quad(int64_t a, int64_t b, int64_t c, int64_t d) {
+    Quad q = { a, b, c, d };
+    return q;
+}
+
 } // extern "C"
 
 // ═══════════════════════════════════════════════════════════════
@@ -204,14 +211,58 @@ static void test_void_ret() {
 // ═══════════════════════════════════════════════════════════════
 // 7. Struct return (by hidden pointer on Win64)
 // ═══════════════════════════════════════════════════════════════
+/* Define Quad as FFI_STRUCT type for the new-style API */
+static ffi_type* quad_elems[] = {
+    &ffi_type_int64, &ffi_type_int64,
+    &ffi_type_int64, &ffi_type_int64
+};
+static ffi_type quad_type = {
+    FFI_STRUCT, 4, 0, quad_elems
+};
+
 static void test_struct_ret() {
     hdr("Struct Return");
 
     // On Win64, structs > 8 bytes use a hidden pointer arg (RCX).
-    // Our FFI layer doesn't support this yet — skip actual FFI call.
-    // TODO: Phase 2 — add hidden-pointer struct return support.
+    // ffi_call_type (new-style API) handles this automatically via
+    // FFI_F_HIDDEN_RET flag. Test with a 32-byte Quad struct.
 
-    t("struct ret (skip — needs hidden ptr)");
+    // Build arg types for make_quad: int64, int64, int64, int64
+    ffi_type* arg_types[4] = {
+        &ffi_type_int64, &ffi_type_int64,
+        &ffi_type_int64, &ffi_type_int64
+    };
+
+    ffi_cif2 cif;
+    int prep_rc = ffi_cif_prep_type(&cif, &quad_type, 4, arg_types);
+    CHECK(prep_rc == FFI_OK, "cif_prep_type failed");
+
+    // Verify hidden ret flag was set (struct > 8 bytes)
+    CHECK(cif.flags & FFI_F_HIDDEN_RET, "expected FFI_F_HIDDEN_RET flag");
+
+    // Prepare args
+    int64_t av[4] = { 10, 20, 30, 40 };
+    void* arg_ptrs[4] = { &av[0], &av[1], &av[2], &av[3] };
+    Quad result;
+    memset(&result, 0, sizeof(result));
+
+    t("struct ret (Quad) via new-style API");
+    ffi_call_type(&cif, (void*)make_quad, &result, arg_ptrs);
+    CHECK(result.a == 10, "expected a=10");
+    CHECK(result.b == 20, "expected b=20");
+    CHECK(result.c == 30, "expected c=30");
+    CHECK(result.d == 40, "expected d=40");
+    PASS;
+
+    // Test with different values
+    int64_t bv[4] = { 100, 200, 300, 400 };
+    void* bptrs[4] = { &bv[0], &bv[1], &bv[2], &bv[3] };
+    t("struct ret (Quad) different values");
+    ffi_call_type(&cif, (void*)make_quad, &result, bptrs);
+    CHECK(result.a == 100, "expected a=100");
+    CHECK(result.b == 200, "expected b=200");
+    CHECK(result.c == 300, "expected c=300");
+    CHECK(result.d == 400, "expected d=400");
     PASS;
 }
 

@@ -41,7 +41,7 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "#include \"quickjs.h\"\n";
         cw << "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n#include <stdint.h>\n";
 #ifdef _WIN32
-        cw << "#define WIN32_LEAN_AND_MEAN\n#include <windows.h>\n#include <direct.h>\n#include <sys/stat.h>\n#include <io.h>\n#define EXPORT __declspec(dllexport)\n";
+        cw << "#define WIN32_LEAN_AND_MEAN\n#define SECURITY_WIN32\n#include <windows.h>\n#include <sspi.h>\n#include <schannel.h>\n#include <direct.h>\n#include <sys/stat.h>\n#include <io.h>\n#define EXPORT __declspec(dllexport)\n";
 #else
         cw << "#include <unistd.h>\n#include <sys/stat.h>\n#include <dirent.h>\n#include <dlfcn.h>\n#define EXPORT __attribute__((visibility(\"default\")))\n";
 #endif
@@ -998,8 +998,8 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  eb[1].cbBuffer=0;eb[1].BufferType=SECBUFFER_DATA;eb[1].pvBuffer=NULL;\n";
         cw << "  eb[2].cbBuffer=0;eb[2].BufferType=SECBUFFER_DATA;eb[2].pvBuffer=NULL;\n";
         cw << "  eb[3].cbBuffer=0;eb[3].BufferType=SECBUFFER_DATA;eb[3].pvBuffer=NULL;\n";
-        cw << "  SECURITY_STATUS ss=pEncryptMessage(&ss->ctx,0,&ed,0);\n";
-        cw << "  if(ss<0){free(buf);JS_FreeCString(ctx,data);return JS_ThrowTypeError(ctx,\"encrypt failed\");}\n";
+        cw << "  SECURITY_STATUS sec_status=pEncryptMessage(&ss->ctx,0,&ed,0);\n";
+        cw << "  if(sec_status<0){free(buf);JS_FreeCString(ctx,data);return JS_ThrowTypeError(ctx,\"encrypt failed\");}\n";
         cw << "  int n=(int)psend(ss->fd,buf+ss->sz.cbHeader,eb[0].cbBuffer,0);\n";
         cw << "  free(buf);JS_FreeCString(ctx,data);\n";
         cw << "  if(n<0)return JS_ThrowTypeError(ctx,\"send failed\");return JS_NewInt32(ctx,n);}\n\n";
@@ -1014,8 +1014,8 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  rb[1].cbBuffer=0;rb[1].BufferType=SECBUFFER_EMPTY;\n";
         cw << "  rb[2].cbBuffer=0;rb[2].BufferType=SECBUFFER_EMPTY;\n";
         cw << "  rb[3].cbBuffer=0;rb[3].BufferType=SECBUFFER_EMPTY;\n";
-        cw << "  SECURITY_STATUS ss=pDecryptMessage(&ss->ctx,&rd,0,NULL);\n";
-        cw << "  if(ss<0)return JS_ThrowTypeError(ctx,\"decrypt failed\");\n";
+        cw << "  SECURITY_STATUS sec_status=pDecryptMessage(&ss->ctx,&rd,0,NULL);\n";
+        cw << "  if(sec_status<0)return JS_ThrowTypeError(ctx,\"decrypt failed\");\n";
         cw << "  for(int i=0;i<4;i++){if(rb[i].BufferType==SECBUFFER_DATA&&rb[i].cbBuffer>0){return JS_NewStringLen(ctx,(const char*)rb[i].pvBuffer,rb[i].cbBuffer);}}\n";
         cw << "  return JS_NULL;}\n\n";
         cw << "static JSValue bridge_tls_close(JSContext*ctx,JSValueConst t,int ac,JSValueConst*av){\n";
@@ -1130,7 +1130,7 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  /* Write tarball to temp file */\n";
         cw << "  char tmpfile[1024]=\"\";const char*td=getenv(\"TMPDIR\");if(!td)td=\"/tmp\";\n";
 #ifdef _WIN32
-        cw << "  snprintf(tmpfile,sizeof(tmpfile),\"%s/qjs_npm_XXXXXX\",td);_mktemp_s(tmpfile,sizeof(tmpfile));\n";
+        cw << "  snprintf(tmpfile,sizeof(tmpfile),\"%s/qjs_npm_XXXXXX\",td);_mktemp(tmpfile);\n";
 #else
         cw << "  snprintf(tmpfile,sizeof(tmpfile),\"%s/qjs_npm_XXXXXX\",td);close(mkstemp(tmpfile));\n";
 #endif
@@ -1173,7 +1173,7 @@ void gen_quickjs_npm_wrapper(const std::string& pkg, const std::string& dir)
         cw << "  char tmpdir[1024]=\"\";const char*td=getenv(\"TMPDIR\");if(!td)td=\"/tmp\";\n";
         cw << "  snprintf(tmpdir,sizeof(tmpdir),\"%s/qjs_rust_XXXXXX\",td);\n";
 #ifdef _WIN32
-        cw << "  _mktemp_s(tmpdir,sizeof(tmpdir));_mkdir(tmpdir);\n";
+        cw << "  _mktemp(tmpdir);_mkdir(tmpdir);\n";
 #else
         cw << "  close(mkstemp(tmpdir));unlink(tmpdir);mkdir(tmpdir,0755);\n";
 #endif
@@ -1339,7 +1339,7 @@ cw << "EXPORT void " << pid << "_free(void*h){\n";
         cw << "  int p=0,r=16384;\n";
         cw << "#define T_APPEND(...) do{int w=snprintf(b+p,r,__VA_ARGS__);if(w>0){p+=w;if(p>=16383)p=16383;r=16384-p;}}while(0)\n";
         cw << "  T_APPEND(\"[\");for(int i=0;i<count&&p<16383;i++){if(i>0)T_APPEND(\",\");T_APPEND(\"%s\",get_json(items[i]));}\n";
-        cw << "  T_APPEND(\"]\");#undef T_APPEND\n";
+        cw << "  T_APPEND(\"]\");\n#undef T_APPEND\n";
         cw << "  void*h=store_json(b);free(b);return h;}\n";
         cw << "EXPORT void* " << pid << "_list2(void*a,void*b){return " << pid << "_tuple2(a,b);}\n";
         cw << "EXPORT void* " << pid << "_list3(void*a,void*b,void*c){return " << pid << "_tuple3(a,b,c);}\n";
