@@ -26,6 +26,7 @@ static std::string g_module_name = "cpplib";
 static bool g_verbose = false;
 static bool g_no_cpp = false;
 static bool g_no_au = false;
+static bool g_with_exceptions = false;
 
 static std::ofstream g_hdr_os;
 static std::ofstream g_src_os;
@@ -336,6 +337,7 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                 g_src_os << cpp_type_to_c_type(pt) << " " << sanitize(pname);
             }
             g_src_os << ") {\n";
+            if (g_with_exceptions) g_src_os << "    try {\n";
             g_src_os << "    return static_cast<void*>(new " << cname << "(";
             for (int i = 0; i < num_params; i++) {
                 if (i > 0) g_src_os << ", ";
@@ -345,6 +347,15 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                 g_src_os << sanitize(pname);
             }
             g_src_os << "));\n";
+            if (g_with_exceptions) {
+                g_src_os << "    } catch (const std::exception& _e) {\n";
+                g_src_os << "        std::fprintf(stderr, \"[cppwrap] %s: %s\\n\", \"" << fn_name << "\", _e.what());\n";
+                g_src_os << "        return nullptr;\n";
+                g_src_os << "    } catch (...) {\n";
+                g_src_os << "        std::fprintf(stderr, \"[cppwrap] %s: unknown exception\\n\", \"" << fn_name << "\");\n";
+                g_src_os << "        return nullptr;\n";
+                g_src_os << "    }\n";
+            }
             g_src_os << "}\n\n";
 
             /* Aurora binding */
@@ -369,7 +380,15 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
             g_hdr_os << "void " << fn_name << "(void* self);\n";
 
             g_src_os << "void " << fn_name << "(void* self) {\n";
+            if (g_with_exceptions) g_src_os << "    try {\n";
             g_src_os << "    if (self) delete static_cast<" << *cls_name << "*>(self);\n";
+            if (g_with_exceptions) {
+                g_src_os << "    } catch (const std::exception& _e) {\n";
+                g_src_os << "        std::fprintf(stderr, \"[cppwrap] %s: %s\\n\", \"" << fn_name << "\", _e.what());\n";
+                g_src_os << "    } catch (...) {\n";
+                g_src_os << "        std::fprintf(stderr, \"[cppwrap] %s: unknown exception\\n\", \"" << fn_name << "\");\n";
+                g_src_os << "    }\n";
+            }
             g_src_os << "}\n\n";
 
             g_au_os << "function " << fn_name << "(self: pointer)\n";
@@ -424,6 +443,7 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                     g_src_os << cpp_type_to_c_type(pt) << " " << sanitize(pname);
                 }
                 g_src_os << ") {\n";
+                if (g_with_exceptions) g_src_os << "    try {\n";
                 g_src_os << "    return " << *cls_name << "::" << mname << "(";
                 for (int i = 0; i < num_params; i++) {
                     if (i > 0) g_src_os << ", ";
@@ -433,6 +453,16 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                     g_src_os << sanitize(pname);
                 }
                 g_src_os << ");\n";
+                if (g_with_exceptions) {
+                    std::string cret = cpp_type_to_c_type(ret_type);
+                    g_src_os << "    } catch (const std::exception& _e) {\n";
+                    g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": %s\\n\", _e.what());\n";
+                    if (cret != "void") g_src_os << "        return 0;\n";
+                    g_src_os << "    } catch (...) {\n";
+                    g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": unknown exception\\n\");\n";
+                    if (cret != "void") g_src_os << "        return 0;\n";
+                    g_src_os << "    }\n";
+                }
                 g_src_os << "}\n\n";
             } else if (is_virtual && !is_const) {
                 /* Virtual: get vtable, call through it */
@@ -445,6 +475,7 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                     g_src_os << ", " << cpp_type_to_c_type(pt) << " " << sanitize(pname);
                 }
                 g_src_os << ") {\n";
+                if (g_with_exceptions) g_src_os << "    try {\n";
                 g_src_os << "    auto* obj = static_cast<" << *cls_name << "*>(self);\n";
                 g_src_os << "    return obj->" << mname << "(";
                 for (int i = 0; i < num_params; i++) {
@@ -455,6 +486,16 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                     g_src_os << sanitize(pname);
                 }
                 g_src_os << ");\n";
+                if (g_with_exceptions) {
+                    std::string cret = cpp_type_to_c_type(ret_type);
+                    g_src_os << "    } catch (const std::exception& _e) {\n";
+                    g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": %s\\n\", _e.what());\n";
+                    if (cret != "void") g_src_os << "        return 0;\n";
+                    g_src_os << "    } catch (...) {\n";
+                    g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": unknown exception\\n\");\n";
+                    if (cret != "void") g_src_os << "        return 0;\n";
+                    g_src_os << "    }\n";
+                }
                 g_src_os << "}\n\n";
             } else {
                 g_src_os << cpp_type_to_c_type(ret_type) << " " << fn_name << "(void* self";
@@ -466,6 +507,7 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                     g_src_os << ", " << cpp_type_to_c_type(pt) << " " << sanitize(pname);
                 }
                 g_src_os << ") {\n";
+                if (g_with_exceptions) g_src_os << "    try {\n";
                 g_src_os << "    auto* obj = static_cast<" << *cls_name << "*>(self);\n";
                 g_src_os << "    return obj->" << mname << "(";
                 for (int i = 0; i < num_params; i++) {
@@ -476,6 +518,16 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
                     g_src_os << sanitize(pname);
                 }
                 g_src_os << ");\n";
+                if (g_with_exceptions) {
+                    std::string cret = cpp_type_to_c_type(ret_type);
+                    g_src_os << "    } catch (const std::exception& _e) {\n";
+                    g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": %s\\n\", _e.what());\n";
+                    if (cret != "void") g_src_os << "        return 0;\n";
+                    g_src_os << "    } catch (...) {\n";
+                    g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": unknown exception\\n\");\n";
+                    if (cret != "void") g_src_os << "        return 0;\n";
+                    g_src_os << "    }\n";
+                }
                 g_src_os << "}\n\n";
             }
 
@@ -532,7 +584,17 @@ static void wrap_class(CXCursor cursor, const std::string& class_name) {
         std::string fn_name = class_name + "_new";
         g_hdr_os << "void* " << fn_name << "();\n";
         g_src_os << "void* " << fn_name << "() {\n";
+        if (g_with_exceptions) g_src_os << "    try {\n";
         g_src_os << "    return static_cast<void*>(new " << class_name << "());\n";
+        if (g_with_exceptions) {
+            g_src_os << "    } catch (const std::exception& _e) {\n";
+            g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": %s\\n\", _e.what());\n";
+            g_src_os << "        return nullptr;\n";
+            g_src_os << "    } catch (...) {\n";
+            g_src_os << "        std::fprintf(stderr, \"[cppwrap] " << fn_name << ": unknown exception\\n\");\n";
+            g_src_os << "        return nullptr;\n";
+            g_src_os << "    }\n";
+        }
         g_src_os << "}\n\n";
         g_au_os << "function " << fn_name << "() -> pointer\n";
     }
@@ -615,6 +677,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "  -m module       Module name for file naming (default: cpplib)\n";
         std::cerr << "  --no-cpp        Skip C wrapper generation\n";
         std::cerr << "  --no-au         Skip Aurora binding generation\n";
+        std::cerr << "  --with-exceptions Wrap thunks in try/catch for exception safety\n";
         std::cerr << "  -I path         Include path\n";
         std::cerr << "  -D def          Macro definition\n";
         std::cerr << "  -std standard   C++ standard (c++11, c++14, c++17, c++20)\n";
@@ -634,6 +697,8 @@ int main(int argc, char* argv[]) {
             g_no_cpp = true;
         } else if (strcmp(argv[i], "--no-au") == 0) {
             g_no_au = true;
+        } else if (strcmp(argv[i], "--with-exceptions") == 0) {
+            g_with_exceptions = true;
         } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
             g_clang_args.push_back(strdup(("-I" + std::string(argv[++i])).c_str()));
         } else if (strncmp(argv[i], "-I", 2) == 0) {
@@ -673,7 +738,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (!g_no_au) {
-        std::string au_path = g_output_dir + "/" + g_module_name + "_cppwrap.au";
+        std::string au_path = g_output_dir + "/" + g_module_name + "_cppwrap.auf";
         g_au_os.open(au_path);
         if (!g_au_os) {
             std::cerr << "Error: could not open .au output file\n";
@@ -701,6 +766,8 @@ int main(int argc, char* argv[]) {
         g_src_os << "   Auto-generated C++ extern \"C\" wrapper for: " << g_module_name << "\n";
         g_src_os << "   ════════════════════════════════════════════════════════════ */\n\n";
         g_src_os << "#include \"" << g_module_name << "_cppwrap.h\"\n";
+        g_src_os << "#include <exception>\n";
+        g_src_os << "#include <cstdio>\n";
         for (auto& h : g_header_paths) {
             /* Try to make include relative */
             std::string include_path = h;

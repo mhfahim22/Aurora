@@ -276,7 +276,7 @@ int cmd_install_github(const std::string& spec) {
     return 0;
 }
 
-int cmd_install(const std::string& pkg) {
+int cmd_install(const std::string& pkg, const std::string& ecosystem_hint) {
     if (pkg.find("github:") == 0 || pkg.find("gh:") == 0) {
         return cmd_install_github(pkg);
     }
@@ -314,9 +314,13 @@ int cmd_install(const std::string& pkg) {
     LockEntry le; le.name = name; le.version = rver; le.resolved = source; le.integrity = integrity;
     lf.packages[name] = le;
 
-    /* Recursively resolve transitive deps across ecosystems */
-    for (auto& eco_name : {"pypi", "npm", "cargo"}) {
-        resolve_recursive_deps(name, rver, eco_name, lf);
+    /* Recursively resolve transitive deps (use ecosystem_hint if known) */
+    if (!ecosystem_hint.empty()) {
+        resolve_recursive_deps(name, rver, ecosystem_hint, lf);
+    } else {
+        for (auto& eco_name : {"pypi", "npm", "cargo"}) {
+            resolve_recursive_deps(name, rver, eco_name, lf);
+        }
     }
 
     write_lockfile(lf);
@@ -517,11 +521,53 @@ int cmd_list() {
     return 0;
 }
 
+/* ── voss add <package> [version] ── */
+/* Auto-detect ecosystem → generate bridge → install, all in one step */
+int cmd_add(const std::string& pkg, const std::string& version) {
+    if (pkg.empty()) {
+        std::cerr << "error: empty package name\n";
+        return 1;
+    }
+    std::string name, ver;
+    if (!parse_pkg_spec(pkg, name, ver) || name.empty())
+        name = pkg;
+    if (ver.empty()) ver = version.empty() ? "latest" : version;
+
+    std::cout << "[add] " << name << " @" << ver << "\n";
+
+    /* Step 1: Auto-detect ecosystem and generate bridge */
+    std::cout << "[add] detecting ecosystem...\n";
+    int bridge_rc = cmd_bridge_auto(name, ver);
+
+    /* Step 2: Detect which ecosystem was found from bridge directory */
+    std::string detected_eco;
+    const char* ecosystems[] = {"pypi", "npm", "cargo"};
+    for (auto eco : ecosystems) {
+        if (fs::exists(name + "_" + eco)) {
+            detected_eco = eco;
+            break;
+        }
+    }
+    if (!detected_eco.empty()) {
+        std::cout << "[add] detected ecosystem: " << detected_eco << "\n";
+    }
+    if (bridge_rc != 0)
+        std::cout << "[add] (bridge generation skipped, proceeding with install)\n";
+
+    /* Step 3: Install the package (with ecosystem hint for transitive deps) */
+    std::string pkg_spec = name;
+    if (!ver.empty() && ver != "latest") pkg_spec += "@" + ver;
+    int install_rc = cmd_install(pkg_spec, detected_eco);
+    if (install_rc == 0)
+        std::cout << "[add] " << name << " ready to use\n";
+    return install_rc;
+}
+
 /* ── Help ── */
 int cmd_help() {
     std::cout << "voss v" << AURA_VERSION << " - Aurora Package Manager\n";
     std::cout << "Usage: voss <command> [options]\n";
-    std::cout << "\nCore:\n  init <name>         Create a new package\n  install <pkg>       Add dependency (@version, or multiple for parallel)\n  install user/repo   Install from GitHub (shorthand, @tag or #branch)\n  uninstall <pkg>     Remove dependency\n  lock                Resolve + lock all deps (incl. transitive)\n  build               Compile + link (enforces permissions)\n  run                 Build + execute\n  test                Build + run tests/\n";
+    std::cout << "\nCore:\n  init <name>         Create a new package\n  add <pkg> [ver]     Auto-detect ecosystem → bridge → install (one step)\n  install <pkg>       Add dependency (@version, or multiple for parallel)\n  install user/repo   Install from GitHub (shorthand, @tag or #branch)\n  uninstall <pkg>     Remove dependency\n  lock                Resolve + lock all deps (incl. transitive)\n  build               Compile + link (enforces permissions)\n  run                 Build + execute\n  test                Build + run tests/\n";
     std::cout << "\nAnalysis:\n  tree                Show dep tree with version conflict detection\n  verify              Check for circular deps\n  audit               Scan locked packages for known vulnerabilities\n  recommend <pkg>     AI advisor: suggest similar/related packages\n  health              Dependency health score (0-100)\n  snapshot [label]    Save project snapshot\n  snapshots           List available snapshots\n  restore <snap>      Time-travel: restore from snapshot\n  sandbox <pkg>       Run a package in isolated sandbox\n  bench <pkg>...      Benchmark: compare build/run performance\n  dead                Detect unused dependencies\n  import <npm|pip|cargo>  Import deps from other package managers\n  detect              Detect project types in current directory\n  why <pkg>           Show why a package is installed (dep chain)\n  migrate <pkg>@<ver> Apply migration rules for version upgrade\n  trust <pkg>         Show trust score for a package\n  export <dir>        Export project snapshot for sharing\n  clone <dir>         Import/restore project from export\n";
     std::cout << "\nSecurity:\n  perms               List permissions (groups, policy)\n  perms allow <perm>  Permanently allow a permission\n  perms deny <perm>   Permanently deny a permission\n  perms reset         Clear permission policy\n  perms review        Audit perms across all deps\n";
     std::cout << "\nCache:\n  cache               Show cache info (SHA-256 content-addressed)\n  cache clean         Clear cache\n";

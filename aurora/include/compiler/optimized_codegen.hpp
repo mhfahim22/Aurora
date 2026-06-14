@@ -125,10 +125,18 @@ private:
     void walk(const ASTNode* node);
     void walk_block(const ASTNode* node);
 
+    /* ── Expression generators ── */
+    llvm::Value* gen_expr(const ASTNode* node);
+    llvm::Value* gen_var(const ASTNode* node);
+    llvm::Value* gen_binop(const ASTNode* node);
+    llvm::Value* gen_unary(const ASTNode* node);
+    llvm::Value* gen_call(const ASTNode* node);
+
     /* ── Statement generators ── */
     void gen_assign(const ASTNode* node);
     void gen_return(const ASTNode* node);
     void gen_function(const ASTNode* node);
+    void gen_output(const ASTNode* node);
 
     /* ── Scope management ── */
     void push_scope();

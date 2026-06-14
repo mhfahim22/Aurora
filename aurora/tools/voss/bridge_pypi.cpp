@@ -30,9 +30,10 @@ const char* pypi_import_alias(const std::string& pkg) {
 void gen_pypi_au_binding(const std::string& pkg, const JsonValue& json,
                           const std::string& ver, std::ostream& os)
 {
+    if (pkg.empty()) return;
     std::string safe = pkg;
-    for (auto& c : safe) if (c == '-') c = '_';
-    std::string desc = json.nested_str({"info", "summary"});
+    for (auto& c : safe) if (c == '-' || c == '.' || c == '/') c = '_';
+    std::string desc = json.type == JsonValue::Null ? "" : json.nested_str({"info", "summary"});
 
     os << "/* ════════════════════════════════════════════════════════════\n";
     os << "   PyPI Bridge — Auto-generated Aurora FFI Bindings\n";

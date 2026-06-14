@@ -46,6 +46,7 @@ private:
     ASTNode::Ptr parse_enum();
     ASTNode::Ptr parse_interface();
     ASTNode::Ptr parse_type_alias();
+    ASTNode::Ptr parse_extern();
     ASTNode::Ptr parse_expr  (const std::vector<Token>& toks, int& idx);
     ASTNode::Ptr parse_cmp   (const std::vector<Token>& toks, int& idx);
     ASTNode::Ptr parse_bitwise(const std::vector<Token>& toks, int& idx);

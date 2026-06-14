@@ -180,7 +180,15 @@ static inline double randn() {
     return sqrt(-2.0 * log(u1)) * cos(2.0 * 3.14159265358979 * ((double)rand() / RAND_MAX));
 }
 
-/* Layer forward/backward (defined in ai_layers.cpp) */
+static inline AuroraTensor* l_tensor(Layer* l, int64_t ndim, int64_t* shape) {
+    return (l->dtype == TENSOR_F32) ? aurora_tensor_new_f32(ndim, shape) : aurora_tensor_new(ndim, shape);
+}
+
+static inline AuroraTensor* l_grad_tensor(Layer* l, int64_t ndim, int64_t* shape) {
+    (void)l; return aurora_tensor_new(ndim, shape);
+}
+
+/* Layer forward/backward */
 extern "C" {
 AuroraTensor* dense_forward(Layer* l, AuroraTensor* input, int training);
 AuroraTensor* dense_backward(Layer* l, AuroraTensor* dout, AuroraTensor* input);

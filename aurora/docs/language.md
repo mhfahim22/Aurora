@@ -566,7 +566,7 @@ event_off("user.login", handler)
 ### 13.1 Import Forms
 
 ```aura
-import "path/to/file.aura"    # file path
+import "path/to/file.aufra"    # file path
 import stdio                   # library module
 import kernel32                # FFI module
 import MrCode                  # third-party package
@@ -577,11 +577,11 @@ from "utils" import helper     # selective import
 
 Search order:
 1. Exact file path
-2. Path + `.aura` extension
+2. Path + `.aufra` extension
 3. Search path / name
-4. Search path / name.aura
+4. Search path / name.aufra
 5. Search path / lib / name
-6. Search path / lib / name.aura
+6. Search path / lib / name.aufra
 
 ### 13.3 Module / Package Declarations
 
@@ -632,7 +632,7 @@ extern union Data
     "version": "1.0.0",
     "author": "Alice",
     "description": "My Aurora application",
-    "entry": "main.aura",
+    "entry": "main.aufra",
     "depends": ["MrCode >= 2.0"]
 }
 ```
@@ -798,28 +798,28 @@ results = search("keyword")
 
 ## 19. Standard Library (`libc/`)
 
-### stdio.au
+### stdio.auf
 `printf`, `fprintf`, `fopen`, `fclose`, `fread`, `fwrite`, `fgets`, `fputs`, `fflush`, `fseek`, `ftell`, `remove`, `rename`, `puts`, `putchar`, `getchar`
 
-### stdlib.au
+### stdlib.auf
 `malloc`, `calloc`, `realloc`, `free`, `atoi`, `atol`, `atoll`, `atof`, `strtol`, `rand`, `srand`, `exit`, `abort`, `atexit`, `abs`, `qsort`, `bsearch`, `getenv`, `system`
 
-### string.au
+### string.auf
 `len`, `strlen`, `strcat`, `substr`, `index`, `has`, `starts`, `ends`, `upper`, `lower`, `trim`, `replace`, `split`, `join`, `reverse`
 
-### collections.au
+### collections.auf
 `list`, `map`, `set`, `stack`, `queue`, `vector`, `json`, `list_last`, `list_first`
 
-### kernel32.au (Windows)
+### kernel32.auf (Windows)
 `GetTickCount`, `Sleep`, `ExitProcess`, `LoadLibraryA/W`, `GetProcAddress`, file I/O, console, `VirtualAlloc/Free`, `HeapAlloc/Free`, environment, system info, timing, error handling, fibers
 
-### user32.au (Windows)
+### user32.auf (Windows)
 Message boxes, window management, window class registration, message loop, drawing, resources, timers, clipboard, dialogs
 
-### gui.au (Cross-platform)
+### gui.auf (Cross-platform)
 `gui_window_new`, `gui_button_new`, `gui_label_new`, `gui_textbox_new`, `gui_listbox_new`, `gui_run`, `gui_quit`
 
-### libtorch.au (Cross-platform)
+### libtorch.auf (Cross-platform)
 `tensor_1d/2d/3d`, `tensor_add/sub/mul/div/matmul`, `tensor_relu/sigmoid/tanh/softmax`, `module_load/forward/destroy`, `optimizer_sgd`
 
 ---
@@ -827,10 +827,10 @@ Message boxes, window management, window class registration, message loop, drawi
 ## 20. Compiler & Build
 
 ```bash
-.\aurora.bat file.aura                   # compile and run
-.\aurora.bat file.aura --emit-obj        # compile to object file
+.\aurora.bat file.aufra                   # compile and run
+.\aurora.bat file.aufra --emit-obj        # compile to object file
 .\aurora.bat build build                 # cmake build
-.\aurora.bat run tests/my_test.aura      # run a specific test
+.\aurora.bat run tests/my_test.aufra      # run a specific test
 ```
 
 Output modes: JIT execution, object file emission, linked executable.

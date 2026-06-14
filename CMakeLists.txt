@@ -1,6 +1,6 @@
 # aurora_restructured/CMakeLists.txt (updated)
 cmake_minimum_required(VERSION 3.20)
-project(Aurora LANGUAGES CXX)
+project(Aurora LANGUAGES CXX ASM_MASM)
 
 # ── Read VERSION file and generate version.h ──
 file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" AURORA_VERSION_STR)
@@ -48,7 +48,13 @@ add_executable(aurorac
     aurora/src/compiler/lexer/lexer.cpp
     aurora/src/compiler/lexer/token.cpp
     aurora/src/compiler/parser/parser.cpp
+    aurora/src/compiler/ir/ir.cpp
+    aurora/src/compiler/ir/ir_lowering.cpp
+    aurora/src/compiler/ir/ir_optimizer.cpp
+    aurora/src/compiler/ir/ir_mem2reg.cpp
+    aurora/src/compiler/ir/ast_to_ir.cpp
     aurora/src/compiler/parser/parse_stmt.cpp
+    aurora/src/compiler/parser/parse_extern.cpp
     aurora/src/compiler/parser/parse_expr.cpp
     aurora/src/compiler/parser/parse_class.cpp
     aurora/src/compiler/parser/parse_struct.cpp
@@ -68,7 +74,9 @@ add_executable(aurorac
     aurora/src/compiler/semantic/benchmark_suite.cpp
     aurora/src/compiler/semantic/module_resolver.cpp
     aurora/src/compiler/codegen/codegen_core.cpp
+    aurora/src/compiler/codegen/codegen_runtime.cpp
     aurora/src/compiler/codegen/codegen_stmt.cpp
+    aurora/src/compiler/codegen/codegen_ffi.cpp
     aurora/src/compiler/codegen/codegen_expr.cpp
     aurora/src/compiler/codegen/codegen_try.cpp
     aurora/src/compiler/codegen/codegen_function.cpp
@@ -125,22 +133,32 @@ endif()
 # ═══════════════════════════════════════════════════════════════
 add_library(aurora_runtime STATIC
     aurora/src/runtime/core/memory.cpp
+    aurora/src/runtime/core/leak_detector.cpp
     aurora/src/runtime/core/aurora_str.cpp
     aurora/src/runtime/core/io.cpp
     aurora/src/runtime/core/array.cpp
     aurora/src/runtime/core/string.cpp
     aurora/src/runtime/core/util.cpp
     aurora/src/runtime/core/crash.cpp
+    aurora/src/runtime/core/reflection.cpp
     aurora/src/runtime/core/ffi.cpp
+    aurora/src/runtime/core/ffi_abi.cpp
+    aurora/src/runtime/core/ffi_call_win64.asm
     aurora/src/runtime/interop/type_ir.cpp
     aurora/src/runtime/interop/type_mapping.cpp
+    aurora/src/runtime/interop/type_mapping_langs.cpp
     aurora/src/runtime/interop/type_serializer.cpp
     aurora/src/runtime/builtins/builtins.cpp
     aurora/src/runtime/builtins/io_builtins.cpp
     aurora/src/runtime/builtins/std_builtins.cpp
     aurora/src/runtime/builtins/backend_builtins.cpp
     aurora/src/runtime/builtins/ai_builtins.cpp
+    aurora/src/runtime/builtins/ai_builtins_ai.cpp
     aurora/src/runtime/ai/ai_layers.cpp
+    aurora/src/runtime/ai/ai_layers_attention.cpp
+    aurora/src/runtime/ai/ai_layers_dense.cpp
+    aurora/src/runtime/ai/ai_layers_rnn.cpp
+    aurora/src/runtime/ai/ai_layers_moe.cpp
     aurora/src/runtime/ai/ai_train.cpp
     aurora/src/runtime/ai/ai_model.cpp
     aurora/src/runtime/ai/ai_gen.cpp
@@ -182,6 +200,10 @@ else()
 endif()
 
 target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ── LTO (Link-Time Optimization) for runtime library ──
+# Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
+set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 # ── Link runtime to compiler ────────────────
 target_link_libraries(aurorac PRIVATE aurora_runtime)
@@ -340,15 +362,21 @@ add_executable(voss
     aurora/tools/voss/commands_deps.cpp
     aurora/tools/voss/commands_config.cpp
     aurora/tools/voss/commands_advanced.cpp
+    aurora/tools/voss/commands_bind.cpp
     aurora/tools/voss/bridge_main.cpp
     aurora/tools/voss/bridge_pypi.cpp
     aurora/tools/voss/bridge_npm.cpp
+    aurora/tools/voss/bridge_npm_impl.cpp
+    aurora/tools/voss/bridge_npm_gen.cpp
     aurora/tools/voss/bridge_cargo.cpp
+    aurora/tools/voss/bridge_cargo_impl.cpp
+    aurora/tools/voss/bridge_cargo_gen.cpp
     aurora/tools/voss/bridge_native.cpp
     aurora/tools/voss/tool_detection.cpp
     aurora/tools/voss/registry_source.cpp
     aurora/src/runtime/interop/type_ir.cpp
     aurora/src/runtime/interop/type_mapping.cpp
+    aurora/src/runtime/interop/type_mapping_langs.cpp
 )
 target_include_directories(voss PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 if(WIN32)
@@ -415,6 +443,8 @@ add_npm_bridge(bridge_chalk   chalk   "${CMAKE_SOURCE_DIR}/packages/bridges/npm/
 # ═══════════════════════════════════════════════════════════════
 add_executable(aurora_lsp
     aurora/tools/lsp/lsp.cpp
+    aurora/tools/lsp/lsp_json.cpp
+    aurora/tools/lsp/lsp_analysis.cpp
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -500,6 +530,33 @@ if(WIN32)
 endif()
 
 # ═══════════════════════════════════════════════════════════════
+# Phase 1: Universal FFI Core — ABI tests
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_ffi_abi
+    aurora/tests/test_ffi_abi.cpp
+)
+target_link_libraries(test_ffi_abi PRIVATE aurora_runtime)
+target_include_directories(test_ffi_abi PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+add_executable(test_ffi_abi_extra
+    aurora/tests/test_ffi_abi_extra.cpp
+)
+target_link_libraries(test_ffi_abi_extra PRIVATE aurora_runtime)
+target_include_directories(test_ffi_abi_extra PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+add_executable(test_ffi_abi_edge
+    aurora/tests/test_ffi_abi_edge.cpp
+)
+target_link_libraries(test_ffi_abi_edge PRIVATE aurora_runtime)
+target_include_directories(test_ffi_abi_edge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+add_executable(test_ffi_abi_struct
+    aurora/tests/test_ffi_abi_struct.cpp
+)
+target_link_libraries(test_ffi_abi_struct PRIVATE aurora_runtime)
+target_include_directories(test_ffi_abi_struct PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
 # End-to-End Bridge Integration Test
 # ═══════════════════════════════════════════════════════════════
 add_executable(test_bridge_e2e
@@ -548,6 +605,41 @@ endif()
 target_include_directories(test_fuzz_parser PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
 # ═══════════════════════════════════════════════════════════════
+# Phase 8: Leak Detector — Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_leak_detector
+    aurora/tests/test_leak_detector.cpp
+)
+target_link_libraries(test_leak_detector PRIVATE aurora_runtime)
+target_include_directories(test_leak_detector PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 8: Smart Pointers — Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_smart_ptr
+    aurora/tests/test_smart_ptr.cpp
+)
+target_link_libraries(test_smart_ptr PRIVATE aurora_runtime)
+target_include_directories(test_smart_ptr PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 9: Optimizer Pass Tests (const_fold, DCE, strength_reduce)
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_optimizer
+    aurora/tests/test_optimizer.cpp
+    aurora/src/compiler/optimizer/const_fold.cpp
+    aurora/src/compiler/optimizer/dead_code.cpp
+    aurora/src/compiler/optimizer/strength_reduce.cpp
+    aurora/src/compiler/aurora_optimizer.cpp
+    aurora/src/compiler/ir/ir.cpp
+    aurora/src/compiler/ir/ir_lowering.cpp
+    aurora/src/compiler/ir/ir_mem2reg.cpp
+    aurora/src/compiler/ir/ir_optimizer.cpp
+)
+target_include_directories(test_optimizer PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include ${LLVM_INCLUDE_DIRS})
+target_link_libraries(test_optimizer PRIVATE ${LLVM_LIBS})
+
+# ═══════════════════════════════════════════════════════════════
 # Phase 8: Compiler Performance Benchmarks
 # ═══════════════════════════════════════════════════════════════
 add_executable(bench_compiler
@@ -557,3 +649,4 @@ if(WIN32)
     target_link_libraries(bench_compiler PRIVATE kernel32)
 endif()
 target_include_directories(bench_compiler PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+

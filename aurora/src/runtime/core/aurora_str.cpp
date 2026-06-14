@@ -127,6 +127,14 @@ AuroraStr* aurora_float_to_str(double val) {
     return s;
 }
 
+/* ── Zero-copy: return internal C string pointer (no allocation) ── */
+extern "C" const char* aurora_str_as_cstr(const void* aurora_str_ptr) {
+    if (!aurora_str_ptr) return nullptr;
+    const AuroraStr* s = static_cast<const AuroraStr*>(aurora_str_ptr);
+    if (!s->ptr || s->len == SIZE_MAX) return nullptr;
+    return s->ptr;
+}
+
 /* ── Ensure capacity (grows if needed, 2x strategy) ── */
 void aurora_str_reserve(AuroraStr* s, size_t needed) {
     if (!s || needed <= s->cap) return;

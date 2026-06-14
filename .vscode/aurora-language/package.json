@@ -4,6 +4,10 @@
   "description": "Aurora language support — syntax highlighting + Aurora Twilight theme (opt-in)",
   "version": "1.0.0",
   "publisher": "aurora-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mhfahim22/Aurora.git"
+  },
   "engines": {
     "vscode": "^1.60.0"
   },

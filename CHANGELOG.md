@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.2.0 (2026-06-14)
+
+### Added
+- **Aurora IR subsystem** — standalone SSA-based intermediate representation (`ir.hpp`, `ir.cpp`)
+  - IR lowering to LLVM IR (`ir_lowering.cpp`)
+  - Optimizer passes: constant folding, dead code elimination, strength reduction
+  - Mem2Reg with multi-block phi insertion, load-only (undef) promotion, single-store fast path
+  - `gen_for` implementation for loop codegen (was a stub)
+- **FFI ABI abstraction** — `ffi_abi.hpp`, `ffi_abi.cpp`, `ffi_call_win64.asm`
+  - Win64/x64 calling convention support
+  - Automated test coverage (`test_ffi_abi*.cpp`)
+- **Leak detector** — `leak_detector.hpp/.cpp` with per-allocation tracking, backtrace capture, JSON/text reports, atexit auto-report (20 tests)
+- **Runtime type reflection** — `reflection.hpp/.cpp` with global type registry, field/method introspection
+- **Smart pointers** — `smart_ptr.hpp` with `AuroraSharedPtr<T>`, `AuroraWeakPtr<T>`, `CppSharedPtrBridge` VTable, `to_std_shared`/`from_std_shared` (27 tests)
+- **LSP enhancements** — `lsp_analysis.cpp`, `lsp_json.cpp`; recursive-descent JSON parser, signatureHelp, improved hover with definition lookup
+- **Bridge refactoring** — `bridge_cargo_gen.cpp`, `bridge_cargo_impl.cpp`, `bridge_npm_gen.cpp`, `bridge_npm_impl.cpp` split from monolithic templates; `type_mapping_langs.cpp` extracted lang-specific mappers
+- **Codegen improvements** — `codegen_runtime.cpp`, `codegen_ffi.cpp` added to build; `optimized_codegen.cpp` function generation no longer a placeholder
+- **Package builtins** — voss CLI integration for install/update/search via `std_builtins.cpp`
+
+### Changed
+- CMakeLists.txt updated with new source files and ASM_MASM language support
+- `.gitignore` updated for `_build/` and `CMakeFiles/` directories
+- Cleaned up duplicate lang-specific mapper code from `type_mapping.cpp`
+
+### Removed
+- `ANCHORED_SUMMARY.md` — internal session summary file
+- Various stderr/stdout log files from project root
+- Orphaned `reg.add_mapping` calls from `type_mapping.cpp` (moved to `type_mapping_langs.cpp`)
+
 ## 0.1.0 (2026-06-11)
 
 ### Added
@@ -27,14 +56,3 @@
 - AppVerif memory validation
 - GitHub Actions CI (Windows + Ubuntu)
 - Example projects for all 3 bridges
-
-### Fixed
-- GIL deadlock in `GIL_RETURN(x)` macro (releases GIL before evaluating `x`)
-- `PyUnicode_AsUTF8AndSize` → `PyUnicode_AsUTF8` (hangs under MT)
-- `JS_FreeValue` leaks on exception paths (10 categories)
-- `SetDllDirectory("")` restriction bypassed
-- Pipe/file handle leaks in subprocess bridge
-- `Py_ssize_t` / `long` type mismatch in `to_cstr()`
-- Memory leaks under ASAN: 1605 allocs → 1605 frees
-- `JS_WriteObject` API signature mismatch in bytecode cache
-- `freeaddrinfo` null-check for `getaddrinfo`

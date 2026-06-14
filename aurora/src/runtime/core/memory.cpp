@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "runtime/memory.hpp"
+#include "runtime/leak_detector.hpp"
 
 /* ════════════════════════════════════════════════════════════
    Aurora Runtime — Memory Management & RAII (Phase 7)
@@ -554,10 +555,12 @@ void* aurora_alloc(size_t size) {
     if (!ptr && size) {
         aurora_panic("out of memory");
     }
+    aurora_leak_track(ptr, size, "heap");
     return ptr;
 }
 
 void aurora_free(void* ptr) {
+    aurora_leak_untrack(ptr);
     free(ptr);
 }
 

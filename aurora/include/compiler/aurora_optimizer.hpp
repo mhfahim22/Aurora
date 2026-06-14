@@ -2,8 +2,10 @@
 /* ════════════════════════════════════════════════════════════
    Aurora Optimizer — Declarations
    ════════════════════════════════════════════════════════════
-   Custom optimization passes for Aurora IR.
-   These run before LLVM's built-in O3 pipeline.
+   Custom optimization passes.
+   Currently operates on LLVM IR directly.
+   Aurora IR (compiler/ir/ir.hpp) provides a standalone SSA-based
+   IR that can host optimizer passes in the future.
    ════════════════════════════════════════════════════════════ */
 
 namespace llvm {

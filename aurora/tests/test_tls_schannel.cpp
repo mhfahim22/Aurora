@@ -56,28 +56,27 @@ static void test_tcp_connect(){
     WSADATA wsa;
     TEST("WSAStartup");
     r=WSAStartup(MAKEWORD(2,2),&wsa);
-    CHECK(r==0,"WSAStartup failed");
+    if(r!=0){FAIL("WSAStartup failed");}
     PASS()
-    struct addrinfo hints,*res;memset(&hints,0,sizeof(hints));
+    struct addrinfo hints,*res=0;memset(&hints,0,sizeof(hints));
     hints.ai_family=AF_INET;hints.ai_socktype=SOCK_STREAM;
     TEST("DNS resolve api.github.com");
     r=getaddrinfo("api.github.com","443",&hints,&res);
-    CHECK(r==0&&res!=0,"DNS failed");
+    if(r!=0||!res){FAIL("DNS failed");if(res)freeaddrinfo(res);WSACleanup();return;}
     PASS()
-    if(!res)return;
     SOCKET fd=socket(res->ai_family,res->ai_socktype,res->ai_protocol);
     TEST("socket()");
-    CHECK(fd!=INVALID_SOCKET,"socket failed");
+    if(fd==INVALID_SOCKET){FAIL("socket failed");freeaddrinfo(res);WSACleanup();return;}
     PASS()
     TEST("TCP connect api.github.com:443");
     r=connect(fd,res->ai_addr,(int)res->ai_addrlen);
-    CHECK(r==0,"connect failed");
+    if(r!=0){FAIL("connect failed");closesocket(fd);freeaddrinfo(res);WSACleanup();return;}
     PASS()
     freeaddrinfo(res);
     const char*req="GET / HTTP/1.1\r\nHost: api.github.com\r\nConnection: close\r\n\r\n";
     TEST("TCP send");
     r=send(fd,req,(int)strlen(req),0);
-    CHECK(r>0,"send failed");
+    if(r<=0){FAIL("send failed");closesocket(fd);WSACleanup();return;}
     PASS()
     TEST("TCP recv (expecting TLS alert)");
     r=(int)recv(fd,buf,sizeof(buf)-1,0);

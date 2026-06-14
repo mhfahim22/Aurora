@@ -646,8 +646,6 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
     auto str_it = extern_string_info_.find(node->value);
     const ExternStringInfo* str_info = (str_it != extern_string_info_.end()) ? &str_it->second : nullptr;
     size_t str_next = 0;
-    /* Track converted cstring values so we can free them after the call */
-    std::vector<llvm::Value*> cstr_to_free;
 
     llvm::FunctionType* ft = callee->getFunctionType();
     unsigned num_fixed_params = ft->getNumParams();
@@ -733,15 +731,14 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         }
         /* C string: auto-convert to char* */
         /* For string literals: create GlobalStringPtr directly (already done above) */
-        /* For non-literal Aurora strings: use aurora_str_to_cstr for safe owned copy */
+        /* For non-literal Aurora strings: use aurora_str_as_cstr (zero-copy, no allocation) */
         else if (is_cstring && !(arg->type == NodeType::Str) && v->getType()->isPointerTy()) {
-            auto* to_cstr = module_->getFunction("aurora_str_to_cstr");
-            if (!to_cstr)
-                to_cstr = llvm::Function::Create(
+            auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+            if (!as_cstr)
+                as_cstr = llvm::Function::Create(
                     llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
-                    llvm::Function::ExternalLinkage, "aurora_str_to_cstr", module_.get());
-            v = builder_->CreateCall(to_cstr, { v }, "cstr_copy");
-            cstr_to_free.push_back(v);
+                    llvm::Function::ExternalLinkage, "aurora_str_as_cstr", module_.get());
+            v = builder_->CreateCall(as_cstr, { v }, "cstr_view");
             str_next++;
         } else if (is_cstring) {
             str_next++;
@@ -778,18 +775,6 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
     ret_inst->setCallingConv(callee->getCallingConv());
     llvm::Value* ret = ret_inst;
 
-    /* Free any cstrings that were auto-converted for this call */
-    if (!cstr_to_free.empty()) {
-        auto* free_fn = module_->getFunction("aurora_free_cstr");
-        if (!free_fn)
-            free_fn = llvm::Function::Create(
-                llvm::FunctionType::get(llvm::Type::getVoidTy(ctx_), { i8ptr_ty() }, false),
-                llvm::Function::ExternalLinkage, "aurora_free_cstr", module_.get());
-        for (auto* cstr_val : cstr_to_free)
-            builder_->CreateCall(free_fn, { cstr_val });
-    }
-
-    /* If function returns a struct, keep it as-is (struct by value) */
     if (ret_ty->isStructTy()) {
         /* struct return — keep as LLVM struct value, no conversion */
     }

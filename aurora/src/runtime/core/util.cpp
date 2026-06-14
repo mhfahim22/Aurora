@@ -3,6 +3,10 @@
 #include <ctime>
 #include <thread>
 #include <chrono>
+#include "runtime/async.hpp"
+
+/* ── Thread-local yield value for generator/coroutine support ── */
+static thread_local int64_t tls_yield_value = 0;
 
 extern "C" {
 
@@ -27,11 +31,18 @@ int64_t aurora_random() {
     return (int64_t)rand();
 }
 
-/* ── Yield placeholder — logs yield event ── */
+/* ── Yield — suspends current generator/coroutine with value ── */
 void aurora_yield(int64_t val) {
-    (void)val;
-    /* In a full implementation, this would suspend the current
-       coroutine/generator and resume later with the value. */
+    tls_yield_value = val;
+    AuroraFiber* cur = aurora_fiber_current();
+    if (cur) {
+        aurora_fiber_yield();
+    }
+}
+
+/* ── Get the last yielded value ── */
+int64_t aurora_yielded_value(void) {
+    return tls_yield_value;
 }
 
 }

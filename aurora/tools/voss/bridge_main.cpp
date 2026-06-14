@@ -154,7 +154,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
         /* cargo: .au generated after function discovery below */
 
         if (!au.str().empty()) {
-            std::string au_path = dir + "/" + pkg + ".au";
+            std::string au_path = dir + "/" + pkg + ".auf";
             if (write_file(au_path, au.str()))
                 std::cout << "[bridge]   " << au_path << "\n";
         }
@@ -189,7 +189,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
         bopts.include_dependency_info = true;
         UniversalBindingGenerator uni_gen(ir_mapper, bopts);
         std::string universal_au = uni_gen.generate(uinfo);
-        std::string uni_path = dir + "/" + pkg + "_universal.au";
+        std::string uni_path = dir + "/" + pkg + "_universal.auf";
         if (write_file(uni_path, universal_au))
             std::cout << "[bridge]   " << uni_path << " (universal, with Type IR)\n";
     }
@@ -1789,7 +1789,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
             {
                 std::ostringstream au;
                 gen_cargo_au_binding(pkg, json, ver, au, "");
-                std::string au_path = dir + "/" + pkg + ".au";
+                std::string au_path = dir + "/" + pkg + ".auf";
                 if (write_file(au_path, au.str()))
                     std::cout << "[bridge]   " << au_path << "\n";
             }
@@ -1816,7 +1816,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
             {
                 std::ostringstream au;
                 gen_cargo_au_binding(pkg, json, ver, au, "");
-                std::string au_path = dir + "/" + pkg + ".au";
+                std::string au_path = dir + "/" + pkg + ".auf";
                 if (write_file(au_path, au.str()))
                     std::cout << "[bridge]   " << au_path << "\n";
             }
@@ -1828,7 +1828,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
         {
             std::ostringstream au;
             gen_cargo_au_binding(pkg, json, ver, au, disc.method_au_entries);
-            std::string au_path = dir + "/" + pkg + ".au";
+            std::string au_path = dir + "/" + pkg + ".auf";
             if (write_file(au_path, au.str()))
                 std::cout << "[bridge]   " << au_path << "\n";
         }
@@ -1892,7 +1892,7 @@ after_build:
     /* ── Generate manifest ── */
     {
         std::ostringstream mf;
-        gen_manifest(pkg, ecosystem, ver, desc, pkg + ".au", mf);
+        gen_manifest(pkg, ecosystem, ver, desc, pkg + ".auf", mf);
 
         std::string mf_path = dir + "/aurora.pkg";
         if (write_file(mf_path, mf.str()))
@@ -2130,6 +2130,10 @@ after_build:
 
 /* ── Auto-resolve: try pypi → npm → cargo, use first success ── */
 int cmd_bridge_auto(const std::string& pkg, const std::string& version) {
+    if (pkg.empty()) {
+        std::cerr << "[bridge] ERROR: empty package name\n";
+        return 1;
+    }
     const char* ecosystems[] = {"pypi", "npm", "cargo"};
     for (auto eco : ecosystems) {
         std::cout << "[bridge] trying " << eco << " for " << pkg << "\n";

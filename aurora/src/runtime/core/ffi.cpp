@@ -218,6 +218,20 @@ static bool aurora_validate_bridge(void* lib, const char* ecs, const char* pkg,
     return true;
 }
 
+/* Track a loaded library handle for cleanup on shutdown */
+static void track_lib(void* lib) {
+    std::lock_guard<std::mutex> lock(g_dl_handle_mtx);
+    get_dl_handles().push_back(lib);
+}
+
+/* Resolve a symbol from an already-opened library and track handle */
+static void* resolve_tracked(void* lib, const char* func_name) {
+    void* sym = aurora_dl_sym(lib, func_name);
+    if (sym) track_lib(lib);
+    else     aurora_dl_close(lib);
+    return sym;
+}
+
 void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
     if (!ecs_name || !ecs_name[0]) return nullptr;
 
@@ -227,11 +241,6 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
 
     if (strncmp(ecs_name, "pypi_", 5) == 0) {
         pkg = ecs_name + 5;
-#ifdef _WIN32
-        snprintf(buf, sizeof(buf), "%s_pypi.dll", pkg);
-#else
-        snprintf(buf, sizeof(buf), "lib%s_pypi.so", pkg);
-#endif
         /* Try bridge dir (new-style: lodash_pypi/) */
         snprintf(buf, sizeof(buf), "%s_pypi/%s_pypi.dll", pkg, pkg);
         lib = aurora_dl_open(buf);
@@ -244,13 +253,14 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
             lib = aurora_dl_open(buf);
         }
         if (lib) {
-            if (aurora_validate_bridge(lib, "pypi", pkg, func_name))
-                return aurora_dl_sym(lib, func_name);
-            return nullptr;
+            if (!aurora_validate_bridge(lib, "pypi", pkg, func_name)) {
+                aurora_dl_close(lib); return nullptr;
+            }
+            return resolve_tracked(lib, func_name);
         }
         /* Fallback: embedded Python */
         lib = aurora_dl_open("python3.dll");
-        if (lib) return aurora_dl_sym(lib, func_name);
+        if (lib) return resolve_tracked(lib, func_name);
         fprintf(stderr, "[ffi] ⚠ could not load bridge for pypi:%s\n", pkg);
         fprintf(stderr, "[ffi]   run: voss bridge pypi \"%s\"\n", pkg);
         return nullptr;
@@ -258,17 +268,14 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
 
     if (strncmp(ecs_name, "npm_", 4) == 0) {
         pkg = ecs_name + 4;
-#ifdef _WIN32
-        snprintf(buf, sizeof(buf), "%s_npm.dll", pkg);
-#else
-        snprintf(buf, sizeof(buf), "lib%s_npm.so", pkg);
-#endif
         /* Try bridge dir (new-style: packages/bridges/npm/lodash_npm/) */
         snprintf(buf, sizeof(buf), "packages/bridges/npm/%s_npm/%s_npm.dll", pkg, pkg);
         lib = aurora_dl_open(buf);
         /* Try bridge dir (old-style: lodash_npm/) */
-        snprintf(buf, sizeof(buf), "%s_npm/%s_npm.dll", pkg, pkg);
-        lib = aurora_dl_open(buf);
+        if (!lib) {
+            snprintf(buf, sizeof(buf), "%s_npm/%s_npm.dll", pkg, pkg);
+            lib = aurora_dl_open(buf);
+        }
         /* Try bridge dir (old-style: lodash_npm_bridge/) */
         if (!lib) {
             snprintf(buf, sizeof(buf), "%s_npm_bridge/%s_npm.dll", pkg, pkg);
@@ -283,12 +290,13 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
             lib = aurora_dl_open(buf);
         }
         if (lib) {
-            if (aurora_validate_bridge(lib, "npm", pkg, func_name))
-                return aurora_dl_sym(lib, func_name);
-            return nullptr;
+            if (!aurora_validate_bridge(lib, "npm", pkg, func_name)) {
+                aurora_dl_close(lib); return nullptr;
+            }
+            return resolve_tracked(lib, func_name);
         }
         lib = aurora_dl_open("node.dll");
-        if (lib) return aurora_dl_sym(lib, func_name);
+        if (lib) return resolve_tracked(lib, func_name);
         fprintf(stderr, "[ffi] ⚠ could not load bridge for npm:%s\n", pkg);
         fprintf(stderr, "[ffi]   run: voss bridge npm \"%s\"\n", pkg);
         return nullptr;
@@ -325,9 +333,10 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
             fprintf(stderr, "[ffi]   run: voss bridge cargo \"%s\"\n", pkg);
             return nullptr;
         }
-        if (aurora_validate_bridge(lib, "cargo", pkg, func_name))
-            return aurora_dl_sym(lib, func_name);
-        return nullptr;
+        if (!aurora_validate_bridge(lib, "cargo", pkg, func_name)) {
+            aurora_dl_close(lib); return nullptr;
+        }
+        return resolve_tracked(lib, func_name);
     }
 
     /* Fallback: native_X or plain library name */
@@ -351,19 +360,20 @@ void* aurora_ecosystem_resolve(const char* ecs_name, const char* func_name) {
             lib = aurora_dl_open(buf);
         }
         if (lib) {
-            if (aurora_validate_bridge(lib, "native", lib_start, func_name))
-                return aurora_dl_sym(lib, func_name);
-            return nullptr;
+            if (!aurora_validate_bridge(lib, "native", lib_start, func_name)) {
+                aurora_dl_close(lib); return nullptr;
+            }
+            return resolve_tracked(lib, func_name);
         }
         /* Fallback: load the original DLL directly */
         lib = aurora_dl_try_open(lib_start);
-        if (lib) return aurora_dl_sym(lib, func_name);
+        if (lib) return resolve_tracked(lib, func_name);
         fprintf(stderr, "[ffi] ⚠ could not load native library '%s'\n", lib_start);
         return nullptr;
     }
     /* Plain library name (no prefix) — try loading directly */
     lib = aurora_dl_try_open(lib_start);
-    if (lib) return aurora_dl_sym(lib, func_name);
+    if (lib) return resolve_tracked(lib, func_name);
     fprintf(stderr, "[ffi] ⚠ could not load library '%s'\n", lib_start);
     return nullptr;
 }
@@ -381,11 +391,13 @@ extern "C" void aurora_free_cstr(char* cstr) {
 extern "C" char* aurora_str_to_cstr(const void* aurora_str_ptr) {
     if (!aurora_str_ptr) return nullptr;
     const AuroraStr* s = static_cast<const AuroraStr*>(aurora_str_ptr);
-    char* out = (char*)malloc(s->len + 1);
+    size_t len = s->len;
+    if (len == SIZE_MAX) return nullptr;
+    char* out = (char*)malloc(len + 1);
     if (!out) return nullptr;
-    if (s->len > 0 && s->ptr)
-        memcpy(out, s->ptr, s->len);
-    out[s->len] = '\0';
+    if (len > 0 && s->ptr)
+        memcpy(out, s->ptr, len);
+    out[len] = '\0';
     return out;
 }
 
@@ -662,7 +674,7 @@ void aurora_callback_cleanup(void) {
 
 #ifdef _WIN32
 #include <windows.h>
-static HMODULE s_python_dll = NULL;
+static std::atomic<HMODULE> s_python_dll{NULL};
 static std::atomic<int> s_python_inited{0};
 static CRITICAL_SECTION s_py_lock;  /* initialized via std::once below */
 static std::once_flag s_py_lock_init_flag;
@@ -676,9 +688,10 @@ static void py_lock_init(void) {
 #else
 #include <dlfcn.h>
 #include <pthread.h>
-static void* s_python_dll = NULL;
+static std::atomic<void*> s_python_dll{NULL};
 static std::atomic<int> s_python_inited{0};
-static pthread_mutex_t s_py_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Use recursive mutex to prevent deadlock if Py_Initialize() re-enters */
+static pthread_mutex_t s_py_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 static std::once_flag s_py_lock_init_flag;
 static void py_lock_init(void) {}
 #endif

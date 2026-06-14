@@ -3,10 +3,12 @@ tools/zig/
 
 # ── Build Output ──
 build/
+_build/
 build_asan/
 output/
 Testing/
 crash/
+CMakeFiles/
 
 # ── Rust target directories (2GB rebuildable artifacts) ──
 packages/bridges/cargo/*/target/

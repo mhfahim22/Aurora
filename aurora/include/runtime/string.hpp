@@ -32,6 +32,11 @@ extern "C" AuroraStr* aurora_str_from_parts(char* ptr, size_t len, size_t cap);
 /* ── Ensure capacity (grows if needed, 2x strategy) ── */
 extern "C" void aurora_str_reserve(AuroraStr* s, size_t needed);
 
+/* ── Zero-copy: get C string pointer from AuroraStr (no allocation) ── */
+/* Returns s->ptr directly. Only valid while AuroraStr is alive.
+   Unlike aurora_str_to_cstr, this does NOT copy or allocate. */
+extern "C" const char* aurora_str_as_cstr(const void* aurora_str_ptr);
+
 /* ── Convert int64_t to AuroraStr ── */
 extern "C" AuroraStr* aurora_int_to_str(int64_t val);
 

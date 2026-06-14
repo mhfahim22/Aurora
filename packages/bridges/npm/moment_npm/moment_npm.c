@@ -896,7 +896,7 @@ static void* qjs_call(void*mod,const char*fn,const char*ajs){
   if(oid<0||oid>=MAX_OBJS||JS_IsNull(g_objs[oid])||JS_IsUndefined(g_objs[oid]))return NULL;
   JSValue obj=g_objs[oid];
   JSValue func=fn&&fn[0]?JS_GetPropertyStr(g_ctx,obj,fn):JS_DupValue(g_ctx,obj);
-  if(JS_IsException(func))return NULL;
+  if(JS_IsException(func)){JS_FreeValue(g_ctx,func);return NULL;}
   if(!JS_IsFunction(g_ctx,func)){
     if(JS_IsObject(func)){int nid=g_next_id++;if(nid>=MAX_OBJS){JS_FreeValue(g_ctx,func);return NULL;}g_objs[nid]=func;return(void*)(intptr_t)nid;}
     char*j=jsval_to_json(g_ctx,func);void*h=store_json(j);free(j);JS_FreeValue(g_ctx,func);return h;}
@@ -934,7 +934,9 @@ EXPORT void* moment_require(void){
 
 EXPORT void moment_free(void*h){
   if(!h||(intptr_t)h<2)return;
-  if(((intptr_t)h & 1) != 0){
+  /* JSON handles (store_json) are heap pointers with bit 0 set — large values.
+     Object IDs are small integers < MAX_OBJS. Use MAX_OBJS as threshold. */
+  if((intptr_t)h > MAX_OBJS && ((intptr_t)h & 1) != 0){
     char**pp=(char**)UNTAG(h);free(*pp);free(pp);return;}
   int id=(int)(intptr_t)h;
   if(id<MAX_OBJS){if(!JS_IsNull(g_objs[id])&&!JS_IsUndefined(g_objs[id]))JS_FreeValue(g_ctx,g_objs[id]);g_objs[id]=JS_NULL;}}
@@ -972,8 +974,11 @@ EXPORT void* moment_tuple4(void*a,void*b,void*c,void*d){
   char buf[16384];snprintf(buf,sizeof(buf),"[%s,%s,%s,%s]",get_json(a),get_json(b),get_json(c),get_json(d));return store_json(buf);}
 EXPORT void* moment_tuple(void**items,int count){
   if(count<=0)return store_json("[]");char*b=(char*)malloc(16384);if(!b)return NULL;
-  int p=0;p+=snprintf(b+p,16384-p,"[");for(int i=0;i<count;i++){if(i>0)p+=snprintf(b+p,16384-p,",");p+=snprintf(b+p,16384-p,"%s",get_json(items[i]));}
-  p+=snprintf(b+p,16384-p,"]");void*h=store_json(b);free(b);return h;}
+  int p=0,r=16384;
+#define TUPLE_APPEND(...) do{int w=snprintf(b+p,r,__VA_ARGS__);if(w>0){p+=w;if(p>=16383)p=16383;r=16384-p;}}while(0)
+  TUPLE_APPEND("[");for(int i=0;i<count&&p<16383;i++){if(i>0)TUPLE_APPEND(",");TUPLE_APPEND("%s",get_json(items[i]));}
+  TUPLE_APPEND("]");void*h=store_json(b);free(b);return h;}
+#undef TUPLE_APPEND
 EXPORT void* moment_list2(void*a,void*b){return moment_tuple2(a,b);}
 EXPORT void* moment_list3(void*a,void*b,void*c){return moment_tuple3(a,b,c);}
 EXPORT void* moment_list4(void*a,void*b,void*c,void*d){return moment_tuple4(a,b,c,d);}

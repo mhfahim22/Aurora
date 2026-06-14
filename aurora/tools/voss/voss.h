@@ -347,9 +347,10 @@ int cmd_help();
 
 int cmd_init(const std::string& name);
 int cmd_sign(const std::string& spec);
+int cmd_add(const std::string& pkg, const std::string& version = "");
 int cmd_verify(const std::string& spec);
 bool verify_package_signature(const std::string& name, const std::string& version);
-int cmd_install(const std::string& pkg);
+int cmd_install(const std::string& pkg, const std::string& ecosystem_hint = "");
 int cmd_install_parallel(const std::vector<std::string>& pkgs);
 int cmd_uninstall(const std::string& pkg);
 int cmd_lock();
@@ -485,6 +486,14 @@ std::string ai_generate_package(const std::string& desc);
 /* ── Ecosystem Bridges (Phase 3) ── */
 int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::string& version);
 int cmd_bridge_auto(const std::string& pkg, const std::string& version);
+
+/* ── Automatic Binding Generator (Phase 2) ── */
+int cmd_bind(const std::string& library, const std::vector<std::string>& headers,
+             const std::string& output_dir, const std::string& lib_name,
+             const std::string& package, const std::vector<std::string>& inc_dirs,
+             const std::vector<std::string>& defs, const std::string& call_conv,
+             bool no_cache, bool verbose, bool no_macros, bool no_functions,
+             bool no_structs, bool no_unions, bool no_typedefs);
 
 /* ── GitHub Registry Integration ── */
 struct VossPackage {

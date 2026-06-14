@@ -7,6 +7,9 @@
 #include "compiler/codegen.hpp"
 #include "compiler/aurora_optimizer.hpp"
 #include "compiler/package_and_doc.hpp"
+#include "compiler/ir/ast_to_ir.hpp"
+#include "compiler/ir/ir_lowering.hpp"
+#include "compiler/ir/ir_optimizer.hpp"
 #include "runtime/crash.h"
 
 #include <llvm/Support/FileSystem.h>
@@ -22,6 +25,7 @@
 #include <llvm/Transforms/Scalar/IndVarSimplify.h>
 #include <llvm/Transforms/Scalar/LoopUnrollPass.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 
 #include <fstream>
 #include <sstream>
@@ -59,7 +63,7 @@ static std::string find_import_file(const std::string& name, const std::string& 
         if (prefix == "libc") {
             /* libc:name — look in libc/ directory */
             auto check_libc = [&](const fs::path& base) -> std::string {
-                auto p = base / "libc" / (rest + ".au");
+                auto p = base / "libc" / (rest + ".auf");
                 return fs::exists(p) ? fs::absolute(p).string() : "";
             };
             auto r = check_libc(fs::current_path());
@@ -74,13 +78,13 @@ static std::string find_import_file(const std::string& name, const std::string& 
             /* pypi|npm|cargo|native:name — check for cached bridge */
             auto check_eco = [&](const fs::path& base) -> std::string {
                 /* new-style: packages/bridges/npm/name_npm/name.au */
-                auto p1 = base / "packages" / "bridges" / prefix / (rest + "_" + prefix) / (rest + ".au");
+                auto p1 = base / "packages" / "bridges" / prefix / (rest + "_" + prefix) / (rest + ".auf");
                 if (fs::exists(p1)) return fs::absolute(p1).string();
                 /* new-style: lodash_npm/ */
-                auto p2 = base / (rest + "_" + prefix) / (rest + ".au");
+                auto p2 = base / (rest + "_" + prefix) / (rest + ".auf");
                 if (fs::exists(p2)) return fs::absolute(p2).string();
                 /* old-style: lodash_npm_bridge/ */
-                auto p3 = base / (rest + "_" + prefix + "_bridge") / (rest + ".au");
+                auto p3 = base / (rest + "_" + prefix + "_bridge") / (rest + ".auf");
                 return fs::exists(p3) ? fs::absolute(p3).string() : "";
             };
             auto r = check_eco(fs::current_path());
@@ -94,13 +98,13 @@ static std::string find_import_file(const std::string& name, const std::string& 
         }
     }
     /* Try with .au extension directly */
-    if (fs::exists(name + ".au")) return fs::absolute(name + ".au").string();
+    if (fs::exists(name + ".auf")) return fs::absolute(name + ".auf").string();
     /* Try relative to source directory */
-    auto src_path_au = fs::path(source_dir) / (name + ".au");
+    auto src_path_au = fs::path(source_dir) / (name + ".auf");
     if (fs::exists(src_path_au)) return fs::absolute(src_path_au).string();
     /* Try relative to libc/ in various locations */
     auto check_libc = [&](const fs::path& base) -> std::string {
-        auto p = base / "libc" / (name + ".au");
+        auto p = base / "libc" / (name + ".auf");
         return fs::exists(p) ? fs::absolute(p).string() : "";
     };
     /* libc/ in cwd */
@@ -129,18 +133,18 @@ static std::string find_import_file(const std::string& name, const std::string& 
     r = check_pkg(fs::path(exe_dir).parent_path().parent_path());
     if (!r.empty()) return r;
 
-    /* Check for ecosystem bridge directories (<name>_<eco>/<name>.au or <name>_<eco>_bridge/<name>.au) */
+    /* Check for ecosystem bridge directories (<name>_<eco>/<name>.au or <name>_<eco>_bridge/<name>.auf) */
     auto check_eco_bridge = [&](const fs::path& base) -> std::string {
         const char* ecosystems[] = {"pypi", "npm", "cargo", "native"};
         for (auto eco : ecosystems) {
             /* new-style: packages/bridges/npm/name_npm/name.au */
-            auto p1 = base / "packages" / "bridges" / eco / (name + "_" + eco) / (name + ".au");
+            auto p1 = base / "packages" / "bridges" / eco / (name + "_" + eco) / (name + ".auf");
             if (fs::exists(p1)) return fs::absolute(p1).string();
             /* new-style: lodash_npm/ */
-            auto p2 = base / (name + "_" + eco) / (name + ".au");
+            auto p2 = base / (name + "_" + eco) / (name + ".auf");
             if (fs::exists(p2)) return fs::absolute(p2).string();
             /* old-style: lodash_npm_bridge/ */
-            auto p3 = base / (name + "_" + eco + "_bridge") / (name + ".au");
+            auto p3 = base / (name + "_" + eco + "_bridge") / (name + ".auf");
             if (fs::exists(p3)) return fs::absolute(p3).string();
         }
         return "";
@@ -311,7 +315,7 @@ static std::string find_header_file(const std::string& name, const std::string& 
 /* ── Auto-generate FFI bindings via aurora-bindgen ── */
 static std::string auto_bindgen(const std::string& header_path, const std::string& exe_dir) {
     fs::path hdr(header_path);
-    fs::path out_path = hdr.parent_path() / (hdr.stem().string() + ".au");
+    fs::path out_path = hdr.parent_path() / (hdr.stem().string() + ".auf");
 
     std::string bindgen_exe = (fs::path(exe_dir) / "aurora_bindgen.exe").string();
     if (!fs::exists(bindgen_exe)) {
@@ -422,7 +426,8 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
 }
 
 /* ── Emit object file using LLVM TargetMachine ── */
-static bool emit_object_file(llvm::Module* module, const std::string& obj_path) {
+static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
+                             bool fast_math = false, bool use_lto = false) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
 
@@ -437,6 +442,26 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path) 
     }
 
     llvm::TargetOptions options;
+    options.AllowFPOpFusion = llvm::FPOpFusion::Standard;
+    if (fast_math) {
+        options.AllowFPOpFusion = llvm::FPOpFusion::Fast;
+        options.UnsafeFPMath = true;
+        options.NoInfsFPMath = true;
+        options.NoNaNsFPMath = true;
+    }
+
+    if (use_lto) {
+        /* Emit LLVM bitcode for LTO instead of native object */
+        std::error_code ec;
+        llvm::raw_fd_ostream bc_file(obj_path, ec, llvm::sys::fs::OF_None);
+        if (ec) {
+            std::cerr << "aurora: cannot write bitcode file: " << ec.message() << "\n";
+            return false;
+        }
+        llvm::WriteBitcodeToFile(*module, bc_file);
+        bc_file.close();
+        return true;
+    }
 
     /* Detect native CPU and features */
     std::string cpu = llvm::sys::getHostCPUName().str();
@@ -561,8 +586,10 @@ static std::vector<std::string> detect_msvc_lib_paths() {
 static bool link_exe(const std::string& obj_path, const std::string& exe_path,
                      const std::string& exe_dir,
                      const std::vector<std::string>& link_libs,
-                     const std::vector<std::string>& lib_paths) {
+                     const std::vector<std::string>& lib_paths,
+                     bool use_lto = false) {
     std::string cmd;
+    std::string lto_flag;
 
 #ifdef _WIN32
     /* ── Windows: lld-link (COFF) ── */
@@ -572,8 +599,10 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     if (!fs::exists(rt_lib))
         rt_lib = "aurora_runtime.lib";
 
+    if (use_lto) lto_flag = " /LTCG";
+
     cmd = "lld-link \"" + obj_path + "\" \"" + rt_lib + "\" /OUT:\"" + exe_path
-        + "\" /NOLOGO /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE";
+        + "\" /NOLOGO /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE" + lto_flag;
 
     for (auto& lp : lib_paths)
         cmd += " /LIBPATH:\"" + lp + "\"";
@@ -601,7 +630,9 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     if (!fs::exists(rt_lib))
         rt_lib = "libaurora_runtime.a";
 
-    cmd = "ld64.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"";
+    if (use_lto) lto_flag = " --lto-O3";
+
+    cmd = "ld64.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"" + lto_flag;
     for (auto& lp : lib_paths)
         cmd += " -L\"" + lp + "\"";
     for (auto& lib : link_libs)
@@ -616,7 +647,9 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     if (!fs::exists(rt_lib))
         rt_lib = "libaurora_runtime.a";
 
-    cmd = "ld.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"";
+    if (use_lto) lto_flag = " --lto-O3";
+
+    cmd = "ld.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"" + lto_flag;
     for (auto& lp : lib_paths)
         cmd += " -L\"" + lp + "\"";
     for (auto& lib : link_libs)
@@ -660,6 +693,7 @@ int main(int argc, char** argv) {
     bool show_percentage_report = false;
     bool export_json = false;
     bool export_csv = false;
+    bool use_aurora_ir = false;
     bool use_optimized_codegen = false;
     bool run_benchmarks = false;
     bool repl_mode = false;
@@ -668,6 +702,11 @@ int main(int argc, char** argv) {
     bool package_mode = false;
     std::vector<std::string> package_args;
     std::string source_path;
+    int opt_level = 3;             /* -O flag: 0-3, default 3 */
+    bool opt_size = false;         /* -Os: optimize for size */
+    bool opt_size_aggressive = false; /* -Oz: aggressively optimize for size */
+    bool fast_math = false;        /* -ffast-math: enable unsafe FP optimizations */
+    bool use_lto = false;          /* -flto: enable link-time optimization */
 
     /* Check for --repl, --doc, --package first */
     for (int i = 1; i < argc; i++) {
@@ -696,6 +735,11 @@ int main(int argc, char** argv) {
         std::cerr << "  -o <file>       Output path (.obj or .exe)\n";
         std::cerr << "  -l <lib>        Library to link against (e.g. -l user32)\n";
         std::cerr << "  -L <path>       Library search path\n";
+        std::cerr << "  -O0/-O1/-O2/-O3  Optimization level (default: -O3)\n";
+        std::cerr << "  -Os             Optimize for size\n";
+        std::cerr << "  -Oz             Aggressively optimize for size\n";
+        std::cerr << "  -ffast-math     Enable unsafe floating-point optimizations\n";
+        std::cerr << "  -flto           Enable link-time optimization (ThinLTO)\n";
         return 1;
     }
 
@@ -731,8 +775,17 @@ int main(int argc, char** argv) {
         else if (arg == "--percentage-report") show_percentage_report = true;
         else if (arg == "--export-json") export_json = true;
         else if (arg == "--export-csv") export_csv = true;
+        else if (arg == "--aurora-ir") use_aurora_ir = true;
         else if (arg == "--optimized") use_optimized_codegen = true;
         else if (arg == "--benchmark") run_benchmarks = true;
+        else if (arg == "-O0") { opt_level = 0; opt_size = false; opt_size_aggressive = false; }
+        else if (arg == "-O1") { opt_level = 1; opt_size = false; opt_size_aggressive = false; }
+        else if (arg == "-O2") { opt_level = 2; opt_size = false; opt_size_aggressive = false; }
+        else if (arg == "-O3") { opt_level = 3; opt_size = false; opt_size_aggressive = false; }
+        else if (arg == "-Os") { opt_level = 2; opt_size = true; opt_size_aggressive = false; }
+        else if (arg == "-Oz") { opt_level = 2; opt_size = true; opt_size_aggressive = true; }
+        else if (arg == "-ffast-math") fast_math = true;
+        else if (arg == "-flto") use_lto = true;
         else if (arg == "--repl") {} /* already handled */
         else if (arg == "--doc") {} /* already handled */
         else if (arg == "--package") {} /* already handled */
@@ -908,7 +961,33 @@ int main(int argc, char** argv) {
         std::unique_ptr<llvm::Module> module;
         auto builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
 
-        if (use_optimized_codegen) {
+        if (fast_math) {
+            llvm::FastMathFlags fmf;
+            fmf.setFast();
+            builder->setFastMathFlags(fmf);
+        }
+
+        if (use_aurora_ir) {
+            /* ── Aurora IR pipeline: AST → Aurora IR → Optimize → Lower to LLVM IR ── */
+            AstToIr ast_to_ir;
+            IrModule ir_mod = ast_to_ir.translate(ast.get());
+            std::cerr << "STAGE4a: Aurora IR generated (" << ir_mod.functions.size()
+                      << " functions, " << ir_mod.type_pool.size() << " types)\n" << std::flush;
+
+            /* Optimize Aurora IR */
+            try {
+                ir_optimize(ir_mod);
+            } catch (...) {}
+            std::cerr << "STAGE4b: Aurora IR optimized\n" << std::flush;
+
+            /* Lower to LLVM IR */
+            module.reset(lower_ir_to_llvm(ir_mod, *ctx));
+            if (!module)
+                module = std::make_unique<llvm::Module>("aurora_module", *ctx);
+            module->setSourceFileName(source_path);
+            std::cerr << "STAGE4c: Lowered to LLVM IR\n" << std::flush;
+
+        } else if (use_optimized_codegen) {
             /* Use optimized codegen with memory analysis */
             module = std::make_unique<llvm::Module>("aurora_module", *ctx);
             OptimizedCodegen opt_codegen(*ctx, module, builder);
@@ -921,14 +1000,16 @@ int main(int argc, char** argv) {
         }
         std::cerr << "STAGE4: Done\n" << std::flush;
 
-        /* ── Stage 5: Aurora custom optimizations ── */
-        std::cerr << "STAGE5: BeforeOpt: " << module->size() << " functions\n" << std::flush;
-        try {
-            run_aurora_optimizer(module.get());
-        } catch (...) {}
-        std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
+        /* ── Stage 5: Aurora custom optimizations (LLVM IR level) ── */
+        if (!use_aurora_ir) {
+            std::cerr << "STAGE5: BeforeOpt: " << module->size() << " functions\n" << std::flush;
+            try {
+                run_aurora_optimizer(module.get());
+            } catch (...) {}
+            std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
+        }
 
-        /* ── Stage 6: LLVM O3 optimization + native CPU ── */
+        /* ── Stage 6: LLVM optimization + native CPU ── */
         std::string cpu = llvm::sys::getHostCPUName().str();
         {
             llvm::StringMap<bool, llvm::MallocAllocator> host_features;
@@ -954,25 +1035,35 @@ int main(int argc, char** argv) {
             PB.registerLoopAnalyses(LAM);
             PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-            llvm::ModulePassManager MPM =
-                PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
-            MPM.run(*module, MAM);
+            /* Select optimization level */
+            llvm::OptimizationLevel ol;
+            if (opt_level == 0) ol = llvm::OptimizationLevel::O0;
+            else if (opt_level == 1) ol = llvm::OptimizationLevel::O1;
+            else if (opt_level == 2) ol = opt_size
+                ? (opt_size_aggressive ? llvm::OptimizationLevel::Oz : llvm::OptimizationLevel::Os)
+                : llvm::OptimizationLevel::O2;
+            else ol = llvm::OptimizationLevel::O3;
 
-            /* ── Phase 3: Post-O3 cleanup passes ── */
-            {
-                llvm::LoopPassManager LPM;
-                LPM.addPass(llvm::IndVarSimplifyPass());
+            if (opt_level > 0) {
+                llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(ol);
+                MPM.run(*module, MAM);
 
-                llvm::FunctionPassManager FPM;
-                FPM.addPass(llvm::createFunctionToLoopPassAdaptor(std::move(LPM)));
-                FPM.addPass(llvm::SimplifyCFGPass());
+                /* Post-optimization cleanup passes */
+                {
+                    llvm::LoopPassManager LPM;
+                    LPM.addPass(llvm::IndVarSimplifyPass());
 
-                llvm::ModulePassManager MPM2;
-                MPM2.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
-                MPM2.run(*module, MAM);
+                    llvm::FunctionPassManager FPM;
+                    FPM.addPass(llvm::createFunctionToLoopPassAdaptor(std::move(LPM)));
+                    FPM.addPass(llvm::SimplifyCFGPass());
+
+                    llvm::ModulePassManager MPM2;
+                    MPM2.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
+                    MPM2.run(*module, MAM);
+                }
             }
         }
-        std::cerr << "STAGE6: O3 done (cpu=" << cpu << ")\n" << std::flush;
+        std::cerr << "STAGE6: opt" << opt_level << " done (cpu=" << cpu << ")\n" << std::flush;
 
         if (emit_ir) {
             /* Print LLVM IR to stdout */
@@ -988,7 +1079,7 @@ int main(int argc, char** argv) {
                 exe_path = obj_path;
                 obj_path = obj_path.substr(0, obj_path.size() - 4) + ".obj";
             }
-            if (emit_object_file(module.get(), obj_path)) {
+            if (emit_object_file(module.get(), obj_path, fast_math, use_lto)) {
                 std::cout << "aurora: object written to " << obj_path << "\n";
             } else {
                 return 1;
@@ -999,7 +1090,7 @@ int main(int argc, char** argv) {
                 if (exe_path.empty())
                     exe_path = source_path.substr(0, source_path.rfind('.')) + ".exe";
 
-                if (!link_exe(obj_path, exe_path, exe_dir, link_libs, lib_paths))
+                if (!link_exe(obj_path, exe_path, exe_dir, link_libs, lib_paths, use_lto))
                     return 1;
                 std::cout << "aurora: executable written to " << exe_path << "\n";
             }

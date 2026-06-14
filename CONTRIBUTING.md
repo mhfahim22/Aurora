@@ -55,7 +55,7 @@ Be respectful, constructive, and inclusive. We have zero tolerance for harassmen
 ### Adding a New Bridge Export
 
 1. Add the C function template in `aurora/tools/voss/bridge_<eco>.cpp`
-2. Add the `.au` binding in the `gen_<eco>_au_binding()` function
+2. Add the `.auf` binding in the `gen_<eco>_au_binding()` function
 3. Add the export declaration (if needed) to the C/JS/Rust codegen
 4. Rebuild voss: `cmake --build build --target voss`
 5. Regenerate the bridge: `voss bridge <eco> <pkg>`

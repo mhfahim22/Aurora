@@ -401,20 +401,30 @@ void OptimizedCodegen::walk(const ASTNode* node) {
         break;
     }
 
-    /* ── BinOp / UnaryOp ── */
+    /* ── Expression-as-statement: generate and discard ── */
+    case NodeType::Num:
+    case NodeType::Float:
+    case NodeType::Str:
+    case NodeType::Var: {
+        gen_expr(node);
+        break;
+    }
     case NodeType::BinOp: {
-        walk(node->left.get());
-        walk(node->right.get());
+        gen_expr(node);
         break;
     }
     case NodeType::UnaryOp: {
-        walk(node->left.get());
+        gen_expr(node);
+        break;
+    }
+    case NodeType::Call: {
+        gen_expr(node);
         break;
     }
 
     /* ── Output ── */
     case NodeType::Output: {
-        walk(node->left.get());
+        gen_output(node);
         break;
     }
 
@@ -457,10 +467,6 @@ void OptimizedCodegen::walk(const ASTNode* node) {
     }
 
     /* ── Leaf nodes ── */
-    case NodeType::Num:
-    case NodeType::Float:
-    case NodeType::Str:
-    case NodeType::Var:
     case NodeType::StructLiteral:
     case NodeType::Import:
     case NodeType::Break:
@@ -474,7 +480,6 @@ void OptimizedCodegen::walk(const ASTNode* node) {
     case NodeType::FunctionType:
     case NodeType::Throw:
     case NodeType::Delete:
-    case NodeType::Call:
     case NodeType::Spawn:
     case NodeType::Wait:
     case NodeType::Async:
@@ -498,93 +503,238 @@ void OptimizedCodegen::gen_assign(const ASTNode* node) {
 
     const std::string& name = node->left->value;
 
+    /* Compute RHS value first */
+    llvm::Value* rhs = gen_expr(node->right.get());
+    if (!rhs) rhs = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+
+    /* Determine the target alloca pointer */
+    llvm::Value* ptr = nullptr;
+
     /* Check for forced allocation strategy from attribute */
     AllocStrategy forced = node->memory_meta.forced_strategy;
     if (forced == AllocStrategy::ForcedGC) {
-        gen_gc_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
-        return;
-    }
-    if (forced == AllocStrategy::ForcedStack) {
-        gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
-        return;
-    }
-    if (forced == AllocStrategy::ForcedArena) {
-        gen_arena_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
-        return;
-    }
-    if (forced == AllocStrategy::ForcedRAII) {
-        auto* alloca = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
-        gen_destructor_insert(name, alloca);
-        return;
-    }
-    if (forced == AllocStrategy::ForcedARC) {
-        auto* alloca = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
-        gen_refcount_alloc(name, alloca);
-        return;
-    }
-
-    /* Check if we have allocation info from memory analyzer */
-    auto it = allocations_.find(name);
-    if (it != allocations_.end()) {
-        AllocationInfo& alloc = it->second;
-
-        /* Generate allocation based on strategy */
-        switch (alloc.strategy) {
-            case AllocStrategy::Stack:
-                /* Stack allocation - already handled by alloca */
-                break;
-
-            case AllocStrategy::Arena:
-                /* Arena allocation */
-                gen_arena_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
-                break;
-
-            case AllocStrategy::Heap:
-                /* Heap allocation */
-                gen_heap_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
-                break;
-
-            case AllocStrategy::RAII: {
-                /* RAII - stack with destructor */
-                auto* alloca = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
-                gen_destructor_insert(name, alloca);
-                break;
+        ptr = gen_gc_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
+    } else if (forced == AllocStrategy::ForcedStack) {
+        ptr = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
+    } else if (forced == AllocStrategy::ForcedArena) {
+        ptr = gen_arena_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
+    } else if (forced == AllocStrategy::ForcedRAII) {
+        ptr = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
+        gen_destructor_insert(name, ptr);
+    } else if (forced == AllocStrategy::ForcedARC) {
+        ptr = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), 64);
+        gen_refcount_alloc(name, ptr);
+    } else {
+        /* Check if we have allocation info from memory analyzer */
+        auto it = allocations_.find(name);
+        if (it != allocations_.end()) {
+            AllocationInfo& alloc = it->second;
+            switch (alloc.strategy) {
+                case AllocStrategy::Stack:
+                    ptr = alloc.alloca_ptr;
+                    break;
+                case AllocStrategy::Arena:
+                    ptr = gen_arena_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
+                    break;
+                case AllocStrategy::Heap:
+                    ptr = gen_heap_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
+                    break;
+                case AllocStrategy::RAII:
+                    ptr = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
+                    gen_destructor_insert(name, ptr);
+                    break;
+                case AllocStrategy::ARC:
+                    ptr = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
+                    gen_refcount_alloc(name, ptr);
+                    break;
+                case AllocStrategy::GC:
+                    ptr = gen_gc_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
+                    break;
+                default:
+                    break;
             }
-
-            case AllocStrategy::ARC: {
-                /* ARC - reference counted */
-                auto* alloca = gen_stack_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
-                gen_refcount_alloc(name, alloca);
-                break;
-            }
-
-            case AllocStrategy::GC:
-                /* GC - heap allocation with GC root tracking */
-                gen_gc_alloc(name, llvm::Type::getInt64Ty(ctx_), alloc.size);
-                break;
-
-            default:
-                break;
         }
+        /* If no allocation info exists, create a default stack alloc */
+        if (!ptr)
+            ptr = create_entry_alloca(name, llvm::Type::getInt64Ty(ctx_));
     }
+
+    /* Store the RHS into the allocated slot */
+    if (ptr)
+        builder_->CreateStore(rhs, ptr);
 }
 
 void OptimizedCodegen::gen_return(const ASTNode* node) {
-    if (!node->left) return;
-
+    (void)node;
     /* If returning a variable with refcount, decrement */
-    if (node->left->type == NodeType::Var) {
+    if (node->left && node->left->type == NodeType::Var) {
         const std::string& name = node->left->value;
         auto it = allocations_.find(name);
         if (it != allocations_.end() && it->second.needs_refcount) {
             /* Don't decrement on return - ownership is transferred */
         }
     }
+    if (!builder_->GetInsertBlock() || !builder_->GetInsertBlock()->getTerminator())
+        builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
 }
 
 void OptimizedCodegen::gen_function(const ASTNode* node) {
-    /* This is a placeholder - actual function generation
-       is handled by the existing codegen */
+    std::vector<std::string> param_names;
+    std::vector<llvm::Type*> param_types;
+    const ASTNode* p = node->args.get();
+    while (p) {
+        param_names.push_back(p->value);
+        param_types.push_back(llvm::Type::getInt64Ty(ctx_));
+        p = p->next.get();
+    }
+
+    auto* fn_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+    auto* fn = llvm::Function::Create(
+        fn_type, llvm::Function::ExternalLinkage,
+        node->value, module_.get());
+
+    int ai = 0;
+    for (auto& arg : fn->args()) {
+        arg.setName(param_names[ai]);
+        arg.addAttr(llvm::Attribute::NoCapture);
+        if (arg.getType()->isPointerTy())
+            arg.addAttr(llvm::Attribute::NoAlias);
+        ai++;
+    }
+
+    auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", fn);
+    auto* saved_bb = builder_->GetInsertBlock();
+
+    builder_->SetInsertPoint(entry_bb);
+
+    push_scope();
+
+    ai = 0;
+    for (auto& arg : fn->args()) {
+        auto* slot = create_entry_alloca(param_names[ai], llvm::Type::getInt64Ty(ctx_));
+        builder_->CreateStore(&arg, slot);
+        ai++;
+    }
+
+    walk_block(node->body.get());
+    pop_scope();
+
+    if (!builder_->GetInsertBlock() || !builder_->GetInsertBlock()->getTerminator())
+        builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
+
+    if (saved_bb) builder_->SetInsertPoint(saved_bb);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Expression Generators
+   ════════════════════════════════════════════════════════════ */
+
+llvm::Value* OptimizedCodegen::gen_expr(const ASTNode* node) {
+    if (!node) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    switch (node->type) {
+        case NodeType::Num:   return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), std::stoll(node->value));
+        case NodeType::Float: return llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), std::stod(node->value));
+        case NodeType::Var:   return gen_var(node);
+        case NodeType::BinOp: return gen_binop(node);
+        case NodeType::UnaryOp: return gen_unary(node);
+        case NodeType::Call:  return gen_call(node);
+        default:
+            return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    }
+}
+
+llvm::Value* OptimizedCodegen::gen_var(const ASTNode* node) {
+    const std::string& name = node->value;
+    auto it = allocations_.find(name);
+    if (it == allocations_.end()) {
+        /* Variable not analyzed — load from a fresh alloca */
+        auto* alloca = create_entry_alloca(name, llvm::Type::getInt64Ty(ctx_));
+        return builder_->CreateLoad(llvm::Type::getInt64Ty(ctx_), alloca, name);
+    }
+    llvm::Value* ptr = it->second.alloca_ptr;
+    if (!ptr) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    return builder_->CreateLoad(llvm::Type::getInt64Ty(ctx_), ptr, name + ".val");
+}
+
+llvm::Value* OptimizedCodegen::gen_binop(const ASTNode* node) {
+    if (!node->left || !node->right) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    auto* lhs = gen_expr(node->left.get());
+    auto* rhs = gen_expr(node->right.get());
+    if (!lhs || !rhs) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+
+    const std::string& op = node->value;
+    if (op == "+")  return builder_->CreateAdd(lhs, rhs, "add");
+    if (op == "-")  return builder_->CreateSub(lhs, rhs, "sub");
+    if (op == "*")  return builder_->CreateMul(lhs, rhs, "mul");
+    if (op == "/")  return builder_->CreateSDiv(lhs, rhs, "div");
+    if (op == "%")  return builder_->CreateSRem(lhs, rhs, "rem");
+    if (op == "&")  return builder_->CreateAnd(lhs, rhs, "and");
+    if (op == "|")  return builder_->CreateOr(lhs, rhs, "or");
+    if (op == "^")  return builder_->CreateXor(lhs, rhs, "xor");
+    if (op == "<<") return builder_->CreateShl(lhs, rhs, "shl");
+    if (op == ">>") return builder_->CreateAShr(lhs, rhs, "ashr");
+    if (op == "==") return builder_->CreateICmpEQ(lhs, rhs, "eq");
+    if (op == "!=") return builder_->CreateICmpNE(lhs, rhs, "ne");
+    if (op == "<")  return builder_->CreateICmpSLT(lhs, rhs, "lt");
+    if (op == ">")  return builder_->CreateICmpSGT(lhs, rhs, "gt");
+    if (op == "<=") return builder_->CreateICmpSLE(lhs, rhs, "le");
+    if (op == ">=") return builder_->CreateICmpSGE(lhs, rhs, "ge");
+
+    return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+}
+
+llvm::Value* OptimizedCodegen::gen_unary(const ASTNode* node) {
+    if (!node->left) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    auto* val = gen_expr(node->left.get());
+    const std::string& op = node->value;
+    if (op == "-") return builder_->CreateNeg(val, "neg");
+    if (op == "~") return builder_->CreateNot(val, "not");
+    if (op == "!") {
+        auto* zero = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+        return builder_->CreateICmpEQ(val, zero, "not");
+    }
+    return val;
+}
+
+llvm::Value* OptimizedCodegen::gen_call(const ASTNode* node) {
+    if (!node->left) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    const std::string& callee = node->left->value;
+
+    /* Gather arguments */
+    std::vector<llvm::Value*> args;
+    const ASTNode* arg = node->args.get();
+    while (arg) {
+        args.push_back(gen_expr(arg));
+        arg = arg->next.get();
+    }
+
+    /* Look up or declare the function */
+    llvm::Function* fn = module_->getFunction(callee);
+    if (!fn) {
+        auto* i64 = llvm::Type::getInt64Ty(ctx_);
+        std::vector<llvm::Type*> param_tys(args.size(), i64);
+        auto* fty = llvm::FunctionType::get(i8ptr_ty(), param_tys, false);
+        fn = llvm::Function::Create(fty, llvm::Function::ExternalLinkage, callee, module_.get());
+    }
+
+    return builder_->CreateCall(fn, args, callee + "_call");
+}
+
+void OptimizedCodegen::gen_output(const ASTNode* node) {
+    if (!node->left) return;
+    auto* val = gen_expr(node->left.get());
+    if (!val) return;
+
+    /* Declare aurora_print_int if not already declared */
+    llvm::Function* fn_print = module_->getFunction("aurora_print_int");
+    if (!fn_print) {
+        auto* fty = llvm::FunctionType::get(
+            llvm::Type::getVoidTy(ctx_),
+            { llvm::Type::getInt64Ty(ctx_) }, false);
+        fn_print = llvm::Function::Create(fty, llvm::Function::ExternalLinkage,
+                                          "aurora_print_int", module_.get());
+    }
+    builder_->CreateCall(fn_print, { val });
 }
 
 /* ════════════════════════════════════════════════════════════

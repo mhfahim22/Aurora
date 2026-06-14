@@ -93,6 +93,38 @@ struct RustMapper : TypeMapper {
     void register_builtins(InteropTypeRegistry& reg) const override;
 };
 
+struct JavaMapper : TypeMapper {
+    InteropLang lang() const override { return InteropLang::Java; }
+    const char* lang_name() const override { return "java"; }
+    MappedType map_to_ir(const std::string& native_type, const InteropTypeRegistry& reg) const override;
+    std::string map_from_ir(const InteropType& ir, const InteropTypeRegistry& reg) const override;
+    void register_builtins(InteropTypeRegistry& reg) const override;
+};
+
+struct CSharpMapper : TypeMapper {
+    InteropLang lang() const override { return InteropLang::CSharp; }
+    const char* lang_name() const override { return "c#"; }
+    MappedType map_to_ir(const std::string& native_type, const InteropTypeRegistry& reg) const override;
+    std::string map_from_ir(const InteropType& ir, const InteropTypeRegistry& reg) const override;
+    void register_builtins(InteropTypeRegistry& reg) const override;
+};
+
+struct GoMapper : TypeMapper {
+    InteropLang lang() const override { return InteropLang::Go; }
+    const char* lang_name() const override { return "go"; }
+    MappedType map_to_ir(const std::string& native_type, const InteropTypeRegistry& reg) const override;
+    std::string map_from_ir(const InteropType& ir, const InteropTypeRegistry& reg) const override;
+    void register_builtins(InteropTypeRegistry& reg) const override;
+};
+
+struct ZigMapper : TypeMapper {
+    InteropLang lang() const override { return InteropLang::Zig; }
+    const char* lang_name() const override { return "zig"; }
+    MappedType map_to_ir(const std::string& native_type, const InteropTypeRegistry& reg) const override;
+    std::string map_from_ir(const InteropType& ir, const InteropTypeRegistry& reg) const override;
+    void register_builtins(InteropTypeRegistry& reg) const override;
+};
+
 struct TypeMappingEngine {
     InteropTypeRegistry registry;
     std::unordered_map<InteropLang, TypeMapper*> mappers;

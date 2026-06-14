@@ -12,6 +12,8 @@
 #include <string>
 #include "runtime/string.hpp"
 #include "runtime/async.hpp"
+#include "runtime/memory.hpp"
+#include "runtime/reflection.hpp"
 #include "common/platform.hpp"
 
 #ifdef _WIN32
@@ -57,7 +59,6 @@ extern "C" {
     char* aurora_fs_dirname(const char* path);
     char* aurora_fs_basename(const char* path);
     int64_t aurora_fs_size(const char* path);
-    int64_t aurora_memory_total_usage();
     int64_t aurora_array_len(int64_t arr_ptr);
     int64_t aurora_array_get_int(int64_t arr_ptr, int64_t idx);
     double aurora_array_get_float(int64_t arr_ptr, int64_t idx);
@@ -845,41 +846,110 @@ int64_t builtin_trace(void* fn_ptr) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Reflection builtins (stubs - return empty arrays)
+   Reflection builtins
    ════════════════════════════════════════════════════════════ */
 
 int64_t builtin_fields(void* obj) {
-    (void)obj;
-    int64_t arr = aurora_array_new(0);
+    if (!obj) return aurora_array_new(0);
+    auto* box = (SharedBox*)obj;
+    if (box->magic != 0x41555230) return aurora_array_new(0);
+    if (!box->data) return aurora_array_new(0);
+    auto& reg = ReflectionRegistry::instance();
+    auto names = reg.get_type_names();
+    int64_t arr = aurora_array_new((int64_t)names.size());
+    for (const auto& tname : names) {
+        auto fields = reg.get_fields(tname);
+        for (const auto& f : fields) {
+            aurora_array_push_str(arr, f.name.c_str());
+        }
+    }
     return arr;
 }
 
 int64_t builtin_methods(void* obj) {
-    (void)obj;
-    int64_t arr = aurora_array_new(0);
+    if (!obj) return aurora_array_new(0);
+    auto* box = (SharedBox*)obj;
+    if (box->magic != 0x41555230) return aurora_array_new(0);
+    if (!box->data) return aurora_array_new(0);
+    auto& reg = ReflectionRegistry::instance();
+    auto names = reg.get_type_names();
+    int64_t arr = aurora_array_new((int64_t)names.size());
+    for (const auto& tname : names) {
+        auto methods = reg.get_methods(tname);
+        for (const auto& m : methods) {
+            aurora_array_push_str(arr, m.name.c_str());
+        }
+    }
     return arr;
 }
 
 /* ════════════════════════════════════════════════════════════
-   Package builtins (stubs - return error messages)
+   Package builtins
    ════════════════════════════════════════════════════════════ */
+
+static int run_voss_cmd(const char* cmd, char* buf, int buf_size) {
+    if (!cmd || !buf || buf_size <= 0) return -1;
+#ifdef _WIN32
+    FILE* pipe = _popen(cmd, "r");
+#else
+    FILE* pipe = popen(cmd, "r");
+#endif
+    if (!pipe) return -1;
+    int total = 0;
+    while (total < buf_size - 1) {
+        int ch = fgetc(pipe);
+        if (ch == EOF) break;
+        buf[total++] = (char)ch;
+    }
+    buf[total] = '\0';
+#ifdef _WIN32
+    int ret = _pclose(pipe);
+#else
+    int ret = pclose(pipe);
+#endif
+    (void)ret;
+    return total;
+}
 
 AuroraStr* builtin_install(const void* pkg_a) {
     const char* pkg = aurora_str_ptr(pkg_a);
     if (!pkg) return aurora_str_from_cstr("no package specified");
-    return aurora_str_from_cstr("package manager not available in this build");
+    char cmd[4096];
+    char out[4096];
+    snprintf(cmd, sizeof(cmd), "voss install \"%s\" 2>&1", pkg);
+    int n = run_voss_cmd(cmd, out, sizeof(out));
+    if (n <= 0) return aurora_str_from_cstr("package manager (voss) not found on PATH");
+    return aurora_str_from_cstr(out);
 }
 
 AuroraStr* builtin_update(const void* pkg_a) {
     const char* pkg = aurora_str_ptr(pkg_a);
     if (!pkg) return aurora_str_from_cstr("no package specified");
-    return aurora_str_from_cstr("package manager not available in this build");
+    char cmd[4096];
+    char out[4096];
+    snprintf(cmd, sizeof(cmd), "voss update \"%s\" 2>&1", pkg);
+    int n = run_voss_cmd(cmd, out, sizeof(out));
+    if (n <= 0) return aurora_str_from_cstr("package manager (voss) not found on PATH");
+    return aurora_str_from_cstr(out);
 }
 
 int64_t builtin_search(const void* query_a) {
     const char* query = aurora_str_ptr(query_a);
-    (void)query;
-    int64_t arr = aurora_array_new(0);
+    if (!query) return aurora_array_new(0);
+    char cmd[4096];
+    char out[65536];
+    snprintf(cmd, sizeof(cmd), "voss search \"%s\" 2>&1", query);
+    int n = run_voss_cmd(cmd, out, sizeof(out));
+    if (n <= 0) return aurora_array_new(0);
+    int64_t arr = aurora_array_new(32);
+    char* line = out;
+    while (line && *line) {
+        char* nl = strchr(line, '\n');
+        if (nl) *nl = '\0';
+        if (*line) aurora_array_push_str(arr, line);
+        if (!nl) break;
+        line = nl + 1;
+    }
     return arr;
 }
 

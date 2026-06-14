@@ -7,4 +7,4 @@ b = Node()
 a.next = b
 b.next = a
 
-output(1)
+output(1) 

@@ -380,13 +380,15 @@ EXPORT void *moment_tuple(void **items, int count) {
     if (count <= 0) return store_json("[]");
     char *buf = (char *)malloc(16384);
     if (!buf) return NULL;
-    int pos = 0;
-    pos += snprintf(buf + pos, 16384 - pos, "[");
-    for (int i = 0; i < count; i++) {
-        if (i > 0) pos += snprintf(buf + pos, 16384 - pos, ",");
-        pos += snprintf(buf + pos, 16384 - pos, "%s", get_json(items[i]));
+    int pos = 0, rem = 16384;
+#define TUPLE_APPEND(...) do{int w=snprintf(buf+pos,rem,__VA_ARGS__);if(w>0){pos+=w;if(pos>=16383)pos=16383;rem=16384-pos;}}while(0)
+    TUPLE_APPEND("[");
+    for (int i = 0; i < count && pos < 16383; i++) {
+        if (i > 0) TUPLE_APPEND(",");
+        TUPLE_APPEND("%s", get_json(items[i]));
     }
-    pos += snprintf(buf + pos, 16384 - pos, "]");
+    TUPLE_APPEND("]");
+#undef TUPLE_APPEND
     void *h = store_json(buf);
     free(buf);
     return h;

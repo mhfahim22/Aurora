@@ -403,6 +403,273 @@ void test_serialization() {
     } END_TEST();
 }
 
+void test_type_mapping_java() {
+    TEST("Java mapper types") {
+        InteropTypeRegistry reg;
+        JavaMapper mapper;
+        mapper.register_builtins(reg);
+
+        auto t1 = mapper.map_to_ir("int", reg);
+        assert(t1.ir_type.kind == InteropTypeKind::Int32);
+        assert(t1.cost == InteropCost::ZeroCost);
+
+        auto t2 = mapper.map_to_ir("boolean", reg);
+        assert(t2.ir_type.kind == InteropTypeKind::Bool);
+
+        auto t3 = mapper.map_to_ir("String", reg);
+        assert(t3.ir_type.kind == InteropTypeKind::String);
+
+        auto t4 = mapper.map_to_ir("java.util.List<String>", reg);
+        assert(t4.ir_type.kind == InteropTypeKind::List);
+        assert(t4.ir_type.element_type == "String");
+
+        auto t5 = mapper.map_to_ir("java.util.Map<String, Integer>", reg);
+        assert(t5.ir_type.kind == InteropTypeKind::Map);
+    } END_TEST();
+
+    TEST("Java round-trip") {
+        InteropTypeRegistry reg;
+        JavaMapper mapper;
+        mapper.register_builtins(reg);
+
+        const char* types[] = {"void", "boolean", "int", "long", "float", "double", "String", nullptr};
+        for (int i = 0; types[i]; i++) {
+            auto mapped = mapper.map_to_ir(types[i], reg);
+            std::string back = mapper.map_from_ir(mapped.ir_type, reg);
+            assert(back == types[i]);
+        }
+    } END_TEST();
+}
+
+void test_type_mapping_csharp() {
+    TEST("C# mapper types") {
+        InteropTypeRegistry reg;
+        CSharpMapper mapper;
+        mapper.register_builtins(reg);
+
+        auto t1 = mapper.map_to_ir("int", reg);
+        assert(t1.ir_type.kind == InteropTypeKind::Int32);
+
+        auto t2 = mapper.map_to_ir("string", reg);
+        assert(t2.ir_type.kind == InteropTypeKind::String);
+
+        auto t3 = mapper.map_to_ir("List<int>", reg);
+        assert(t3.ir_type.kind == InteropTypeKind::List);
+
+        auto t4 = mapper.map_to_ir("Dictionary<string, int>", reg);
+        assert(t4.ir_type.kind == InteropTypeKind::Map);
+
+        auto t5 = mapper.map_to_ir("Nullable<int>", reg);
+        assert(t5.ir_type.kind == InteropTypeKind::Optional);
+        assert(t5.ir_type.inner_type == "int");
+
+        auto t6 = mapper.map_to_ir("int?", reg);
+        assert(t6.ir_type.kind == InteropTypeKind::Optional);
+    } END_TEST();
+
+    TEST("C# round-trip") {
+        InteropTypeRegistry reg;
+        CSharpMapper mapper;
+        mapper.register_builtins(reg);
+
+        const char* types[] = {"void", "bool", "int", "long", "float", "double", "string", "object", nullptr};
+        for (int i = 0; types[i]; i++) {
+            auto mapped = mapper.map_to_ir(types[i], reg);
+            std::string back = mapper.map_from_ir(mapped.ir_type, reg);
+            assert(back == types[i]);
+        }
+    } END_TEST();
+}
+
+void test_type_mapping_go() {
+    TEST("Go mapper types") {
+        InteropTypeRegistry reg;
+        GoMapper mapper;
+        mapper.register_builtins(reg);
+
+        auto t1 = mapper.map_to_ir("int64", reg);
+        assert(t1.ir_type.kind == InteropTypeKind::Int64);
+
+        auto t2 = mapper.map_to_ir("string", reg);
+        assert(t2.ir_type.kind == InteropTypeKind::String);
+
+        auto t3 = mapper.map_to_ir("[]int32", reg);
+        assert(t3.ir_type.kind == InteropTypeKind::List);
+
+        auto t4 = mapper.map_to_ir("map[string]int", reg);
+        assert(t4.ir_type.kind == InteropTypeKind::Map);
+
+        auto t5 = mapper.map_to_ir("*MyStruct", reg);
+        assert(t5.ir_type.kind == InteropTypeKind::Reference);
+        assert(t5.ir_type.inner_type == "MyStruct");
+    } END_TEST();
+
+    TEST("Go round-trip") {
+        InteropTypeRegistry reg;
+        GoMapper mapper;
+        mapper.register_builtins(reg);
+
+        const char* types[] = {"void", "bool", "int8", "int16", "int32", "int64", "float32", "float64", "string", nullptr};
+        for (int i = 0; types[i]; i++) {
+            auto mapped = mapper.map_to_ir(types[i], reg);
+            std::string back = mapper.map_from_ir(mapped.ir_type, reg);
+            assert(back == types[i]);
+        }
+    } END_TEST();
+}
+
+void test_type_mapping_zig() {
+    TEST("Zig mapper types") {
+        InteropTypeRegistry reg;
+        ZigMapper mapper;
+        mapper.register_builtins(reg);
+
+        auto t1 = mapper.map_to_ir("i32", reg);
+        assert(t1.ir_type.kind == InteropTypeKind::Int32);
+
+        auto t2 = mapper.map_to_ir("f64", reg);
+        assert(t2.ir_type.kind == InteropTypeKind::Float64);
+
+        auto t3 = mapper.map_to_ir("[]const u8", reg);
+        assert(t3.ir_type.kind == InteropTypeKind::String);
+
+        auto t4 = mapper.map_to_ir("[]i32", reg);
+        assert(t4.ir_type.kind == InteropTypeKind::List);
+
+        auto t5 = mapper.map_to_ir("?i32", reg);
+        assert(t5.ir_type.kind == InteropTypeKind::Optional);
+    } END_TEST();
+
+    TEST("Zig round-trip") {
+        InteropTypeRegistry reg;
+        ZigMapper mapper;
+        mapper.register_builtins(reg);
+
+        const char* types[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", nullptr};
+        for (int i = 0; types[i]; i++) {
+            auto mapped = mapper.map_to_ir(types[i], reg);
+            std::string back = mapper.map_from_ir(mapped.ir_type, reg);
+            assert(back == types[i]);
+        }
+    } END_TEST();
+}
+
+void test_deserialization() {
+    TEST("JSON from_json struct") {
+        std::string json = TypeSerializer::to_json(
+            InteropType::make_struct("Point", {{"x", "f64"}, {"y", "f64"}}));
+        InteropType t = TypeSerializer::from_json(json);
+        assert(t.kind == InteropTypeKind::Struct);
+        assert(t.name == "Point");
+        assert(t.fields.size() == 2);
+        assert(t.fields[0].name == "x");
+        assert(t.fields[0].type_ref == "f64");
+    } END_TEST();
+
+    TEST("JSON from_json primitive") {
+        std::string json = TypeSerializer::to_json(InteropType::make_int(32, true));
+        InteropType t = TypeSerializer::from_json(json);
+        assert(t.kind == InteropTypeKind::Int32);
+        assert(t.name == "i32");
+        assert(t.is_signed == true);
+    } END_TEST();
+
+    TEST("JSON from_json list") {
+        std::string json = TypeSerializer::to_json(InteropType::make_list("string"));
+        InteropType t = TypeSerializer::from_json(json);
+        assert(t.kind == InteropTypeKind::List);
+        assert(t.element_type == "string");
+    } END_TEST();
+
+    TEST("JSON from_json map") {
+        std::string json = TypeSerializer::to_json(InteropType::make_map("string", "i32"));
+        InteropType t = TypeSerializer::from_json(json);
+        assert(t.kind == InteropTypeKind::Map);
+        assert(t.key_type == "string");
+        assert(t.value_type == "i32");
+    } END_TEST();
+
+    TEST("JSON from_json optional") {
+        std::string json = TypeSerializer::to_json(InteropType::make_optional("f64"));
+        InteropType t = TypeSerializer::from_json(json);
+        assert(t.kind == InteropTypeKind::Optional);
+        assert(t.inner_type == "f64");
+    } END_TEST();
+
+    TEST("JSON from_json result") {
+        auto t = InteropType::make_result("i32", "string");
+        std::string json = TypeSerializer::to_json(t);
+        InteropType parsed = TypeSerializer::from_json(json);
+        assert(parsed.kind == InteropTypeKind::Result);
+        assert(parsed.inner_type == "i32");
+        assert(parsed.error_type == "string");
+    } END_TEST();
+
+    TEST("JSON from_json function") {
+        auto t = InteropType::make_function({{"a", "i32"}, {"b", "f64"}}, "bool");
+        std::string json = TypeSerializer::to_json(t);
+        InteropType parsed = TypeSerializer::from_json(json);
+        assert(parsed.kind == InteropTypeKind::Function);
+        assert(parsed.fn_params.size() == 2);
+        assert(parsed.fn_params[0].name == "a");
+        assert(parsed.fn_params[1].type_ref == "f64");
+        assert(parsed.fn_return == "bool");
+    } END_TEST();
+
+    TEST("JSON from_json enum") {
+        auto t = InteropType::make_enum("Color", {"Red", "Green", "Blue"});
+        std::string json = TypeSerializer::to_json(t);
+        InteropType parsed = TypeSerializer::from_json(json);
+        assert(parsed.kind == InteropTypeKind::Enum);
+        assert(parsed.enum_variants.size() == 3);
+        assert(parsed.enum_variants[0] == "Red");
+        assert(parsed.enum_variants[2] == "Blue");
+    } END_TEST();
+
+    TEST("JSON from_json pointer") {
+        auto t = InteropType::make_pointer("i32");
+        std::string json = TypeSerializer::to_json(t);
+        InteropType parsed = TypeSerializer::from_json(json);
+        assert(parsed.kind == InteropTypeKind::Reference);
+        assert(parsed.inner_type == "i32");
+    } END_TEST();
+
+    TEST("JSON registry round-trip") {
+        InteropTypeRegistry reg;
+        reg.register_type("Point", InteropType::make_struct("Point", {{"x", "f64"}, {"y", "f64"}}));
+        reg.register_type("i32", InteropType::make_int(32, true));
+        reg.register_type("names", InteropType::make_list("string"));
+
+        std::string json = TypeSerializer::to_json_registry(reg);
+        InteropTypeRegistry parsed = TypeSerializer::from_json_registry(json);
+
+        assert(parsed.has_type("Point"));
+        assert(parsed.has_type("i32"));
+        assert(parsed.has_type("names"));
+
+        auto* pt = parsed.get_type("Point");
+        assert(pt != nullptr);
+        assert(pt->kind == InteropTypeKind::Struct);
+        assert(pt->fields.size() == 2);
+
+        auto* it = parsed.get_type("i32");
+        assert(it != nullptr);
+        assert(it->kind == InteropTypeKind::Int32);
+
+        auto* nt = parsed.get_type("names");
+        assert(nt != nullptr);
+        assert(nt->kind == InteropTypeKind::List);
+        assert(nt->element_type == "string");
+    } END_TEST();
+
+    TEST("JSON from_json unknown kind") {
+        std::string json = "{\"kind\": \"bogus\", \"name\": \"x\"}";
+        InteropType t = TypeSerializer::from_json(json);
+        assert(t.kind == InteropTypeKind::Unknown);
+        assert(t.name == "x");
+    } END_TEST();
+}
+
 void test_marshal_codegen() {
     TEST("marshal code generation — zero-cost path") {
         TypeMappingEngine engine;
@@ -495,6 +762,21 @@ int main() {
 
     printf("\n── Serialization ──\n");
     test_serialization();
+
+    printf("\n── Java Type Mapping ──\n");
+    test_type_mapping_java();
+
+    printf("\n── C# Type Mapping ──\n");
+    test_type_mapping_csharp();
+
+    printf("\n── Go Type Mapping ──\n");
+    test_type_mapping_go();
+
+    printf("\n── Zig Type Mapping ──\n");
+    test_type_mapping_zig();
+
+    printf("\n── Deserialization ──\n");
+    test_deserialization();
 
     printf("\n── Marshal Codegen ──\n");
     test_marshal_codegen();

@@ -25,9 +25,15 @@ void Codegen::gen_function(const ASTNode* node) {
         fn_type, llvm::Function::ExternalLinkage,
         node->value, module_.get());
 
-    /* Name the LLVM arguments */
+    /* Name the LLVM arguments and add optimization attributes */
     int ai = 0;
-    for (auto& arg : fn->args()) arg.setName(param_names[ai++]);
+    for (auto& arg : fn->args()) {
+        arg.setName(param_names[ai]);
+        arg.addAttr(llvm::Attribute::NoCapture);
+        if (arg.getType()->isPointerTy())
+            arg.addAttr(llvm::Attribute::NoAlias);
+        ai++;
+    }
 
     auto* entry_bb  = llvm::BasicBlock::Create(ctx_, "entry", fn);
     auto* saved_fn  = cur_fn_;

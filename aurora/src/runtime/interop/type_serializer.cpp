@@ -185,6 +185,309 @@ std::string TypeSerializer::to_json_registry(const InteropTypeRegistry& reg) {
     return os.str();
 }
 
+/* ── Minimal JSON parser for TypeSerializer output ── */
+static std::string json_trim(const std::string& s) {
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = s.find_last_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
+}
+
+static std::string json_unwrap_string(const std::string& s) {
+    if (s.size() < 2) return s;
+    size_t start = 0, end = s.size();
+    if (s[start] == '"') start++;
+    if (s[end - 1] == '"') end--;
+    if (start >= end) return "";
+    std::string inner = s.substr(start, end - start);
+    std::string r;
+    for (size_t i = 0; i < inner.size(); i++) {
+        if (inner[i] == '\\' && i + 1 < inner.size()) {
+            switch (inner[i + 1]) {
+                case '"': r += '"'; i++; break;
+                case '\\': r += '\\'; i++; break;
+                case 'n': r += '\n'; i++; break;
+                case 't': r += '\t'; i++; break;
+                default: r += inner[i];
+            }
+        } else {
+            r += inner[i];
+        }
+    }
+    return r;
+}
+
+static bool json_parse_bool(const std::string& s) {
+    std::string t = json_trim(s);
+    return t == "true";
+}
+
+/* Extract value for a named key from a JSON object string.
+   Returns empty string if not found. */
+static std::string json_extract(const std::string& json, const std::string& key) {
+    std::string search = "\"" + key + "\":";
+    size_t pos = json.find(search);
+    if (pos == std::string::npos) return "";
+    pos += search.size();
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n' || json[pos] == '\r'))
+        pos++;
+    if (pos >= json.size()) return "";
+    if (json[pos] == '"') {
+        size_t end = pos + 1;
+        while (end < json.size()) {
+            if (json[end] == '\\') end += 2;
+            else if (json[end] == '"') break;
+            else end++;
+        }
+        if (end < json.size()) end++;
+        return json.substr(pos, end - pos);
+    }
+    if (json[pos] == '{' || json[pos] == '[') {
+        char open = json[pos];
+        char close = (open == '{') ? '}' : ']';
+        int depth = 0;
+        size_t end = pos;
+        while (end < json.size()) {
+            if (json[end] == open) depth++;
+            else if (json[end] == close) { depth--; if (depth == 0) break; }
+            else if (json[end] == '"') {
+                end++;
+                while (end < json.size()) {
+                    if (json[end] == '\\') end += 2;
+                    else if (json[end] == '"') break;
+                    else end++;
+                }
+            }
+            end++;
+        }
+        if (end < json.size()) end++;
+        return json.substr(pos, end - pos);
+    }
+    /* Number or boolean */
+    size_t end = pos;
+    while (end < json.size() && (json[end] != ',' && json[end] != '}' && json[end] != ']' && json[end] != '\n'))
+        end++;
+    return json_trim(json.substr(pos, end - pos));
+}
+
+static std::vector<std::string> json_parse_array(const std::string& arr_json) {
+    std::vector<std::string> items;
+    std::string t = json_trim(arr_json);
+    if (t.empty() || t[0] != '[') return items;
+    size_t i = 1;
+    while (i < t.size() && t[i] != ']') {
+        while (i < t.size() && (t[i] == ' ' || t[i] == '\t' || t[i] == '\n' || t[i] == '\r' || t[i] == ','))
+            i++;
+        if (i >= t.size() || t[i] == ']') break;
+        if (t[i] == '"') {
+            size_t start = i;
+            i++;
+            while (i < t.size()) {
+                if (t[i] == '\\') i += 2;
+                else if (t[i] == '"') break;
+                else i++;
+            }
+            if (i < t.size()) i++;
+            items.push_back(t.substr(start, i - start));
+        } else if (t[i] == '{') {
+            int depth = 0;
+            size_t start = i;
+            while (i < t.size()) {
+                if (t[i] == '{') depth++;
+                else if (t[i] == '}') { depth--; if (depth == 0) break; }
+                else if (t[i] == '"') {
+                    i++;
+                    while (i < t.size()) {
+                        if (t[i] == '\\') i += 2;
+                        else if (t[i] == '"') break;
+                        else i++;
+                    }
+                }
+                i++;
+            }
+            if (i < t.size()) i++;
+            items.push_back(t.substr(start, i - start));
+        } else {
+            size_t start = i;
+            while (i < t.size() && t[i] != ',' && t[i] != ']' && t[i] != '\n')
+                i++;
+            items.push_back(json_trim(t.substr(start, i - start)));
+        }
+    }
+    return items;
+}
+
+static std::string json_extract_field(const std::string& json, const std::string& fname) {
+    std::string key_str = "\"name\": \"" + fname + "\"";
+    size_t pos = json.find(key_str);
+    if (pos == std::string::npos) return "";
+    size_t brace_start = pos;
+    while (brace_start > 0 && json[brace_start] != '{') brace_start--;
+    size_t brace_end = brace_start;
+    int depth = 0;
+    while (brace_end < json.size()) {
+        if (json[brace_end] == '{') depth++;
+        else if (json[brace_end] == '}') { depth--; if (depth == 0) break; }
+        brace_end++;
+    }
+    if (brace_end < json.size()) brace_end++;
+    return json.substr(brace_start, brace_end - brace_start);
+}
+
+static InteropType json_parse_type(const std::string& json) {
+    InteropType t;
+    std::string j = json_trim(json);
+    if (j.empty()) return t;
+
+    std::string kind_str = json_extract(j, "kind");
+    if (!kind_str.empty()) {
+        std::string k = json_unwrap_string(kind_str);
+        t.kind = kind_from_json(k);
+    }
+
+    std::string name_str = json_extract(j, "name");
+    if (!name_str.empty()) t.name = json_unwrap_string(name_str);
+
+    std::string orig_str = json_extract(j, "original_name");
+    if (!orig_str.empty()) t.original_name = json_unwrap_string(orig_str);
+
+    std::string arr_size_str = json_extract(j, "array_size");
+    if (!arr_size_str.empty()) t.array_size = std::stoll(arr_size_str);
+
+    std::string elem_str = json_extract(j, "element_type");
+    if (!elem_str.empty()) t.element_type = json_unwrap_string(elem_str);
+
+    std::string key_str = json_extract(j, "key_type");
+    if (!key_str.empty()) t.key_type = json_unwrap_string(key_str);
+
+    std::string val_str = json_extract(j, "value_type");
+    if (!val_str.empty()) t.value_type = json_unwrap_string(val_str);
+
+    std::string inner_str = json_extract(j, "inner_type");
+    if (!inner_str.empty()) t.inner_type = json_unwrap_string(inner_str);
+
+    std::string err_str = json_extract(j, "error_type");
+    if (!err_str.empty()) t.error_type = json_unwrap_string(err_str);
+
+    std::string alias_str = json_extract(j, "alias_for");
+    if (!alias_str.empty()) t.alias_for = json_unwrap_string(alias_str);
+
+    std::string fn_ret_str = json_extract(j, "fn_return");
+    if (!fn_ret_str.empty()) t.fn_return = json_unwrap_string(fn_ret_str);
+
+    std::string signed_str = json_extract(j, "is_signed");
+    if (!signed_str.empty()) t.is_signed = json_parse_bool(signed_str);
+
+    std::string nullable_str = json_extract(j, "is_nullable");
+    if (!nullable_str.empty()) t.is_nullable = json_parse_bool(nullable_str);
+
+    /* Parse fields */
+    std::string fields_json = json_extract(j, "fields");
+    if (!fields_json.empty()) {
+        auto items = json_parse_array(fields_json);
+        for (auto& item : items) {
+            InteropField f;
+            std::string fn = json_extract(item, "name");
+            if (!fn.empty()) f.name = json_unwrap_string(fn);
+            std::string ft = json_extract(item, "type_ref");
+            if (!ft.empty()) f.type_ref = json_unwrap_string(ft);
+            std::string fo = json_extract(item, "is_optional");
+            if (!fo.empty()) f.is_optional = json_parse_bool(fo);
+            t.fields.push_back(f);
+        }
+    }
+
+    /* Parse enum variants */
+    std::string variants_json = json_extract(j, "enum_variants");
+    if (!variants_json.empty()) {
+        auto items = json_parse_array(variants_json);
+        for (auto& item : items) {
+            t.enum_variants.push_back(json_unwrap_string(item));
+        }
+    }
+
+    /* Parse fn_params */
+    std::string params_json = json_extract(j, "fn_params");
+    if (!params_json.empty()) {
+        auto items = json_parse_array(params_json);
+        for (auto& item : items) {
+            InteropFnParam p;
+            std::string pn = json_extract(item, "name");
+            if (!pn.empty()) p.name = json_unwrap_string(pn);
+            std::string pt = json_extract(item, "type_ref");
+            if (!pt.empty()) p.type_ref = json_unwrap_string(pt);
+            t.fn_params.push_back(p);
+        }
+    }
+
+    return t;
+}
+
+InteropType TypeSerializer::from_json(const std::string& json) {
+    return json_parse_type(json);
+}
+
+InteropTypeRegistry TypeSerializer::from_json_registry(const std::string& json) {
+    InteropTypeRegistry reg;
+    std::string j = json_trim(json);
+    std::string types_json = json_extract(j, "types");
+    if (types_json.empty()) return reg;
+
+    auto entries = json_parse_array(types_json);
+    /* The registry is stored as key-value pairs: "name": { type object } */
+    /* Parse using a simpler approach: find all "name": {...} patterns */
+    size_t i = 1; /* skip opening { */
+    while (i < types_json.size()) {
+        while (i < types_json.size() && (types_json[i] == ' ' || types_json[i] == '\t' || types_json[i] == '\n' || types_json[i] == '\r' || types_json[i] == ','))
+            i++;
+        if (i >= types_json.size() || types_json[i] == '}') break;
+
+        /* Read key */
+        if (types_json[i] != '"') { i++; continue; }
+        size_t key_start = i;
+        i++;
+        while (i < types_json.size()) {
+            if (types_json[i] == '\\') i += 2;
+            else if (types_json[i] == '"') break;
+            else i++;
+        }
+        if (i >= types_json.size()) break;
+        i++; /* skip closing quote */
+        std::string key = json_unwrap_string(types_json.substr(key_start, i - key_start));
+
+        /* skip colon */
+        while (i < types_json.size() && types_json[i] != ':') i++;
+        if (i < types_json.size()) i++;
+        while (i < types_json.size() && (types_json[i] == ' ' || types_json[i] == '\t' || types_json[i] == '\n' || types_json[i] == '\r'))
+            i++;
+
+        /* Read value (type object) */
+        if (i < types_json.size() && types_json[i] == '{') {
+            int depth = 0;
+            size_t val_start = i;
+            while (i < types_json.size()) {
+                if (types_json[i] == '{') depth++;
+                else if (types_json[i] == '}') { depth--; if (depth == 0) break; }
+                else if (types_json[i] == '"') {
+                    i++;
+                    while (i < types_json.size()) {
+                        if (types_json[i] == '\\') i += 2;
+                        else if (types_json[i] == '"') break;
+                        else i++;
+                    }
+                }
+                i++;
+            }
+            if (i < types_json.size()) i++;
+            std::string type_json = types_json.substr(val_start, i - val_start);
+            InteropType parsed = json_parse_type(type_json);
+            reg.register_type(key, parsed);
+        }
+    }
+
+    return reg;
+}
+
 std::string TypeSerializer::to_schema() {
     return R"({
   "$schema": "https://json-schema.org/draft-07/schema#",

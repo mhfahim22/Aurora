@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <stdexcept>
 #include <cstdint>
+#include <unordered_map>
 
 /* ── Forward declare C FFI dispatch functions from ffi.cpp ── */
 extern "C" {
@@ -65,17 +66,24 @@ public:
         return aurora_dl_sym(handle_, name.c_str());
     }
 
-    /* ── Type-safe function pointer resolution ── */
+    /* ── Type-safe function pointer resolution (with cache) ── */
     template <typename T>
     T* resolve_fn(const std::string& name) const {
         static_assert(std::is_function_v<T>, "T must be a function type");
-        return reinterpret_cast<T*>(sym(name));
+        auto it = sym_cache_.find(name);
+        if (it != sym_cache_.end())
+            return reinterpret_cast<T*>(it->second);
+        void* ptr = sym(name);
+        if (ptr)
+            sym_cache_[name] = ptr;
+        return reinterpret_cast<T*>(ptr);
     }
 
     std::string error() const { return aurora_dl_error(); }
 
 private:
     void* handle_{nullptr};
+    mutable std::unordered_map<std::string, void*> sym_cache_;
 };
 
 /* ── Platform calling convention flags (for codegen) ── */
@@ -167,9 +175,10 @@ public:
         return fn(args...);
     }
 
-    /* ── Check if a symbol exists ── */
+    /* ── Check if a symbol exists (caches result for fast re-check) ── */
     bool has(const std::string& name) const {
-        return lib_.sym(name) != nullptr;
+        /* Use resolve_fn with a void function type to check + cache */
+        return lib_.resolve_fn<void()>(name) != nullptr;
     }
 
     std::string error() const { return lib_.error(); }
@@ -188,9 +197,11 @@ private:
 
     bool load_pypi() {
         /* PyPI: load the embedded CPython DLL, then import the module
-         * Python DLL is usually python3XX.dll or python3.dll */
+         * Python DLL versions tried: python3.dll → python314.dll → python313.dll → python312.dll */
         loaded_ = lib_.open("python3.dll");
-        if (!loaded_) loaded_ = lib_.open("python3*.dll");
+        if (!loaded_) loaded_ = lib_.open("python314.dll");
+        if (!loaded_) loaded_ = lib_.open("python313.dll");
+        if (!loaded_) loaded_ = lib_.open("python312.dll");
         return loaded_;
     }
 

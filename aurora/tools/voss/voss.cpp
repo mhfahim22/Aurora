@@ -54,6 +54,12 @@ int main(int argc, char* argv[]) {
 
     /* Core */
     if (cmd == "init") { if (argc < off + 1) { std::cerr << "usage: voss init <name>\n"; return 1; } return cmd_init(argv[off]); }
+    if (cmd == "add" || cmd == "a") {
+        if (argc < off + 1) { std::cerr << "usage: voss add <package> [version]\n"; return 1; }
+        std::string pkg = argv[off];
+        std::string ver = (argc > off + 1) ? argv[off + 1] : "";
+        return cmd_add(pkg, ver);
+    }
     if (cmd == "install" || cmd == "i") {
         if (argc < off + 1) { std::cerr << "usage: voss install <package> [<package> ...]\n"; return 1; }
         if (argc - off >= 2) { std::vector<std::string> pkgs; for (int i = off; i < argc; i++) pkgs.push_back(argv[i]); return cmd_install_parallel(pkgs); }
@@ -108,6 +114,39 @@ int main(int argc, char* argv[]) {
         }
         if (eco == "--auto") return cmd_bridge_auto(pkg, ver);
         return cmd_bridge(eco, pkg, ver);
+    }
+    if (cmd == "bind") {
+        if (argc <= off) { std::cerr << "usage: voss bind <library> [header.h ...] [options]\n"; return 1; }
+        std::string library = argv[off++];
+        std::vector<std::string> headers;
+        std::string output_dir = "bindings";
+        std::string lib_name;
+        std::string package;
+        std::vector<std::string> inc_dirs;
+        std::vector<std::string> defs;
+        std::string call_conv;
+        bool no_cache = false, bind_verbose = false;
+        bool no_macros = false, no_functions = false;
+        bool no_structs = false, no_unions = false, no_typedefs = false;
+        for (int i = off; i < argc; i++) {
+            if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) { if (i + 1 < argc) output_dir = argv[++i]; }
+            else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--library-name") == 0) { if (i + 1 < argc) lib_name = argv[++i]; }
+            else if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--package") == 0) { if (i + 1 < argc) package = argv[++i]; }
+            else if (strcmp(argv[i], "-I") == 0) { if (i + 1 < argc) inc_dirs.push_back(argv[++i]); }
+            else if (strcmp(argv[i], "-D") == 0) { if (i + 1 < argc) defs.push_back(argv[++i]); }
+            else if (strcmp(argv[i], "--cc") == 0) { if (i + 1 < argc) call_conv = argv[++i]; }
+            else if (strcmp(argv[i], "--no-cache") == 0) { no_cache = true; }
+            else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) { bind_verbose = true; }
+            else if (strcmp(argv[i], "--no-macros") == 0) { no_macros = true; }
+            else if (strcmp(argv[i], "--no-functions") == 0) { no_functions = true; }
+            else if (strcmp(argv[i], "--no-structs") == 0) { no_structs = true; }
+            else if (strcmp(argv[i], "--no-unions") == 0) { no_unions = true; }
+            else if (strcmp(argv[i], "--no-typedefs") == 0) { no_typedefs = true; }
+            else if (argv[i][0] != '-') { headers.push_back(argv[i]); }
+        }
+        return cmd_bind(library, headers, output_dir, lib_name, package,
+                        inc_dirs, defs, call_conv, no_cache, bind_verbose,
+                        no_macros, no_functions, no_structs, no_unions, no_typedefs);
     }
     if (cmd == "import") {
         if (argc <= off) { std::cerr << "usage: voss import <npm|pip|cargo> [<fmt> ...]\n"; return 1; }
