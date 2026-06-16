@@ -30,7 +30,7 @@ Be respectful, constructive, and inclusive. We have zero tolerance for harassmen
    ```
 2. **Run ASAN tests:**
    ```bash
-   .\build_asan.bat
+   .\scripts\build_asan.bat
    build_asan\Debug\test_ffi_memory_safety.exe
    ```
 3. **Rebuild voss** if changing bridge templates, then regenerate at least one bridge DLL

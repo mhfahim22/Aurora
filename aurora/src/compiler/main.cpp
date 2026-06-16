@@ -28,6 +28,7 @@
 #include <llvm/Bitcode/BitcodeWriter.h>
 
 #include <fstream>
+
 #include <sstream>
 #include <iostream>
 #include <string>
@@ -682,6 +683,7 @@ int main(int argc, char** argv) {
     std::string output_path;                /* -o <file> */
     std::vector<std::string> link_libs;     /* -l <lib> */
     std::vector<std::string> lib_paths;     /* -L <path> */
+    bool run_jit = false;
     bool show_memory_report = false;
     bool show_lifetime_report = false;
     bool show_ownership_report = false;
@@ -707,6 +709,7 @@ int main(int argc, char** argv) {
     bool opt_size_aggressive = false; /* -Oz: aggressively optimize for size */
     bool fast_math = false;        /* -ffast-math: enable unsafe FP optimizations */
     bool use_lto = false;          /* -flto: enable link-time optimization */
+    bool enable_coverage = false;  /* --coverage: enable code coverage tracing */
 
     /* Check for --repl, --doc, --package first */
     for (int i = 1; i < argc; i++) {
@@ -786,6 +789,8 @@ int main(int argc, char** argv) {
         else if (arg == "-Oz") { opt_level = 2; opt_size = true; opt_size_aggressive = true; }
         else if (arg == "-ffast-math") fast_math = true;
         else if (arg == "-flto") use_lto = true;
+        else if (arg == "--coverage") enable_coverage = true;
+        else if (arg == "--run")      run_jit = true;
         else if (arg == "--repl") {} /* already handled */
         else if (arg == "--doc") {} /* already handled */
         else if (arg == "--package") {} /* already handled */
@@ -861,6 +866,8 @@ int main(int argc, char** argv) {
                 auto module = std::make_unique<llvm::Module>("aurora_repl", *ctx);
                 auto builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
                 Codegen codegen(*ctx, module, builder);
+                codegen.set_source_file(source_path);
+                codegen.set_coverage_enabled(enable_coverage);
                 codegen.generate(ast.get());
 
                 /* Run JIT */
@@ -996,6 +1003,8 @@ int main(int argc, char** argv) {
             /* Use standard codegen */
             module = std::make_unique<llvm::Module>("aurora_module", *ctx);
             Codegen codegen(*ctx, module, builder);
+            codegen.set_source_file(source_path);
+            codegen.set_coverage_enabled(enable_coverage);
             codegen.generate(ast.get());
         }
         std::cerr << "STAGE4: Done\n" << std::flush;
@@ -1064,6 +1073,15 @@ int main(int argc, char** argv) {
             }
         }
         std::cerr << "STAGE6: opt" << opt_level << " done (cpu=" << cpu << ")\n" << std::flush;
+
+        if (run_jit) {
+            /* JIT-execute main function */
+            std::cerr << "JIT: Starting execution\n" << std::flush;
+            int exit_code = jit_execute_main(std::move(ctx), std::move(module));
+            if (exit_code != 0 && exit_code != -1)
+                std::cerr << "JIT exit code: " << exit_code << "\n" << std::flush;
+            return exit_code == -1 ? 1 : 0;
+        }
 
         if (emit_ir) {
             /* Print LLVM IR to stdout */

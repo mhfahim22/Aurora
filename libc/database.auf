@@ -1,0 +1,237 @@
+## Unified Database Interface
+## Usage: import "database"  or  import libc:database
+##
+## Connects to PostgreSQL or MySQL via connection URL.
+## Returns a connection handle that wraps the driver-specific connection.
+##
+## Example:
+##   import "database"
+##   db = db_connect("postgresql://user:pass@localhost:5432/testdb")
+##   users = db_query(db, "SELECT id, name FROM users")
+##   for u in users
+##       output("id=" + str(u.id) + " name=" + u.name)
+##   end
+##   db_close(db)
+
+import "string"
+import "collections"
+import "pq"
+import "mysql"
+
+## ── Connect ──
+function db_connect(url)
+    if starts(url, "postgresql://") or starts(url, "postgres://")
+        return pg_connect(url)
+    elseif starts(url, "mysql://")
+        return mysql_connect(url)
+    else
+        output("db_connect: unsupported URL: " + url)
+        return map()
+    end
+end
+
+function db_close(db)
+    if map_has(db, "driver")
+        if db.driver == "postgresql"
+            PQfinish(db.handle)
+        elseif db.driver == "mysql"
+            mysql_close(db.handle)
+        end
+    end
+end
+
+## ── Query: returns [{col: val, ...}, ...]  or [] on error ──
+function db_query(db, sql)
+    if db.driver == "postgresql"
+        return pg_query(db.handle, sql)
+    elseif db.driver == "mysql"
+        return mysql_query_wrap(db.handle, sql)
+    end
+    return []
+end
+
+## ── Execute INSERT/UPDATE/DELETE — returns affected rows count ──
+function db_execute(db, sql)
+    if db.driver == "postgresql"
+        return pg_execute(db.handle, sql)
+    elseif db.driver == "mysql"
+        return mysql_exec_wrap(db.handle, sql)
+    end
+    return -1
+end
+
+## ── PostgreSQL ──
+
+function pg_connect(url)
+    info = map()
+    conn = PQconnectdb(url)
+    if conn == null
+        return info
+    end
+    if PQstatus(conn) != CONNECTION_OK
+        PQfinish(conn)
+        return info
+    end
+    info.driver = "postgresql"
+    info.handle = conn
+    return info
+end
+
+function pg_query(conn, sql)
+    res = PQexec(conn, sql)
+    if res == null
+        return []
+    end
+    st = PQresultStatus(res)
+    if st != PGRES_TUPLES_OK
+        PQclear(res)
+        return []
+    end
+    nrows = PQntuples(res)
+    ncols = PQnfields(res)
+    rows = []
+    i = 0
+    loop
+        if i >= nrows
+            break
+        end
+        row = map()
+        j = 0
+        loop
+            if j >= ncols
+                break
+            end
+            name = PQfname(res, j)
+            val = PQgetvalue(res, i, j)
+            map_set(row, name, val)
+            j = j + 1
+        end
+        list_push(rows, row)
+        i = i + 1
+    end
+    PQclear(res)
+    return rows
+end
+
+function pg_execute(conn, sql)
+    res = PQexec(conn, sql)
+    if res == null
+        return -1
+    end
+    st = PQresultStatus(res)
+    if st != PGRES_COMMAND_OK
+        PQclear(res)
+        return -1
+    end
+    n = 0
+    s = PQcmdTuples(res)
+    if s != null and s != ""
+        n = int(s)
+    end
+    PQclear(res)
+    return n
+end
+
+## ── MySQL ──
+
+function mysql_connect(url)
+    info = map()
+    rest = url
+    p = index(rest, "://")
+    if p < 0
+        return info
+    end
+    rest = substr(rest, p + 3, len(rest))
+    user = "root"
+    pass = ""
+    host = "localhost"
+    port = 3306
+    dbname = ""
+    at = index(rest, "@")
+    if at >= 0
+        up = substr(rest, 0, at)
+        rest = substr(rest, at + 1, len(rest))
+        cp = index(up, ":")
+        if cp >= 0
+            user = substr(up, 0, cp)
+            pass = substr(up, cp + 1, len(up))
+        else
+            user = up
+        end
+    end
+    sl = index(rest, "/")
+    hp = rest
+    if sl >= 0
+        hp = substr(rest, 0, sl)
+        dbname = substr(rest, sl + 1, len(rest))
+    end
+    cp = index(hp, ":")
+    if cp >= 0
+        host = substr(hp, 0, cp)
+        port = int(substr(hp, cp + 1, len(hp)))
+    else
+        host = hp
+    end
+    mysql = mysql_init(null)
+    if mysql == null
+        return info
+    end
+    conn = mysql_real_connect(mysql, host, user, pass, dbname, port, null, 0)
+    if conn == null
+        mysql_close(mysql)
+        return info
+    end
+    info.driver = "mysql"
+    info.handle = mysql
+    return info
+end
+
+function mysql_query_wrap(conn, sql)
+    rc = mysql_query(conn, sql)
+    if rc != 0
+        return []
+    end
+    res = mysql_store_result(conn)
+    if res == null
+        return []
+    end
+    nrows = mysql_num_rows(res)
+    ncols = mysql_num_fields(res)
+    rows = []
+    i = 0
+    loop
+        if i >= nrows
+            break
+        end
+        row_data = mysql_fetch_row(res)
+        if row_data == null
+            break
+        end
+        lengths = mysql_fetch_lengths(res)
+        row = map()
+        j = 0
+        loop
+            if j >= ncols
+                break
+            end
+            name = mysql_fetch_field_direct(res, j)
+            if name != null
+                val = mysql_native_get_field(row_data, j)
+                map_set(row, name, val)
+            end
+            j = j + 1
+        end
+        list_push(rows, row)
+        i = i + 1
+    end
+    mysql_free_result(res)
+    return rows
+end
+
+function mysql_exec_wrap(conn, sql)
+    rc = mysql_query(conn, sql)
+    if rc != 0
+        return -1
+    end
+    return mysql_affected_rows(conn)
+end

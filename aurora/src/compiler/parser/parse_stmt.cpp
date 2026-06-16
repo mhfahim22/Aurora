@@ -951,11 +951,17 @@ ASTNode::Ptr Parser::parse_stmt() {
         throw std::runtime_error("Line " + std::to_string(ln) + ": '" + t0.value + "' without matching if");
     }
 
-    /* ── lambda(params): body ── */
+    /* ── lambda [name](params): body ── */
     if (t0.is_keyword("lambda")) {
         int idx = 1;
-        static int lambda_counter = 0;
-        std::string lname = "__lambda_" + std::to_string(++lambda_counter);
+        std::string lname;
+        /* If next token is an identifier (not '(' or ':'), use it as name */
+        if (idx < cnt && toks[idx].is_identifier() && !toks[idx].is_operator('(')) {
+            lname = toks[idx++].value;
+        } else {
+            static int lambda_counter = 0;
+            lname = "__lambda_" + std::to_string(++lambda_counter);
+        }
         auto stmt = make_node(NodeType::Lambda, lname, ln);
         if (idx < cnt && toks[idx].is_operator('(')) {
             idx++;
@@ -1463,7 +1469,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     /* ── obj.field = expr  (field assignment) ── */
     if (t0.is(TokenType::Identifier) && cnt > 3
         && toks[1].is_operator('.')
-        && toks[2].is_identifier()
+        && (toks[2].is_identifier() || toks[2].is(TokenType::Keyword))
         && toks[3].is_operator('=')
         && (cnt < 5 || !toks[4].is_operator('='))) {
         /* build:  Assign{ left=Attribute{obj,field}, right=expr } */

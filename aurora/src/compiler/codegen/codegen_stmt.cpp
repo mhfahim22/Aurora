@@ -121,26 +121,54 @@ void Codegen::gen_assign(const ASTNode* node) {
 
     if (!rec) {
         llvm::Value* slot;
-        /* Use strategy-based allocation */
         slot = gen_allocation_for_var(name, val->getType(), init_state, strat);
-        builder_->CreateStore(val, slot);
+        auto* store_val = val;
+        if (auto* gv_slot = llvm::dyn_cast<llvm::GlobalVariable>(slot)) {
+            auto* gv_ty = gv_slot->getValueType();
+            if (store_val->getType() != gv_ty) {
+                if (store_val->getType()->isPointerTy() && gv_ty->isIntegerTy())
+                    store_val = builder_->CreatePtrToInt(store_val, gv_ty, name + "_gv_int");
+                else if (store_val->getType()->isIntegerTy() && gv_ty->isPointerTy())
+                    store_val = builder_->CreateIntToPtr(store_val, gv_ty, name + "_gv_ptr");
+            }
+        }
+        builder_->CreateStore(store_val, slot);
         declare_var(name, slot, init_state);
         auto* r = lookup_var(name);
         r->is_array  = flag_array;
         r->is_string = flag_string;
         rec = r;
     } else {
-        auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
-        llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
-        if (slot_ty != val->getType()) {
-            auto* new_slot = create_entry_alloca(name + "_r", val->getType());
-            builder_->CreateStore(val, new_slot);
-            rec->alloca_ptr = new_slot;
+        auto* slot_ptr = rec->alloca_ptr;
+        if (auto* gv = llvm::dyn_cast<llvm::GlobalVariable>(slot_ptr)) {
+            auto* store_val = val;
+            auto* gv_ty = gv->getValueType();
+            if (store_val->getType() != gv_ty) {
+                if (store_val->getType()->isPointerTy() && gv_ty->isIntegerTy())
+                    store_val = builder_->CreatePtrToInt(store_val, gv_ty, name + "_gv_int");
+                else if (store_val->getType()->isIntegerTy() && gv_ty->isPointerTy())
+                    store_val = builder_->CreateIntToPtr(store_val, gv_ty, name + "_gv_ptr");
+            }
+            builder_->CreateStore(store_val, gv);
         } else {
-            builder_->CreateStore(val, rec->alloca_ptr);
+            auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(slot_ptr);
+            llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
+            if (slot_ty != val->getType()) {
+                auto* new_slot = create_entry_alloca(name + "_r", val->getType());
+                builder_->CreateStore(val, new_slot);
+                rec->alloca_ptr = new_slot;
+            } else {
+                builder_->CreateStore(val, rec->alloca_ptr);
+            }
         }
         rec->is_array  = flag_array;
         rec->is_string = flag_string;
+    }
+
+    /* Closure-returning function calls: propagate is_closure to receiver */
+    if (node->right && node->right->type == NodeType::Call) {
+        if (closure_returning_fns_.count(node->right->value))
+            rec->is_closure = true;
     }
 
     /* Track struct type for struct literal variables */
@@ -348,6 +376,15 @@ void Codegen::gen_return(const ASTNode* node) {
     /* Function returns i8*, so bitcast i64/int results to i8* */
     if (!val) {
         val = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty()));
+    } else if (val->getType()->isStructTy()) {
+        /* Closure returns: heap-allocate storage so the struct survives
+           the function return (stack allocas would be freed). */
+        auto* struct_ty = llvm::cast<llvm::StructType>(val->getType());
+        llvm::Value* heap_slot = builder_->CreateCall(
+            fn_arena_alloc_, { i64((int64_t)module_->getDataLayout().getTypeAllocSize(struct_ty)) },
+            "ret_closure_heap");
+        builder_->CreateStore(val, heap_slot);
+        val = heap_slot;
     } else if (val->getType() != i8ptr_ty()) {
         if (val->getType()->isIntegerTy())
             val = builder_->CreateIntToPtr(val, i8ptr_ty(), "ret_cast");
@@ -535,6 +572,7 @@ void Codegen::gen_if(const ASTNode* node) {
 
     /* then */
     builder_->SetInsertPoint(then_bb);
+    emit_coverage_trace(node->src_line);
     push_scope();
     gen_block(node->body.get());
     pop_scope_and_drop();
@@ -543,6 +581,7 @@ void Codegen::gen_if(const ASTNode* node) {
     /* else / elseif */
     if (node->orelse) {
         builder_->SetInsertPoint(else_bb);
+        emit_coverage_trace(node->orelse->src_line);
         push_scope();
         if (node->orelse->type == NodeType::If)
             gen_if(node->orelse.get());
@@ -574,6 +613,7 @@ void Codegen::gen_while(const ASTNode* node) {
 
     /* body — no new scope, variables visible outside loop */
     builder_->SetInsertPoint(body_bb);
+    emit_coverage_trace(node->src_line);
     gen_block(node->body.get());
     safe_br(cond_bb);
 
@@ -590,6 +630,7 @@ void Codegen::gen_loop(const ASTNode* node) {
     safe_br(body_bb);
 
     builder_->SetInsertPoint(body_bb);
+    emit_coverage_trace(node->src_line);
     gen_block(node->body.get());
     safe_br(body_bb);
 
@@ -852,11 +893,15 @@ void Codegen::gen_lambda(const ASTNode* node) {
         auto* fn_gep = builder_->CreateStructGEP(closure_ty, closure_alloca, 0, "fn_slot");
         builder_->CreateStore(fn_ptr, fn_gep);
 
-        /* Allocate env array and store captured values */
+        /* Allocate env array and store captured values.
+           Heap-allocate via arena so the env survives function returns;
+           stack allocas become dangling pointers when a closure outlives
+           its creating function. */
         size_t ncaptures = node->captures.size();
-        auto* env_array_ty = llvm::ArrayType::get(i64_ty(), ncaptures);
-        auto* env_alloca = create_entry_alloca(var_name + "_env", env_array_ty);
-        auto* env_as_i64 = builder_->CreateBitCast(env_alloca, llvm::PointerType::get(i64_ty(), 0), var_name + "_env_i64");
+        size_t env_bytes = ncaptures * 8;
+        auto* env_heap = builder_->CreateCall(
+            fn_arena_alloc_, { i64((int64_t)env_bytes) }, var_name + "_env_heap");
+        auto* env_as_i64 = builder_->CreateBitCast(env_heap, llvm::PointerType::get(i64_ty(), 0), var_name + "_env_i64");
         for (size_t i = 0; i < ncaptures; i++) {
             VarRecord* cap_rec = lookup_var(node->captures[i]);
             if (cap_rec && cap_rec->alloca_ptr) {
@@ -867,7 +912,7 @@ void Codegen::gen_lambda(const ASTNode* node) {
         }
 
         /* Store env pointer in closure */
-        llvm::Value* env_ptr = builder_->CreateBitCast(env_alloca, i8ptr_ty(), var_name + "_env_ptr");
+        llvm::Value* env_ptr = builder_->CreateBitCast(env_heap, i8ptr_ty(), var_name + "_env_ptr");
         auto* env_gep = builder_->CreateStructGEP(closure_ty, closure_alloca, 1, "env_slot");
         builder_->CreateStore(env_ptr, env_gep);
 
@@ -876,11 +921,15 @@ void Codegen::gen_lambda(const ASTNode* node) {
         VarRecord* rec = lookup_var(var_name);
         if (rec) rec->is_closure = true;
     } else {
-        /* Non-capturing: store function pointer (same as before) */
-        auto* fn_ptr = builder_->CreateBitCast(fn, i8ptr_ty(), lambda_name + "_ptr");
-        auto* slot = create_entry_alloca(var_name, i8ptr_ty());
-        builder_->CreateStore(fn_ptr, slot);
-        declare_var(var_name, slot, OwnershipState::Borrowed);
+        /* Non-capturing: store function pointer as GlobalVariable so
+           any function (including outlined try-bodies) can reference it
+           without cross-function alloca issues. */
+        auto* fn_ptr = llvm::ConstantExpr::getBitCast(fn, i8ptr_ty());
+        auto* gv = new llvm::GlobalVariable(
+            *module_, i8ptr_ty(), false,
+            llvm::GlobalVariable::InternalLinkage,
+            fn_ptr, var_name);
+        declare_var(var_name, gv, OwnershipState::Borrowed);
     }
 }
 
@@ -1129,12 +1178,17 @@ void Codegen::gen_safe_block(const ASTNode* node) {
 /* ── panic [expr] — halt execution ── */
 void Codegen::gen_panic(const ASTNode* node) {
     auto* fn_panic = module_->getFunction("aurora_panic");
+    auto* fn_as_cstr = module_->getFunction("aurora_str_as_cstr");
     if (fn_panic) {
         llvm::Value* msg = i64(0);
         if (node->left) {
             msg = gen_expr(node->left.get());
-            if (msg && !msg->getType()->isPointerTy())
-                msg = builder_->CreateIntToPtr(msg, i8ptr_ty(), "panic_msg");
+            if (msg) {
+                if (!msg->getType()->isPointerTy())
+                    msg = builder_->CreateIntToPtr(msg, i8ptr_ty(), "panic_msg");
+                else if (fn_as_cstr)
+                    msg = builder_->CreateCall(fn_as_cstr, { msg }, "panic_cstr");
+            }
         }
         builder_->CreateCall(fn_panic, { msg ? msg : llvm::ConstantPointerNull::get(i8ptr_ty()) });
     }

@@ -478,6 +478,12 @@ int cmd_telemetry_enable(const std::string& endpoint);
 int cmd_telemetry_disable();
 int cmd_telemetry_submit();
 
+/* ── Package Templates (voss new) ── */
+int cmd_new(int argc, char** argv);
+
+/* ── Documentation Generator (voss doc) ── */
+int cmd_doc(const std::string& output_dir, bool serve);
+
 /* ── AI Package Generator ── */
 int cmd_ai_generate(const std::string& description);
 int cmd_ai_generate_file(const std::string& desc, const std::string& output);

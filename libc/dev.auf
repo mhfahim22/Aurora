@@ -1,0 +1,12 @@
+## Dev Server with Hot-Reload
+## Usage: import "dev"
+##
+## Example:
+##   import "dev"
+##   dev_server(8080, "./src")
+
+extern function aurora_dev_server(port: int, src_dir: cstring)
+
+function dev_server(port, src_dir):
+    aurora_dev_server(port, src_dir)
+end

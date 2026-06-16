@@ -1,0 +1,29 @@
+## Static File Server
+## Usage: import "static"
+##
+## Example:
+##   import "static"
+##   static_server(8080, "/static", "./public")
+
+extern function aurora_server_init(port: int) -> pointer
+extern function aurora_server_start(srv: pointer)
+extern function aurora_server_stop(srv: pointer)
+extern function aurora_router_new() -> pointer
+extern function aurora_server_static(srv: pointer, prefix: cstring, directory: cstring)
+extern function aurora_server_accept_loop(srv: pointer, router: pointer)
+
+function static_server(port, prefix, directory):
+    srv = aurora_server_init(port)
+    router = aurora_router_new()
+    aurora_server_static(srv, prefix, directory)
+    aurora_server_start(srv)
+    aurora_server_accept_loop(srv, router)
+end
+
+function static_server_async_start(port, prefix, directory):
+    srv = aurora_server_init(port)
+    router = aurora_router_new()
+    aurora_server_static(srv, prefix, directory)
+    aurora_server_start(srv)
+    return srv
+end

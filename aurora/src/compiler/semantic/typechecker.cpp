@@ -1180,7 +1180,7 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
             }
         }
         if (left == AuroraType::String || right == AuroraType::String) {
-            if ((op == "==" || op == "!=") && left == right)
+            if ((op == "==" || op == "!=") && (left == right || left == AuroraType::Unknown || right == AuroraType::Unknown))
                 return AuroraType::Bool;
             std::ostringstream msg;
             msg << "strings only support == and !=";

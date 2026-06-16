@@ -1,0 +1,14 @@
+## Test: model layer
+import libc:database
+import libc:model
+
+function main()
+    db = db_connect("postgresql://localhost/testdb")
+
+    user = model_new("users", db)
+    model_set_field(user, "name", "Alice")
+    model_set_field(user, "age", "30")
+    model_save(user, ["name", "age"])
+
+    db_close(db)
+end

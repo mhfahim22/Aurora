@@ -164,11 +164,21 @@ public:
        emits LLVM IR into the module passed to the constructor. */
     void generate(const ASTNode* root);
 
+    /* Pre-scan: identify functions whose return value is a capturing
+       lambda (closure), so callers can mark variables accordingly. */
+    void scan_closure_returning_fns(const ASTNode* root);
+    bool fn_body_returns_closure(const ASTNode* body);
+
     /* ── Dump IR to stdout (for debugging) ── */
     void dump() const;
 
     /* ── Get the raw module (after generate()) ── */
     llvm::Module* module() { return module_.get(); }
+
+    /* ── Coverage control (public setters) ── */
+    void set_coverage_enabled(bool on) { coverage_enabled_ = on; }
+    void set_source_file(const std::string& path);
+    void emit_coverage_trace(int line);
 
 private:
     /* ── LLVM infrastructure (references, not owned) ── */
@@ -317,6 +327,13 @@ private:
     llvm::Function* comp_render_tree_{ nullptr };
     llvm::Function* comp_update_tree_{ nullptr };
 
+    /* ── Coverage runtime functions ── */
+    llvm::Function* fn_coverage_trace_ { nullptr };
+    llvm::Function* fn_coverage_rep_   { nullptr };
+    bool            coverage_enabled_  { false };
+    std::string     source_file_path_;
+    llvm::Value*    source_file_ptr_   { nullptr };
+
     /* ── Utility runtime functions ── */
     llvm::Function* fn_sleep_       { nullptr };
     llvm::Function* fn_time_        { nullptr };
@@ -408,6 +425,11 @@ private:
         bool has_pointer_param{false};   /* true if any param is pointer/void* */
     };
     std::unordered_map<std::string, ExternStringInfo> extern_string_info_;
+
+    /* Set of function names whose body returns a capturing lambda (closure).
+       Populated by a pre-scan before codegen and used to propagate the
+       `is_closure` flag to variables that receive the return value. */
+    std::unordered_set<std::string> closure_returning_fns_;
 
 
 

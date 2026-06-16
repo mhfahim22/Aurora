@@ -1,6 +1,7 @@
 #include "std/collections.hpp"
 #include "std/json.hpp"
 #include "runtime/memory.hpp"
+#include "runtime/string.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -108,6 +109,25 @@ void map_free(void* map) {
     Map* m = (Map*)map;
     free(m->entries);
     free(m);
+}
+
+void map_copy(void* dst, void* src) {
+    Map* s = (Map*)src;
+    for (int i = 0; i < s->len; i++) {
+        map_set(dst, s->entries[i].key, s->entries[i].val);
+    }
+}
+
+/* WARNING: returns raw char* pointers from map entries.
+   These char* are valid only while the map is alive.
+   Do not store or free them. */
+void* map_keys(void* map) {
+    Map* m = (Map*)map;
+    void* list = list_new();
+    for (int i = 0; i < m->len; i++) {
+        list_push(list, (long long)(intptr_t)(m->entries[i].key));
+    }
+    return list;
 }
 
 /* ── Set ── */

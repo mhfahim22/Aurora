@@ -1,12 +1,71 @@
-/* ════════════════════════════════════════════════════════════
-   lsp.cpp — Aurora Language Server Protocol implementation
-   Communicates via stdin/stdout using JSON-RPC 2.0.
-   ════════════════════════════════════════════════════════════ */
-
 #include "../../include/tools/lsp.hpp"
+#include "compiler/parser.hpp"
 #include <iostream>
 #include <sstream>
 #include <regex>
+#include <stdexcept>
+#include <algorithm>
+
+/* ════════════════════════════════════════════════════════════
+   DocumentState implementation
+   ════════════════════════════════════════════════════════════ */
+
+void DocumentState::update(const std::string& newText) {
+    text = newText;
+    dirty = true;
+}
+
+void DocumentState::reparse() {
+    if (!dirty) return;
+    dirty = false;
+
+    Lexer lexer;
+    lines = lexer.lex(text);
+
+    try {
+        Parser parser(lines);
+        ast = parser.parse();
+        parseError.clear();
+    } catch (const std::exception& e) {
+        ast.reset();
+        parseError = e.what();
+    }
+}
+
+const LexedLine* DocumentState::find_line(int line) const {
+    if (line < 0 || line >= (int)lines.size()) return nullptr;
+    return &lines[line];
+}
+
+const Token* DocumentState::find_token(int line, int col) const {
+    auto* ll = find_line(line);
+    if (!ll) return nullptr;
+    for (auto& t : ll->tokens) {
+        if (t.col <= col && col < t.col + (int)t.value.size())
+            return &t;
+    }
+    return nullptr;
+}
+
+std::string DocumentState::get_word_at(int line, int col) const {
+    auto* ll = find_line(line);
+    if (!ll) return "";
+
+    const std::string& ln = text;
+    std::istringstream ss(text);
+    std::string cur_line;
+    int l = 0;
+    while (l < line && std::getline(ss, cur_line)) l++;
+    if (l != line) return "";
+    std::getline(ss, cur_line);
+
+    int start = col;
+    while (start > 0 && (isalnum(cur_line[start-1]) || cur_line[start-1] == '_')) start--;
+    int end = col;
+    while (end < (int)cur_line.size() && (isalnum(cur_line[end]) || cur_line[end] == '_')) end++;
+    if (start < end) return cur_line.substr(start, end - start);
+    return "";
+}
 
 /* ════════════════════════════════════════════════════════════
    LspServer implementation
@@ -30,7 +89,6 @@ std::string LspServer::escape_json(const std::string& s) {
 }
 
 std::string LspServer::read_message() {
-    /* Read Content-Length header */
     std::string header;
     int content_length = 0;
     while (std::getline(std::cin, header)) {
@@ -87,33 +145,8 @@ std::string LspServer::get_json_field(const std::string& json, const std::string
     return "";
 }
 
-std::vector<std::string> LspServer::get_keywords() {
-    return {
-        "function", "return", "if", "else", "elseif", "while", "for", "loop",
-        "break", "continue", "match", "case", "default", "switch",
-        "class", "extends", "implements", "interface", "enum", "struct",
-        "public", "private", "protected", "static", "final", "abstract",
-        "try", "catch", "finally", "throw", "panic", "ensure",
-        "import", "from", "namespace", "module", "package", "extern",
-        "async", "await", "spawn", "parallel", "thread",
-        "true", "false", "null", "and", "or", "not",
-        "new", "self", "super", "lambda", "type",
-        "output", "debug", "log", "pass",
-        "move", "copy", "shared", "weak", "borrow", "drop", "delete",
-        "safe", "unsafe", "const", "mutable", "reference", "pointer",
-        "event", "signal", "emit", "callback",
-        "scene", "entity", "sprite", "camera", "physics",
-        "component", "render", "state", "properties",
-        "server", "api", "route", "middleware",
-        "ai", "tensor", "train", "predict",
-        "int", "float", "string", "bool", "void", "list", "map", "set", "array", "json"
-    };
-}
-
-
-
 /* ════════════════════════════════════════════════════════════
-   LSP message handlers
+   Message routing
    ════════════════════════════════════════════════════════════ */
 
 void LspServer::handle_message(const std::string& json) {
@@ -143,6 +176,16 @@ void LspServer::handle_message(const std::string& json) {
         response = handle_document_symbol(JsonParser::stringify(params));
     } else if (method == "textDocument/signatureHelp") {
         response = handle_signature_help(JsonParser::stringify(params));
+    } else if (method == "textDocument/semanticTokens/full") {
+        response = handle_semantic_tokens(JsonParser::stringify(params));
+    } else if (method == "textDocument/formatting") {
+        response = handle_formatting(JsonParser::stringify(params));
+    } else if (method == "textDocument/rename") {
+        response = handle_rename(JsonParser::stringify(params));
+    } else if (method == "textDocument/foldingRange") {
+        response = handle_folding_range(JsonParser::stringify(params));
+    } else if (method == "textDocument/codeAction") {
+        response = handle_code_action(JsonParser::stringify(params));
     } else if (method == "textDocument/didOpen") {
         handle_did_open(JsonParser::stringify(params));
         return;
@@ -168,28 +211,43 @@ void LspServer::handle_message(const std::string& json) {
         send_message(response);
 }
 
+/* ════════════════════════════════════════════════════════════
+   Initialize / Shutdown
+   ════════════════════════════════════════════════════════════ */
+
 std::string LspServer::handle_initialize(const std::string& params) {
     initialized_ = true;
 
     JsonValue p = JsonParser::parse(params);
     workspace_root_ = p.get("rootUri").as_string();
 
-    /* Capabilities — use object-style textDocumentSync per spec */
     std::string caps = R"({
         "textDocumentSync":{"openClose":true,"change":2,"save":true},
-        "completionProvider":{"triggerCharacters":[".","@"]},
+        "completionProvider":{"triggerCharacters":[".","@"," "]},
         "definitionProvider":true,
         "hoverProvider":true,
         "referencesProvider":true,
         "documentSymbolProvider":true,
-        "signatureHelpProvider":{"triggerCharacters":["("]}
+        "signatureHelpProvider":{"triggerCharacters":["("]},
+        "semanticTokensProvider":{
+            "legend":{
+                "tokenTypes":["variable","function","method","class","interface","enum","struct","parameter","property","keyword","comment","string","number","operator","type","namespace","macro","modifier","event","decorator"],
+                "tokenModifiers":["declaration","definition","readonly","static","abstract","deprecated","async","modification","documentation"]
+            },
+            "full":true,
+            "range":false
+        },
+        "documentFormattingProvider":true,
+        "renameProvider":{"prepareProvider":false},
+        "foldingRangeProvider":true,
+        "codeActionProvider":true
     })";
 
     JsonBuilder result;
     result.add_raw("capabilities", caps);
     JsonBuilder info;
     info.add("name", "aurora-lsp");
-    info.add("version", "0.1.0");
+    info.add("version", "0.2.0");
     result.add_raw("serverInfo", info.str());
     return make_response(current_msg_id_, result.str());
 }
@@ -199,14 +257,67 @@ std::string LspServer::handle_shutdown() {
     return make_response(current_msg_id_, "null");
 }
 
+/* ════════════════════════════════════════════════════════════
+   Document lifecycle handlers
+   ════════════════════════════════════════════════════════════ */
+
+void LspServer::handle_did_open(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    std::string text = p.get("textDocument").get("text").as_string();
+
+    if (!uri.empty()) {
+        DocumentState doc;
+        doc.uri = uri;
+        doc.update(text);
+        doc.reparse();
+        documents_[uri] = std::move(doc);
+        update_diagnostics(uri, text);
+    }
+}
+
+void LspServer::handle_did_change(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+
+    if (!uri.empty() && documents_.count(uri)) {
+        JsonValue changes = p.get("contentChanges");
+        if (changes.type == JsonValue::Array && !changes.items.empty()) {
+            documents_[uri].update(changes.items.back().get("text").as_string());
+            documents_[uri].reparse();
+        }
+        update_diagnostics(uri, documents_[uri].text);
+    }
+}
+
+void LspServer::handle_did_save(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    if (!uri.empty() && documents_.count(uri)) {
+        documents_[uri].reparse();
+        update_diagnostics(uri, documents_[uri].text);
+    }
+}
+
+void LspServer::handle_did_close(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    if (!uri.empty()) documents_.erase(uri);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Feature handlers (delegate to analysis)
+   ════════════════════════════════════════════════════════════ */
+
 std::string LspServer::handle_completion(const std::string& params) {
     JsonValue p = JsonParser::parse(params);
     std::string uri = p.get("textDocument").get("uri").as_string();
     int line = p.get("position").get("line").as_int();
     int col = p.get("position").get("character").as_int();
 
-    std::string text = open_documents_[uri];
-    auto items = get_completions(text, line, col);
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    auto items = get_completions(doc, line, col);
 
     std::string items_json = "[";
     for (size_t i = 0; i < items.size(); i++) {
@@ -236,47 +347,11 @@ std::string LspServer::handle_definition(const std::string& params) {
     int line = p.get("position").get("line").as_int();
     int col = p.get("position").get("character").as_int();
 
-    /* Get word under cursor */
-    std::string text = open_documents_[uri];
-    std::string word;
-    {
-        std::istringstream stream(text);
-        std::string ln;
-        int cur_line = 0;
-        while (cur_line < line && std::getline(stream, ln)) cur_line++;
-        if (cur_line == line) {
-            int start = col;
-            while (start > 0 && (isalnum(ln[start-1]) || ln[start-1] == '_')) start--;
-            int end = col;
-            while (end < (int)ln.size() && (isalnum(ln[end]) || ln[end] == '_')) end++;
-            if (start < end) word = ln.substr(start, end - start);
-        }
-    }
-
-    if (!word.empty()) {
-        std::regex def_re(R"((?:^|\s+)(?:function\s+|class\s+|struct\s+|enum\s+|interface\s+|extern\s+(?:\"[^\"]*\"\s+)?function\s+)?)" + word +
-                          R"(\s*(?:\(|=|:))");
-        for (auto& [doc_uri, doc_text] : open_documents_) {
-            std::istringstream ds(doc_text);
-            std::string ln;
-            int ln_num = 0;
-            while (std::getline(ds, ln)) {
-                std::smatch dm;
-                if (std::regex_search(ln, dm, def_re)) {
-                    JsonBuilder jb;
-                    jb.add("uri", escape_json(doc_uri));
-                    std::string rng = "{\"start\":{\"line\":" + std::to_string(ln_num) +
-                                      ",\"character\":0}" +
-                                      ",\"end\":{\"line\":" + std::to_string(ln_num) +
-                                      ",\"character\":" + std::to_string((int)ln.length()) + "}}";
-                    jb.add_raw("range", rng);
-                    return make_response(current_msg_id_, jb.str());
-                }
-                ln_num++;
-            }
-        }
-    }
-
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    std::string loc = get_definition_location(doc, line, col);
+    if (!loc.empty())
+        return make_response(current_msg_id_, loc);
     return make_response(current_msg_id_, "null");
 }
 
@@ -286,70 +361,9 @@ std::string LspServer::handle_hover(const std::string& params) {
     int line = p.get("position").get("line").as_int();
     int col = p.get("position").get("character").as_int();
 
-    /* Get word under cursor */
-    std::string text = open_documents_[uri];
-    std::istringstream stream(text);
-    std::string ln;
-    int cur_line = 0;
-    while (cur_line < line && std::getline(stream, ln)) cur_line++;
-    if (cur_line == line) {
-        std::string word;
-        int start = col;
-        while (start > 0 && (isalnum(ln[start-1]) || ln[start-1] == '_')) start--;
-        int end = col;
-        while (end < (int)ln.size() && (isalnum(ln[end]) || ln[end] == '_')) end++;
-        if (start < end) word = ln.substr(start, end - start);
-
-        if (!word.empty()) {
-            std::string hover_text = "```\n" + word + "\n```";
-
-            /* Look up word as a function definition */
-            std::regex func_def_re(R"((?:^|\s*)function\s+)" + word +
-                                   R"(\s*\(([^)]*)\)\s*(?::\s*(\w+))?)");
-            for (auto& [doc_uri, doc_text] : open_documents_) {
-                std::istringstream ds(doc_text);
-                std::string dl;
-                int dln = 0;
-                while (std::getline(ds, dl)) {
-                    std::smatch fm;
-                    if (std::regex_search(dl, fm, func_def_re)) {
-                        std::string sig = "function " + word + "(" + fm[1].str() + ")";
-                        if (fm[2].matched) sig += ": " + fm[2].str();
-                        hover_text += "\n---\n" + sig + "\n*Defined at " + doc_uri + ":" + std::to_string(dln + 1) + "*";
-                        break;
-                    }
-                    dln++;
-                }
-                if (hover_text.find("*Defined") != std::string::npos) break;
-            }
-
-            /* Look up as variable definition */
-            if (hover_text.find("*Defined") == std::string::npos) {
-                std::regex var_def_re(R"((?:^|\s*)(?:let\s+|var\s+|const\s+)?)" +
-                                      word + R"(\s*(?::\s*\w+)?\s*=[^=])");
-                for (auto& [doc_uri, doc_text] : open_documents_) {
-                    std::istringstream ds(doc_text);
-                    std::string dl;
-                    int dln = 0;
-                    while (std::getline(ds, dl)) {
-                        std::smatch vm;
-                        if (std::regex_search(dl, vm, var_def_re)) {
-                            hover_text += "\n---\n*Variable defined at " + doc_uri + ":" + std::to_string(dln + 1) + "*";
-                            break;
-                        }
-                        dln++;
-                    }
-                    if (hover_text.find("*Variable defined") != std::string::npos) break;
-                }
-            }
-
-            JsonBuilder jb;
-            jb.add("contents", escape_json(hover_text));
-            return make_response(current_msg_id_, jb.str());
-        }
-    }
-
-    return make_response(current_msg_id_, "{\"contents\":[]}");
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    return get_hover_info(doc, line, col);
 }
 
 std::string LspServer::handle_references(const std::string& params) {
@@ -358,55 +372,24 @@ std::string LspServer::handle_references(const std::string& params) {
     int line = p.get("position").get("line").as_int();
     int col = p.get("position").get("character").as_int();
 
-    /* Get word under cursor */
-    std::string text = open_documents_[uri];
-    std::string word;
-    {
-        std::istringstream stream(text);
-        std::string ln;
-        int cur_line = 0;
-        while (cur_line < line && std::getline(stream, ln)) cur_line++;
-        if (cur_line == line) {
-            int start = col;
-            while (start > 0 && (isalnum(ln[start-1]) || ln[start-1] == '_')) start--;
-            int end = col;
-            while (end < (int)ln.size() && (isalnum(ln[end]) || ln[end] == '_')) end++;
-            if (start < end) word = ln.substr(start, end - start);
-        }
-    }
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    auto refs = get_all_references(doc, line, col);
 
     std::string refs_json = "[";
-    bool first = true;
-    if (!word.empty()) {
-        std::regex word_re("\\b" + word + "\\b");
-        for (auto& [doc_uri, doc_text] : open_documents_) {
-            std::istringstream ds(doc_text);
-            std::string ln;
-            int ln_num = 0;
-            while (std::getline(ds, ln)) {
-                std::smatch rm;
-                std::string::const_iterator search_start = ln.cbegin();
-                while (std::regex_search(search_start, ln.cend(), rm, word_re)) {
-                    int char_start = (int)(rm.position());
-                    int char_end   = char_start + (int)rm.length();
-                    if (!first) refs_json += ",";
-                    first = false;
-                    JsonBuilder jb;
-                    jb.add("uri", escape_json(doc_uri));
-                    std::string rng = "{\"start\":{\"line\":" + std::to_string(ln_num) +
-                                      ",\"character\":" + std::to_string(char_start) + "}" +
-                                      ",\"end\":{\"line\":" + std::to_string(ln_num) +
-                                      ",\"character\":" + std::to_string(char_end) + "}}";
-                    jb.add_raw("range", rng);
-                    refs_json += jb.str();
-                    search_start = rm[0].second;
-                }
-                ln_num++;
-            }
-        }
+    for (size_t i = 0; i < refs.size(); i++) {
+        if (i > 0) refs_json += ",";
+        auto& r = refs[i];
+        JsonBuilder jb;
+        jb.add("uri", escape_json(r.uri));
+        std::string rng = "{\"start\":{\"line\":" + std::to_string(r.range.start.line) +
+                          ",\"character\":" + std::to_string(r.range.start.character) + "}" +
+                          ",\"end\":{\"line\":" + std::to_string(r.range.end.line) +
+                          ",\"character\":" + std::to_string(r.range.end.character) + "}}";
+        jb.add_raw("range", rng);
+        refs_json += jb.str();
     }
     refs_json += "]";
-
     return make_response(current_msg_id_, refs_json);
 }
 
@@ -414,8 +397,9 @@ std::string LspServer::handle_document_symbol(const std::string& params) {
     JsonValue p = JsonParser::parse(params);
     std::string uri = p.get("textDocument").get("uri").as_string();
 
-    std::string text = open_documents_[uri];
-    auto symbols = get_symbols(text);
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    auto symbols = get_symbols(doc);
 
     std::string sym_json = "[";
     for (size_t i = 0; i < symbols.size(); i++) {
@@ -423,7 +407,7 @@ std::string LspServer::handle_document_symbol(const std::string& params) {
         if (i > 0) sym_json += ",";
         JsonBuilder jb;
         jb.add("name", escape_json(s.name));
-        jb.add("kind", s.kind);
+        jb.add_int("kind", std::stoi(s.kind));
         std::string rng = "{\"start\":{\"line\":" + std::to_string(s.range.start.line) +
                           ",\"character\":" + std::to_string(s.range.start.character) + "}" +
                           ",\"end\":{\"line\":" + std::to_string(s.range.end.line) +
@@ -433,7 +417,6 @@ std::string LspServer::handle_document_symbol(const std::string& params) {
         sym_json += jb.str();
     }
     sym_json += "]";
-
     return make_response(current_msg_id_, sym_json);
 }
 
@@ -443,163 +426,223 @@ std::string LspServer::handle_signature_help(const std::string& params) {
     int line = p.get("position").get("line").as_int();
     int col = p.get("position").get("character").as_int();
 
-    std::string text = open_documents_[uri];
-    std::istringstream stream(text);
-    std::string ln;
-    int cur_line = 0;
-    while (cur_line < line && std::getline(stream, ln)) cur_line++;
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    return get_signature_info(doc, line, col);
+}
 
-    if (cur_line != line) {
-        return make_response(current_msg_id_, "null");
+std::string LspServer::handle_semantic_tokens(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    auto tokens = get_semantic_tokens(doc);
+
+    std::string data = "[";
+    for (size_t i = 0; i < tokens.size(); i++) {
+        if (i > 0) data += ",";
+        data += std::to_string(tokens[i].line) + ",";
+        data += std::to_string(tokens[i].startChar) + ",";
+        data += std::to_string(tokens[i].length) + ",";
+        data += std::to_string(tokens[i].tokenType) + ",";
+        data += std::to_string(tokens[i].tokenModifiers);
+    }
+    data += "]";
+
+    JsonBuilder result;
+    result.add_raw("data", data);
+    return make_response(current_msg_id_, result.str());
+}
+
+std::string LspServer::handle_formatting(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    auto edits = get_formatting_edits(doc);
+
+    std::string edits_json = "[";
+    for (size_t i = 0; i < edits.size(); i++) {
+        if (i > 0) edits_json += ",";
+        auto& e = edits[i];
+        JsonBuilder jb;
+        std::string rng = "{\"start\":{\"line\":" + std::to_string(e.range.start.line) +
+                          ",\"character\":" + std::to_string(e.range.start.character) + "}" +
+                          ",\"end\":{\"line\":" + std::to_string(e.range.end.line) +
+                          ",\"character\":" + std::to_string(e.range.end.character) + "}}";
+        jb.add_raw("range", rng);
+        jb.add("newText", escape_json(e.newText));
+        edits_json += jb.str();
+    }
+    edits_json += "]";
+    return make_response(current_msg_id_, edits_json);
+}
+
+std::string LspServer::handle_rename(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+    int line = p.get("position").get("line").as_int();
+    int col = p.get("position").get("character").as_int();
+    std::string newName = p.get("newName").as_string();
+
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    std::string word = doc.get_word_at(line, col);
+    if (word.empty()) return make_response(current_msg_id_, "null");
+
+    auto refs = get_all_references(doc, line, col);
+
+    std::string edits_json = "[";
+    bool first = true;
+    for (auto& r : refs) {
+        if (!first) edits_json += ",";
+        first = false;
+        JsonBuilder jb;
+        std::string rng = "{\"start\":{\"line\":" + std::to_string(r.range.start.line) +
+                          ",\"character\":" + std::to_string(r.range.start.character) + "}" +
+                          ",\"end\":{\"line\":" + std::to_string(r.range.end.line) +
+                          ",\"character\":" + std::to_string(r.range.end.character) + "}}";
+        jb.add_raw("range", rng);
+        jb.add("newText", escape_json(newName));
+        edits_json += jb.str();
+    }
+    edits_json += "]";
+
+    std::string changes = "{\"" + escape_json(uri) + "\":" + edits_json + "}";
+    JsonBuilder result;
+    result.add_raw("changes", changes);
+    return make_response(current_msg_id_, result.str());
+}
+
+std::string LspServer::handle_folding_range(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+    auto ranges = get_folding_ranges(doc);
+
+    std::string json = "[";
+    for (size_t i = 0; i < ranges.size(); i++) {
+        if (i > 0) json += ",";
+        JsonBuilder jb;
+        jb.add_int("startLine", ranges[i].startLine);
+        jb.add_int("endLine", ranges[i].endLine);
+        if (!ranges[i].kind.empty())
+            jb.add("kind", ranges[i].kind);
+        json += jb.str();
+    }
+    json += "]";
+    return make_response(current_msg_id_, json);
+}
+
+std::string LspServer::handle_code_action(const std::string& params) {
+    JsonValue p = JsonParser::parse(params);
+    std::string uri = p.get("textDocument").get("uri").as_string();
+
+    if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
+    auto& doc = documents_[uri];
+
+    std::string diagMsg;
+    JsonValue context = p.get("context");
+    JsonValue diags = context.get("diagnostics");
+    if (diags.type == JsonValue::Array && !diags.items.empty()) {
+        diagMsg = diags.items[0].get("message").as_string();
     }
 
-    /* Find the function name before the cursor — look backwards for '(' */
-    int paren = (int)ln.rfind('(', col);
-    if (paren == std::string::npos) {
-        return make_response(current_msg_id_, "null");
+    auto actions = get_code_actions(doc, diagMsg);
+    std::string json = "[";
+    for (size_t i = 0; i < actions.size(); i++) {
+        if (i > 0) json += ",";
+        auto& a = actions[i];
+        JsonBuilder jb;
+        jb.add("title", escape_json(a.title));
+        jb.add("kind", escape_json(a.kind));
+        json += jb.str();
     }
+    json += "]";
+    return make_response(current_msg_id_, json);
+}
 
-    /* Extract function name before '(' */
-    int name_end = paren;
-    int name_start = name_end;
-    while (name_start > 0 && (isalnum(ln[name_start-1]) || ln[name_start-1] == '_'))
-        name_start--;
+/* ════════════════════════════════════════════════════════════
+   AST walking helpers
+   ════════════════════════════════════════════════════════════ */
 
-    std::string func_name = ln.substr(name_start, name_end - name_start);
+void LspServer::walk_ast(ASTNode* node, std::function<void(ASTNode*)> fn) {
+    if (!node) return;
+    fn(node);
+    walk_ast(node->left.get(), fn);
+    walk_ast(node->right.get(), fn);
+    walk_ast(node->body.get(), fn);
+    walk_ast(node->orelse.get(), fn);
+    walk_ast(node->next.get(), fn);
+    walk_ast(node->args.get(), fn);
+}
 
-    if (func_name.empty() || func_name == " ") {
-        return make_response(current_msg_id_, "null");
-    }
-
-    /* Count how many commas before this paren to determine active parameter */
-    /* First, find the matching opening paren for this closing paren if nested */
-    /* Start from the beginning of this call's argument list */
-    int active_param = 0;
-    int depth = 0;
-    bool found_start = false;
-    for (int i = paren + 1; i < col; i++) {
-        if (i >= (int)ln.size()) break;
-        if (ln[i] == '(') { depth++; found_start = true; }
-        else if (ln[i] == ')') { depth--; }
-        else if (ln[i] == ',' && depth == 0) { active_param++; }
-    }
-
-    /* Search for function definition across open documents */
-    std::regex func_re(R"((?:^|\s*)function\s+)" + func_name +
-                       R"(\s*\(([^)]*)\)\s*(?::\s*(\w+))?)");
-
-    for (auto& [doc_uri, doc_text] : open_documents_) {
-        std::istringstream ds(doc_text);
-        std::string dl;
-        int dln = 0;
-        while (std::getline(ds, dl)) {
-            std::smatch fm;
-            if (std::regex_search(dl, fm, func_re)) {
-                std::string params_str = fm[1].str();
-                std::string return_type = fm[2].matched ? fm[2].str() : "";
-
-                /* Parse individual parameters */
-                std::vector<std::string> param_names;
-                std::vector<std::string> param_types;
-                std::istringstream ps(params_str);
-                std::string param;
-                while (std::getline(ps, param, ',')) {
-                    /* Trim */
-                    size_t s = param.find_first_not_of(" ");
-                    size_t e = param.find_last_not_of(" ");
-                    if (s != std::string::npos && e != std::string::npos)
-                        param = param.substr(s, e - s + 1);
-                    else
-                        param.clear();
-
-                    /* Split on ':' to get name and type */
-                    auto colon_pos = param.find(':');
-                    if (colon_pos != std::string::npos) {
-                        param_names.push_back(param.substr(0, colon_pos));
-                        // trim type
-                        std::string ptype = param.substr(colon_pos + 1);
-                        size_t ts = ptype.find_first_not_of(" ");
-                        if (ts != std::string::npos) ptype = ptype.substr(ts);
-                        param_types.push_back(ptype);
-                    } else {
-                        param_names.push_back(param);
-                        param_types.push_back("");
-                    }
-                }
-
-                /* Build signature information */
-                std::string label = func_name + "(";
-                for (size_t i = 0; i < param_names.size(); i++) {
-                    if (i > 0) label += ", ";
-                    label += param_names[i];
-                    if (!param_types[i].empty()) label += ": " + param_types[i];
-                }
-                label += ")";
-                if (!return_type.empty()) label += ": " + return_type;
-
-                std::string sig_json = R"({
-                    "signatures":[{
-                        "label":")" + escape_json(label) + R"(",
-                        "parameters":[)";
-
-                for (size_t i = 0; i < param_names.size(); i++) {
-                    if (i > 0) sig_json += ",";
-                    std::string plabel = param_names[i];
-                    if (!param_types[i].empty()) plabel += ": " + param_types[i];
-                    sig_json += R"({"label":")" + escape_json(plabel) + R"("})";
-                }
-                sig_json += R"(],
-                        "activeParameter":)" + std::to_string(active_param) + R"(
-                    }],
-                    "activeSignature":0
-                })";
-
-                return make_response(current_msg_id_, sig_json);
-            }
-            dln++;
+ASTNode* LspServer::find_def(ASTNode* root, const std::string& name) {
+    ASTNode* result = nullptr;
+    walk_ast(root, [&](ASTNode* n) {
+        if (result) return;
+        if (n->type == NodeType::Function && n->value == name) {
+            result = n;
+        } else if (n->type == NodeType::Class && n->value == name) {
+            result = n;
+        } else if (n->type == NodeType::Var && n->value == name && n->left && n->left->type == NodeType::Assign) {
+            result = n;
         }
+    });
+    return result;
+}
+
+std::vector<ASTNode*> LspServer::find_all_refs(ASTNode* root, const std::string& name) {
+    std::vector<ASTNode*> refs;
+    walk_ast(root, [&](ASTNode* n) {
+        if (n->value == name &&
+            (n->type == NodeType::Var || n->type == NodeType::Call ||
+             n->type == NodeType::Function || n->type == NodeType::Class))
+            refs.push_back(n);
+    });
+    return refs;
+}
+
+std::string LspServer::node_type_name(NodeType t) {
+    switch (t) {
+        case NodeType::Function: return "function";
+        case NodeType::Class: return "class";
+        case NodeType::InterfaceDecl: return "interface";
+        case NodeType::EnumDecl: return "enum";
+        case NodeType::StructDecl: return "struct";
+        case NodeType::Var: return "variable";
+        case NodeType::Call: return "function";
+        case NodeType::Lambda: return "function";
+        case NodeType::ExternFn: return "function";
+        case NodeType::Import: return "module";
+        case NodeType::NamespaceDecl: return "namespace";
+        default: return "variable";
     }
-
-    return make_response(current_msg_id_, "null");
 }
 
-void LspServer::handle_did_open(const std::string& params) {
-    JsonValue p = JsonParser::parse(params);
-    std::string uri = p.get("textDocument").get("uri").as_string();
-    std::string text = p.get("textDocument").get("text").as_string();
-
-    if (!uri.empty()) {
-        open_documents_[uri] = text;
-        update_diagnostics(uri, text);
+int LspServer::node_to_symbol_kind(NodeType t) {
+    switch (t) {
+        case NodeType::Function: return 12;
+        case NodeType::Class: return 5;
+        case NodeType::InterfaceDecl: return 11;
+        case NodeType::EnumDecl: return 10;
+        case NodeType::StructDecl: return 23;
+        case NodeType::Lambda: return 12;
+        case NodeType::ExternFn: return 12;
+        case NodeType::Var: return 13;
+        case NodeType::NamespaceDecl: return 2;
+        case NodeType::ModuleDecl: return 2;
+        default: return 13;
     }
 }
 
-void LspServer::handle_did_change(const std::string& params) {
-    JsonValue p = JsonParser::parse(params);
-    std::string uri = p.get("textDocument").get("uri").as_string();
-
-    if (!uri.empty() && open_documents_.count(uri)) {
-        /* Get full text from contentChanges array (last entry has the full text) */
-        JsonValue changes = p.get("contentChanges");
-        if (changes.type == JsonValue::Array && !changes.items.empty()) {
-            open_documents_[uri] = changes.items.back().get("text").as_string();
-        }
-        update_diagnostics(uri, open_documents_[uri]);
-    }
-}
-
-void LspServer::handle_did_save(const std::string& params) {
-    JsonValue p = JsonParser::parse(params);
-    std::string uri = p.get("textDocument").get("uri").as_string();
-    if (!uri.empty() && open_documents_.count(uri))
-        update_diagnostics(uri, open_documents_[uri]);
-}
-
-void LspServer::handle_did_close(const std::string& params) {
-    JsonValue p = JsonParser::parse(params);
-    std::string uri = p.get("textDocument").get("uri").as_string();
-    if (!uri.empty()) open_documents_.erase(uri);
-}
+/* ════════════════════════════════════════════════════════════
+   run — main event loop
+   ════════════════════════════════════════════════════════════ */
 
 void LspServer::run() {
     while (true) {

@@ -90,14 +90,15 @@ void Codegen::gen_try(const ASTNode* node) {
        Only plain i64 slots; arrays/strings need separate handling
        (they carry runtime state in separate allocations, so the i64
        handle in the alloca is still the right thing to pass).        */
-    struct LiveVar { std::string name; llvm::AllocaInst* slot; };
+    struct LiveVar { std::string name; llvm::AllocaInst* slot; llvm::Type* ty; };
     std::vector<LiveVar> live;
     for (auto& scope : scopes_) {
         for (auto& [nm, rec] : scope.vars) {
             if (!rec.alloca_ptr) continue;
             auto* ai = llvm::dyn_cast<llvm::AllocaInst>(rec.alloca_ptr);
             if (!ai) continue;
-            if (!ai->getAllocatedType()->isIntegerTy(64)) continue;
+            auto* ty = ai->getAllocatedType();
+            if (!ty->isIntegerTy(64) && !ty->isPointerTy()) continue;
             /* Only collect allocas that belong to cur_fn_.
                Outlined functions switch cur_fn_; outer scopes still on
                scopes_ have allocas in a different function, which would
@@ -105,7 +106,7 @@ void Codegen::gen_try(const ASTNode* node) {
                replaces the offending code with unreachable, silently
                dropping any statements after aurora_try_exec.           */
             if (ai->getParent()->getParent() != cur_fn_) continue;
-            live.push_back({nm, ai});
+            live.push_back({nm, ai, ty});
         }
     }
     const int nv = static_cast<int>(live.size());
@@ -120,7 +121,9 @@ void Codegen::gen_try(const ASTNode* node) {
     /* Helpers to save/restore live vars to/from ctx */
     auto save_vars = [&]() {
         for (int i = 0; i < nv; i++) {
-            llvm::Value* v = builder_->CreateLoad(i64T, live[i].slot, "ctx_sv");
+            llvm::Value* v = builder_->CreateLoad(live[i].ty, live[i].slot, "ctx_sv");
+            if (live[i].ty->isPointerTy())
+                v = builder_->CreatePtrToInt(v, i64T);
             llvm::Value* p = builder_->CreateGEP(i64T, ctx_arr, i64(i));
             builder_->CreateStore(v, p);
         }
@@ -129,6 +132,8 @@ void Codegen::gen_try(const ASTNode* node) {
         for (int i = 0; i < nv; i++) {
             llvm::Value* p = builder_->CreateGEP(i64T, ctx_arr, i64(i));
             llvm::Value* v = builder_->CreateLoad(i64T, p, "ctx_rv");
+            if (live[i].ty->isPointerTy())
+                v = builder_->CreateIntToPtr(v, live[i].ty);
             builder_->CreateStore(v, live[i].slot);
         }
     };
@@ -161,9 +166,11 @@ void Codegen::gen_try(const ASTNode* node) {
         /* Restore live vars from ctx into fresh alloca slots */
         push_scope();
         for (int i = 0; i < nv; i++) {
-            auto* slot = create_entry_alloca(live[i].name, i64T);
+            auto* slot = create_entry_alloca(live[i].name, live[i].ty);
             llvm::Value* p = builder_->CreateGEP(i64T, arg_ctx, i64(i));
             llvm::Value* v = builder_->CreateLoad(i64T, p, "in");
+            if (live[i].ty->isPointerTy())
+                v = builder_->CreateIntToPtr(v, live[i].ty);
             builder_->CreateStore(v, slot);
             declare_var(live[i].name, slot, OwnershipState::Owned);
         }
@@ -183,7 +190,9 @@ void Codegen::gen_try(const ASTNode* node) {
             for (int i = 0; i < nv; i++) {
                 VarRecord* rec = lookup_var(live[i].name);
                 if (!rec || !rec->alloca_ptr) continue;
-                llvm::Value* v = builder_->CreateLoad(i64T, rec->alloca_ptr, "out");
+                llvm::Value* v = builder_->CreateLoad(live[i].ty, rec->alloca_ptr, "out");
+                if (live[i].ty->isPointerTy())
+                    v = builder_->CreatePtrToInt(v, i64T);
                 llvm::Value* p = builder_->CreateGEP(i64T, arg_ctx, i64(i));
                 builder_->CreateStore(v, p);
             }
@@ -244,8 +253,16 @@ void Codegen::gen_throw(const ASTNode* node) {
     llvm::Value* has = node->left ? i64(1) : i64(0);
     builder_->CreateCall(fn_throw, {val, has});
 
-    /* aurora_throw never returns — insert unreachable to satisfy LLVM */
-    builder_->CreateUnreachable();
+    /* Ret instead of unreachable — prevents LLVM from inferring noreturn
+       on the enclosing function (which would cause the optimizer to
+       eliminate calls to functions that contain throws).  The ret is
+       never reached at runtime because aurora_throw throws a C++
+       exception via the runtime library. */
+    auto* ret_ty = cur_fn_->getReturnType();
+    if (ret_ty->isVoidTy())
+        builder_->CreateRetVoid();
+    else
+        builder_->CreateRet(llvm::PoisonValue::get(ret_ty));
 
     /* Start a new dead block so subsequent code generation doesn't break */
     auto* dead_bb = llvm::BasicBlock::Create(ctx_, "throw_dead", cur_fn_);

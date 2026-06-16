@@ -17,6 +17,16 @@ Codegen::Codegen(llvm::LLVMContext& ctx,
     : ctx_(ctx), module_(module), builder_(builder)
 {}
 
+void Codegen::set_source_file(const std::string& path) {
+    source_file_path_ = path;
+}
+
+void Codegen::emit_coverage_trace(int line) {
+    if (!coverage_enabled_ || !cur_fn_ || !fn_coverage_trace_) return;
+    if (!source_file_ptr_) return;
+    builder_->CreateCall(fn_coverage_trace_, {source_file_ptr_, i64(line)});
+}
+
 /* ════════════════════════════════════════════════════════════
    Main entry point
    ════════════════════════════════════════════════════════════ */
@@ -37,7 +47,11 @@ void Codegen::generate(const ASTNode* root) {
     /* Step 2 — run ownership analysis (throws OwnershipError on violations) */
     ownership_.analyse(root);
 
-    /* Step 3 — declare runtime helpers */
+    /* Step 3 — identify closure-returning functions so callers can
+       propagate the `is_closure` flag on receiving variables. */
+    scan_closure_returning_fns(root);
+
+    /* Step 4 — declare runtime helpers */
     declare_runtime_helpers();
 
     /* Step 4 — check if the user defines "function main():" in the AST.
@@ -74,6 +88,10 @@ void Codegen::generate(const ASTNode* root) {
     }
     auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", cur_fn_);
     builder_->SetInsertPoint(entry_bb);
+
+    /* Initialize coverage source file ptr now that builder has insertion point */
+    if (!source_file_path_.empty())
+        source_file_ptr_ = builder_->CreateGlobalStringPtr(source_file_path_, "cov_file");
 
     /* Install crash handler at program start */
     {
@@ -176,6 +194,19 @@ llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
             break;
     }
 
+    /* Module-level variables: use GlobalVariable (original type preserved)
+       so they are accessible from any function (not just the entry fn). */
+    if (scopes_.size() == 1) {
+        auto* gv_init = ty->isPointerTy()
+            ? static_cast<llvm::Constant*>(llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ctx_)))
+            : static_cast<llvm::Constant*>(llvm::ConstantInt::get(ty, 0));
+        auto* gv = new llvm::GlobalVariable(
+            *module_, ty, false,
+            llvm::GlobalVariable::InternalLinkage,
+            gv_init, name);
+        return gv;
+    }
+
     llvm::Value* ptr = create_entry_alloca(name, ty);
 
     /* Emit ownership-specific setup based on state */
@@ -240,12 +271,23 @@ void Codegen::emit_scope_cleanup(CodegenScope& scope) {
         if (!rec.alloca_ptr || current_block_terminated()) continue;
         if (rec.state == OwnershipState::Moved) continue;
 
-        auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec.alloca_ptr);
-        llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : nullptr;
+        auto* slot_ptr = rec.alloca_ptr;
+
+        /* Skip GlobalVariable-backed variables in per-function cleanup.
+           Module-level globals are shared state and must only be cleaned
+           up at program exit (when the module scope is popped by the top-
+           level caller). Premature cleanup causes use-after-free when
+           multiple functions reference the same global. */
+        if (llvm::dyn_cast<llvm::GlobalVariable>(slot_ptr))
+            continue;
+
+        auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(slot_ptr);
+        llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType()
+                                       : nullptr;
         llvm::Value* value = nullptr;
 
         if (slot_ty)
-            value = builder_->CreateLoad(slot_ty, rec.alloca_ptr, kv.first + "_cleanup");
+            value = builder_->CreateLoad(slot_ty, slot_ptr, kv.first + "_cleanup");
 
         if (rec.is_array && value && value->getType()->isIntegerTy(64)) {
             builder_->CreateCall(fn_array_free_, { value });
@@ -784,4 +826,44 @@ void Codegen::gen_stmt(const ASTNode* node) {
         case NodeType::ExternUnion:   gen_extern_union(node);  break;
         default:                      gen_expr(node);         break;
     }
+}
+
+/* ════════════════════════════════════════════════════════════
+   Closure-returning function detection  (pre-scan)
+   ════════════════════════════════════════════════════════════ */
+
+void Codegen::scan_closure_returning_fns(const ASTNode* root) {
+    closure_returning_fns_.clear();
+    const ASTNode* n = root;
+    while (n) {
+        if (n->type == NodeType::Function || n->type == NodeType::PerformanceFn) {
+            if (fn_body_returns_closure(n->body.get()))
+                closure_returning_fns_.insert(n->value);
+        }
+        n = n->next.get();
+    }
+}
+
+bool Codegen::fn_body_returns_closure(const ASTNode* body) {
+    std::unordered_set<std::string> closure_vars;
+    const ASTNode* stmt = body;
+    while (stmt) {
+        if (stmt->type == NodeType::Lambda && !stmt->captures.empty()) {
+            if (!stmt->value.empty())
+                closure_vars.insert(stmt->value);
+        }
+        if (stmt->type == NodeType::Assign && stmt->left) {
+            std::string lhs = stmt->left->value;
+            if (stmt->right && stmt->right->type == NodeType::Lambda && !stmt->right->captures.empty())
+                closure_vars.insert(lhs);
+        }
+        if (stmt->type == NodeType::Return && stmt->left) {
+            if (stmt->left->type == NodeType::Lambda && !stmt->left->captures.empty())
+                return true;
+            if (stmt->left->type == NodeType::Var && closure_vars.count(stmt->left->value))
+                return true;
+        }
+        stmt = stmt->next.get();
+    }
+    return false;
 }

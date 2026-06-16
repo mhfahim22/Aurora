@@ -1,19 +1,20 @@
 {
   "name": "aurora-language",
   "displayName": "Aurora Language",
-  "description": "Aurora language support — syntax highlighting + Aurora Twilight theme (opt-in)",
-  "version": "1.0.0",
+  "description": "Aurora language support — syntax highlighting, LSP, semantic tokens, formatting, and more",
+  "version": "2.0.0",
   "publisher": "aurora-lang",
   "repository": {
     "type": "git",
     "url": "https://github.com/mhfahim22/Aurora.git"
   },
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Programming Languages",
     "Themes",
+    "Language Packs",
     "Other"
   ],
   "activationEvents": [
@@ -49,6 +50,22 @@
         "uiTheme": "vs-dark",
         "path": "./themes/aurora-color-theme.json"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Aurora",
+      "properties": {
+        "aurora.lsp.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the aurora_lsp executable. Leave empty to auto-detect."
+        },
+        "aurora.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Aurora Language Server for diagnostics, completions, and more."
+        }
+      }
+    }
   }
 }

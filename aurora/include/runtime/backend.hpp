@@ -6,6 +6,10 @@
 extern "C" {
 #endif
 
+/* ── Forward declarations ── */
+struct AuroraStaticRoute;
+struct AuroraFileWatchState;
+
 /* ── Server ── */
 typedef struct AuroraServer {
     int       port;
@@ -14,6 +18,9 @@ typedef struct AuroraServer {
     void**    middleware_handlers;
     int       middleware_count;
     int       middleware_cap;
+    AuroraStaticRoute* static_routes;
+    int       static_count;
+    int       static_cap;
 } AuroraServer;
 
 AuroraServer* aurora_server_init(int64_t port);
@@ -147,8 +154,35 @@ const char* aurora_auth_generate_token(const char* payload, const char* secret);
 int         aurora_auth_verify_token(const char* token, const char* secret, char** out_payload);
 const char* aurora_auth_hash_password(const char* password);
 
-/* ── Server accept + handle (with middleware) ── */
+/* ── Static file route ── */
+struct AuroraStaticRoute {
+    char* prefix;
+    char* directory;
+};
+
+/* ── File watcher state (polling-based) ── */
+struct AuroraFileWatchState {
+    char**   files;
+    int64_t* mtimes;
+    int      count;
+    int      cap;
+};
+
+/* ── Server accept + handle (with middleware + static routes) ── */
 void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router);
+void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router);
+
+/* ── Static file serving ── */
+void aurora_server_static(AuroraServer* srv, const char* prefix, const char* directory);
+int  aurora_server_serve_static(AuroraHttpRequest* req, AuroraHttpResponse* res, AuroraServer* srv);
+
+/* ── Dev server with hot-reload ── */
+void aurora_dev_server(int64_t port, const char* src_dir);
+
+/* ── File watcher (polling) ── */
+AuroraFileWatchState* aurora_fs_watch_init(const char* dir);
+int  aurora_fs_watch_poll(AuroraFileWatchState* state);
+void aurora_fs_watch_free(AuroraFileWatchState* state);
 
 #ifdef __cplusplus
 }

@@ -54,6 +54,7 @@ int main(int argc, char* argv[]) {
 
     /* Core */
     if (cmd == "init") { if (argc < off + 1) { std::cerr << "usage: voss init <name>\n"; return 1; } return cmd_init(argv[off]); }
+    if (cmd == "new") { return cmd_new(argc - off, argv + off); }
     if (cmd == "add" || cmd == "a") {
         if (argc < off + 1) { std::cerr << "usage: voss add <package> [version]\n"; return 1; }
         std::string pkg = argv[off];
@@ -356,6 +357,16 @@ int main(int argc, char* argv[]) {
     /* Info */
     if (cmd == "info") return cmd_info();
     if (cmd == "list" || cmd == "ls") return cmd_list();
+    if (cmd == "doc") {
+        std::string out_dir;
+        bool serve = false;
+        for (int i = off; i < argc; i++) {
+            if (strcmp(argv[i], "--serve") == 0 || strcmp(argv[i], "-s") == 0) serve = true;
+            else if (strcmp(argv[i], "--output") == 0 || strcmp(argv[i], "-o") == 0) { if (i + 1 < argc) out_dir = argv[++i]; }
+            else out_dir = argv[i];
+        }
+        return cmd_doc(out_dir, serve);
+    }
     if (cmd == "help" || cmd == "--help" || cmd == "-h") return cmd_help();
 
     std::cerr << "unknown command '" << cmd << "'\n";

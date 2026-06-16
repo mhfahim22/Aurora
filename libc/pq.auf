@@ -1,0 +1,103 @@
+## PostgreSQL client library (libpq) bindings
+## Usage: import "pq"  or  import libc:pq
+##
+## Requires: libpq.dll (Windows) / libpq.so (Linux/macOS)
+## Install: https://www.postgresql.org/download/
+##
+## Example:
+##   import "pq"
+##   conn = PQconnectdb("host=localhost dbname=test user=postgres")
+##   if PQstatus(conn) != 0
+##       output("DB error: " + PQerrorMessage(conn))
+##   else
+##       res = PQexec(conn, "SELECT * FROM users")
+##       rows = PQntuples(res)
+##       output("Got " + str(rows) + " rows")
+##       PQclear(res)
+##   end
+##   PQfinish(conn)
+
+## ── Connection ──
+extern "libpq" function PQconnectdb(conninfo: cstring) -> pointer
+extern "libpq" function PQsetdbLogin(host: cstring, port: cstring, options: cstring, tty: cstring, db: cstring, login: cstring, pwd: cstring) -> pointer
+extern "libpq" function PQfinish(conn: pointer)
+extern "libpq" function PQreset(conn: pointer)
+extern "libpq" function PQstatus(conn: pointer) -> i32
+extern "libpq" function PQdb(conn: pointer) -> cstring
+extern "libpq" function PQuser(conn: pointer) -> cstring
+extern "libpq" function PQhost(conn: pointer) -> cstring
+extern "libpq" function PQport(conn: pointer) -> cstring
+extern "libpq" function PQerrorMessage(conn: pointer) -> cstring
+extern "libpq" function PQparameterStatus(conn: pointer, name: cstring) -> cstring
+extern "libpq" function PQsocket(conn: pointer) -> i32
+extern "libpq" function PQping(conninfo: cstring) -> i32
+
+## ── Query Execution ──
+extern "libpq" function PQexec(conn: pointer, command: cstring) -> pointer
+extern "libpq" function PQexecParams(conn: pointer, command: cstring, nParams: i32, paramTypes: pointer, paramValues: pointer, paramLengths: pointer, paramFormats: pointer, resultFormat: i32) -> pointer
+extern "libpq" function PQprepare(conn: pointer, stmtName: cstring, query: cstring, nParams: i32, paramTypes: pointer) -> pointer
+extern "libpq" function PQexecPrepared(conn: pointer, stmtName: cstring, nParams: i32, paramValues: pointer, paramLengths: pointer, paramFormats: pointer, resultFormat: i32) -> pointer
+extern "libpq" function PQsendQuery(conn: pointer, command: cstring) -> i32
+extern "libpq" function PQgetResult(conn: pointer) -> pointer
+extern "libpq" function PQisBusy(conn: pointer) -> i32
+extern "libpq" function PQconsumeInput(conn: pointer) -> i32
+
+## ── Result Set ──
+extern "libpq" function PQresultStatus(res: pointer) -> i32
+extern "libpq" function PQresStatus(status: i32) -> cstring
+extern "libpq" function PQresultErrorMessage(res: pointer) -> cstring
+extern "libpq" function PQresultErrorField(res: pointer, fieldcode: i32) -> cstring
+extern "libpq" function PQntuples(res: pointer) -> i32
+extern "libpq" function PQnfields(res: pointer) -> i32
+extern "libpq" function PQfname(res: pointer, col: i32) -> cstring
+extern "libpq" function PQfnumber(res: pointer, name: cstring) -> i32
+extern "libpq" function PQftable(res: pointer, col: i32) -> u32
+extern "libpq" function PQftype(res: pointer, col: i32) -> u32
+extern "libpq" function PQfmod(res: pointer, col: i32) -> i32
+extern "libpq" function PQfsize(res: pointer, col: i32) -> i32
+extern "libpq" function PQgetvalue(res: pointer, row: i32, col: i32) -> cstring
+extern "libpq" function PQgetisnull(res: pointer, row: i32, col: i32) -> i32
+extern "libpq" function PQgetlength(res: pointer, row: i32, col: i32) -> i32
+extern "libpq" function PQcmdStatus(res: pointer) -> cstring
+extern "libpq" function PQcmdTuples(res: pointer) -> cstring
+extern "libpq" function PQoidValue(res: pointer) -> u32
+extern "libpq" function PQclear(res: pointer)
+extern "libpq" function PQntuples(res: pointer) -> i32
+extern "libpq" function PQnparams(res: pointer) -> i32
+extern "libpq" function PQparamtype(res: pointer, idx: i32) -> u32
+
+## ── Transaction ──
+extern "libpq" function PQsetAutoCommit(conn: pointer, autoCommit: i32) -> i32
+extern "libpq" function PQtransactionStatus(conn: pointer) -> i32
+
+## ── Escape ──
+extern "libpq" function PQescapeString(conn: pointer, to: cstring, from: cstring, len: i64) -> i64
+extern "libpq" function PQescapeLiteral(conn: pointer, str: cstring, len: i64) -> cstring
+extern "libpq" function PQescapeIdentifier(conn: pointer, str: cstring, len: i64) -> cstring
+
+## ── COPY ──
+extern "libpq" function PQputCopyData(conn: pointer, buffer: cstring, nbytes: i32) -> i32
+extern "libpq" function PQputCopyEnd(conn: pointer, errormsg: cstring) -> i32
+extern "libpq" function PQgetCopyData(conn: pointer, buffer: pointer, async: i32) -> i32
+
+## ── Result status constants ──
+PGRES_EMPTY_QUERY = 0
+PGRES_COMMAND_OK = 1
+PGRES_TUPLES_OK = 2
+PGRES_COPY_OUT = 3
+PGRES_COPY_IN = 4
+PGRES_BAD_RESPONSE = 5
+PGRES_NONFATAL_ERROR = 6
+PGRES_FATAL_ERROR = 7
+PGRES_COPY_BOTH = 8
+PGRES_SINGLE_TUPLE = 9
+
+## ── Connection status ──
+CONNECTION_OK = 0
+CONNECTION_BAD = 1
+
+## ── Ping response ──
+PQPING_OK = 0
+PQPING_REJECT = 1
+PQPING_NO_RESPONSE = 2
+PQPING_NO_ATTEMPT = 3

@@ -1,0 +1,30 @@
+## Test: template engine — all features
+import libc:template
+
+function main()
+    ctx = map()
+    map_set(ctx, "name", "Alice")
+    map_set(ctx, "count", "3")
+
+    ## {{ var }}
+    html = template_render("<h1>{{name}}</h1><p>{{count}}</p>", ctx)
+    output(html)
+
+    ## {{{ raw }}}
+    html = template_render("{{{name}}}", ctx)
+    output(html)
+
+    ## {% if %}
+    tpl = "{% if count %}<p>yes</p>{% endif %}"
+    html = template_render(tpl, ctx)
+    output(html)
+
+    ## {% for %}
+    items = []
+    list_push(items, "a")
+    list_push(items, "b")
+    map_set(ctx, "items", items)
+    tpl = "{% for item in items %}<li>{{item}}</li>{% endfor %}"
+    html = template_render(tpl, ctx)
+    output(html)
+end

@@ -1,0 +1,14 @@
+import "test"
+import "mock"
+
+function main()
+    test_begin("Integration Tests")
+
+    lambda throwing_fn():
+        throw "error"
+    end
+    assert_throws(throwing_fn)
+    test_pass("assert_throws")
+
+    test_report()
+end

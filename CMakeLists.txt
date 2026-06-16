@@ -134,6 +134,7 @@ endif()
 add_library(aurora_runtime STATIC
     aurora/src/runtime/core/memory.cpp
     aurora/src/runtime/core/leak_detector.cpp
+    aurora/src/runtime/core/coverage.cpp
     aurora/src/runtime/core/aurora_str.cpp
     aurora/src/runtime/core/io.cpp
     aurora/src/runtime/core/array.cpp
@@ -184,6 +185,7 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/ui/render.cpp
     aurora/src/runtime/ui/component.cpp
     aurora/src/runtime/game/engine.cpp
+    aurora/src/runtime/gfx/gl_helper.cpp
     aurora/src/runtime/backend/server.cpp
     aurora/src/std/math.cpp
     aurora/src/std/json.cpp
@@ -201,9 +203,29 @@ endif()
 
 target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
+# ── OpenGL / 3D Graphics support (optional) ──
+if(WIN32)
+    target_link_libraries(aurora_runtime PRIVATE opengl32.lib)
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_GL=1)
+elseif(APPLE)
+    target_link_libraries(aurora_runtime PRIVATE "-framework OpenGL")
+    target_compile_definitions(aurora_runtime PRIVATE AURORA_GL=1)
+else()
+    find_package(OpenGL QUIET)
+    if(OpenGL_FOUND)
+        target_link_libraries(aurora_runtime PRIVATE OpenGL::GL)
+        target_compile_definitions(aurora_runtime PRIVATE AURORA_GL=1)
+    else()
+        message(STATUS "OpenGL not found — 3D graphics support disabled")
+        target_compile_definitions(aurora_runtime PRIVATE AURORA_GL=0)
+    endif()
+endif()
+
 # ── LTO (Link-Time Optimization) for runtime library ──
 # Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
-set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+# Disabled temporarily for function pointer / test development
+# set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 
 # ── Link runtime to compiler ────────────────
 target_link_libraries(aurorac PRIVATE aurora_runtime)
@@ -361,6 +383,7 @@ add_executable(voss
     aurora/tools/voss/commands_core.cpp
     aurora/tools/voss/commands_deps.cpp
     aurora/tools/voss/commands_config.cpp
+    aurora/tools/voss/commands_template.cpp
     aurora/tools/voss/commands_advanced.cpp
     aurora/tools/voss/commands_bind.cpp
     aurora/tools/voss/bridge_main.cpp
@@ -444,13 +467,55 @@ add_npm_bridge(bridge_mobx       mobx       "${CMAKE_SOURCE_DIR}/packages/bridge
 add_npm_bridge(bridge_uuid       uuid       "${CMAKE_SOURCE_DIR}/packages/bridges/npm/uuid_npm/uuid_npm.c")
 
 # ═══════════════════════════════════════════════════════════════
+# MySQL native bridge — C helper for MYSQL_ROW field access
+# ═══════════════════════════════════════════════════════════════
+set(MYSQL_BRIDGE_CPP "${CMAKE_SOURCE_DIR}/packages/bridges/native/mysql_native/mysql_wrapper.cpp")
+if(EXISTS "${MYSQL_BRIDGE_CPP}")
+    add_library(bridge_mysql_native SHARED "${MYSQL_BRIDGE_CPP}")
+    set_target_properties(bridge_mysql_native PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "mysql_native"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bridges"
+    )
+    if(WIN32 AND CMAKE_C_COMPILER_ID MATCHES "MSVC")
+        set_property(TARGET bridge_mysql_native PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    endif()
+    message(STATUS "MySQL native bridge: enabled")
+else()
+    message(STATUS "MySQL native bridge: ${MYSQL_BRIDGE_CPP} not found — skipping")
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# aurora_parser — static library (lexer + parser, no LLVM)
+# ═══════════════════════════════════════════════════════════════
+add_library(aurora_parser STATIC
+    aurora/src/compiler/lexer/lexer.cpp
+    aurora/src/compiler/lexer/token.cpp
+    aurora/src/compiler/parser/parser.cpp
+    aurora/src/compiler/parser/parse_stmt.cpp
+    aurora/src/compiler/parser/parse_extern.cpp
+    aurora/src/compiler/parser/parse_expr.cpp
+    aurora/src/compiler/parser/parse_class.cpp
+    aurora/src/compiler/parser/parse_struct.cpp
+    aurora/src/compiler/parser/parse_enum.cpp
+    aurora/src/compiler/parser/parse_interface.cpp
+    aurora/src/compiler/parser/parse_type_alias.cpp
+)
+target_include_directories(aurora_parser PUBLIC ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
 # aurora-lsp — Language Server Protocol implementation
 # ═══════════════════════════════════════════════════════════════
 add_executable(aurora_lsp
     aurora/tools/lsp/lsp.cpp
     aurora/tools/lsp/lsp_json.cpp
     aurora/tools/lsp/lsp_analysis.cpp
+    aurora/tools/lsp/lsp_semantic_tokens.cpp
+    aurora/tools/lsp/lsp_formatting.cpp
+    aurora/tools/lsp/lsp_code_actions.cpp
 )
+target_link_libraries(aurora_lsp PRIVATE aurora_parser)
+target_include_directories(aurora_lsp PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
 # ═══════════════════════════════════════════════════════════════
 # Optional: aurora-bindgen (only if libclang is available)

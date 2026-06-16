@@ -1,0 +1,62 @@
+function mock_new()
+    ctx = map("type", "mock")
+    map_set(ctx, "expectations", list())
+    map_set(ctx, "call_index", 0)
+    map_set(ctx, "calls", list())
+    return ctx
+end
+
+function mock_expect(ctx, args, return_value)
+    exp_list = map_get(ctx, "expectations")
+    exp = list(args, return_value)
+    list_push(exp_list, exp)
+end
+
+function mock_call(ctx, actual_args)
+    calls_list = map_get(ctx, "calls")
+    list_push(calls_list, actual_args)
+    idx = map_get(ctx, "call_index")
+    map_set(ctx, "call_index", idx + 1)
+    exp_list = map_get(ctx, "expectations")
+    if idx >= list_len(exp_list)
+        panic "mock_call: unexpected call (no more expectations)"
+    end
+    exp = list_get(exp_list, idx)
+    return list_get(exp, 1)
+end
+
+function mock_verify(ctx)
+    idx = map_get(ctx, "call_index")
+    exp_list = map_get(ctx, "expectations")
+    total = list_len(exp_list)
+    if idx != total
+        leftover = total - idx
+        msg = strcat("mock_verify: ", str(leftover))
+        msg = strcat(msg, " unfulfilled expectations")
+        panic msg
+    end
+end
+
+function mock_spy(ctx)
+    mock_set_spy(ctx, true)
+end
+
+function mock_set_spy(ctx, enabled)
+    map_set(ctx, "spy_mode", enabled)
+end
+
+function mock_call_count(ctx)
+    calls_list = map_get(ctx, "calls")
+    return list_len(calls_list)
+end
+
+function mock_call_args(ctx, index)
+    calls_list = map_get(ctx, "calls")
+    return list_get(calls_list, index)
+end
+
+function mock_reset(ctx)
+    map_set(ctx, "expectations", list())
+    map_set(ctx, "call_index", 0)
+    map_set(ctx, "calls", list())
+end

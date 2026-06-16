@@ -1,28 +1,35 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set BUILD_DIR=%~dp0build_asan
-set SRC_DIR=%~dp0
+REM Build Aurora with AddressSanitizer (ASAN) for memory error detection
 
-echo === Configuring ASAN build ===
-cmake -S "%SRC_DIR%" -B "%BUILD_DIR%" ^
-    -DCMAKE_BUILD_TYPE=Debug ^
+set BUILD_DIR=build_asan
+set LLVM_DIR=C:\Program Files\LLVM\lib\cmake\llvm
+
+if not exist "%LLVM_DIR%" (
+    echo [ERROR] LLVM not found at %LLVM_DIR%
+    echo Set LLVM_DIR to your LLVM installation path and rerun.
+    exit /b 1
+)
+
+echo [INFO] Configuring ASAN build...
+cmake -B %BUILD_DIR% -DCMAKE_BUILD_TYPE=Debug ^
     -DCMAKE_CXX_FLAGS_DEBUG="/fsanitize=address /MDd /Od /Zi /D_ITERATOR_DEBUG_LEVEL=0" ^
     -DCMAKE_EXE_LINKER_FLAGS_DEBUG="/DEBUG" ^
-    -DLLVM_DIR="C:\Program Files\Microsoft Visual Studio\18\Community\Tools\LLVM\lib\cmake\llvm"
-if %ERRORLEVEL% neq 0 exit /b 1
+    -DLLVM_DIR="%LLVM_DIR%"
 
-echo.
-echo === Building all targets ===
-cmake --build "%BUILD_DIR%" --config Debug
-if %ERRORLEVEL% neq 0 exit /b 1
+if %errorlevel% neq 0 (
+    echo [ERROR] CMake configuration failed
+    exit /b %errorlevel%
+)
 
-echo.
-echo === ASAN build complete ===
-echo To run with ASAN, ensure the ASAN runtime DLL is in PATH:
-echo     set PATH=C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64;%%PATH%%
-echo.
-echo Example:
-echo     "%BUILD_DIR%\Debug\test_bridge_e2e.exe"
-echo     "%BUILD_DIR%\Debug\test_pypi_thread_safety.exe"
-echo     "%BUILD_DIR%\Debug\test_ffi_memory_safety.exe"
+echo [INFO] Building ASAN targets...
+cmake --build %BUILD_DIR% --config Debug --target test_ffi_memory_safety --target bench_npm_bridge -j2
+
+if %errorlevel% neq 0 (
+    echo [ERROR] ASAN build failed
+    exit /b %errorlevel%
+)
+
+echo [INFO] ASAN build complete.
+echo [INFO] Run tests: build_asan\Debug\test_ffi_memory_safety.exe

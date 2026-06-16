@@ -1,0 +1,193 @@
+## Aurora 3D Graphics Library
+## Usage: import "gl"
+##
+## Provides high-level 3D helpers built on top of libc/glfw.auf + libc/opengl.auf
+##
+## Example:
+##   import "glfw"
+##   import "gl"
+##   glfwInit()
+##   window = glfwCreateWindow(800, 600, "3D App", null, null)
+##   glfwMakeContextCurrent(window)
+##   prog = gl_create_program(vert_src, frag_src)
+##   while not glfwWindowShouldClose(window):
+##       gl_clear(0.2, 0.3, 0.3, 1.0)
+##       gl_use_program(prog)
+##       gl_draw_triangle()
+##       glfwSwapBuffers(window)
+##       glfwPollEvents()
+##   end
+##   glfwDestroyWindow(window)
+##   glfwTerminate()
+
+import "opengl"
+
+## ── GL helper externs (runtime builtins) ──
+extern function aurora_gl_shader_source(shader: u32, source: cstring)
+extern function aurora_gl_compile_shader(shader: u32)
+extern function aurora_gl_create_shader(type: u32) -> u32
+extern function aurora_gl_create_program() -> u32
+extern function aurora_gl_attach_shader(program: u32, shader: u32)
+extern function aurora_gl_link_program(program: u32)
+extern function aurora_gl_use_program(program: u32)
+extern function aurora_gl_delete_shader(shader: u32)
+extern function aurora_gl_delete_program(program: u32)
+extern function aurora_gl_get_shader_iv(shader: u32, pname: u32) -> i32
+extern function aurora_gl_get_program_iv(program: u32, pname: u32) -> i32
+extern function aurora_gl_get_shader_info_log(shader: u32) -> cstring
+extern function aurora_gl_get_program_info_log(program: u32) -> cstring
+extern function aurora_gl_compile_program(vert_src: cstring, frag_src: cstring) -> u32
+extern function aurora_gl_free_string(s: pointer)
+
+## ── High-level shader ──
+function gl_compile_shader_from_source(source: cstring, shader_type):
+    shader = aurora_gl_create_shader(shader_type)
+    if shader == 0:
+        output("ERROR: glCreateShader failed")
+        return 0
+    end
+    aurora_gl_shader_source(shader, source)
+    aurora_gl_compile_shader(shader)
+    status = aurora_gl_get_shader_iv(shader, GL_COMPILE_STATUS)
+    if status != GL_TRUE:
+        log = aurora_gl_get_shader_info_log(shader)
+        output("ERROR: shader compile failed:")
+        output(log)
+        aurora_gl_free_string(log)
+        aurora_gl_delete_shader(shader)
+        return 0
+    end
+    return shader
+end
+
+function gl_link_program(vert_shader, frag_shader):
+    program = aurora_gl_create_program()
+    if program == 0:
+        output("ERROR: glCreateProgram failed")
+        return 0
+    end
+    aurora_gl_attach_shader(program, vert_shader)
+    aurora_gl_attach_shader(program, frag_shader)
+    aurora_gl_link_program(program)
+    status = aurora_gl_get_program_iv(program, GL_LINK_STATUS)
+    if status != GL_TRUE:
+        log = aurora_gl_get_program_info_log(program)
+        output("ERROR: program link failed:")
+        output(log)
+        aurora_gl_free_string(log)
+        aurora_gl_delete_program(program)
+        return 0
+    end
+    return program
+end
+
+## ── Simple 3D primitives ──
+function gl_draw_triangle():
+    glBegin(GL_TRIANGLES)
+    glVertex3f(0.0, 0.5, 0.0)
+    glVertex3f(-0.5, -0.5, 0.0)
+    glVertex3f(0.5, -0.5, 0.0)
+    glEnd()
+end
+
+function gl_draw_quad():
+    glBegin(GL_TRIANGLE_STRIP)
+    glVertex3f(-0.5, -0.5, 0.0)
+    glVertex3f(0.5, -0.5, 0.0)
+    glVertex3f(-0.5, 0.5, 0.0)
+    glVertex3f(0.5, 0.5, 0.0)
+    glEnd()
+end
+
+function gl_draw_colored_triangle():
+    glBegin(GL_TRIANGLES)
+    glColor3f(1.0, 0.0, 0.0)
+    glVertex3f(0.0, 0.5, 0.0)
+    glColor3f(0.0, 1.0, 0.0)
+    glVertex3f(-0.5, -0.5, 0.0)
+    glColor3f(0.0, 0.0, 1.0)
+    glVertex3f(0.5, -0.5, 0.0)
+    glEnd()
+end
+
+## ── Clear helpers ──
+function gl_clear(r, g, b, a):
+    glClearColor(r, g, b, a)
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+end
+
+function gl_clear_color(r, g, b):
+    gl_clear(r, g, b, 1.0)
+end
+
+## ── 3D cube (immediate mode) ──
+function gl_draw_cube(size):
+    s = size / 2
+    glBegin(GL_TRIANGLES)
+    ## Front face
+    glColor3f(1.0, 0.0, 0.0)
+    glVertex3f(-s, -s, s)
+ glVertex3f(s, -s, s)
+    glVertex3f(-s,  s, s)
+ glVertex3f( s, -s, s)
+    glVertex3f(s,  s, s)
+ glVertex3f(-s,  s, s)
+    ## Back face
+    glColor3f(0.0, 1.0, 0.0)
+    glVertex3f(-s, -s, -s)
+ glVertex3f(-s,  s, -s)
+    glVertex3f(s, -s, -s)
+ glVertex3f( s, -s, -s)
+    glVertex3f(-s,  s, -s)
+ glVertex3f(s,  s, -s)
+    ## Left face
+    glColor3f(0.0, 0.0, 1.0)
+    glVertex3f(-s, -s, -s)
+ glVertex3f(-s, -s,  s)
+    glVertex3f(-s,  s, -s)
+ glVertex3f(-s, -s,  s)
+    glVertex3f(-s,  s,  s)
+ glVertex3f(-s,  s, -s)
+    ## Right face
+    glColor3f(1.0, 1.0, 0.0)
+    glVertex3f( s, -s, -s)
+ glVertex3f( s,  s, -s)
+    glVertex3f( s, -s,  s)
+ glVertex3f( s, -s,  s)
+    glVertex3f( s,  s, -s)
+ glVertex3f( s,  s,  s)
+    ## Top face
+    glColor3f(1.0, 0.0, 1.0)
+    glVertex3f(-s,  s, -s)
+ glVertex3f(-s,  s,  s)
+    glVertex3f( s,  s, -s)
+ glVertex3f(-s,  s,  s)
+    glVertex3f( s,  s,  s)
+ glVertex3f( s,  s, -s)
+    ## Bottom face
+    glColor3f(0.0, 1.0, 1.0)
+    glVertex3f(-s, -s, -s)
+ glVertex3f( s, -s, -s)
+    glVertex3f(-s, -s,  s)
+ glVertex3f( s, -s, -s)
+    glVertex3f( s, -s,  s)
+ glVertex3f(-s, -s,  s)
+    glEnd()
+end
+
+## ── Immediate-mode helpers (OpenGL 1.x compatibility) ──
+function gl_begin_vertices(mode):
+    glBegin(mode)
+end
+
+function gl_end_vertices():
+    glEnd()
+end
+
+function gl_vertex(x, y, z):
+    glVertex3f(x, y, z)
+end
+
+function gl_color(r, g, b):
+    glColor3f(r, g, b)
+end

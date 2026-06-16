@@ -70,6 +70,11 @@ void Codegen::declare_runtime_helpers() {
         llvm::FunctionType::get(void_ty(), { i64_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_print_int", module_.get());
 
+    /* void aurora_coverage_trace(i8* file, i64 line) */
+    fn_coverage_trace_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_coverage_trace", module_.get());
+
     /* void aurora_print_str(i8* ptr) — prints AuroraStr* */
     fn_print_str_ = llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { i8ptr_ty() }, false),
@@ -79,6 +84,11 @@ void Codegen::declare_runtime_helpers() {
     fn_str_from_cstr_ = llvm::Function::Create(
         llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_str_from_cstr", module_.get());
+
+    /* i8* aurora_str_as_cstr(i8*) — get C string pointer from AuroraStr */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_str_as_cstr", module_.get());
 
     /* i8* aurora_str_new(i64) — allocate new AuroraStr with given capacity */
     fn_str_new_ = llvm::Function::Create(
@@ -353,14 +363,16 @@ void Codegen::declare_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(ptr, {}, false),
         llvm::Function::ExternalLinkage, "map_new", module_.get());
-    /* void map_set(i8*, i8*, i64) */
+    /* void map_set(i8*, i8*, i64) — second param is cstring */
     llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { ptr, ptr, i64_ty() }, false),
         llvm::Function::ExternalLinkage, "map_set", module_.get());
-    /* i64 map_get(i8*, i8*) */
+    extern_string_info_["map_set"] = { {1}, false, true };
+    /* i64 map_get(i8*, i8*) — second param is cstring */
     llvm::Function::Create(
         llvm::FunctionType::get(i64_ty(), { ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "map_get", module_.get());
+    extern_string_info_["map_get"] = { {1}, false, true };
     /* i32 map_has(i8*, i8*) */
     llvm::Function::Create(
         llvm::FunctionType::get(i32_ty, { ptr, ptr }, false),
@@ -369,6 +381,14 @@ void Codegen::declare_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { ptr }, false),
         llvm::Function::ExternalLinkage, "map_free", module_.get());
+    /* void map_copy(i8*, i8*) — copy all entries from src to dst */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "map_copy", module_.get());
+    /* i8* map_keys(i8*) — return list of string keys */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "map_keys", module_.get());
     /* i8* set_new() */
     llvm::Function::Create(
         llvm::FunctionType::get(ptr, {}, false),

@@ -79,8 +79,8 @@ jobs:
 
     - name: Run Aurora Language Tests
       run: |
-        if (Test-Path -LiteralPath ".\run_all_tests.ps1") {
-          .\run_all_tests.ps1
+        if (Test-Path -LiteralPath ".\scripts\run_all_tests.ps1") {
+          .\scripts\run_all_tests.ps1
         } else {
           Write-Host "  Skipping (run_all_tests.ps1 not found)"
         }
@@ -252,7 +252,7 @@ JSValue hello_world() {
                    JS_UNDEFINED,0,NULL);
 }
 CEOF
-        qjs_dir="${{ github.workspace }}/quickjs"
+        qjs_dir="${{ github.workspace }}/deps/quickjs"
         gcc -shared -fPIC -o /tmp/test_bridge.so /tmp/test_bridge.c \
             "$qjs_dir/quickjs.c" "$qjs_dir/cutils.c" \
             "$qjs_dir/libregexp.c" "$qjs_dir/libunicode.c" "$qjs_dir/dtoa.c" \
@@ -351,7 +351,7 @@ JSValue hello_world() {
                    JS_UNDEFINED,0,NULL);
 }
 CEOF
-        qjs_dir="${{ github.workspace }}/quickjs"
+        qjs_dir="${{ github.workspace }}/deps/quickjs"
         gcc -shared -fPIC -o /tmp/test_bridge.so /tmp/test_bridge.c \
             "$qjs_dir/quickjs.c" "$qjs_dir/cutils.c" \
             "$qjs_dir/libregexp.c" "$qjs_dir/libunicode.c" "$qjs_dir/dtoa.c" \

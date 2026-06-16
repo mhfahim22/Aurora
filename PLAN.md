@@ -1,6 +1,6 @@
 # Production Readiness Plan — Remaining Work
 
-> ✅ Phases 1–7 (GIL, Memory Leaks, Real-World Testing, QuickJS Compatibility, Error Handling, Exports Map, Performance, CI/CD) are all **completed**, plus Phase 6 (AI/ML functional builtins). See git history for details.
+> ✅ All phases 1–10 are **completed**. This includes Phases 1–7 (GIL, Memory Leaks, Real-World Testing, QuickJS, Error Handling, Exports Map, Performance, CI/CD); Phase 6 (AI/ML); Phase 5 (3D Graphics via OpenGL + GLFW); and Phases 8–10 (Testing, Documentation, Package Ecosystem). See git history for details.
 >
 > Below is only what **still needs to be done**, renumbered from Phase 1.
 

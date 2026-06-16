@@ -126,7 +126,10 @@ llvm::Value* Codegen::gen_var(const ASTNode* node) {
 
     /* Load with the actual allocated type */
     auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
-    llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
+    auto* global_var = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr);
+    llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType()
+                         : global_var ? global_var->getValueType()
+                         : i64_ty();
     return builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->value);
 }
 
@@ -307,7 +310,12 @@ llvm::Value* Codegen::gen_unary(const ASTNode* node) {
             return builder_->CreateFNeg(val, "neg");
         return builder_->CreateNeg(val, "neg", false, true);
     }
-    if (node->value == "not") return builder_->CreateNot(val, "not");
+    if (node->value == "not") {
+        if (val->getType()->isIntegerTy(1))
+            return builder_->CreateNot(val, "not");
+        auto* is_zero = builder_->CreateICmpEQ(val, i64(0), "not");
+        return builder_->CreateZExt(is_zero, i64_ty(), "not_ext");
+    }
     return val;
 }
 
@@ -322,9 +330,16 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         } else if (arg->type == NodeType::Var) {
             VarRecord* rec = lookup_var(arg->value);
             if (rec && rec->is_string) {
-                auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
-                llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType() : i8ptr_ty();
+                llvm::Type* alloc_ty = [&]() -> llvm::Type* {
+                    if (auto* ai = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr))
+                        return ai->getAllocatedType();
+                    if (auto* gv = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr))
+                        return gv->getValueType();
+                    return i8ptr_ty();
+                }();
                 llvm::Value* val = builder_->CreateLoad(alloc_ty, rec->alloca_ptr, arg->value);
+                if (alloc_ty->isIntegerTy())
+                    val = builder_->CreateIntToPtr(val, i8ptr_ty(), arg->value + "_str");
                 builder_->CreateCall(fn_print_str_, { val });
             } else {
                 llvm::Value* val = gen_expr(arg);
@@ -534,12 +549,17 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
     /* ── panic(msg) — halt with message ── */
     if (node->value == "panic") {
         auto* fn_panic = module_->getFunction("aurora_panic");
+        auto* fn_as_cstr = module_->getFunction("aurora_str_as_cstr");
         if (fn_panic) {
             llvm::Value* msg = i64(0);
             if (node->args) {
                 msg = gen_expr(node->args.get());
-                if (msg && !msg->getType()->isPointerTy())
-                    msg = builder_->CreateIntToPtr(msg, i8ptr_ty(), "panic_msg");
+                if (msg) {
+                    if (!msg->getType()->isPointerTy())
+                        msg = builder_->CreateIntToPtr(msg, i8ptr_ty(), "panic_msg");
+                    else if (fn_as_cstr)
+                        msg = builder_->CreateCall(fn_as_cstr, { msg }, "panic_cstr");
+                }
             }
             builder_->CreateCall(fn_panic, { msg ? msg : i64(0) });
         }
@@ -979,8 +999,22 @@ llvm::Value* Codegen::gen_struct_literal(const ASTNode* node) {
 llvm::Value* Codegen::gen_closure_call(const ASTNode* node, VarRecord* rec) {
     auto* closure_ty = llvm::StructType::get(ctx_, { i8ptr_ty(), i8ptr_ty() }, false);
 
-    /* Load closure struct (the alloca is the closure itself) */
+    /* Load the closure value and normalise to a {ptr, ptr}* pointer.
+       When the closure is stored locally as a struct (AllocaInst of
+       closure_ty), use the alloca pointer directly. When it comes from
+       a function return (i64 boxed pointer), load + inttoptr. */
     llvm::Value* closure_ptr = rec->alloca_ptr;
+    if (auto* ai = llvm::dyn_cast<llvm::AllocaInst>(closure_ptr)) {
+        if (ai->getAllocatedType() != closure_ty) {
+            /* Boxed pointer storage: load i64 then inttoptr */
+            llvm::Value* boxed = builder_->CreateLoad(i64_ty(), closure_ptr, node->value + "_boxed");
+            closure_ptr = builder_->CreateIntToPtr(boxed, llvm::PointerType::get(closure_ty, 0), node->value + "_closure_ptr");
+        }
+    } else {
+        /* Not an alloca — assume boxed pointer (e.g. GlobalVariable or fn arg) */
+        llvm::Value* boxed = builder_->CreateLoad(i64_ty(), closure_ptr, node->value + "_boxed");
+        closure_ptr = builder_->CreateIntToPtr(boxed, llvm::PointerType::get(closure_ty, 0), node->value + "_closure_ptr");
+    }
 
     /* Extract function pointer */
     auto* fn_ptr_gep = builder_->CreateStructGEP(closure_ty, closure_ptr, 0, "cfn_ptr");
@@ -1010,6 +1044,7 @@ llvm::Value* Codegen::gen_closure_call(const ASTNode* node, VarRecord* rec) {
     auto* fn_call_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
 
     llvm::CallInst* call = builder_->CreateCall(fn_call_type, fn_ptr, args, "closure_call");
+    call->setTailCallKind(llvm::CallInst::TCK_NoTail);
     llvm::Value* result = call;
     if (result->getType()->isPointerTy())
         result = builder_->CreatePtrToInt(result, i64_ty(), "closure_ret");
@@ -1037,6 +1072,7 @@ llvm::Value* Codegen::gen_fnptr_call(const ASTNode* node, VarRecord* rec) {
     auto* fn_call_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
 
     llvm::CallInst* call = builder_->CreateCall(fn_call_type, fn_ptr, args, node->value + "_call");
+    call->setTailCallKind(llvm::CallInst::TCK_NoTail);
     llvm::Value* result = call;
     if (result->getType()->isPointerTy())
         result = builder_->CreatePtrToInt(result, i64_ty(), node->value + "_ret");

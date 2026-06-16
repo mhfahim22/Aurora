@@ -1,0 +1,328 @@
+## ════════════════════════════════════════════════════════════
+## Aurora ORM / Query Builder
+## Usage: import "orm"  or  import libc:orm
+##
+##   users = table_new(db, "users")
+##   q = query_select(users, ["id", "name"])
+##   q = query_join(q, "posts", "users.id = posts.user_id", "INNER")
+##   q = query_where(q, "age > ?", [18])
+##   q = query_group_by(q, "users.id")
+##   q = query_having(q, "count(*) > 5")
+##   q = query_order(q, "name")
+##   q = query_limit(q, 10)
+##   rows = query_execute(q)
+##
+##   query_insert(db, "users", ["name", "age"], ["Alice", 30])
+##   query_update(db, "users", ["name"], ["Bob"], "id = ?")
+##   query_delete(db, "users", "id = ?", [42])
+## ════════════════════════════════════════════════════════════
+
+import "string"
+import "collections"
+import "database"
+
+## ── Table ──
+function table_new(db, name)
+    t = map()
+    map_set(t, "db", db)
+    map_set(t, "name", name)
+    return t
+end
+
+## ── Query Builder: SELECT ──
+
+## Create a SELECT query
+function query_select(tbl, cols)
+    q = map()
+    map_set(q, "type", "select")
+    map_set(q, "table", tbl)
+    map_set(q, "columns", cols)
+    map_set(q, "conditions", map())
+    q.params = []
+    map_set(q, "order_col", "")
+    map_set(q, "order_dir", "")
+    map_set(q, "limit_val", -1)
+    map_set(q, "offset_val", -1)
+    map_set(q, "joins", [])
+    map_set(q, "group_by", "")
+    map_set(q, "having", "")
+    return q
+end
+
+## Add WHERE clause
+function query_where(q, condition, params)
+    if condition != ""
+        map_set(q.conditions, "where", condition)
+        q.params = params
+    end
+    return q
+end
+
+## Add AND WHERE
+function query_and_where(q, condition, params)
+    if condition != ""
+        if map_has(q.conditions, "where")
+            prev = map_get(q.conditions, "where")
+            map_set(q.conditions, "where", strcat(prev, " AND "))
+            map_set(q.conditions, "where", strcat(map_get(q.conditions, "where"), condition))
+        else
+            map_set(q.conditions, "where", condition)
+        end
+        q.params = params
+    end
+    return q
+end
+
+## Add OR WHERE
+function query_or_where(q, condition, params)
+    if condition != ""
+        if map_has(q.conditions, "where")
+            prev = map_get(q.conditions, "where")
+            map_set(q.conditions, "where", strcat(prev, " OR "))
+            map_set(q.conditions, "where", strcat(map_get(q.conditions, "where"), condition))
+        else
+            map_set(q.conditions, "where", condition)
+        end
+        q.params = params
+    end
+    return q
+end
+
+## Add JOIN clause
+## join_type: "INNER", "LEFT", "RIGHT" (or empty for INNER)
+function query_join(q, table_name, on_condition, join_type)
+    j = map()
+    map_set(j, "table", table_name)
+    map_set(j, "on", on_condition)
+    if join_type == ""
+        join_type = "INNER"
+    end
+    map_set(j, "type", join_type)
+    list_push(q.joins, j)
+    return q
+end
+
+## Shorthand: INNER JOIN
+function query_inner_join(q, table_name, on_condition)
+    return query_join(q, table_name, on_condition, "INNER")
+end
+
+## Shorthand: LEFT JOIN
+function query_left_join(q, table_name, on_condition)
+    return query_join(q, table_name, on_condition, "LEFT")
+end
+
+## Shorthand: RIGHT JOIN
+function query_right_join(q, table_name, on_condition)
+    return query_join(q, table_name, on_condition, "RIGHT")
+end
+
+## Add ORDER BY
+function query_order(q, col)
+    map_set(q, "order_col", col)
+    return q
+end
+
+## Add ORDER BY DESC
+function query_order_desc(q, col)
+    map_set(q, "order_col", col)
+    map_set(q, "order_dir", "DESC")
+    return q
+end
+
+## Add GROUP BY
+function query_group_by(q, cols)
+    map_set(q, "group_by", cols)
+    return q
+end
+
+## Add HAVING
+function query_having(q, condition)
+    map_set(q, "having", condition)
+    return q
+end
+
+## Add LIMIT
+function query_limit(q, limit_val)
+    map_set(q, "limit_val", limit_val)
+    return q
+end
+
+## Add OFFSET
+function query_offset(q, offset_val)
+    map_set(q, "offset_val", offset_val)
+    return q
+end
+
+## Helper: build comma-separated list from an array
+function build_column_list(cols, default)
+    if cols == "*"
+        return "*"
+    end
+    n = list_len(cols)
+    if n == 0
+        return default
+    end
+    result = ""
+    i = 0
+    loop
+        if i >= n
+            break
+        end
+        if i > 0
+            result = strcat(result, ", ")
+        end
+        result = strcat(result, list_get(cols, i))
+        i = i + 1
+    end
+    return result
+end
+
+## Build and execute the SELECT query
+function query_execute(q)
+    sql = "SELECT "
+    cols = q.columns
+    sql = strcat(sql, build_column_list(cols, "*"))
+    sql = strcat(sql, " FROM ")
+    tbl = q.table
+    sql = strcat(sql, map_get(tbl, "name"))
+    ## JOIN clauses
+    joins = q.joins
+    n_joins = list_len(joins)
+    if n_joins > 0
+        i = 0
+        loop
+            if i >= n_joins
+                break
+            end
+            j = list_get(joins, i)
+            sql = strcat(sql, " ")
+            sql = strcat(sql, map_get(j, "type"))
+            sql = strcat(sql, " JOIN ")
+            sql = strcat(sql, map_get(j, "table"))
+            sql = strcat(sql, " ON ")
+            sql = strcat(sql, map_get(j, "on"))
+            i = i + 1
+        end
+    end
+    ## WHERE
+    if map_has(q.conditions, "where")
+        sql = strcat(sql, " WHERE ")
+        sql = strcat(sql, map_get(q.conditions, "where"))
+    end
+    ## GROUP BY
+    gb = q.group_by
+    if gb != ""
+        sql = strcat(sql, " GROUP BY ")
+        sql = strcat(sql, gb)
+    end
+    ## HAVING
+    hv = q.having
+    if hv != ""
+        sql = strcat(sql, " HAVING ")
+        sql = strcat(sql, hv)
+    end
+    ## ORDER BY
+    oc = q.order_col
+    if oc != ""
+        sql = strcat(sql, " ORDER BY ")
+        sql = strcat(sql, oc)
+        od = q.order_dir
+        if od != ""
+            sql = strcat(sql, " ")
+            sql = strcat(sql, od)
+        end
+    end
+    ## LIMIT
+    lv = q.limit_val
+    if lv >= 0
+        sql = strcat(sql, " LIMIT ")
+        sql = strcat(sql, str(lv))
+    end
+    ## OFFSET
+    ov = q.offset_val
+    if ov >= 0
+        sql = strcat(sql, " OFFSET ")
+        sql = strcat(sql, str(ov))
+    end
+    return db_query(map_get(tbl, "db"), sql)
+end
+
+## ── INSERT ──
+
+## Insert a row and return affected rows count
+##   cols: list of column names
+##   vals: list of values
+function query_insert(db, table_name, cols, vals)
+    sql = "INSERT INTO "
+    sql = strcat(sql, table_name)
+    sql = strcat(sql, " (")
+    i = 0
+    n = list_len(cols)
+    loop
+        if i >= n
+            break
+        end
+        if i > 0
+            sql = strcat(sql, ", ")
+        end
+        sql = strcat(sql, list_get(cols, i))
+        i = i + 1
+    end
+    sql = strcat(sql, ") VALUES (")
+    i = 0
+    loop
+        if i >= n
+            break
+        end
+        if i > 0
+            sql = strcat(sql, ", ")
+        end
+        sql = strcat(sql, "?")
+        i = i + 1
+    end
+    sql = strcat(sql, ")")
+    return db_execute(db, sql)
+end
+
+## ── UPDATE ──
+
+## Update rows matching a condition
+##   cols: list of column names to set
+##   vals: list of values (same length as cols)
+function query_update(db, table_name, cols, vals, condition)
+    sql = "UPDATE "
+    sql = strcat(sql, table_name)
+    sql = strcat(sql, " SET ")
+    i = 0
+    n = list_len(cols)
+    loop
+        if i >= n
+            break
+        end
+        if i > 0
+            sql = strcat(sql, ", ")
+        end
+        sql = strcat(sql, list_get(cols, i))
+        sql = strcat(sql, " = ?")
+        i = i + 1
+    end
+    if condition != ""
+        sql = strcat(sql, " WHERE ")
+        sql = strcat(sql, condition)
+    end
+    return db_execute(db, sql)
+end
+
+## ── DELETE ──
+
+## Delete rows matching a condition
+function query_delete(db, table_name, condition, params)
+    sql = "DELETE FROM "
+    sql = strcat(sql, table_name)
+    if condition != ""
+        sql = strcat(sql, " WHERE ")
+        sql = strcat(sql, condition)
+    end
+    return db_execute(db, sql)
+end

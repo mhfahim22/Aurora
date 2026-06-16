@@ -1,0 +1,53 @@
+## OpenGL Demo: Rotating 3D Cube (compat mode)
+## Requires: glfw3.dll in PATH or project directory
+
+import "glfw"
+import "opengl"
+import "gl"
+
+glfwInit()
+glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0)
+glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE)
+
+window = glfwCreateWindow(800, 600, "Aurora 3D Cube", null, null)
+if window == null:
+    output("ERROR: glfwCreateWindow failed")
+    glfwTerminate()
+    return
+end
+
+glfwMakeContextCurrent(window)
+glfwSwapInterval(1)
+
+glEnable(GL_DEPTH_TEST)
+
+## Projection
+glMatrixMode(GL_PROJECTION)
+glLoadIdentity()
+glFrustum(-1.0, 1.0, -0.75, 0.75, 1.0, 10.0)
+glMatrixMode(GL_MODELVIEW)
+
+start_time = glfwGetTime()
+
+while glfwWindowShouldClose(window) == 0:
+    angle = (glfwGetTime() - start_time) * 50.0
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+    glLoadIdentity()
+    glTranslatef(0.0, 0.0, -3.0)
+    glRotatef(angle, 1.0, 1.0, 0.0)
+
+    gl_draw_cube(1.0)
+
+    glfwSwapBuffers(window)
+    glfwPollEvents()
+
+    if glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS:
+        glfwSetWindowShouldClose(window, GLFW_TRUE)
+    end
+end
+
+glfwDestroyWindow(window)
+glfwTerminate()

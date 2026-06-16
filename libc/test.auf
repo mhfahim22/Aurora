@@ -1,0 +1,264 @@
+import "string"
+import "collections"
+
+function assert_true(val)
+    if not val
+        panic "assert_true failed"
+    end
+end
+
+function assert_false(val)
+    if val
+        panic "assert_false failed"
+    end
+end
+
+function assert_equal(actual, expected)
+    if actual != expected
+        msg = strcat("assert_equal failed: ", str(actual))
+        msg = strcat(msg, " != ")
+        msg = strcat(msg, str(expected))
+        panic msg
+    end
+end
+
+function assert_not_equal(a, b)
+    if a == b
+        msg = strcat("assert_not_equal failed: ", str(a))
+        msg = strcat(msg, " == ")
+        msg = strcat(msg, str(b))
+        panic msg
+    end
+end
+
+function assert_greater(a, b)
+    if a <= b
+        panic "assert_greater failed"
+    end
+end
+
+function assert_less(a, b)
+    if a >= b
+        panic "assert_less failed"
+    end
+end
+
+function assert_contains(haystack, needle)
+    if has(haystack, needle) == 0
+        msg = strcat("assert_contains failed: ", str(needle))
+        msg = strcat(msg, " not found in ")
+        msg = strcat(msg, str(haystack))
+        panic msg
+    end
+end
+
+function assert_not_contains(haystack, needle)
+    if has(haystack, needle) != 0
+        msg = strcat("assert_not_contains failed: ", str(needle))
+        msg = strcat(msg, " found in ")
+        msg = strcat(msg, str(haystack))
+        panic msg
+    end
+end
+
+function assert_near(actual, expected, epsilon)
+    diff = actual - expected
+    if diff < 0
+        diff = -diff
+    end
+    if diff > epsilon
+        msg = strcat("assert_near failed: |", str(actual))
+        msg = strcat(msg, " - ")
+        msg = strcat(msg, str(expected))
+        msg = strcat(msg, "| > ")
+        msg = strcat(msg, str(epsilon))
+        panic msg
+    end
+end
+
+function assert_null(val)
+    if val != 0
+        panic "assert_null failed: value is not null"
+    end
+end
+
+function assert_not_null(val)
+    if val == 0
+        panic "assert_not_null failed: value is null"
+    end
+end
+
+function assert_match(str_val, pattern)
+    if has(str_val, pattern) == 0
+        msg = strcat("assert_match failed: '", str(str_val))
+        msg = strcat(msg, "' does not contain '")
+        msg = strcat(msg, str(pattern))
+        msg = strcat(msg, "'")
+        panic msg
+    end
+end
+
+function assert_throws(fn)
+    did_throw = 0
+    try:
+        fn()
+    catch e:
+        did_throw = 1
+    end
+    if did_throw == 0
+        panic "assert_throws failed: function did not throw"
+    end
+end
+
+_tests_total = 0
+_tests_pass = 0
+_tests_fail = 0
+_tests_group = ""
+_setup_fn = 0
+_teardown_fn = 0
+_test_filter_pattern = ""
+
+function test_setup(fn)
+    _setup_fn = fn
+end
+
+function test_teardown(fn)
+    _teardown_fn = fn
+end
+
+function test_filter(pattern)
+    _test_filter_pattern = pattern
+end
+
+function test_begin(name)
+    _tests_group = name
+    _tests_total = 0
+    _tests_pass = 0
+    _tests_fail = 0
+    output(strcat("=== ", name))
+end
+
+function test_pass(msg)
+    _tests_pass = _tests_pass + 1
+    _tests_total = _tests_total + 1
+    output(strcat("  PASS: ", msg))
+end
+
+function test_fail(msg)
+    _tests_fail = _tests_fail + 1
+    _tests_total = _tests_total + 1
+    output(strcat("  FAIL: ", msg))
+end
+
+function test_report()
+    output("---")
+    output(strcat("Passed: ", str(_tests_pass)))
+    output(strcat("Failed: ", str(_tests_fail)))
+    output(strcat("Total:  ", str(_tests_total)))
+end
+
+function _matches_filter(name)
+    if _test_filter_pattern == ""
+        return 1
+    end
+    if has(name, _test_filter_pattern) == 0
+        return 0
+    end
+    return 1
+end
+
+function test_run(fn, name)
+    if _matches_filter(name) == 0
+        return
+    end
+    if _setup_fn != 0
+        try:
+            _setup_fn()
+        catch e:
+            test_fail(strcat(strcat(name, " "), "setup failed"))
+            return
+        end
+    end
+    ok = 1
+    errmsg = ""
+    start = now()
+    try:
+        fn()
+    catch e:
+        ok = 0
+        errmsg = str(e)
+    end
+    elapsed = now() - start
+    if _teardown_fn != 0
+        try:
+            _teardown_fn()
+        catch e:
+            test_fail(strcat(strcat(name, " "), "teardown failed"))
+            return
+        end
+    end
+    if ok != 0
+        label = strcat(strcat(strcat(name, " ("), str(elapsed)), "ms)")
+        test_pass(label)
+    else
+        label = strcat(strcat(strcat(strcat(name, ": "), errmsg), " ("), str(elapsed))
+        label = strcat(label, "ms)")
+        test_fail(label)
+    end
+end
+
+function test_cases(cases, fn)
+    i = 0
+    n = list_len(cases)
+    loop
+        if i >= n
+            break
+        end
+        c = list_get(cases, i)
+        name = strcat("case ", str(i))
+        if map_has(c, "name") != 0
+            name = map_get(c, "name")
+        end
+        if _matches_filter(name) == 0
+            i = i + 1
+            continue
+        end
+        if _setup_fn != 0
+            try:
+                _setup_fn()
+            catch e:
+                test_fail(strcat(strcat(name, " "), "setup failed"))
+                i = i + 1
+                continue
+            end
+        end
+        ok = 1
+        errmsg = ""
+        start = now()
+        try:
+            fn(c)
+        catch e:
+            ok = 0
+            errmsg = str(e)
+        end
+        elapsed = now() - start
+        if _teardown_fn != 0
+            try:
+                _teardown_fn()
+            catch e:
+                test_fail(strcat(strcat(name, " "), "teardown failed"))
+                i = i + 1
+                continue
+            end
+        end
+        if ok != 0
+            label = strcat(strcat(strcat(name, " ("), str(elapsed)), "ms)")
+            test_pass(label)
+        else
+            label = strcat(strcat(strcat(strcat(name, ": "), errmsg), " ("), str(elapsed))
+            label = strcat(label, "ms)")
+            test_fail(label)
+        end
+        i = i + 1
+    end
+end

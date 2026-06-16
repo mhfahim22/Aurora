@@ -954,7 +954,7 @@ int64_t builtin_search(const void* query_a) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   AI builtins (stubs - return info messages)
+   AI builtins — chat via active model
    ════════════════════════════════════════════════════════════ */
 
 char* chat(const void* msg_a) {

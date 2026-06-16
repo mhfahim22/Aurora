@@ -1,4 +1,5 @@
 #include "../../include/tools/lsp.hpp"
+#include "compiler/keywords.hpp"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -20,423 +21,151 @@ static void add_diag(std::vector<LspDiagnostic>& diags, int line, int col_start,
     diags.push_back(d);
 }
 
-std::vector<LspDiagnostic> LspServer::analyze(const std::string& text) {
+/* ════════════════════════════════════════════════════════════
+   AST-walking diagnostics
+   ════════════════════════════════════════════════════════════ */
+
+std::vector<LspDiagnostic> LspServer::analyze(DocumentState& doc) {
     std::vector<LspDiagnostic> diags;
-    std::istringstream stream(text);
-    std::string line;
-    int line_num = 0;
-    std::vector<std::string> lines;
+    const auto& lines = doc.lines;
 
-    /* Collect all lines first for multi-line analysis */
-    {
-        std::string l;
-        std::istringstream s(text);
-        while (std::getline(s, l)) lines.push_back(l);
-    }
+    if (lines.empty()) return diags;
 
-    /* ── Pass 1: collect declarations, definitions, and uses ── */
-    std::set<int> class_lines;
-    std::set<int> func_lines;
-    std::map<std::string, int> var_defs;
-    std::map<std::string, int> var_uses;
-    std::set<std::string> vars_all;
-
-    std::regex func_def_re(R"(^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\()");
-    std::regex class_def_re(R"(^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*))");
-    std::regex var_def_re(R"(^\s*(?:let\s+|var\s+|const\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::\s*\w+)?\s*=[^=])");
-    std::regex var_use_re(R"(\b([a-zA-Z_][a-zA-Z0-9_]*)\b)");
-    std::regex return_re(R"(\breturn\b)");
-    std::regex string_lit_re(R"("(?:[^"\\]|\\.)*")");
-    std::regex int_lit_re(R"(\b\d+\b)");
-    std::regex output_re(R"(\boutput\s*\()");
-
-    for (size_t i = 0; i < lines.size(); i++) {
-        const std::string& ln = lines[i];
+    /* ── Report parse errors from the real parser ── */
+    if (!doc.parseError.empty()) {
+        std::regex err_line_re(R"(line (\d+))");
         std::smatch m;
-
-        if (std::regex_search(ln, m, func_def_re)) {
-            func_lines.insert((int)i);
+        int err_line = 0;
+        if (std::regex_search(doc.parseError, m, err_line_re)) {
+            err_line = std::stoi(m[1]) - 1;
         }
-        if (std::regex_search(ln, m, class_def_re)) {
-            class_lines.insert((int)i);
-        }
-        if (std::regex_search(ln, m, var_def_re)) {
-            std::string vname = m[1];
-            var_defs[vname] = (int)i;
-            vars_all.insert(vname);
-        }
-
-        auto start = ln.cbegin();
-        while (std::regex_search(start, ln.cend(), m, var_use_re)) {
-            std::string w = m[1];
-            static const std::set<std::string> keywords = {
-                "function", "return", "if", "else", "elseif", "while", "for", "loop",
-                "break", "continue", "match", "case", "default", "switch",
-                "class", "extends", "implements", "interface", "enum", "struct",
-                "public", "private", "protected", "static", "final", "abstract",
-                "try", "catch", "finally", "throw", "panic", "ensure",
-                "import", "from", "namespace", "module", "package", "extern",
-                "async", "await", "spawn", "parallel", "thread",
-                "true", "false", "null", "and", "or", "not",
-                "new", "self", "super", "lambda", "type",
-                "output", "debug", "log", "pass",
-                "move", "copy", "shared", "weak", "borrow", "drop", "delete",
-                "safe", "unsafe", "const", "mutable", "reference", "pointer",
-                "event", "signal", "emit", "callback",
-                "scene", "entity", "sprite", "camera", "physics",
-                "component", "render", "state", "properties",
-                "server", "api", "route", "middleware",
-                "ai", "tensor", "train", "predict",
-                "int", "float", "string", "bool", "void", "list", "map", "set", "array", "json",
-                "let", "var"
-            };
-            if (keywords.find(w) == keywords.end()) {
-                if (var_defs.find(w) == var_defs.end()) {
-                }
-                var_uses[w] = (int)i;
-                vars_all.insert(w);
-            }
-            start = m[0].second;
-        }
+        add_diag(diags, err_line, 0, err_line < (int)lines.size() ? (int)lines[err_line].tokens.size() : 1, 1, doc.parseError, "aurorac");
     }
 
-    /* ── Run aurorac parse-only check if available ── */
-    {
-        std::string aurorac_cmd;
-#ifdef _WIN32
-        aurorac_cmd = "where aurorac.exe >nul 2>nul && (echo AURORAC_AVAILABLE) || (echo AURORAC_NOT_FOUND)";
-#else
-        aurorac_cmd = "which aurorac >/dev/null 2>&1 && echo AURORAC_AVAILABLE || echo AURORAC_NOT_FOUND";
-#endif
-        std::string check_result;
-#ifdef _WIN32
-        FILE* pipe = _popen(aurorac_cmd.c_str(), "r");
-#else
-        FILE* pipe = popen(aurorac_cmd.c_str(), "r");
-#endif
-        if (pipe) {
-            char buf[128];
-            while (fgets(buf, sizeof(buf), pipe)) check_result += buf;
-#ifdef _WIN32
-            _pclose(pipe);
-#else
-            pclose(pipe);
-#endif
-        }
-        if (check_result.find("AURORAC_AVAILABLE") != std::string::npos) {
-            std::string tmpfile = ".aura_lsp_tmp.aura";
-            {
-                std::ofstream tmp(tmpfile);
-                tmp << text;
+    /* ── Use the real AST for semantic analysis ── */
+    if (doc.ast) {
+        std::set<std::string> defined_funcs;
+        std::set<std::string> defined_classes;
+        std::map<std::string, int> defined_vars;
+        std::map<std::string, int> used_vars;
+        bool in_function = false;
+        int func_start_line = -1;
+        std::string func_name;
+        bool has_return = false;
+
+        walk_ast(doc.ast.get(), [&](ASTNode* n) {
+            if (n->type == NodeType::Function) {
+                defined_funcs.insert(n->value);
+                if (in_function) {
+                    add_diag(diags, func_start_line, 0, 1, 1, "Missing 'end function' for '" + func_name + "'", "aurora-lint");
+                }
+                in_function = true;
+                func_start_line = n->src_line;
+                func_name = n->value;
+                has_return = false;
             }
-            std::string parse_cmd = "aurorac --parse-only \"" + tmpfile + "\" 2>&1 || aurorac -fsyntax-only \"" + tmpfile + "\" 2>&1";
-            std::string parse_out;
-#ifdef _WIN32
-            FILE* p2 = _popen(parse_cmd.c_str(), "r");
-#else
-            FILE* p2 = popen(parse_cmd.c_str(), "r");
-#endif
-            if (p2) {
-                char buf[4096];
-                while (fgets(buf, sizeof(buf), p2)) parse_out += buf;
-#ifdef _WIN32
-                _pclose(p2);
-#else
-                pclose(p2);
-#endif
+            if (n->type == NodeType::Return) {
+                has_return = true;
             }
-            if (!parse_out.empty()) {
-                std::regex err_re(R"((\d+):(\d+):\s*(.*)|error:\s*(.*)|Error:\s*(.*))");
-                std::smatch em;
-                std::istringstream err_stream(parse_out);
-                std::string err_line;
-                while (std::getline(err_stream, err_line)) {
-                    if (std::regex_search(err_line, em, err_re)) {
-                        int err_line_num = 0;
-                        if (em[1].matched) err_line_num = std::stoi(em[1]) - 1;
-                        std::string msg = em[3].matched ? em[3].str() : (em[4].matched ? em[4].str() : em[5].str());
-                        add_diag(diags, err_line_num, 0, err_line_num < (int)lines.size() ? (int)lines[err_line_num].length() : 1, 1, msg, "aurorac");
-                    } else if (!err_line.empty()) {
-                        add_diag(diags, 0, 0, lines.empty() ? 1 : (int)lines[0].length(), 2, err_line, "aurorac");
+            if (n->type == NodeType::Class) {
+                defined_classes.insert(n->value);
+            }
+        });
+
+        /* Check for unused variables using the AST */
+        walk_ast(doc.ast.get(), [&](ASTNode* n) {
+            if (n->type == NodeType::Var && n->src_line > 0) {
+                std::string vname = n->value;
+                const auto& keywords = aurora_keywords();
+                if (keywords.find(vname) == keywords.end() && !vname.empty()) {
+                    if (defined_vars.find(vname) == defined_vars.end()) {
+                        defined_vars[vname] = n->src_line;
                     }
                 }
             }
-            std::remove(tmpfile.c_str());
+        });
+
+        /* Collect var uses */
+        walk_ast(doc.ast.get(), [&](ASTNode* n) {
+            if (n->type == NodeType::Var && n->src_line > 0) {
+                std::string vname = n->value;
+                const auto& keywords = aurora_keywords();
+                if (keywords.find(vname) == keywords.end() && !vname.empty()) {
+                    used_vars[vname] = n->src_line;
+                }
+            }
+        });
+
+        /* Report unused variables */
+        for (auto& [vname, def_line] : defined_vars) {
+            if (used_vars.find(vname) == used_vars.end() || used_vars[vname] == def_line) {
+                add_diag(diags, def_line - 1, 0, 1, 3, "Unused variable '" + vname + "'", "aurora-lint");
+            }
         }
     }
 
-    /* ── Pass 2: line-by-line checks + multi-line structural checks ── */
+    /* ── Lexer-based structural checks ── */
     bool in_class = false;
     int class_start_line = -1;
-    bool in_function = false;
-    int func_start_line = -1;
-    bool has_return = false;
-    bool non_void_func = false;
+    bool in_fn = false;
+    int fn_start_line = -1;
 
     for (size_t i = 0; i < lines.size(); i++) {
-        const std::string& ln = lines[i];
-        std::smatch m;
+        const auto& ll = lines[i];
+        const auto& toks = ll.tokens;
+        if (toks.empty()) continue;
 
-        /* ── Unbalanced braces per line ── */
+        /* Check brace balance per line */
         int open_br = 0, close_br = 0;
-        for (char c : ln) {
-            if (c == '{') open_br++;
-            if (c == '}') close_br++;
+        for (auto& t : toks) {
+            if (t.is_operator('{')) open_br++;
+            if (t.is_operator('}')) close_br++;
         }
 
-        /* ── Extra space checks ── */
-        if (ln.find("( ") != std::string::npos) {
-            add_diag(diags, (int)i, 0, (int)ln.length(), 3, "Extra space after '('", "aurora-lint");
-        }
-        if (ln.find(" )") != std::string::npos && ln.find("()") == std::string::npos) {
-            add_diag(diags, (int)i, 0, (int)ln.length(), 3, "Extra space before ')'", "aurora-lint");
-        }
-
-        /* ── Track function bodies for missing end function ── */
-        if (std::regex_search(ln, m, func_def_re)) {
-            if (in_function) {
-                add_diag(diags, func_start_line, 0, (int)lines[func_start_line].length(), 1, "Missing 'end function' for previous function", "aurora-lint");
+        /* Track function/class structure from lexed tokens */
+        if (toks.size() >= 2 && toks[0].is_keyword("function") && toks[1].is_identifier()) {
+            if (in_fn) {
+                add_diag(diags, fn_start_line, 0, 1, 1, "Missing 'end function' for previous function", "aurora-lint");
             }
-            in_function = true;
-            func_start_line = (int)i;
-            has_return = false;
-            non_void_func = ln.find(": void") == std::string::npos && ln.find("):") != std::string::npos;
+            in_fn = true;
+            fn_start_line = (int)i;
         }
-        if (in_function && ln.find("end function") != std::string::npos) {
-            if (!has_return && non_void_func) {
-                add_diag(diags, func_start_line, 0, (int)lines[func_start_line].length(), 2, "Function may be missing a 'return' statement", "aurora-lint");
+        if (in_fn) {
+            bool found_end = false;
+            for (auto& t : toks) {
+                if (t.is_keyword("end")) { found_end = true; break; }
             }
-            in_function = false;
-            func_start_line = -1;
-            non_void_func = false;
-        }
-        if (std::regex_search(ln, m, return_re)) {
-            has_return = true;
+            if (found_end) in_fn = false;
         }
 
-        /* ── Track class bodies for missing end class ── */
-        if (std::regex_search(ln, m, class_def_re)) {
+        if (toks.size() >= 2 && toks[0].is_keyword("class") && toks[1].is_identifier()) {
             if (in_class) {
-                add_diag(diags, class_start_line, 0, (int)lines[class_start_line].length(), 1, "Missing 'end class' for previous class", "aurora-lint");
+                add_diag(diags, class_start_line, 0, 1, 1, "Missing 'end class' for previous class", "aurora-lint");
             }
             in_class = true;
             class_start_line = (int)i;
         }
-        if (in_class && ln.find("end class") != std::string::npos) {
-            in_class = false;
-            class_start_line = -1;
-        }
-
-        /* ── Type checking hints ── */
-        if (std::regex_search(ln, m, var_def_re)) {
-            std::string vname = m[1];
-            size_t var_end = m.position(0) + m.length(0);
-            std::string rest = ln.substr(var_end);
-            std::regex type_annotation_re(R"(([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(int|float|string|bool)\s*=)");
-            std::smatch tm;
-            if (std::regex_search(ln, tm, type_annotation_re)) {
-                std::string vn = tm[1];
-                std::string vtype = tm[2];
-                if (vtype == "int" || vtype == "float") {
-                    if (std::regex_search(rest, string_lit_re)) {
-                        add_diag(diags, (int)i, (int)tm.position(0), (int)ln.length(), 2, "Assigning string value to " + vtype + " variable '" + vn + "'", "aurora-lint");
-                    }
-                }
-                if (vtype == "string") {
-                    if (std::regex_search(rest, int_lit_re) && rest.find('"') == std::string::npos) {
-                        add_diag(diags, (int)i, (int)tm.position(0), (int)ln.length(), 2, "Assigning numeric literal to string variable '" + vn + "'", "aurora-lint");
-                    }
-                }
+        if (in_class) {
+            for (auto& t : toks) {
+                if (t.is_keyword("end")) { in_class = false; break; }
             }
-            if (std::regex_search(ln, output_re)) {
-                size_t out_end = m.position(0) + m.length(0);
-                std::string args_rest = ln.substr(out_end);
-            }
-        }
-
-        /* ── Variables used before assignment ── */
-        auto use_start = ln.cbegin();
-        while (std::regex_search(use_start, ln.cend(), m, var_use_re)) {
-            std::string w = m[1];
-            static const std::set<std::string> kw = {
-                "function", "return", "if", "else", "elseif", "while", "for", "loop",
-                "break", "continue", "match", "case", "default", "switch",
-                "class", "extends", "implements", "interface", "enum", "struct",
-                "public", "private", "protected", "static", "final", "abstract",
-                "try", "catch", "finally", "throw", "panic", "ensure",
-                "import", "from", "namespace", "module", "package", "extern",
-                "async", "await", "spawn", "parallel", "thread",
-                "true", "false", "null", "and", "or", "not",
-                "new", "self", "super", "lambda", "type",
-                "output", "debug", "log", "pass",
-                "move", "copy", "shared", "weak", "borrow", "drop", "delete",
-                "safe", "unsafe", "const", "mutable", "reference", "pointer",
-                "event", "signal", "emit", "callback",
-                "scene", "entity", "sprite", "camera", "physics",
-                "component", "render", "state", "properties",
-                "server", "api", "route", "middleware",
-                "ai", "tensor", "train", "predict",
-                "int", "float", "string", "bool", "void", "list", "map", "set", "array", "json",
-                "let", "var"
-            };
-            if (kw.find(w) == kw.end()) {
-                bool is_def = false;
-                std::smatch dm;
-                if (std::regex_search(ln, dm, var_def_re) && dm[1] == w) {
-                    is_def = true;
-                }
-                if (!is_def && var_defs.find(w) != var_defs.end() && var_defs[w] > (int)i) {
-                    add_diag(diags, (int)i, (int)m.position(0), (int)(m.position(0) + m.length(0)), 2, "Variable '" + w + "' used before assignment (defined at line " + std::to_string(var_defs[w] + 1) + ")", "aurora-lint");
-                } else if (!is_def && var_defs.find(w) == var_defs.end() && vars_all.find(w) != vars_all.end()) {
-                }
-            }
-            use_start = m[0].second;
         }
     }
 
-    /* ── Final structural checks ── */
-    if (in_function) {
-        add_diag(diags, func_start_line, 0, (int)lines[func_start_line].length(), 1, "Missing 'end function' to close function", "aurora-lint");
+    if (in_fn) {
+        add_diag(diags, fn_start_line, 0, 1, 1, "Missing 'end function' to close function", "aurora-lint");
     }
     if (in_class) {
-        add_diag(diags, class_start_line, 0, (int)lines[class_start_line].length(), 1, "Missing 'end class' to close class", "aurora-lint");
-    }
-
-    /* ── Unused variables ── */
-    for (auto& [vname, def_line] : var_defs) {
-        if (var_uses.find(vname) == var_uses.end() || var_uses[vname] == def_line) {
-            bool used_elsewhere = false;
-            for (auto& [un, ul] : var_uses) {
-                if (un == vname && ul != def_line) {
-                    used_elsewhere = true;
-                    break;
-                }
-            }
-            if (!used_elsewhere) {
-                add_diag(diags, def_line, 0, (int)lines[def_line].length(), 3, "Unused variable '" + vname + "'", "aurora-lint");
-            }
-        }
+        add_diag(diags, class_start_line, 0, 1, 1, "Missing 'end class' to close class", "aurora-lint");
     }
 
     return diags;
 }
 
-std::vector<LspCompletionItem> LspServer::get_completions(const std::string& text, int line, int col) {
-    std::vector<LspCompletionItem> items;
-
-    for (auto& kw : get_keywords()) {
-        LspCompletionItem ci;
-        ci.label = kw;
-        ci.kind = 14;
-        ci.detail = "keyword";
-        ci.insertText = kw;
-        items.push_back(ci);
-    }
-
-    std::vector<std::pair<std::string, std::string>> builtins = {
-        {"output", "Print value to stdout"},
-        {"debug", "Print debug message"},
-        {"log", "Log a message"},
-        {"len", "Get length of array/string"},
-        {"sum", "Sum of array elements"},
-        {"min", "Minimum of array"},
-        {"max", "Maximum of array"},
-        {"range", "Create range of integers"},
-        {"sleep", "Sleep for milliseconds"},
-        {"time", "Get current timestamp"},
-        {"random", "Get random number"},
-        {"panic", "Panic with error message"},
-        {"input", "Read line from stdin"},
-        {"move", "Transfer ownership"},
-        {"copy", "Copy value"},
-        {"sizeof", "Size of type in bytes"},
-        {"typeof", "Get type name as string"},
-        {"convert", "Convert between types"},
-    };
-    for (auto& [name, desc] : builtins) {
-        LspCompletionItem ci;
-        ci.label = name;
-        ci.kind = 3;
-        ci.detail = desc;
-        ci.documentation = desc;
-        ci.insertText = name;
-        items.push_back(ci);
-    }
-
-    for (auto& [uri, content] : open_documents_) {
-        std::istringstream stream(content);
-        std::string ln;
-        std::regex word_re("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b");
-        std::set<std::string> seen;
-        while (std::getline(stream, ln)) {
-            std::smatch m;
-            auto start = ln.cbegin();
-            while (std::regex_search(start, ln.cend(), m, word_re)) {
-                std::string w = m[1];
-                if (w.size() > 1 && !std::count(get_keywords().begin(), get_keywords().end(), w)) {
-                    if (seen.insert(w).second) {
-                        LspCompletionItem ci;
-                        ci.label = w;
-                        ci.kind = 6;
-                        ci.detail = "identifier";
-                        ci.insertText = w;
-                        items.push_back(ci);
-                    }
-                }
-                start = m[0].second;
-            }
-        }
-    }
-
-    std::sort(items.begin(), items.end(), [](auto& a, auto& b) {
-        if (a.kind != b.kind) return a.kind < b.kind;
-        return a.label < b.label;
-    });
-
-    return items;
-}
-
-std::vector<LspSymbol> LspServer::get_symbols(const std::string& text) {
-    std::vector<LspSymbol> symbols;
-    std::istringstream stream(text);
-    std::string line;
-    int line_num = 0;
-
-    std::regex func_re("^\\s*function\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\((.*)\\)");
-    std::regex class_re("^\\s*class\\s+([a-zA-Z_][a-zA-Z0-9_]*)");
-    std::regex struct_re("^\\s*struct\\s+([a-zA-Z_][a-zA-Z0-9_]*)");
-    std::regex enum_re("^\\s*enum\\s+([a-zA-Z_][a-zA-Z0-9_]*)");
-    std::regex interface_re("^\\s*interface\\s+([a-zA-Z_][a-zA-Z0-9_]*)");
-    std::regex extern_re("^\\s*extern\\s+(?:\\\"[^\\\"]+\\\"\\s+)?function\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(");
-    std::regex var_re("^\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*=");
-
-    while (std::getline(stream, line)) {
-        std::smatch m;
-
-        if (std::regex_search(line, m, func_re)) {
-            symbols.push_back({m[1], "function", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        } else if (std::regex_search(line, m, class_re)) {
-            symbols.push_back({m[1], "class", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        } else if (std::regex_search(line, m, struct_re)) {
-            symbols.push_back({m[1], "struct", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        } else if (std::regex_search(line, m, enum_re)) {
-            symbols.push_back({m[1], "enum", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        } else if (std::regex_search(line, m, interface_re)) {
-            symbols.push_back({m[1], "interface", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        } else if (std::regex_search(line, m, extern_re)) {
-            symbols.push_back({m[1], "function", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        } else if (std::regex_search(line, m, var_re)) {
-            symbols.push_back({m[1], "variable", {{line_num, 0}, {line_num, (int)m[0].length()}}, {{line_num, 0}, {line_num, (int)m[0].length()}}});
-        }
-
-        line_num++;
-    }
-
-    return symbols;
-}
-
 void LspServer::update_diagnostics(const std::string& uri, const std::string& text) {
-    auto diags = analyze(text);
+    if (!documents_.count(uri)) return;
+    auto& doc = documents_[uri];
+    auto diags = analyze(doc);
 
     JsonValue diag_arr;
     diag_arr.type = JsonValue::Array;
@@ -495,4 +224,440 @@ void LspServer::update_diagnostics(const std::string& uri, const std::string& te
 
     std::string params_str = JsonParser::stringify(notif_params);
     send_message(make_notification("textDocument/publishDiagnostics", params_str));
+}
+
+/* ════════════════════════════════════════════════════════════
+   AST-walking completions
+   ════════════════════════════════════════════════════════════ */
+
+std::vector<LspCompletionItem> LspServer::get_completions(DocumentState& doc, int line, int col) {
+    std::vector<LspCompletionItem> items;
+    std::set<std::string> seen;
+
+    /* Keywords from the real keyword table */
+    for (auto& kw : aurora_keywords()) {
+        if (seen.count(kw)) continue;
+        seen.insert(kw);
+        LspCompletionItem ci;
+        ci.label = kw;
+        ci.kind = 14;
+        ci.detail = "keyword";
+        ci.insertText = kw;
+        items.push_back(ci);
+    }
+
+    /* Builtin functions */
+    std::vector<std::pair<std::string, std::string>> builtins = {
+        {"output", "Print value to stdout"},
+        {"debug", "Print debug message"},
+        {"log", "Log a message"},
+        {"len", "Get length of array/string"},
+        {"sum", "Sum of array elements"},
+        {"min", "Minimum of array"},
+        {"max", "Maximum of array"},
+        {"range", "Create range of integers"},
+        {"sleep", "Sleep for milliseconds"},
+        {"time", "Get current timestamp"},
+        {"random", "Get random number"},
+        {"panic", "Panic with error message"},
+        {"input", "Read line from stdin"},
+        {"sizeof", "Size of type in bytes"},
+        {"typeof", "Get type name as string"},
+        {"convert", "Convert between types"},
+        {"read_file", "Read file contents"},
+        {"write_file", "Write file contents"},
+        {"file_exists", "Check if file exists"},
+        {"abs", "Absolute value"},
+        {"sqrt", "Square root"},
+        {"floor", "Floor value"},
+        {"ceil", "Ceiling value"},
+        {"round", "Round value"},
+        {"pow", "Power"},
+        {"clamp", "Clamp value"},
+    };
+    for (auto& [name, desc] : builtins) {
+        if (seen.count(name)) continue;
+        seen.insert(name);
+        LspCompletionItem ci;
+        ci.label = name;
+        ci.kind = 3;
+        ci.detail = desc;
+        ci.documentation = desc;
+        ci.insertText = name;
+        items.push_back(ci);
+    }
+
+    /* Identifiers from lexed tokens across all open documents */
+    for (auto& [uri, d] : documents_) {
+        for (auto& ll : d.lines) {
+            for (auto& t : ll.tokens) {
+                if (t.type == TokenType::Identifier) {
+                    if (seen.count(t.value)) continue;
+                    seen.insert(t.value);
+                    LspCompletionItem ci;
+                    ci.label = t.value;
+                    ci.kind = 6;
+                    ci.detail = "identifier";
+                    ci.insertText = t.value;
+                    items.push_back(ci);
+                }
+            }
+        }
+    }
+
+    /* Function names from AST */
+    if (doc.ast) {
+        walk_ast(doc.ast.get(), [&](ASTNode* n) {
+            if (n->type == NodeType::Function) {
+                if (seen.count(n->value)) return;
+                seen.insert(n->value);
+                LspCompletionItem ci;
+                ci.label = n->value;
+                ci.kind = 2;
+                ci.detail = "function";
+                ci.insertText = n->value;
+                items.push_back(ci);
+            }
+            if (n->type == NodeType::Class) {
+                if (seen.count(n->value)) return;
+                seen.insert(n->value);
+                LspCompletionItem ci;
+                ci.label = n->value;
+                ci.kind = 7;
+                ci.detail = "class";
+                ci.insertText = n->value;
+                items.push_back(ci);
+            }
+        });
+    }
+
+    std::sort(items.begin(), items.end(), [](auto& a, auto& b) {
+        if (a.kind != b.kind) return a.kind < b.kind;
+        return a.label < b.label;
+    });
+
+    return items;
+}
+
+/* ════════════════════════════════════════════════════════════
+   AST-walking symbols
+   ════════════════════════════════════════════════════════════ */
+
+std::vector<LspSymbol> LspServer::get_symbols(DocumentState& doc) {
+    std::vector<LspSymbol> symbols;
+
+    if (!doc.ast) return symbols;
+
+    /* Types and symbol kinds mapping */
+    struct SymbolInfo {
+        NodeType type;
+        int kind;
+    };
+
+    walk_ast(doc.ast.get(), [&](ASTNode* n) {
+        int kind = 0;
+        std::string kind_str;
+
+        switch (n->type) {
+            case NodeType::Function:
+                kind = 12; kind_str = "function"; break;
+            case NodeType::Class:
+                kind = 5; kind_str = "class"; break;
+            case NodeType::InterfaceDecl:
+                kind = 11; kind_str = "interface"; break;
+            case NodeType::EnumDecl:
+                kind = 10; kind_str = "enum"; break;
+            case NodeType::StructDecl:
+                kind = 23; kind_str = "struct"; break;
+            case NodeType::ExternFn:
+                kind = 12; kind_str = "function"; break;
+            case NodeType::Lambda:
+                kind = 12; kind_str = "function"; break;
+            case NodeType::NamespaceDecl:
+                kind = 2; kind_str = "namespace"; break;
+            case NodeType::Var:
+                /* Check if this is a variable definition at indent start */
+                if (n->src_line > 0 && n->value.size() > 0 && !n->left) {
+                    kind = 13; kind_str = "variable";
+                } else {
+                    return;
+                }
+                break;
+            default:
+                return;
+        }
+
+        if (n->value.empty()) return;
+
+        LspSymbol sym;
+        sym.name = n->value;
+        sym.kind = std::to_string(kind);
+        sym.range.start = {n->src_line - 1, 0};
+        sym.range.end = {n->src_line - 1, (int)n->value.size()};
+        sym.selectionRange = sym.range;
+        symbols.push_back(sym);
+    });
+
+    return symbols;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Definition / Hover / References / Signature using AST + lexer
+   ════════════════════════════════════════════════════════════ */
+
+std::string LspServer::get_definition_location(DocumentState& doc, int line, int col) {
+    std::string word = doc.get_word_at(line, col);
+    if (word.empty()) return "";
+
+    if (doc.ast) {
+        ASTNode* def = find_def(doc.ast.get(), word);
+        if (def && def->src_line > 0) {
+            JsonBuilder jb;
+            jb.add("uri", escape_json(doc.uri));
+            std::string rng = "{\"start\":{\"line\":" + std::to_string(def->src_line - 1) +
+                              ",\"character\":0}" +
+                              ",\"end\":{\"line\":" + std::to_string(def->src_line - 1) +
+                              ",\"character\":" + std::to_string((int)def->value.size()) + "}}";
+            jb.add_raw("range", rng);
+            return jb.str();
+        }
+    }
+
+    /* Fallback to lexer-based search across open docs */
+    for (auto& [uri, d] : documents_) {
+        for (auto& ll : d.lines) {
+            const auto& toks = ll.tokens;
+            if (toks.size() >= 2) {
+                bool is_def = false;
+                if (toks[0].is_keyword("function") && toks[1].is_identifier() && toks[1].value == word) is_def = true;
+                if (toks[0].is_keyword("class") && toks[1].is_identifier() && toks[1].value == word) is_def = true;
+                if (toks[0].is_keyword("struct") && toks[1].is_identifier() && toks[1].value == word) is_def = true;
+                if (toks[0].is_keyword("enum") && toks[1].is_identifier() && toks[1].value == word) is_def = true;
+                if (toks[0].is_keyword("interface") && toks[1].is_identifier() && toks[1].value == word) is_def = true;
+
+                if (is_def) {
+                    JsonBuilder jb;
+                    jb.add("uri", escape_json(uri));
+                    std::string rng = "{\"start\":{\"line\":" + std::to_string(ll.line_no - 1) +
+                                      ",\"character\":0}" +
+                                      ",\"end\":{\"line\":" + std::to_string(ll.line_no - 1) +
+                                      ",\"character\":" + std::to_string(toks[1].col + (int)toks[1].value.size()) + "}}";
+                    jb.add_raw("range", rng);
+                    return jb.str();
+                }
+            }
+        }
+    }
+
+    return "";
+}
+
+std::string LspServer::get_hover_info(DocumentState& doc, int line, int col) {
+    std::string word = doc.get_word_at(line, col);
+    if (word.empty()) return make_response(current_msg_id_, "{\"contents\":[]}");
+
+    std::string hover_text = "```\n" + word + "\n```";
+
+    /* Check if it's a keyword */
+    if (is_aurora_keyword(word)) {
+        hover_text = "**" + word + "** (keyword)";
+        JsonBuilder jb;
+        jb.add("contents", escape_json(hover_text));
+        return make_response(current_msg_id_, jb.str());
+    }
+
+    /* Look up in AST */
+    if (doc.ast) {
+        walk_ast(doc.ast.get(), [&](ASTNode* n) {
+            if (n->value == word && n->type == NodeType::Function) {
+                std::string sig = "function " + word + "(...)";
+                hover_text += "\n---\n" + sig + "\n*Defined at line " + std::to_string(n->src_line) + "*";
+            } else if (n->value == word && n->type == NodeType::Class) {
+                std::string sig = "class " + word;
+                hover_text += "\n---\n" + sig + "\n*Defined at line " + std::to_string(n->src_line) + "*";
+            } else if (n->value == word && n->type == NodeType::Var) {
+                hover_text += "\n---\n*Variable defined at line " + std::to_string(n->src_line) + "*";
+            }
+        });
+    }
+
+    /* Fallback lexer search */
+    if (hover_text.find("*Defined") == std::string::npos && hover_text.find("*Variable defined") == std::string::npos) {
+        for (auto& [uri, d] : documents_) {
+            for (auto& ll : d.lines) {
+                const auto& toks = ll.tokens;
+                for (size_t i = 0; i < toks.size(); i++) {
+                    if (toks[i].is_identifier() && toks[i].value == word && i > 0) {
+                        if (toks[i-1].is_keyword("function") || toks[i-1].is_keyword("class") ||
+                            toks[i-1].is_keyword("struct") || toks[i-1].is_keyword("enum")) {
+                            hover_text += "\n---\n*Defined at line " + std::to_string(ll.line_no) + "*";
+                            break;
+                        }
+                    }
+                }
+                if (hover_text.find("*Defined") != std::string::npos) break;
+            }
+            if (hover_text.find("*Defined") != std::string::npos) break;
+        }
+    }
+
+    JsonBuilder jb;
+    jb.add("contents", escape_json(hover_text));
+    return make_response(current_msg_id_, jb.str());
+}
+
+std::vector<LspLocation> LspServer::get_all_references(DocumentState& doc, int line, int col) {
+    std::vector<LspLocation> refs;
+    std::string word = doc.get_word_at(line, col);
+    if (word.empty()) return refs;
+
+    if (doc.ast) {
+        auto nodes = find_all_refs(doc.ast.get(), word);
+        for (auto* n : nodes) {
+            if (n->src_line > 0) {
+                LspLocation loc;
+                loc.uri = doc.uri;
+                loc.range.start = {n->src_line - 1, 0};
+                loc.range.end = {n->src_line - 1, (int)n->value.size()};
+                refs.push_back(loc);
+            }
+        }
+    }
+
+    /* Also add lexer-based references across all docs */
+    for (auto& [uri, d] : documents_) {
+        for (auto& ll : d.lines) {
+            for (auto& t : ll.tokens) {
+                if (t.type == TokenType::Identifier && t.value == word) {
+                    LspLocation loc;
+                    loc.uri = uri;
+                    loc.range.start = {ll.line_no - 1, t.col};
+                    loc.range.end = {ll.line_no - 1, t.col + (int)t.value.size()};
+                    /* Deduplicate */
+                    bool dup = false;
+                    for (auto& r : refs) {
+                        if (r.uri == loc.uri && r.range.start.line == loc.range.start.line &&
+                            r.range.start.character == loc.range.start.character) {
+                            dup = true; break;
+                        }
+                    }
+                    if (!dup) refs.push_back(loc);
+                }
+            }
+        }
+    }
+
+    return refs;
+}
+
+std::string LspServer::get_signature_info(DocumentState& doc, int line, int col) {
+    std::string text = doc.text;
+    std::string ln;
+    {
+        std::istringstream ss(text);
+        int l = 0;
+        while (l < line && std::getline(ss, ln)) l++;
+        if (l != line) std::getline(ss, ln);
+    }
+
+    /* Find the function name before cursor */
+    int paren = (int)ln.rfind('(', col);
+    if (paren == std::string::npos) return make_response(current_msg_id_, "null");
+
+    int name_end = paren;
+    int name_start = name_end;
+    while (name_start > 0 && (isalnum(ln[name_start-1]) || ln[name_start-1] == '_'))
+        name_start--;
+
+    std::string func_name = ln.substr(name_start, name_end - name_start);
+    if (func_name.empty()) return make_response(current_msg_id_, "null");
+
+    /* Count active parameter */
+    int active_param = 0;
+    int depth = 0;
+    for (int i = paren + 1; i < col; i++) {
+        if (i >= (int)ln.size()) break;
+        if (ln[i] == '(') depth++;
+        else if (ln[i] == ')') depth--;
+        else if (ln[i] == ',' && depth == 0) active_param++;
+    }
+
+    /* Look up function def in AST */
+    if (doc.ast) {
+        std::string sig_label;
+        std::vector<std::string> param_labels;
+        walk_ast(doc.ast.get(), [&](ASTNode* n) {
+            if (n->type == NodeType::Function && n->value == func_name && sig_label.empty()) {
+                sig_label = "function " + func_name + "(";
+                /* Walk args */
+                ASTNode* arg = n->args.get();
+                while (arg) {
+                    std::string pl = arg->value;
+                    param_labels.push_back(pl);
+                    if (sig_label.back() != '(') sig_label += ", ";
+                    sig_label += pl;
+                    arg = arg->next.get();
+                }
+                sig_label += ")";
+            }
+        });
+
+        if (!sig_label.empty()) {
+            std::string sig_json = R"({
+                "signatures":[{
+                    "label":")" + escape_json(sig_label) + R"(",
+                    "parameters":[)";
+            for (size_t i = 0; i < param_labels.size(); i++) {
+                if (i > 0) sig_json += ",";
+                sig_json += R"({"label":")" + escape_json(param_labels[i]) + R"("})";
+            }
+            sig_json += R"(],
+                    "activeParameter":)" + std::to_string(active_param) + R"(
+                }],
+                "activeSignature":0
+            })";
+            return make_response(current_msg_id_, sig_json);
+        }
+    }
+
+    /* Fallback lexer search */
+    for (auto& [uri, d] : documents_) {
+        for (auto& ll : d.lines) {
+            const auto& toks = ll.tokens;
+            for (size_t i = 0; i + 1 < toks.size(); i++) {
+                if (toks[i].is_keyword("function") && toks[i+1].is_identifier() && toks[i+1].value == func_name) {
+                    std::string label = "function " + func_name + "(";
+                    std::vector<std::string> params;
+                    for (size_t j = i + 2; j < toks.size(); j++) {
+                        if (toks[j].is_operator('(')) continue;
+                        if (toks[j].is_operator(')')) break;
+                        if (toks[j].is_operator(',')) continue;
+                        if (toks[j].type == TokenType::Identifier) {
+                            params.push_back(toks[j].value);
+                            if (label.back() != '(') label += ", ";
+                            label += toks[j].value;
+                        }
+                    }
+                    label += ")";
+
+                    std::string sig_json = R"({
+                        "signatures":[{
+                            "label":")" + escape_json(label) + R"(",
+                            "parameters":[)";
+                    for (size_t k = 0; k < params.size(); k++) {
+                        if (k > 0) sig_json += ",";
+                        sig_json += R"({"label":")" + escape_json(params[k]) + R"("})";
+                    }
+                    sig_json += R"(],
+                            "activeParameter":)" + std::to_string(active_param) + R"(
+                        }],
+                        "activeSignature":0
+                    })";
+                    return make_response(current_msg_id_, sig_json);
+                }
+            }
+        }
+    }
+
+    return make_response(current_msg_id_, "null");
 }

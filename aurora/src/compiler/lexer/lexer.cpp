@@ -103,14 +103,21 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
             t.value = std::string(1, *p);
             p++; col++;
         }
-        /* ── float or int number ── */
+        /* ── float or int number (decimal or hex) ── */
         else if (std::isdigit((unsigned char)*p)) {
             bool is_float = false;
-            while (std::isdigit((unsigned char)*p)) { t.value += *p++; col++; }
-            if (*p == '.' && std::isdigit((unsigned char)*(p+1))) {
-                is_float = true;
+            bool is_hex = (*p == '0' && (*(p+1) == 'x' || *(p+1) == 'X'));
+            if (is_hex) {
                 t.value += *p++; col++;
+                t.value += *p++; col++;
+                while (std::isxdigit((unsigned char)*p)) { t.value += *p++; col++; }
+            } else {
                 while (std::isdigit((unsigned char)*p)) { t.value += *p++; col++; }
+                if (*p == '.' && std::isdigit((unsigned char)*(p+1))) {
+                    is_float = true;
+                    t.value += *p++; col++;
+                    while (std::isdigit((unsigned char)*p)) { t.value += *p++; col++; }
+                }
             }
             t.type = is_float ? TokenType::Float : TokenType::Number;
         }

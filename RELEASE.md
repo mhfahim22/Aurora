@@ -28,7 +28,7 @@ Version format: `MAJOR.MINOR.PATCH` (semver after 1.0)
    ```
 6. **Run ASAN:**
    ```bash
-   .\build_asan.bat
+   .\scripts\build_asan.bat
    build_asan\Debug\test_ffi_memory_safety.exe
    ```
 7. **Create GitHub Release:**

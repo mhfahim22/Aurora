@@ -1,0 +1,108 @@
+## MySQL client library (libmysqlclient) bindings
+## Usage: import "mysql"  or  import libc:mysql
+##
+## Requires: libmysql.dll (Windows) / libmysqlclient.so (Linux/macOS)
+## Install: https://dev.mysql.com/downloads/connector/c/
+##
+## Example:
+##   import "mysql"
+##   mysql = mysql_init(null)
+##   conn = mysql_real_connect(mysql, "localhost", "root", "password", "testdb", 3306, null, 0)
+##   if conn == null
+##       output("Error: " + mysql_error(mysql))
+##   else
+##       mysql_query(conn, "SELECT * FROM users")
+##       res = mysql_store_result(conn)
+##       rows = mysql_num_rows(res)
+##       output("Got " + str(rows) + " rows")
+##       mysql_free_result(res)
+##       mysql_close(conn)
+##   end
+
+## ── Init / Connect ──
+extern "libmysql" function mysql_init(alloc: pointer) -> pointer
+extern "libmysql" function mysql_ssl_set(mysql: pointer, key: cstring, cert: cstring, ca: cstring, capath: cstring, cipher: cstring) -> i32
+extern "libmysql" function mysql_real_connect(mysql: pointer, host: cstring, user: cstring, passwd: cstring, db: cstring, port: u32, unix_socket: cstring, clientflag: u64) -> pointer
+extern "libmysql" function mysql_close(mysql: pointer)
+extern "libmysql" function mysql_options(mysql: pointer, option: i32, arg: cstring) -> i32
+extern "libmysql" function mysql_ping(mysql: pointer) -> i32
+extern "libmysql" function mysql_change_user(mysql: pointer, user: cstring, passwd: cstring, db: cstring) -> i32
+extern "libmysql" function mysql_select_db(mysql: pointer, db: cstring) -> i32
+
+## ── Query ──
+extern "libmysql" function mysql_query(mysql: pointer, query: cstring) -> i32
+extern "libmysql" function mysql_real_query(mysql: pointer, query: cstring, length: u64) -> i32
+extern "libmysql" function mysql_stmt_init(mysql: pointer) -> pointer
+extern "libmysql" function mysql_stmt_prepare(stmt: pointer, query: cstring, length: u64) -> i32
+extern "libmysql" function mysql_stmt_execute(stmt: pointer) -> i32
+extern "libmysql" function mysql_stmt_close(stmt: pointer) -> i32
+extern "libmysql" function mysql_affected_rows(mysql: pointer) -> i64
+extern "libmysql" function mysql_insert_id(mysql: pointer) -> i64
+
+## ── Result ──
+extern "libmysql" function mysql_store_result(mysql: pointer) -> pointer
+extern "libmysql" function mysql_use_result(mysql: pointer) -> pointer
+extern "libmysql" function mysql_free_result(result: pointer)
+extern "libmysql" function mysql_num_rows(result: pointer) -> i64
+extern "libmysql" function mysql_num_fields(result: pointer) -> u32
+extern "libmysql" function mysql_fetch_row(result: pointer) -> pointer
+extern "libmysql" function mysql_fetch_lengths(result: pointer) -> pointer
+extern "libmysql" function mysql_fetch_field(result: pointer) -> pointer
+extern "libmysql" function mysql_fetch_fields(result: pointer) -> pointer
+extern "libmysql" function mysql_data_seek(result: pointer, offset: i64)
+extern "libmysql" function mysql_row_seek(result: pointer, offset: pointer) -> pointer
+extern "libmysql" function mysql_row_tell(result: pointer) -> pointer
+extern "libmysql" function mysql_field_seek(result: pointer, offset: u32) -> u32
+extern "libmysql" function mysql_field_count(mysql: pointer) -> u32
+
+## ── Metadata ──
+extern "libmysql" function mysql_errno(mysql: pointer) -> u32
+extern "libmysql" function mysql_error(mysql: pointer) -> cstring
+extern "libmysql" function mysql_sqlstate(mysql: pointer) -> cstring
+extern "libmysql" function mysql_warning_count(mysql: pointer) -> u32
+extern "libmysql" function mysql_info(mysql: pointer) -> cstring
+extern "libmysql" function mysql_character_set_name(mysql: pointer) -> cstring
+extern "libmysql" function mysql_set_character_set(mysql: pointer, csname: cstring) -> i32
+extern "libmysql" function mysql_get_host_info(mysql: pointer) -> cstring
+extern "libmysql" function mysql_get_server_info(mysql: pointer) -> cstring
+extern "libmysql" function mysql_get_client_info() -> cstring
+extern "libmysql" function mysql_get_server_version(mysql: pointer) -> u64
+extern "libmysql" function mysql_get_client_version() -> u64
+extern "libmysql" function mysql_thread_id(mysql: pointer) -> u64
+extern "libmysql" function mysql_stat(mysql: pointer) -> cstring
+
+## ── Field metadata ──
+extern "libmysql" function mysql_fetch_field_direct(result: pointer, fieldnr: u32) -> pointer
+extern "libmysql" function mysql_field_seek(result: pointer, offset: u32) -> u32
+extern "libmysql" function mysql_field_tell(result: pointer) -> u32
+
+## ── Transaction ──
+extern "libmysql" function mysql_autocommit(mysql: pointer, mode: i32) -> i32
+extern "libmysql" function mysql_commit(mysql: pointer) -> i32
+extern "libmysql" function mysql_rollback(mysql: pointer) -> i32
+
+## ── Prepared statement helpers ──
+extern "libmysql" function mysql_stmt_bind_param(stmt: pointer, bind: pointer) -> i32
+extern "libmysql" function mysql_stmt_bind_result(stmt: pointer, bind: pointer) -> i32
+extern "libmysql" function mysql_stmt_fetch(stmt: pointer) -> i32
+extern "libmysql" function mysql_stmt_fetch_column(stmt: pointer, bind: pointer, column: u32, offset: u64) -> i32
+extern "libmysql" function mysql_stmt_store_result(stmt: pointer) -> i32
+extern "libmysql" function mysql_stmt_num_rows(stmt: pointer) -> i64
+extern "libmysql" function mysql_stmt_affected_rows(stmt: pointer) -> i64
+extern "libmysql" function mysql_stmt_insert_id(stmt: pointer) -> i64
+extern "libmysql" function mysql_stmt_field_count(stmt: pointer) -> u32
+extern "libmysql" function mysql_stmt_param_count(stmt: pointer) -> u64
+extern "libmysql" function mysql_stmt_attr_get(stmt: pointer, option: i64, arg: pointer) -> i32
+extern "libmysql" function mysql_stmt_attr_set(stmt: pointer, option: i64, arg: pointer) -> i32
+extern "libmysql" function mysql_stmt_errno(stmt: pointer) -> u32
+extern "libmysql" function mysql_stmt_error(stmt: pointer) -> cstring
+extern "libmysql" function mysql_stmt_sqlstate(stm: pointer) -> cstring
+extern "libmysql" function mysql_stmt_free_result(stmt: pointer) -> i32
+extern "libmysql" function mysql_stmt_send_long_data(stmt: pointer, pn: u32, data: cstring, len: u64) -> i32
+extern "libmysql" function mysql_stmt_reset(stmt: pointer) -> i32
+
+## ── MySQL Native Bridge helpers (from bridge_mysql_native DLL) ──
+extern "native_mysql" function mysql_native_get_field(row: pointer, col: i32) -> cstring
+extern "native_mysql" function mysql_native_get_length(lengths: pointer, col: i32) -> u64
+extern "native_mysql" function mysql_native_field_is_null(row: pointer, col: i32) -> i32
+extern "native_mysql" function mysql_native_field_name(field: pointer) -> cstring

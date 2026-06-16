@@ -17,6 +17,7 @@ void  map_set(void* map, const char* key, long long val);
 long long map_get(void* map, const char* key);
 int   map_has(void* map, const char* key);
 void  map_free(void* map);
+void* map_keys(void* map);
 
 /* ── Set (hash set) ── */
 void* set_new(void);

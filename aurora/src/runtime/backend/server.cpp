@@ -9,6 +9,12 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <sstream>
+#include <algorithm>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -522,7 +528,9 @@ void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
             int mw_result = aurora_middleware_run_chain(
                 srv->middleware_handlers, srv->middleware_count, req, res);
             if (mw_result == 0) {
-                aurora_route_dispatch(router, req, res);
+                /* Try static file routes before router dispatch */
+                if (!aurora_server_serve_static(req, res, srv))
+                    aurora_route_dispatch(router, req, res);
             }
         } else {
             aurora_http_response_set_status(res, 400, "Bad Request");
@@ -551,7 +559,8 @@ void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
             int mw_result = aurora_middleware_run_chain(
                 srv->middleware_handlers, srv->middleware_count, req, res);
             if (mw_result == 0) {
-                aurora_route_dispatch(router, req, res);
+                if (!aurora_server_serve_static(req, res, srv))
+                    aurora_route_dispatch(router, req, res);
             }
         } else {
             aurora_http_response_set_status(res, 400, "Bad Request");
@@ -565,12 +574,407 @@ void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
 #endif
 }
 
+/* ════════════════════════════════════════════════════════════
+   Static file serving
+   ════════════════════════════════════════════════════════════ */
+
+static const char* mime_type(const char* path) {
+    const char* ext = strrchr(path, '.');
+    if (!ext) return "application/octet-stream";
+    if (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0) return "text/html; charset=utf-8";
+    if (strcmp(ext, ".css") == 0) return "text/css; charset=utf-8";
+    if (strcmp(ext, ".js") == 0) return "application/javascript; charset=utf-8";
+    if (strcmp(ext, ".json") == 0) return "application/json";
+    if (strcmp(ext, ".png") == 0) return "image/png";
+    if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) return "image/jpeg";
+    if (strcmp(ext, ".gif") == 0) return "image/gif";
+    if (strcmp(ext, ".svg") == 0) return "image/svg+xml";
+    if (strcmp(ext, ".ico") == 0) return "image/x-icon";
+    if (strcmp(ext, ".woff2") == 0) return "font/woff2";
+    if (strcmp(ext, ".woff") == 0) return "font/woff";
+    if (strcmp(ext, ".ttf") == 0) return "font/ttf";
+    if (strcmp(ext, ".otf") == 0) return "font/otf";
+    if (strcmp(ext, ".wasm") == 0) return "application/wasm";
+    if (strcmp(ext, ".txt") == 0) return "text/plain; charset=utf-8";
+    if (strcmp(ext, ".xml") == 0) return "application/xml";
+    if (strcmp(ext, ".yaml") == 0 || strcmp(ext, ".yml") == 0) return "text/yaml";
+    if (strcmp(ext, ".md") == 0) return "text/markdown; charset=utf-8";
+    if (strcmp(ext, ".pdf") == 0) return "application/pdf";
+    if (strcmp(ext, ".zip") == 0) return "application/zip";
+    if (strcmp(ext, ".mp3") == 0) return "audio/mpeg";
+    if (strcmp(ext, ".mp4") == 0) return "video/mp4";
+    if (strcmp(ext, ".webp") == 0) return "image/webp";
+    return "application/octet-stream";
+}
+
+void aurora_server_static(AuroraServer* srv, const char* prefix, const char* directory) {
+    if (!srv || !prefix || !directory) return;
+    if (srv->static_count >= srv->static_cap) {
+        int new_cap = srv->static_cap ? srv->static_cap * 2 : 4;
+        srv->static_routes = (AuroraStaticRoute*)aurora_safe_realloc(
+            srv->static_routes, (size_t)new_cap * sizeof(AuroraStaticRoute));
+        srv->static_cap = new_cap;
+    }
+    AuroraStaticRoute* r = &srv->static_routes[srv->static_count++];
+    r->prefix = strdup(prefix);
+    r->directory = strdup(directory);
+    if (r->prefix[strlen(r->prefix) - 1] == '/')
+        r->prefix[strlen(r->prefix) - 1] = '\0';
+    printf("[server] static route: %s -> %s\n", r->prefix, r->directory);
+}
+
+int aurora_server_serve_static(AuroraHttpRequest* req, AuroraHttpResponse* res, AuroraServer* srv) {
+    if (!req || !res || !srv || !req->path_without_query) return 0;
+    for (int i = 0; i < srv->static_count; i++) {
+        const char* prefix = srv->static_routes[i].prefix;
+        const char* dir = srv->static_routes[i].directory;
+        const char* path = req->path_without_query;
+        int plen = (int)strlen(prefix);
+        if (strncmp(path, prefix, plen) != 0) continue;
+        if (path[plen] != '/' && path[plen] != '\0') continue;
+        const char* rel = path[plen] == '/' ? path + plen + 1 : "";
+        if (!*rel) rel = "index.html";
+        /* Build full path */
+        char full[1024];
+        snprintf(full, sizeof(full), "%s/%s", dir, rel);
+        /* Prevent path traversal */
+        if (strstr(rel, "..")) {
+            aurora_http_response_set_status(res, 403, "Forbidden");
+            aurora_http_response_set_body(res, "Forbidden");
+            return 1;
+        }
+        /* Check file existence */
+        struct stat st;
+        if (stat(full, &st) != 0 || (st.st_mode & S_IFDIR)) {
+            continue; /* not found or directory, try next static route */
+        }
+        /* Read and serve */
+        FILE* fp = fopen(full, "rb");
+        if (!fp) continue;
+        fseek(fp, 0, SEEK_END);
+        long fsize = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        char* buf = (char*)aurora_alloc((size_t)fsize + 1);
+        size_t nread = fread(buf, 1, (size_t)fsize, fp);
+        fclose(fp);
+        buf[nread] = '\0';
+        aurora_http_response_set_status(res, 200, "OK");
+        aurora_http_response_set_content_type(res, mime_type(full));
+        aurora_http_response_set_header(res, "Cache-Control", "no-cache");
+        aurora_http_response_set_body(res, buf);
+        aurora_free(buf);
+        return 1;
+    }
+    return 0;
+}
+
+void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
+    if (!srv || !srv->handle || !srv->running) return;
+    printf("[server] accept loop started on port %d\n", srv->port);
+    while (srv->running) {
+        aurora_server_accept_and_handle(srv, router);
+    }
+}
+
+/* ════════════════════════════════════════════════════════════
+   File watcher (polling)
+   ════════════════════════════════════════════════════════════ */
+
+#ifndef _WIN32
+#include <dirent.h>
+#endif
+
+static int64_t file_mtime(const char* path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+#ifdef _WIN32
+    return (int64_t)st.st_mtime * 1000;
+#else
+    return (int64_t)st.st_mtim.tv_sec * 1000 + st.st_mtim.tv_nsec / 1000000;
+#endif
+}
+
+static void scan_directory(const char* dir, std::vector<std::string>& out) {
+#ifdef _WIN32
+    std::string pattern = std::string(dir) + "\\*";
+    WIN32_FIND_DATAA ffd;
+    HANDLE hFind = FindFirstFileA(pattern.c_str(), &ffd);
+    if (hFind == INVALID_HANDLE_VALUE) return;
+    do {
+        if (strcmp(ffd.cFileName, ".") == 0 || strcmp(ffd.cFileName, "..") == 0) continue;
+        std::string full = std::string(dir) + "\\" + ffd.cFileName;
+        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            scan_directory(full.c_str(), out);
+        } else {
+            out.push_back(full);
+        }
+    } while (FindNextFileA(hFind, &ffd) != 0);
+    FindClose(hFind);
+#else
+    DIR* d = opendir(dir);
+    if (!d) return;
+    struct dirent* de;
+    while ((de = readdir(d)) != NULL) {
+        if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
+        std::string full = std::string(dir) + "/" + de->d_name;
+        struct stat st;
+        if (stat(full.c_str(), &st) != 0) continue;
+        if (S_ISDIR(st.st_mode)) {
+            scan_directory(full.c_str(), out);
+        } else {
+            out.push_back(full);
+        }
+    }
+    closedir(d);
+#endif
+}
+
+AuroraFileWatchState* aurora_fs_watch_init(const char* dir) {
+    AuroraFileWatchState* state = (AuroraFileWatchState*)calloc(1, sizeof(AuroraFileWatchState));
+    if (!state) return nullptr;
+    std::vector<std::string> files;
+    scan_directory(dir, files);
+    state->count = (int)files.size();
+    state->cap = state->count > 0 ? state->count : 8;
+    state->files = (char**)calloc((size_t)state->cap, sizeof(char*));
+    state->mtimes = (int64_t*)calloc((size_t)state->cap, sizeof(int64_t));
+    for (int i = 0; i < state->count; i++) {
+        state->files[i] = strdup(files[i].c_str());
+        state->mtimes[i] = file_mtime(files[i].c_str());
+    }
+    printf("[watch] watching %d files in %s\n", state->count, dir);
+    return state;
+}
+
+int aurora_fs_watch_poll(AuroraFileWatchState* state) {
+    if (!state || state->count == 0) return 0;
+    std::string dir;
+    if (state->files[0]) {
+        dir = state->files[0];
+        auto pos = dir.find_last_of("/\\");
+        if (pos != std::string::npos) dir = dir.substr(0, pos);
+    }
+    if (dir.empty()) return 0;
+    /* Check modification times first (fast path) */
+    for (int i = 0; i < state->count; i++) {
+        int64_t mtime = file_mtime(state->files[i]);
+        if (mtime != state->mtimes[i]) {
+            state->mtimes[i] = mtime;
+            return i + 1;
+        }
+    }
+    /* Check for added/removed files (slow path — only on no mtime change) */
+    std::vector<std::string> current;
+    scan_directory(dir.c_str(), current);
+    if (current.size() != (size_t)state->count) {
+        aurora_fs_watch_free(state);
+        AuroraFileWatchState* ns = aurora_fs_watch_init(dir.c_str());
+        if (ns) {
+            *state = *ns;
+            free(ns);
+        }
+        return 1;
+    }
+    return 0;
+}
+
+void aurora_fs_watch_free(AuroraFileWatchState* state) {
+    if (!state) return;
+    for (int i = 0; i < state->count; i++)
+        free(state->files[i]);
+    free(state->files);
+    free(state->mtimes);
+    state->files = nullptr;
+    state->mtimes = nullptr;
+    state->count = 0;
+    state->cap = 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Dev server (built-in hot reload)
+   ════════════════════════════════════════════════════════════ */
+
+static const char* LIVE_RELOAD_SCRIPT =
+    "<script>\n"
+    "(function(){var ws=new WebSocket('ws://'+location.host+'/__aurora_livereload');\n"
+    "ws.onmessage=function(e){if(e.data==='reload')location.reload();};\n"
+    "ws.onclose=function(){setTimeout(function(){location.reload();},1000);};\n"
+    "})();\n"
+    "</script>\n";
+
+static void inject_live_reload(char* body, size_t body_len) {
+    if (!body) return;
+    const char* insert_before = "</body>";
+    char* pos = strstr(body, insert_before);
+    if (!pos) {
+        insert_before = "</html>";
+        pos = strstr(body, insert_before);
+    }
+    if (!pos) return;
+    size_t before_len = (size_t)(pos - body);
+    size_t script_len = strlen(LIVE_RELOAD_SCRIPT);
+    size_t after_len = strlen(pos);
+    size_t new_len = before_len + script_len + after_len + 1;
+    if (new_len > body_len) return;
+    memmove(pos + script_len, pos, after_len + 1);
+    memcpy(pos, LIVE_RELOAD_SCRIPT, script_len);
+}
+
+static void dev_server_handle_request(AuroraHttpRequest* req, AuroraHttpResponse* res,
+                                       AuroraServer* srv) {
+    /* Check for live-reload WebSocket upgrade */
+    if (req->path_without_query && strcmp(req->path_without_query, "/__aurora_livereload") == 0) {
+        /* Simple SSE-style keep-alive instead of full WebSocket */
+        const char* sse = "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: text/event-stream\r\n"
+                          "Cache-Control: no-cache\r\n"
+                          "Connection: keep-alive\r\n"
+                          "Access-Control-Allow-Origin: *\r\n"
+                          "\r\n"
+                          "data: connected\n\n";
+        /* Can't easily inject this — let the connection handler open a pipe. We handle
+           this in the accept loop by not sending the response and keeping the socket open. */
+    }
+    /* Try static files first */
+    if (aurora_server_serve_static(req, res, srv))
+        return;
+    /* 404 fallback */
+    aurora_http_response_set_status(res, 404, "Not Found");
+    aurora_http_response_set_content_type(res, "text/html; charset=utf-8");
+    aurora_http_response_set_body(res,
+        "<!DOCTYPE html><html><head><title>404</title></head>"
+        "<body><h1>404 — Not Found</h1><p>Dev server could not find the requested file.</p>"
+        "</body></html>");
+}
+
+void aurora_dev_server(int64_t port, const char* src_dir) {
+    printf("[dev] starting dev server on port %lld, serving %s\n", (long long)port, src_dir);
+    AuroraServer* srv = aurora_server_init(port);
+    if (!srv) return;
+    aurora_server_static(srv, "/", src_dir);
+    aurora_server_start(srv);
+    if (!srv->running) return;
+
+    AuroraFileWatchState* watch = aurora_fs_watch_init(src_dir);
+    if (!watch) return;
+
+    /* Accept + handle loop with polling */
+    while (srv->running) {
+#ifdef _WIN32
+        SOCKET listen_sock = (SOCKET)(intptr_t)srv->handle;
+        fd_set readfds;
+        struct timeval tv;
+        FD_ZERO(&readfds);
+        FD_SET(listen_sock, &readfds);
+        tv.tv_sec = 0;
+        tv.tv_usec = 200000; /* 200ms timeout for polling */
+        if (select(0, &readfds, NULL, NULL, &tv) <= 0) {
+            /* Check for file changes */
+            if (aurora_fs_watch_poll(watch)) {
+                printf("[dev] file change detected, clients will reload\n");
+            }
+            continue;
+        }
+#else
+        int listen_sock = (int)(intptr_t)srv->handle;
+        fd_set readfds;
+        struct timeval tv;
+        FD_ZERO(&readfds);
+        FD_SET(listen_sock, &readfds);
+        tv.tv_sec = 0;
+        tv.tv_usec = 200000;
+        if (select(listen_sock + 1, &readfds, NULL, NULL, &tv) <= 0) {
+            if (aurora_fs_watch_poll(watch)) {
+                printf("[dev] file change detected, clients will reload\n");
+            }
+            continue;
+        }
+#endif
+        struct sockaddr_in client_addr;
+        int addr_len = sizeof(client_addr);
+#ifdef _WIN32
+        SOCKET client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
+        if (client == INVALID_SOCKET) continue;
+#else
+        int client = accept(listen_sock, (struct sockaddr*)&client_addr, (socklen_t*)&addr_len);
+        if (client < 0) continue;
+#endif
+        char raw[32768];
+#ifdef _WIN32
+        int n = recv(client, raw, sizeof(raw) - 1, 0);
+#else
+        int n = (int)recv(client, raw, sizeof(raw) - 1, 0);
+#endif
+        if (n > 0) {
+            raw[n] = '\0';
+            /* Check for live-reload event-stream request */
+            if (strstr(raw, "/__aurora_livereload")) {
+                /* Send SSE response and keep connection open; poll for changes */
+                const char* sse_hdr = "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: text/event-stream\r\n"
+                    "Cache-Control: no-cache\r\n"
+                    "Connection: keep-alive\r\n"
+                    "Access-Control-Allow-Origin: *\r\n\r\n"
+                    "data: connected\n\n";
+#ifdef _WIN32
+                send(client, sse_hdr, (int)strlen(sse_hdr), 0);
+#else
+                send(client, sse_hdr, strlen(sse_hdr), MSG_NOSIGNAL);
+#endif
+                /* Poll for changes in a tight loop */
+                int64_t last_change = 0;
+                while (srv->running) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    int changed = aurora_fs_watch_poll(watch);
+                    if (changed) {
+                        last_change = now_ms();
+                        const char* msg = "data: reload\n\n";
+#ifdef _WIN32
+                        send(client, msg, (int)strlen(msg), 0);
+#else
+                        send(client, msg, strlen(msg), MSG_NOSIGNAL);
+#endif
+                    }
+                    if (last_change && now_ms() - last_change > 2000)
+                        break;
+                }
+#ifdef _WIN32
+                closesocket(client);
+#else
+                close(client);
+#endif
+                continue;
+            }
+            AuroraHttpRequest* req = aurora_http_parse_request(raw);
+            AuroraHttpResponse* res = aurora_http_response_new();
+            if (req) {
+                dev_server_handle_request(req, res, srv);
+            } else {
+                aurora_http_response_set_status(res, 400, "Bad Request");
+                aurora_http_response_set_body(res, "Bad Request");
+            }
+            /* Inject live-reload script into HTML responses */
+            if (res->body && strstr(res->body, "<html") && strstr(res->body, "</body>")) {
+                inject_live_reload(res->body, strlen(res->body) + 512);
+                aurora_http_response_set_header(res, "Content-Length", "");
+            }
+            aurora_http_response_send(res, (int64_t)(intptr_t)client);
+            aurora_http_request_free(req);
+            aurora_http_response_free(res);
+        }
+#ifdef _WIN32
+        closesocket(client);
+#else
+        close(client);
+#endif
+    }
+    aurora_fs_watch_free(watch);
+    aurora_server_stop(srv);
+    free(srv);
+    printf("[dev] dev server stopped\n");
+}
+
 /* ── In-memory database engine ── */
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <sstream>
-#include <algorithm>
 
 static std::mutex g_db_mutex;
 

@@ -317,8 +317,28 @@ void aurora_gui_quit() {
     PostQuitMessage(0);
 }
 
-void aurora_gui_layout_horizontal(AuroraWidget, int) {}
-void aurora_gui_layout_vertical(AuroraWidget, int) {}
+void aurora_gui_layout_horizontal(AuroraWidget parent, int margin) {
+    GuiWidget* p = (GuiWidget*)parent;
+    if (!p || !p->hwnd) return;
+    int x = margin;
+    for (auto* w : g_widgets) {
+        if (w->parent == p && w->hwnd) {
+            MoveWindow(w->hwnd, x, margin, w->w, w->h, TRUE);
+            x += w->w + margin;
+        }
+    }
+}
+void aurora_gui_layout_vertical(AuroraWidget parent, int margin) {
+    GuiWidget* p = (GuiWidget*)parent;
+    if (!p || !p->hwnd) return;
+    int y = margin;
+    for (auto* w : g_widgets) {
+        if (w->parent == p && w->hwnd) {
+            MoveWindow(w->hwnd, margin, y, w->w, w->h, TRUE);
+            y += w->h + margin;
+        }
+    }
+}
 void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) {
     ((GuiWidget*)widget)->callback = cb;
 }
@@ -573,7 +593,27 @@ void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) {
     if (widget) ((GuiWidget*)widget)->callback = cb;
 }
 
-void aurora_gui_layout_horizontal(AuroraWidget, int) {}
-void aurora_gui_layout_vertical(AuroraWidget, int) {}
+void aurora_gui_layout_horizontal(AuroraWidget parent, int margin) {
+    GuiWidget* p = (GuiWidget*)parent;
+    if (!g_display || !p || !p->xwindow) return;
+    int x = margin;
+    for (auto* w : g_widgets) {
+        if (w->parent == p && w->xwindow) {
+            XMoveResizeWindow(g_display, w->xwindow, x, margin, w->w, w->h);
+            x += w->w + margin;
+        }
+    }
+}
+void aurora_gui_layout_vertical(AuroraWidget parent, int margin) {
+    GuiWidget* p = (GuiWidget*)parent;
+    if (!g_display || !p || !p->xwindow) return;
+    int y = margin;
+    for (auto* w : g_widgets) {
+        if (w->parent == p && w->xwindow) {
+            XMoveResizeWindow(g_display, w->xwindow, margin, y, w->w, w->h);
+            y += w->h + margin;
+        }
+    }
+}
 
 #endif

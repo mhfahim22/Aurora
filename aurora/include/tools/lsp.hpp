@@ -5,6 +5,8 @@
 #include <functional>
 #include <sstream>
 #include <memory>
+#include "compiler/ast.hpp"
+#include "compiler/lexer.hpp"
 
 /* ── JSON value type ── */
 struct JsonValue {
@@ -23,7 +25,7 @@ struct JsonValue {
     bool has(const std::string& key) const;
 };
 
-/* ── Simple JSON parser (recursive-descent) ── */
+/* ── Simple JSON parser ── */
 class JsonParser {
 public:
     static JsonValue parse(const std::string& json);
@@ -47,7 +49,7 @@ struct LspRange { LspPosition start; LspPosition end; };
 struct LspLocation { std::string uri; LspRange range; };
 struct LspDiagnostic {
     LspRange range;
-    int severity; /* 1=error,2=warning,3=info,4=hint */
+    int severity;
     std::string message;
     std::string source;
 };
@@ -56,13 +58,53 @@ struct LspCompletionItem {
     std::string detail;
     std::string documentation;
     std::string insertText;
-    int kind; /* 1=text,2=method,3=function,4=constructor,5=field,6=variable,7=class,8=interface,9=module,10=property,11=unit,12=value,13=enum,14=keyword,15=snippet,16=color,17=file,18=reference,19=folder,20=enumMember,21=constant,22=struct,23=event,24=operator,25=typeParameter */
+    int kind;
 };
 struct LspSymbol {
     std::string name;
-    std::string kind; /* "function", "class", "variable", "module", etc */
+    std::string kind;
     LspRange range;
     LspRange selectionRange;
+};
+struct LspFoldingRange {
+    int startLine;
+    int endLine;
+    std::string kind;
+};
+struct LspTextEdit {
+    LspRange range;
+    std::string newText;
+};
+struct LspCodeAction {
+    std::string title;
+    std::string kind;
+    std::vector<LspTextEdit> edits;
+    std::string diagnosticMessage;
+};
+
+/* ── Document state: caches lexed tokens + parsed AST per document ── */
+struct DocumentState {
+    std::string uri;
+    std::string text;
+    std::vector<LexedLine> lines;
+    ASTNode::Ptr ast;
+    std::string parseError;
+    bool dirty = true;
+
+    void update(const std::string& newText);
+    void reparse();
+    const LexedLine* find_line(int line) const;
+    const Token* find_token(int line, int col) const;
+    std::string get_word_at(int line, int col) const;
+};
+
+/* ── Semantic token types ── */
+struct SemanticToken {
+    int line;
+    int startChar;
+    int length;
+    int tokenType;
+    int tokenModifiers;
 };
 
 /* ── LSP Server ── */
@@ -83,30 +125,53 @@ private:
     void handle_message(const std::string& json);
     std::string handle_initialize(const std::string& params);
     std::string handle_shutdown();
+
+    /* Text document handlers */
+    void handle_did_open(const std::string& params);
+    void handle_did_change(const std::string& params);
+    void handle_did_save(const std::string& params);
+    void handle_did_close(const std::string& params);
+
+    /* Language features */
     std::string handle_completion(const std::string& params);
     std::string handle_definition(const std::string& params);
     std::string handle_hover(const std::string& params);
     std::string handle_references(const std::string& params);
     std::string handle_document_symbol(const std::string& params);
     std::string handle_signature_help(const std::string& params);
-    void handle_did_open(const std::string& params);
-    void handle_did_change(const std::string& params);
-    void handle_did_save(const std::string& params);
-    void handle_did_close(const std::string& params);
+    std::string handle_semantic_tokens(const std::string& params);
+    std::string handle_formatting(const std::string& params);
+    std::string handle_rename(const std::string& params);
+    std::string handle_folding_range(const std::string& params);
+    std::string handle_code_action(const std::string& params);
 
-    /* Analysis */
+    /* Analysis using real AST */
     void update_diagnostics(const std::string& uri, const std::string& text);
-    std::vector<LspDiagnostic> analyze(const std::string& text);
-    std::vector<LspCompletionItem> get_completions(const std::string& text, int line, int col);
-    std::vector<std::string> get_keywords();
-    std::vector<LspSymbol> get_symbols(const std::string& text);
+    std::vector<LspDiagnostic> analyze(DocumentState& doc);
+    std::vector<LspCompletionItem> get_completions(DocumentState& doc, int line, int col);
+    std::vector<LspSymbol> get_symbols(DocumentState& doc);
+    std::vector<SemanticToken> get_semantic_tokens(DocumentState& doc);
+    std::vector<LspFoldingRange> get_folding_ranges(DocumentState& doc);
+    std::vector<LspCodeAction> get_code_actions(DocumentState& doc, const std::string& diagMsg);
+    std::vector<LspTextEdit> get_formatting_edits(DocumentState& doc);
+    std::string get_definition_location(DocumentState& doc, int line, int col);
+    std::string get_hover_info(DocumentState& doc, int line, int col);
+    std::string get_signature_info(DocumentState& doc, int line, int col);
+    std::vector<LspLocation> get_all_references(DocumentState& doc, int line, int col);
+
+    /* AST walking helpers */
+    static void walk_ast(ASTNode* node, std::function<void(ASTNode*)> fn);
+    static ASTNode* find_def(ASTNode* root, const std::string& name);
+    static std::vector<ASTNode*> find_all_refs(ASTNode* root, const std::string& name);
+    static std::string node_type_name(NodeType t);
+    static int node_to_symbol_kind(NodeType t);
 
     /* JSON helpers */
     std::string get_json_field(const std::string& json, const std::string& field);
     std::string escape_json(const std::string& s);
 
     /* State */
-    std::map<std::string, std::string> open_documents_; /* uri -> text */
+    std::map<std::string, DocumentState> documents_;
     bool initialized_ = false;
     bool shutdown_ = false;
     std::string workspace_root_;

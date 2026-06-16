@@ -35,17 +35,27 @@ void Codegen::gen_function(const ASTNode* node) {
         ai++;
     }
 
+    /* Prevent inlining of closure-returning functions: when the
+       optimizer inlines them, the indirect call through the closure
+       {ptr,ptr} struct is incorrectly simplified into calling the
+       struct pointer directly instead of extracting field 0. */
+    if (closure_returning_fns_.count(node->value))
+        fn->addFnAttr(llvm::Attribute::NoInline);
+
     auto* entry_bb  = llvm::BasicBlock::Create(ctx_, "entry", fn);
     auto* saved_fn  = cur_fn_;
     auto* saved_bb  = builder_->GetInsertBlock();
-    auto  saved_scopes = std::move(scopes_);
     auto  saved_cache  = std::move(literal_aurora_cache_);
-    scopes_.clear();
 
     cur_fn_ = fn;
     builder_->SetInsertPoint(entry_bb);
 
+    /* Keep existing scopes (module-level vars etc.) accessible */
     push_scope();
+
+    /* Coverage: trace function entry */
+    if (coverage_enabled_ && node->value != "main")
+        emit_coverage_trace(node->src_line);
 
     /* Allocate params as i64 (for arithmetic) */
     ai = 0;
@@ -63,7 +73,6 @@ void Codegen::gen_function(const ASTNode* node) {
     safe_ret(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
 
     /* Restore caller context */
-    scopes_ = std::move(saved_scopes);
     literal_aurora_cache_ = std::move(saved_cache);
     cur_fn_ = saved_fn;
     if (saved_bb) builder_->SetInsertPoint(saved_bb);

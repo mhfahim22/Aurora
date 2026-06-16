@@ -1,0 +1,17 @@
+function direct_throw()
+    throw "test"
+end
+
+function main()
+    did_catch = false
+    try:
+        direct_throw()
+    catch e:
+        did_catch = true
+    end
+    if did_catch
+        output("caught")
+    else
+        output("NOT caught")
+    end
+end
