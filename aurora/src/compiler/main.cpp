@@ -583,6 +583,29 @@ static std::vector<std::string> detect_msvc_lib_paths() {
 }
 #endif
 
+/* ── Locate lld-link on Windows by searching common install paths ── */
+#ifdef _WIN32
+static std::string find_lld_link() {
+    /* Try PATH first */
+    std::vector<std::string> candidates = {
+        "lld-link",
+        "C:\\LLVM\\bin\\lld-link.exe",
+        "C:\\Program Files\\LLVM\\bin\\lld-link.exe",
+        "C:\\Program Files (x86)\\LLVM\\bin\\lld-link.exe",
+        "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\LLVM\\bin\\lld-link.exe",
+        "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\LLVM\\bin\\lld-link.exe",
+    };
+    /* Try LLVM_HOME env var */
+    const char* llvm_home = std::getenv("LLVM_HOME");
+    if (llvm_home)
+        candidates.push_back(std::string(llvm_home) + "\\bin\\lld-link.exe");
+    for (auto& c : candidates) {
+        if (fs::exists(c)) return c;
+    }
+    return "lld-link";
+}
+#endif
+
 /* ── Link object file into executable (cross-platform) ── */
 static bool link_exe(const std::string& obj_path, const std::string& exe_path,
                      const std::string& exe_dir,
@@ -596,13 +619,15 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     /* ── Windows: lld-link (COFF) ── */
     std::string rt_lib = exe_dir + "/aurora_runtime.lib";
     if (!fs::exists(rt_lib))
+        rt_lib = exe_dir + "/lib/aurora_runtime.lib";
+    if (!fs::exists(rt_lib))
         rt_lib = exe_dir + "/../build/Release/aurora_runtime.lib";
     if (!fs::exists(rt_lib))
         rt_lib = "aurora_runtime.lib";
 
     if (use_lto) lto_flag = " /LTCG";
 
-    cmd = "lld-link \"" + obj_path + "\" \"" + rt_lib + "\" /OUT:\"" + exe_path
+    cmd = find_lld_link() + " \"" + obj_path + "\" \"" + rt_lib + "\" /OUT:\"" + exe_path
         + "\" /NOLOGO /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE" + lto_flag;
 
     for (auto& lp : lib_paths)
