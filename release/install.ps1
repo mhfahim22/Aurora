@@ -49,9 +49,11 @@ try {
     Write-Host "Running installer..." -ForegroundColor Cyan
     Start-Process -FilePath $ExePath -Wait
     Remove-Item $ExePath -Force -ErrorAction SilentlyContinue
+    # Refresh PATH from registry for current session
+    $env:Path = [Environment]::GetEnvironmentVariable('Path','User')
     Write-Host ""
     Write-Host "Aurora $Version installed successfully!" -ForegroundColor Green
-    Write-Host "  Location: $InstallDir"
+    Write-Host "  Location: (choose during setup)"
     Write-Host "  Run: aurorac --repl"
     exit 0
 } catch {
