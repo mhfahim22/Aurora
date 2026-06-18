@@ -1,11 +1,11 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Aurora Language Installer — full installation with stdlib and runtime.
+    Aurora Language Installer — one-command setup for Windows.
 .DESCRIPTION
-    Downloads the latest Aurora release package (compiler, stdlib, runtime lib)
-    from GitHub and adds it to PATH.
-    Requires: Windows 10+, PowerShell 5+
+    Downloads and installs the latest Aurora release.
+    First tries the .exe setup (Inno Setup), falls back to .zip extraction.
+    Adds Aurora to PATH and sets AURORA_PATH/AURORA_LIB env vars.
 .LINK
     https://github.com/mhfahim22/Aurora
 #>
@@ -13,12 +13,11 @@
 $Repo = "mhfahim22/Aurora"
 $AppName = "Aurora"
 $InstallDir = "$env:LOCALAPPDATA\Aurora"
-$BinDir = "$InstallDir"
 
-# ── Ensure install directory ──
+# ── Helper: ensure directory exists ──
 if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null }
 
-# ── Fetch latest release from GitHub API ──
+# ── Fetch latest release ──
 Write-Host "Fetching latest Aurora release..." -ForegroundColor Cyan
 $ReleaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
 try {
@@ -30,14 +29,36 @@ try {
     $TagsUrl = "https://api.github.com/repos/$Repo/tags"
     $Tags = Invoke-RestMethod -Uri $TagsUrl -UseBasicParsing
     if (-not $Tags -or $Tags.Count -eq 0) {
-        Write-Error "No releases found. The project may not have any releases yet."
+        Write-Error "No releases found."
         exit 1
     }
     $Version = $Tags[0].name -replace '^v', ''
     $Release = $null
 }
 
-# ── Download ──
+# ── Try .exe installer first (Inno Setup) ──
+$ExeName = "Aurora-$Version-windows-x64-setup.exe"
+$ExeUrl = "https://github.com/$Repo/releases/download/v$Version/$ExeName"
+$ExePath = "$env:TEMP\$ExeName"
+
+Write-Host "Downloading $ExeName ..." -ForegroundColor Cyan
+try {
+    Invoke-WebRequest -Uri $ExeUrl -OutFile $ExePath -UseBasicParsing -TimeoutSec 120
+    Write-Host "  Downloaded successfully!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Running installer..." -ForegroundColor Cyan
+    Start-Process -FilePath $ExePath -Wait
+    Remove-Item $ExePath -Force -ErrorAction SilentlyContinue
+    Write-Host ""
+    Write-Host "Aurora $Version installed successfully!" -ForegroundColor Green
+    Write-Host "  Location: $InstallDir"
+    Write-Host "  Run: aurorac --repl"
+    exit 0
+} catch {
+    Write-Warning "Setup installer not available (no release build yet). Falling back to ZIP."
+}
+
+# ── Fallback: download and extract ZIP ──
 $AssetName = "Aurora-$Version-windows-x64.zip"
 $DownloadUrl = "https://github.com/$Repo/releases/download/v$Version/$AssetName"
 $ZipPath = "$env:TEMP\Aurora-$Version.zip"
@@ -51,77 +72,51 @@ try {
     exit 1
 }
 
-# ── Extract ──
-Write-Host "Extracting to $InstallDir ..." -ForegroundColor Cyan
-try {
-    # Remove old installation first
-    if (Test-Path "$InstallDir\aurorac.exe") {
-        Write-Host "  Removing previous installation..." -ForegroundColor Yellow
-        Remove-Item "$InstallDir\*" -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Expand-Archive -Path $ZipPath -DestinationPath $InstallDir -Force
-} catch {
-    Write-Error "Extraction failed: $($_.Exception.Message)"
-    exit 1
+Write-Host "  Extracting..." -ForegroundColor Cyan
+
+# ── Backup existing libc if present ──
+$LibcDir = Join-Path $InstallDir "libc"
+if (Test-Path $LibcDir) {
+    $BackupDir = "$env:TEMP\aurora_libc_backup_$(Get-Date -Format 'yyyyMMddHHmmss')"
+    Move-Item -Path $LibcDir -Destination $BackupDir -Force
+    Write-Host "  Backed up existing libc to $BackupDir"
 }
 
-# ── Cleanup zip ──
-Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue
+# ── Extract to temp then copy ──
+$ExtractDir = "$env:TEMP\AuroraExtract"
+if (Test-Path $ExtractDir) { Remove-Item -Path $ExtractDir -Recurse -Force }
+Expand-Archive -Path $ZipPath -DestinationPath $ExtractDir -Force
 
-# ── Verify ──
-$Exe = "$InstallDir\aurorac.exe"
-if (-not (Test-Path $Exe)) {
-    Write-Error "Installation corrupted: aurorac.exe not found"
-    exit 1
-}
+# ── Copy files ──
+Get-ChildItem -Path $ExtractDir | Copy-Item -Destination $InstallDir -Recurse -Force
+Remove-Item -Path $ExtractDir -Recurse -Force
+Remove-Item -Path $ZipPath -Force
 
-# ── Verify libc/ ──
-$LibcCount = @(Get-ChildItem "$InstallDir\libc\*.auf" -ErrorAction SilentlyContinue).Count
-if ($LibcCount -eq 0) {
-    Write-Warning "libc/ standard library not found. Some imports will not work."
-} else {
-    Write-Host "  [ok]   libc/ ($LibcCount .auf files)" -ForegroundColor Green
-}
-
-# ── Verify runtime lib ──
-if (Test-Path "$InstallDir\lib\aurora_runtime.lib") {
-    Write-Host "  [ok]   aurora_runtime.lib (for AOT compilation)" -ForegroundColor Green
-}
-
-# ── Add to PATH ──
-$UserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+# ── Add to PATH if not already present ──
+$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($UserPath -notlike "*$InstallDir*") {
-    $NewPath = if ($UserPath) { "$UserPath;$InstallDir" } else { $InstallDir }
-    [Environment]::SetEnvironmentVariable("PATH", $NewPath, "User")
-    $env:PATH = "$env:PATH;$InstallDir"
-    Write-Host "  [ok]   Added $InstallDir to PATH (user-level)" -ForegroundColor Green
+    $NewPath = "$InstallDir;$UserPath"
+    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
+    Write-Host "  Added $InstallDir to PATH" -ForegroundColor Green
 }
 
-# ── Print summary ──
+# ── Set AURORA_PATH and AURORA_LIB ──
+[Environment]::SetEnvironmentVariable("AURORA_PATH", "$InstallDir\libc", "User")
+[Environment]::SetEnvironmentVariable("AURORA_LIB", "$InstallDir\libc", "User")
+Write-Host "  Set AURORA_PATH = $InstallDir\libc" -ForegroundColor Green
+
+# ── Update current session PATH ──
+$env:Path = "$InstallDir;$env:Path"
+$env:AURORA_PATH = "$InstallDir\libc"
+$env:AURORA_LIB = "$InstallDir\libc"
+
 Write-Host ""
-Write-Host "╔═══════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║  Aurora Language v$Version installed!             ║" -ForegroundColor Green
-Write-Host "╠═══════════════════════════════════════════════╣" -ForegroundColor Green
-Write-Host "║  Compiler:    aurorac.exe                     ║" -ForegroundColor Green
-Write-Host "║  Package Mgr: voss.exe                        ║" -ForegroundColor Green
-Write-Host "║  Std Library: libc/ ($LibcCount files)         ║" -ForegroundColor Green
-Write-Host "║  Location:    $InstallDir" -ForegroundColor Green
-Write-Host "╚═══════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "Aurora $Version installed successfully!" -ForegroundColor Green
+Write-Host "  Location: $InstallDir"
+Write-Host "  libc:     $InstallDir\libc"
 Write-Host ""
-Write-Host "Quick start:" -ForegroundColor White
-Write-Host "  Create a file hello.aura:" -ForegroundColor Cyan
-Write-Host '    output("Hello, Aurora!")' -ForegroundColor White
-Write-Host "  Run it:" -ForegroundColor Cyan
-Write-Host "    aurorac hello.aura" -ForegroundColor White
+Write-Host "Quick test:" -ForegroundColor Cyan
+Write-Host "  aurorac --repl" -ForegroundColor White
+Write-Host "  aurorac --run examples/2d/flappy_bird.aura" -ForegroundColor White
 Write-Host ""
-Write-Host "Project workflow:" -ForegroundColor White
-Write-Host "  voss init my-project" -ForegroundColor Cyan
-Write-Host "  cd my-project" -ForegroundColor Cyan
-Write-Host "  voss run" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Cross-ecosystem bridges (requires network):" -ForegroundColor White
-Write-Host "  voss bridge pypi requests    # Python packages" -ForegroundColor Cyan
-Write-Host "  voss bridge npm lodash       # Node.js packages" -ForegroundColor Cyan
-Write-Host "  voss bridge cargo serde      # Rust crates" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Documentation: aurora/docs/language.md" -ForegroundColor White
+Write-Host "Close and reopen your terminal for PATH changes to take effect." -ForegroundColor Yellow
