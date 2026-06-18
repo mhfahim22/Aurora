@@ -101,6 +101,9 @@ Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_PATH"
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_LIB"; ValueData: "{app}\libc"; Flags: deletevalue
 
 [Code]
+const
+  WM_WININICHANGE = $001A;
+
 function NeedsAddPath(Param: string): boolean;
 var
   OrigPath: string;
@@ -111,4 +114,12 @@ begin
     exit;
   end;
   Result := Pos(LowerCase(Param), LowerCase(OrigPath)) = 0;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    SendBroadcastMessage(WM_WININICHANGE, 0, 'Environment');
+  end;
 end;
