@@ -43,6 +43,10 @@ typedef struct AuroraHttpRequest {
     char** query_param_values;
     int    query_param_count;
     char*  body;
+    /* Route path parameters (e.g. :id, :name) */
+    char** param_names;
+    char** param_values;
+    int    param_count;
 } AuroraHttpRequest;
 
 /* ── HTTP Response ── */
@@ -77,13 +81,17 @@ AuroraHttpRequest*  aurora_http_parse_request(const char* raw);
 void                aurora_http_request_free(AuroraHttpRequest* req);
 const char*         aurora_http_get_query_param(AuroraHttpRequest* req, const char* name);
 const char*         aurora_http_get_header(AuroraHttpRequest* req, const char* name);
+const char*         aurora_http_get_field(AuroraHttpRequest* req, const char* field);
+const char*         aurora_http_get_param(AuroraHttpRequest* req, const char* name);
 
 /* ── Response builder ── */
 AuroraHttpResponse* aurora_http_response_new(void);
 void                aurora_http_response_set_status(AuroraHttpResponse* res, int code, const char* text);
 void                aurora_http_response_set_header(AuroraHttpResponse* res, const char* name, const char* value);
 void                aurora_http_response_set_body(AuroraHttpResponse* res, const char* body);
+void                aurora_http_response_set_json(AuroraHttpResponse* res, const char* body);
 int                 aurora_http_response_send(AuroraHttpResponse* res, int64_t sock);
+int                 aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int chunk_size);
 void                aurora_http_response_free(AuroraHttpResponse* res);
 void                aurora_http_response_set_content_type(AuroraHttpResponse* res, const char* content_type);
 void                aurora_http_response_set_status_code(AuroraHttpResponse* res, int code);
@@ -176,6 +184,11 @@ void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router);
 void aurora_server_static(AuroraServer* srv, const char* prefix, const char* directory);
 int  aurora_server_serve_static(AuroraHttpRequest* req, AuroraHttpResponse* res, AuroraServer* srv);
 
+/* ── Simplified server run ── */
+void aurora_route_register(const char* method, const char* path, void* handler);
+void aurora_server_set_router(AuroraServer* srv, AuroraRouter* router);
+void aurora_server_run(AuroraServer* srv);
+
 /* ── Dev server with hot-reload ── */
 void aurora_dev_server(int64_t port, const char* src_dir);
 
@@ -183,6 +196,13 @@ void aurora_dev_server(int64_t port, const char* src_dir);
 AuroraFileWatchState* aurora_fs_watch_init(const char* dir);
 int  aurora_fs_watch_poll(AuroraFileWatchState* state);
 void aurora_fs_watch_free(AuroraFileWatchState* state);
+
+/* ── Todo Store ── */
+const char* aurora_todo_list(void);
+const char* aurora_todo_create(const char* title);
+const char* aurora_todo_get(const char* id_str);
+const char* aurora_todo_update(const char* id_str, const char* title, int64_t done);
+const char* aurora_todo_delete(const char* id_str);
 
 #ifdef __cplusplus
 }

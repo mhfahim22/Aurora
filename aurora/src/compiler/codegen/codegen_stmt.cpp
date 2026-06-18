@@ -1344,8 +1344,104 @@ void Codegen::gen_server(const ASTNode* node) {
     if (node->left)
         port = gen_expr(node->left.get());
     llvm::Value* srv = builder_->CreateCall(server_init_, { port }, "server");
-    gen_block(node->body.get());
-    builder_->CreateCall(server_start_, { srv });
+
+    /* Route counter for generating unique handler function names */
+    static uint64_t route_counter = 0;
+
+    /* Process body: for each route node, generate a handler function and register it */
+    const ASTNode* child = node->body.get();
+    while (child) {
+        if (child->type == NodeType::Route) {
+            /* Create handler function: void(i8* req, i8* res) */
+            std::string handler_name = "_route_hdl_" + std::to_string(route_counter++);
+            auto* hdl_fn_type = llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i8ptr_ty() }, false);
+            auto* hdl_fn = llvm::Function::Create(
+                hdl_fn_type, llvm::Function::InternalLinkage, handler_name, module_.get());
+            auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", hdl_fn);
+
+            /* Save current function state */
+            auto* saved_fn = cur_fn_;
+            auto saved_ip = builder_->saveIP();
+
+            /* Set insert point to entry of new handler function */
+            builder_->SetInsertPoint(entry_bb);
+            cur_fn_ = hdl_fn;
+
+            /* Clear literal cache — cached SSA values belong to the prior function */
+            literal_aurora_cache_.clear();
+
+            /* Get req/res parameters and give them names so they can be referenced */
+            auto arg_it = hdl_fn->arg_begin();
+            llvm::Value* req_param = arg_it++;
+            llvm::Value* res_param = arg_it++;
+            req_param->setName("req");
+            res_param->setName("res");
+
+            /* Push a scope for handler-local variables */
+            push_scope();
+
+            /* Store req/res in scope so response()/request keywords can find them */
+            /* Borrowed: the C caller (aurora_server_accept_and_handle) owns and frees these */
+            declare_var("__http_req", create_entry_alloca("__http_req", i8ptr_ty()), OwnershipState::Borrowed);
+            declare_var("__http_res", create_entry_alloca("__http_res", i8ptr_ty()), OwnershipState::Borrowed);
+            builder_->CreateStore(req_param, lookup_var("__http_req")->alloca_ptr);
+            builder_->CreateStore(res_param, lookup_var("__http_res")->alloca_ptr);
+
+            /* Set default Content-Type */
+            if (http_resp_ct_) {
+                llvm::Value* ct = builder_->CreateGlobalStringPtr("application/json", "ct");
+                builder_->CreateCall(http_resp_ct_, { res_param, ct });
+            }
+
+            /* Generate the route handler body code */
+            gen_block(child->body.get());
+
+            /* Pop handler scope (drop __http_req/__http_res local allocas) */
+            pop_scope_and_drop();
+
+            builder_->CreateRetVoid();
+
+            /* Restore codegen state */
+            cur_fn_ = saved_fn;
+            builder_->restoreIP(saved_ip);
+
+            /* Register the handler function */
+            if (route_register_) {
+                /* Method from route's left child (default "GET") */
+                llvm::Value* method_str = nullptr;
+                if (child->left) {
+                    method_str = gen_expr(child->left.get());
+                    if (method_str->getType() != i8ptr_ty())
+                        method_str = builder_->CreateBitCast(method_str, i8ptr_ty());
+                    /* Convert AuroraStr* to const char* */
+                    llvm::Function* str_to_c = module_->getFunction("aurora_str_as_cstr");
+                    if (str_to_c)
+                        method_str = builder_->CreateCall(str_to_c, { method_str }, "method_cstr");
+                }
+                if (!method_str)
+                    method_str = builder_->CreateGlobalStringPtr("GET", "rmethod");
+
+                /* Path from child's value */
+                llvm::Value* path_str = builder_->CreateGlobalStringPtr(
+                    child->value.empty() ? "/" : child->value.c_str(), "rpath");
+
+                /* Cast handler function to i8* */
+                llvm::Value* hdl_ptr = builder_->CreateBitCast(hdl_fn, i8ptr_ty(), "hdl");
+
+                builder_->CreateCall(route_register_, { method_str, path_str, hdl_ptr });
+            }
+        } else {
+            gen_stmt(child);
+        }
+        child = child->next.get();
+    }
+
+    /* Start the server run loop */
+    if (server_run_) {
+        builder_->CreateCall(server_run_, { srv });
+    } else if (server_start_) {
+        builder_->CreateCall(server_start_, { srv });
+    }
 }
 
 void Codegen::gen_api(const ASTNode* node) {
@@ -1362,14 +1458,14 @@ void Codegen::gen_api(const ASTNode* node) {
             /* Generate the handler function */
             gen_function(child);
             /* Register it as a route if it has a path annotation */
-            llvm::Function* fn_route = module_->getFunction("aurora_route_register");
-            if (fn_route && !child->value.empty()) {
+            if (route_register_ && !child->value.empty()) {
+                llvm::Value* method_str = builder_->CreateGlobalStringPtr("GET", "api_method");
                 llvm::Value* path_str = builder_->CreateGlobalStringPtr(
                     "/" + child->value, "api_route");
                 llvm::Function* handler_fn = module_->getFunction(child->value);
                 if (handler_fn) {
                     llvm::Value* handler_ptr = builder_->CreateBitCast(handler_fn, i8ptr_ty());
-                    builder_->CreateCall(fn_route, { path_str, handler_ptr });
+                    builder_->CreateCall(route_register_, { method_str, path_str, handler_ptr });
                 }
             }
         } else {
@@ -1521,6 +1617,7 @@ void Codegen::gen_theme(const ASTNode* node) {
 
 void Codegen::gen_route(const ASTNode* node) {
     if (!route_register_) return;
+    llvm::Value* method = builder_->CreateGlobalStringPtr("GET", "rmethod");
     llvm::Value* path = llvm::ConstantPointerNull::get(i8ptr_ty());
     llvm::Value* handler = llvm::ConstantPointerNull::get(i8ptr_ty());
     if (node->left) {
@@ -1528,7 +1625,7 @@ void Codegen::gen_route(const ASTNode* node) {
         if (node->left->next)
             handler = gen_expr(node->left->next.get());
     }
-    builder_->CreateCall(route_register_, { path, handler });
+    builder_->CreateCall(route_register_, { method, path, handler });
     if (node->body) gen_block(node->body.get());
 }
 

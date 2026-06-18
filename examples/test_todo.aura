@@ -1,0 +1,4 @@
+outputln("Testing todo functions...")
+result = aurora_todo_list()
+outputln(result)
+outputln("Done!")

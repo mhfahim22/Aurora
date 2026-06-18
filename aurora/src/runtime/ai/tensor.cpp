@@ -12,6 +12,13 @@
 #if AURORA_CUDA
 extern "C" int cuda_matmul_available();
 extern "C" int cuda_matmul(double* A, double* B, double* C, int64_t M, int64_t K, int64_t N);
+extern "C" int cuda_elewise_available();
+extern "C" int cuda_add_f32(const float* a, const float* b, float* out, int64_t n);
+extern "C" int cuda_sub_f32(const float* a, const float* b, float* out, int64_t n);
+extern "C" int cuda_mul_f32(const float* a, const float* b, float* out, int64_t n);
+extern "C" int cuda_div_f32(const float* a, const float* b, float* out, int64_t n);
+extern "C" int cuda_relu_f32(float* data, int64_t n);
+extern "C" int cuda_sigmoid_f32(float* data, int64_t n);
 #elif AURORA_HIP
 extern "C" int hip_matmul_available();
 extern "C" int hip_matmul(double* A, double* B, double* C, int64_t M, int64_t K, int64_t N);
@@ -23,6 +30,21 @@ extern "C" int dml_matmul(const float* A, const float* B, float* C, int64_t M, i
 #endif
 
 extern "C" {
+
+/* ── Forward declarations for autograd functions ── */
+struct AuroraTensor;
+static void backward_add(AuroraTensor* self);
+static void backward_sub(AuroraTensor* self);
+static void backward_mul(AuroraTensor* self);
+static void backward_div(AuroraTensor* self);
+static void backward_pow(AuroraTensor* self);
+static void backward_matmul(AuroraTensor* self);
+static void backward_relu(AuroraTensor* self);
+static void backward_sigmoid(AuroraTensor* self);
+static void backward_tanh(AuroraTensor* self);
+static AuroraTensor* link_grad(AuroraTensor* result, void (*backward)(AuroraTensor*),
+                                AuroraTensor* input1, AuroraTensor* input2,
+                                AuroraTensor* input3, AuroraTensor* input4);
 
 /* ── Helper: compute total size from shape ── */
 static int64_t tensor_compute_size(int64_t ndim, int64_t* shape) {
@@ -98,6 +120,7 @@ void aurora_tensor_free(AuroraTensor* t) {
     if (!t) return;
     free(t->shape);
     free(t->data_ptr);
+    free(t->grad);
     free(t);
 }
 
@@ -280,6 +303,7 @@ AuroraTensor* aurora_tensor_matmul(AuroraTensor* a, AuroraTensor* b) {
             if (dml_matmul(a2->data_f32, b2->data_f32, r->data_f32, M, N, K)) {
                 if (a2 != a) aurora_tensor_free(a2);
                 if (b2 != b) aurora_tensor_free(b2);
+                link_grad(r, backward_matmul, a, b, 0, 0);
                 return r;
             }
         }
@@ -288,6 +312,7 @@ AuroraTensor* aurora_tensor_matmul(AuroraTensor* a, AuroraTensor* b) {
 
         if (a2 != a) aurora_tensor_free(a2);
         if (b2 != b) aurora_tensor_free(b2);
+        link_grad(r, backward_matmul, a, b, 0, 0);
         return r;
     }
 
@@ -297,13 +322,17 @@ AuroraTensor* aurora_tensor_matmul(AuroraTensor* a, AuroraTensor* b) {
 
 #if AURORA_CUDA
     if (cuda_matmul_available()) {
-        if (cuda_matmul(a->data, b->data, r->data, M, K, N))
+        if (cuda_matmul(a->data, b->data, r->data, M, K, N)) {
+            link_grad(r, backward_matmul, a, b, 0, 0);
             return r;
+        }
     }
 #elif AURORA_HIP
     if (hip_matmul_available()) {
-        if (hip_matmul(a->data, b->data, r->data, M, K, N))
+        if (hip_matmul(a->data, b->data, r->data, M, K, N)) {
+            link_grad(r, backward_matmul, a, b, 0, 0);
             return r;
+        }
     }
 #endif
 
@@ -317,6 +346,7 @@ AuroraTensor* aurora_tensor_matmul(AuroraTensor* a, AuroraTensor* b) {
             r->data[i * N + j] = sum;
         }
     }
+    link_grad(r, backward_matmul, a, b, 0, 0);
     return r;
 }
 
@@ -346,10 +376,19 @@ AuroraTensor* aurora_tensor_add(AuroraTensor* a, AuroraTensor* b) {
         aurora_tensor_new_f32(a->ndim, a->shape) : aurora_tensor_new(a->ndim, a->shape);
     int64_t n = r->total_size;
     if (dt == TENSOR_F32) {
+#if AURORA_CUDA
+        if (a->dtype == TENSOR_F32 && b->dtype == TENSOR_F32 && cuda_elewise_available()) {
+            if (cuda_add_f32(a->data_f32, b->data_f32, r->data_f32, n)) {
+                link_grad(r, backward_add, a, b, 0, 0);
+                return r;
+            }
+        }
+#endif
         for (int64_t i = 0; i < n; i++) r->data_f32[i] = (float)(tensor_read_f64(a, i) + tensor_read_f64(b, i));
     } else {
         for (int64_t i = 0; i < n; i++) r->data[i] = tensor_read_f64(a, i) + tensor_read_f64(b, i);
     }
+    link_grad(r, backward_add, a, b, 0, 0);
     return r;
 }
 
@@ -360,10 +399,19 @@ AuroraTensor* aurora_tensor_sub(AuroraTensor* a, AuroraTensor* b) {
         aurora_tensor_new_f32(a->ndim, a->shape) : aurora_tensor_new(a->ndim, a->shape);
     int64_t n = r->total_size;
     if (dt == TENSOR_F32) {
+#if AURORA_CUDA
+        if (a->dtype == TENSOR_F32 && b->dtype == TENSOR_F32 && cuda_elewise_available()) {
+            if (cuda_sub_f32(a->data_f32, b->data_f32, r->data_f32, n)) {
+                link_grad(r, backward_sub, a, b, 0, 0);
+                return r;
+            }
+        }
+#endif
         for (int64_t i = 0; i < n; i++) r->data_f32[i] = (float)(tensor_read_f64(a, i) - tensor_read_f64(b, i));
     } else {
         for (int64_t i = 0; i < n; i++) r->data[i] = tensor_read_f64(a, i) - tensor_read_f64(b, i);
     }
+    link_grad(r, backward_sub, a, b, 0, 0);
     return r;
 }
 
@@ -374,10 +422,19 @@ AuroraTensor* aurora_tensor_mul(AuroraTensor* a, AuroraTensor* b) {
         aurora_tensor_new_f32(a->ndim, a->shape) : aurora_tensor_new(a->ndim, a->shape);
     int64_t n = r->total_size;
     if (dt == TENSOR_F32) {
+#if AURORA_CUDA
+        if (a->dtype == TENSOR_F32 && b->dtype == TENSOR_F32 && cuda_elewise_available()) {
+            if (cuda_mul_f32(a->data_f32, b->data_f32, r->data_f32, n)) {
+                link_grad(r, backward_mul, a, b, 0, 0);
+                return r;
+            }
+        }
+#endif
         for (int64_t i = 0; i < n; i++) r->data_f32[i] = (float)(tensor_read_f64(a, i) * tensor_read_f64(b, i));
     } else {
         for (int64_t i = 0; i < n; i++) r->data[i] = tensor_read_f64(a, i) * tensor_read_f64(b, i);
     }
+    link_grad(r, backward_mul, a, b, 0, 0);
     return r;
 }
 
@@ -388,6 +445,14 @@ AuroraTensor* aurora_tensor_div(AuroraTensor* a, AuroraTensor* b) {
         aurora_tensor_new_f32(a->ndim, a->shape) : aurora_tensor_new(a->ndim, a->shape);
     int64_t n = r->total_size;
     if (dt == TENSOR_F32) {
+#if AURORA_CUDA
+        if (a->dtype == TENSOR_F32 && b->dtype == TENSOR_F32 && cuda_elewise_available()) {
+            if (cuda_div_f32(a->data_f32, b->data_f32, r->data_f32, n)) {
+                link_grad(r, backward_div, a, b, 0, 0);
+                return r;
+            }
+        }
+#endif
         for (int64_t i = 0; i < n; i++) {
             double bv = tensor_read_f64(b, i);
             r->data_f32[i] = (float)(bv != 0.0 ? tensor_read_f64(a, i) / bv : 0.0);
@@ -398,6 +463,7 @@ AuroraTensor* aurora_tensor_div(AuroraTensor* a, AuroraTensor* b) {
             r->data[i] = bv != 0.0 ? tensor_read_f64(a, i) / bv : 0.0;
         }
     }
+    link_grad(r, backward_div, a, b, 0, 0);
     return r;
 }
 
@@ -427,6 +493,7 @@ AuroraTensor* aurora_tensor_pow(AuroraTensor* a, double exp_val) {
     } else {
         for (int64_t i = 0; i < n; i++) r->data[i] = pow(tensor_read_f64(a, i), exp_val);
     }
+    link_grad(r, backward_pow, a, 0, 0, 0);
     return r;
 }
 
@@ -627,18 +694,41 @@ AuroraTensor* aurora_tensor_slice(AuroraTensor* t, int64_t start, int64_t end, i
     return nullptr;
 }
 
-/* ── Activation functions (in-place, dtype-aware) ── */
+/* ── Activation functions (in-place, dtype-aware, autograd-aware) ── */
 void aurora_tensor_relu(AuroraTensor* t) {
     if (!t) return;
     int64_t n = t->total_size;
-    for (int64_t i = 0; i < n; i++) {
-        double v = tensor_read_f64(t, i);
-        if (v < 0.0) v = 0.0;
-        switch (t->dtype) {
-            case TENSOR_F32: t->data_f32[i] = (float)v; break;
-            case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
-            case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
-            default: t->data[i] = v; break;
+    if (t->dtype == TENSOR_F32) {
+#if AURORA_CUDA
+        if (cuda_elewise_available()) {
+            if (cuda_relu_f32(t->data_f32, n)) {
+                if (t->requires_grad) {
+                    t->backward_fn = backward_relu;
+                    if (t->prev_count == 0) t->prev[t->prev_count++] = t;
+                }
+                return;
+            }
+        }
+#endif
+        for (int64_t i = 0; i < n; i++)
+            if (t->data_f32[i] < 0.0f) t->data_f32[i] = 0.0f;
+    } else {
+        for (int64_t i = 0; i < n; i++) {
+            double v = tensor_read_f64(t, i);
+            if (v < 0.0) v = 0.0;
+            switch (t->dtype) {
+                case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
+                case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
+                default: t->data[i] = v; break;
+            }
+        }
+    }
+    if (t->requires_grad) {
+        /* Chain backward: the current backward_fn runs after this activation's backward */
+        t->backward_fn = backward_relu;
+        /* Ensure t is in its own prev list for topo_sort */
+        if (t->prev_count == 0) {
+            t->prev[t->prev_count++] = t;
         }
     }
 }
@@ -646,13 +736,34 @@ void aurora_tensor_relu(AuroraTensor* t) {
 void aurora_tensor_sigmoid(AuroraTensor* t) {
     if (!t) return;
     int64_t n = t->total_size;
-    for (int64_t i = 0; i < n; i++) {
-        double v = 1.0 / (1.0 + exp(-tensor_read_f64(t, i)));
-        switch (t->dtype) {
-            case TENSOR_F32: t->data_f32[i] = (float)v; break;
-            case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
-            case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
-            default: t->data[i] = v; break;
+    if (t->dtype == TENSOR_F32) {
+#if AURORA_CUDA
+        if (cuda_elewise_available()) {
+            if (cuda_sigmoid_f32(t->data_f32, n)) {
+                if (t->requires_grad) {
+                    t->backward_fn = backward_sigmoid;
+                    if (t->prev_count == 0) t->prev[t->prev_count++] = t;
+                }
+                return;
+            }
+        }
+#endif
+        for (int64_t i = 0; i < n; i++)
+            t->data_f32[i] = 1.0f / (1.0f + expf(-t->data_f32[i]));
+    } else {
+        for (int64_t i = 0; i < n; i++) {
+            double v = 1.0 / (1.0 + exp(-tensor_read_f64(t, i)));
+            switch (t->dtype) {
+                case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
+                case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
+                default: t->data[i] = v; break;
+            }
+        }
+    }
+    if (t->requires_grad) {
+        t->backward_fn = backward_sigmoid;
+        if (t->prev_count == 0) {
+            t->prev[t->prev_count++] = t;
         }
     }
 }
@@ -667,6 +778,12 @@ void aurora_tensor_tanh(AuroraTensor* t) {
             case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
             case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
             default: t->data[i] = v; break;
+        }
+    }
+    if (t->requires_grad) {
+        t->backward_fn = backward_tanh;
+        if (t->prev_count == 0) {
+            t->prev[t->prev_count++] = t;
         }
     }
 }
@@ -706,6 +823,308 @@ AuroraTensor* aurora_predict(AuroraTensor* model, AuroraTensor* input) {
     aurora_tensor_free(weights);
     aurora_tensor_free(bias);
     return result;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Autograd — Computational Graph for Tensors
+   ════════════════════════════════════════════════════════════ */
+
+/* Enable/disable gradient tracking on a tensor (also allocates grad buffer) */
+void aurora_tensor_set_requires_grad(AuroraTensor* t, int flag) {
+    if (!t) return;
+    t->requires_grad = flag;
+    if (flag && !t->grad) {
+        t->grad = (double*)calloc((size_t)t->total_size, sizeof(double));
+    } else if (!flag && t->grad) {
+        free(t->grad);
+        t->grad = nullptr;
+    }
+}
+
+/* Helper: link result tensor to input tensors for autograd graph */
+/* Returns result tensor (so it can be chained) */
+static AuroraTensor* link_grad(AuroraTensor* result, void (*backward)(AuroraTensor*),
+                                AuroraTensor* input1, AuroraTensor* input2,
+                                AuroraTensor* input3, AuroraTensor* input4) {
+    result->backward_fn = backward;
+    if (input1 && input1->requires_grad) {
+        result->prev[result->prev_count++] = input1;
+        result->requires_grad = 1;
+    }
+    if (input2 && input2->requires_grad) {
+        result->prev[result->prev_count++] = input2;
+        result->requires_grad = 1;
+    }
+    if (input3 && input3->requires_grad) {
+        result->prev[result->prev_count++] = input3;
+        result->requires_grad = 1;
+    }
+    if (input4 && input4->requires_grad) {
+        result->prev[result->prev_count++] = input4;
+        result->requires_grad = 1;
+    }
+    if (result->requires_grad) {
+        result->grad = (double*)calloc((size_t)result->total_size, sizeof(double));
+    }
+    return result;
+}
+
+/* ── Backward functions for each operation ── */
+
+/* add backward: grad flows equally to both inputs */
+static void backward_add(AuroraTensor* self) {
+    int64_t n = self->total_size;
+    for (int i = 0; i < self->prev_count && i < 2; i++) {
+        AuroraTensor* p = self->prev[i];
+        if (p && p->grad) {
+            for (int64_t j = 0; j < n && j < p->total_size; j++)
+                p->grad[j] += self->grad[j];
+        }
+    }
+}
+
+/* sub backward: grad flows + to a, - to b */
+static void backward_sub(AuroraTensor* self) {
+    int64_t n = self->total_size;
+    if (self->prev_count >= 1 && self->prev[0] && self->prev[0]->grad) {
+        for (int64_t j = 0; j < n && j < self->prev[0]->total_size; j++)
+            self->prev[0]->grad[j] += self->grad[j];
+    }
+    if (self->prev_count >= 2 && self->prev[1] && self->prev[1]->grad) {
+        for (int64_t j = 0; j < n && j < self->prev[1]->total_size; j++)
+            self->prev[1]->grad[j] -= self->grad[j];
+    }
+}
+
+/* mul backward: grad_a = grad * b, grad_b = grad * a */
+static void backward_mul(AuroraTensor* self) {
+    int64_t n = self->total_size;
+    if (self->prev_count >= 1 && self->prev[0] && self->prev[0]->grad) {
+        AuroraTensor* a = self->prev[0];
+        AuroraTensor* b = (self->prev_count >= 2) ? self->prev[1] : nullptr;
+        for (int64_t j = 0; j < n && j < a->total_size; j++)
+            a->grad[j] += self->grad[j] * (b ? tensor_read_f64(b, j) : 1.0);
+    }
+    if (self->prev_count >= 2 && self->prev[1] && self->prev[1]->grad) {
+        AuroraTensor* b = self->prev[1];
+        AuroraTensor* a = self->prev[0];
+        for (int64_t j = 0; j < n && j < b->total_size; j++)
+            b->grad[j] += self->grad[j] * (a ? tensor_read_f64(a, j) : 1.0);
+    }
+}
+
+/* div backward: grad_a = grad/b, grad_b = -grad*a/(b*b) */
+static void backward_div(AuroraTensor* self) {
+    if (self->prev_count >= 1 && self->prev[0] && self->prev[0]->grad) {
+        AuroraTensor* a = self->prev[0];
+        AuroraTensor* b = (self->prev_count >= 2) ? self->prev[1] : nullptr;
+        for (int64_t j = 0; j < a->total_size; j++) {
+            double bv = b ? tensor_read_f64(b, j) : 1.0;
+            a->grad[j] += self->grad[j] / (bv != 0.0 ? bv : 1.0);
+        }
+    }
+    if (self->prev_count >= 2 && self->prev[1] && self->prev[1]->grad) {
+        AuroraTensor* b = self->prev[1];
+        AuroraTensor* a = self->prev[0];
+        for (int64_t j = 0; j < b->total_size; j++) {
+            double bv = tensor_read_f64(b, j);
+            double av = a ? tensor_read_f64(a, j) : 1.0;
+            b->grad[j] -= self->grad[j] * av / (bv * bv + 1e-12);
+        }
+    }
+}
+
+/* pow backward: grad_a = grad * exp * a^(exp-1) */
+static void backward_pow(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* a = self->prev[0];
+    /* exp is stored as data1 in self or we extract from the forward op */
+    double exp_val = 2.0; /* default if not set */
+    for (int64_t j = 0; j < a->total_size; j++) {
+        double av = tensor_read_f64(a, j);
+        a->grad[j] += self->grad[j] * exp_val * pow(av, exp_val - 1.0);
+    }
+}
+
+/* matmul backward: grad_a = grad @ b.T, grad_b = a.T @ grad */
+static void backward_matmul(AuroraTensor* self) {
+    if (!self->prev_count) return;
+    AuroraTensor* a = self->prev[0];
+    AuroraTensor* b = (self->prev_count >= 2) ? self->prev[1] : nullptr;
+    if (a && a->grad && a->ndim == 2 && self->ndim == 2) {
+        int64_t M = self->shape[0], N = self->shape[1];
+        int64_t Ka = a->shape[1];
+        /* grad_a = self->grad @ b.T  (M x Ka) = (M x N) @ (N x Ka after transpose) */
+        if (b && a->grad) {
+            for (int64_t i = 0; i < M; i++)
+                for (int64_t k = 0; k < Ka; k++)
+                    for (int64_t j = 0; j < N; j++)
+                        a->grad[i * Ka + k] += self->grad[i * N + j] * tensor_read_f64(b, k * N + j);
+        }
+    }
+    if (b && b->grad && b->ndim == 2 && self->ndim == 2 && a && a->ndim == 2) {
+        int64_t M = self->shape[0], N = self->shape[1];
+        int64_t Kb = b->shape[0];
+        /* grad_b = a.T @ self->grad  (Ka x N) = (Kb x M after transpose) @ (M x N) */
+        for (int64_t k = 0; k < Kb; k++)
+            for (int64_t j = 0; j < N; j++)
+                for (int64_t i = 0; i < M; i++)
+                    b->grad[k * N + j] += tensor_read_f64(a, i * Kb + k) * self->grad[i * N + j];
+    }
+}
+
+/* relu backward: grad = grad * (input > 0) */
+static void backward_relu(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    for (int64_t j = 0; j < input->total_size; j++) {
+        double iv = tensor_read_f64(input, j);
+        double sg = (self->grad && j < self->total_size) ? self->grad[j] : 0.0;
+        input->grad[j] += (iv > 0.0) ? sg : 0.0;
+    }
+}
+
+/* sigmoid backward (in-place): grad = grad * out * (1 - out) */
+/* Since sigmoid is in-place, the tensor now contains sigmoid(x). */
+/* dsigmoid/dx = out * (1 - out), we compute from the current value. */
+static void backward_sigmoid(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    for (int64_t j = 0; j < input->total_size; j++) {
+        double out_val = tensor_read_f64(input, j);
+        double sg = (self->grad && j < self->total_size) ? self->grad[j] : 0.0;
+        input->grad[j] += sg * out_val * (1.0 - out_val);
+    }
+}
+
+/* tanh backward (in-place): grad = grad * (1 - out^2) */
+static void backward_tanh(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    for (int64_t j = 0; j < input->total_size; j++) {
+        double out_val = tensor_read_f64(input, j);
+        double sg = (self->grad && j < self->total_size) ? self->grad[j] : 0.0;
+        input->grad[j] += sg * (1.0 - out_val * out_val);
+    }
+}
+
+/* Helper: topologically sort the graph for backward traversal */
+static void topo_sort(AuroraTensor* t, AuroraTensor** order, int* count, int max_depth) {
+    if (!t || max_depth <= 0) return;
+    /* Visit children first (parents in the graph = prev tensors) */
+    for (int i = 0; i < t->prev_count; i++) {
+        if (t->prev[i]) {
+            /* Check if already in order */
+            int found = 0;
+            for (int j = 0; j < *count; j++)
+                if (order[j] == t->prev[i]) { found = 1; break; }
+            if (!found)
+                topo_sort(t->prev[i], order, count, max_depth - 1);
+        }
+    }
+    /* Add self if not already in order */
+    int found = 0;
+    for (int j = 0; j < *count; j++)
+        if (order[j] == t) { found = 1; break; }
+    if (!found && *count < 1024)
+        order[(*count)++] = t;
+}
+
+/* ── Main backward() function ── */
+void aurora_tensor_backward(AuroraTensor* t) {
+    if (!t || !t->requires_grad) return;
+    /* Initialize gradient of output tensor to 1 (scalar assumption) */
+    if (t->grad && t->total_size > 0) t->grad[0] = 1.0;
+
+    /* Topological sort */
+    AuroraTensor* order[1024];
+    int count = 0;
+    topo_sort(t, order, &count, 256);
+
+    /* Traverse in reverse topological order (root last → visited first) */
+    for (int i = count - 1; i >= 0; i--) {
+        if (order[i]->backward_fn)
+            order[i]->backward_fn(order[i]);
+    }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SGD Optimizer Step
+   ════════════════════════════════════════════════════════════ */
+
+/* Apply gradient descent: param = param - lr * grad */
+void aurora_tensor_sgd_step(AuroraTensor* param, double lr) {
+    if (!param || !param->grad || !param->data) return;
+    for (int64_t i = 0; i < param->total_size; i++) {
+        param->data[i] -= lr * param->grad[i];
+    }
+}
+
+/* ════════════════════════════════════════════════════════════
+   INT8 Quantization Helpers
+   ════════════════════════════════════════════════════════════ */
+
+/* Quantize F32 tensor to INT8 with scale and zero_point */
+/* Returns a new tensor with dtype indicating 'quantized' */
+AuroraTensor* aurora_tensor_quantize_i8(AuroraTensor* t) {
+    if (!t) return nullptr;
+    /* Work in F32 for quantization */
+    AuroraTensor* src = (t->dtype == TENSOR_F32) ? t : aurora_tensor_to_f32(t);
+
+    int64_t n = src->total_size;
+    /* Find min/max */
+    float min_val = src->data_f32[0], max_val = src->data_f32[0];
+    for (int64_t i = 1; i < n; i++) {
+        if (src->data_f32[i] < min_val) min_val = src->data_f32[i];
+        if (src->data_f32[i] > max_val) max_val = src->data_f32[i];
+    }
+
+    /* Compute scale and zero_point for symmetric INT8 */
+    float abs_max = (fabsf(min_val) > fabsf(max_val)) ? fabsf(min_val) : fabsf(max_val);
+    float scale = (abs_max > 1e-10f) ? abs_max / 127.0f : 1.0f;
+    int8_t zero_point = 0;
+
+    /* Allocate quantized tensor — we reuse total_size for element count */
+    AuroraTensor* q = (AuroraTensor*)calloc(1, sizeof(AuroraTensor));
+    q->ndim = t->ndim;
+    q->shape = (int64_t*)malloc((size_t)t->ndim * sizeof(int64_t));
+    memcpy(q->shape, t->shape, (size_t)t->ndim * sizeof(int64_t));
+    q->total_size = n;
+    q->dtype = 10; /* TENSOR_QINT8 marker */
+    q->data_ptr = malloc((size_t)n * sizeof(int8_t));
+
+    int8_t* qdata = (int8_t*)q->data_ptr;
+    for (int64_t i = 0; i < n; i++) {
+        int32_t qv = (int32_t)roundf(src->data_f32[i] / scale);
+        if (qv > 127) qv = 127;
+        if (qv < -128) qv = -128;
+        qdata[i] = (int8_t)qv;
+    }
+
+    /* Store scale and zero_point after the data (for dequantize) */
+    /* We store them in a small metadata block */
+    float* meta = (float*)malloc(2 * sizeof(float));
+    meta[0] = scale;
+    meta[1] = (float)zero_point;
+    q->grad = (double*)meta; /* Reuse grad pointer for metadata storage */
+
+    if (src != t) aurora_tensor_free(src);
+    return q;
+}
+
+/* Dequantize INT8 tensor back to F64 */
+AuroraTensor* aurora_tensor_dequantize(AuroraTensor* q) {
+    if (!q || q->dtype != 10 || !q->data_ptr) return nullptr;
+    int64_t n = q->total_size;
+    float* meta = (float*)q->grad;
+    float scale = meta ? meta[0] : 1.0f;
+    int8_t zero_point = meta ? (int8_t)meta[1] : 0;
+    int8_t* qdata = (int8_t*)q->data_ptr;
+
+    AuroraTensor* r = aurora_tensor_new(q->ndim, q->shape);
+    for (int64_t i = 0; i < n; i++)
+        r->data[i] = (double)((float)qdata[i] * scale + (float)zero_point);
+    return r;
 }
 
 } /* extern "C" */

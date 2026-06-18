@@ -123,7 +123,23 @@ void* aurora_dl_resolve(const char* libname, const char* name) {
     void* lib = aurora_dl_open(libname);
     if (!lib) return nullptr;
     void* sym = aurora_dl_sym(lib, name);
-    if (!sym) { aurora_dl_close(lib); return nullptr; }
+    if (!sym) {
+        /* For OpenGL, fall back to wglGetProcAddress (modern GL functions are
+           not exported by opengl32.dll — they come from the GPU driver's ICD). */
+#ifdef _WIN32
+        if (libname && name && strcmp(libname, "opengl32") == 0) {
+            HMODULE opengl32 = LoadLibraryA("opengl32.dll");
+            if (opengl32) {
+                auto wglGetProcAddr = (PROC(WINAPI*)(LPCSTR))
+                    GetProcAddress(opengl32, "wglGetProcAddress");
+                if (wglGetProcAddr) {
+                    sym = (void*)wglGetProcAddr(name);
+                }
+            }
+        }
+#endif
+        if (!sym) { aurora_dl_close(lib); return nullptr; }
+    }
     {
         std::lock_guard<std::mutex> lock(g_dl_handle_mtx);
         get_dl_handles().push_back(lib);

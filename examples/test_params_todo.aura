@@ -1,0 +1,6 @@
+outputln("Testing params + todo...")
+server app
+    route "GET" "/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+outputln("Server registered.")

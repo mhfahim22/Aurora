@@ -51,6 +51,36 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
         case NodeType::WeakRef:   return gen_weak_expr(node);
         case NodeType::Borrow:    return gen_borrow_expr(node);
         case NodeType::Attribute: {
+            /* request.xxx — HTTP request field access */
+            if (node->left && node->left->type == NodeType::Var && node->left->value == "request") {
+                VarRecord* http_req_rec = lookup_var("__http_req");
+                if (!http_req_rec || !http_req_rec->alloca_ptr) return i64(0);
+                llvm::Value* req_val = builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "req");
+                llvm::Value* field_str = builder_->CreateGlobalStringPtr(node->value, "rfield");
+                auto* fn_get_field = module_->getFunction("aurora_http_get_field");
+                if (!fn_get_field) return i64(0);
+                llvm::Value* result = builder_->CreateCall(fn_get_field, { req_val, field_str }, "field_val");
+                auto* fn_from_cstr = module_->getFunction("aurora_str_from_cstr");
+                if (fn_from_cstr && result)
+                    result = builder_->CreateCall(fn_from_cstr, { result }, "field_aurora");
+                return result ? result : i64(0);
+            }
+            /* request.params.xxx — HTTP route parameter access */
+            if (node->left && node->left->type == NodeType::Attribute &&
+                node->left->value == "params" && node->left->left &&
+                node->left->left->type == NodeType::Var && node->left->left->value == "request") {
+                VarRecord* http_req_rec = lookup_var("__http_req");
+                if (!http_req_rec || !http_req_rec->alloca_ptr) return i64(0);
+                llvm::Value* req_val = builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "req");
+                llvm::Value* param_str = builder_->CreateGlobalStringPtr(node->value, "rparam");
+                auto* fn_get_param = module_->getFunction("aurora_http_get_param");
+                if (!fn_get_param) return i64(0);
+                llvm::Value* result = builder_->CreateCall(fn_get_param, { req_val, param_str }, "param_val");
+                auto* fn_from_cstr = module_->getFunction("aurora_str_from_cstr");
+                if (fn_from_cstr && result)
+                    result = builder_->CreateCall(fn_from_cstr, { result }, "param_aurora");
+                return result ? result : i64(0);
+            }
             /* obj.field read */
             const std::string& obj_name   = node->left ? node->left->value : "";
             const std::string& field_name = node->value;
@@ -377,6 +407,63 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
                 builder_->CreateCall(fn_array_reserve_, { arr_val, cap_val });
             }
         }
+        return i64(0);
+    }
+
+    /* ── request("field") — get HTTP request field ── */
+    if (node->value == "request") {
+        VarRecord* http_req_rec = lookup_var("__http_req");
+        if (!http_req_rec || !http_req_rec->alloca_ptr) return i64(0);
+        llvm::Value* req_val = builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "req");
+        llvm::Value* field_val = llvm::ConstantPointerNull::get(i8ptr_ty());
+        if (node->args) {
+            field_val = gen_expr(node->args.get());
+            if (field_val && field_val->getType() != i8ptr_ty())
+                field_val = builder_->CreateIntToPtr(field_val, i8ptr_ty(), "field_ptr");
+            if (field_val) {
+                auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+                if (as_cstr)
+                    field_val = builder_->CreateCall(as_cstr, { field_val }, "field_cstr");
+            }
+        }
+        auto* fn_get_field = module_->getFunction("aurora_http_get_field");
+        if (!fn_get_field) return i64(0);
+        llvm::Value* result = builder_->CreateCall(fn_get_field, { req_val, field_val ? field_val : llvm::ConstantPointerNull::get(i8ptr_ty()) }, "field_val");
+        /* Wrap the const char* result back into an AuroraStr* */
+        auto* fn_from_cstr = module_->getFunction("aurora_str_from_cstr");
+        if (fn_from_cstr && result)
+            result = builder_->CreateCall(fn_from_cstr, { result }, "field_aurora");
+        return result ? result : i64(0);
+    }
+
+    /* ── json(expr) — set response body with JSON content type ── */
+    if (node->value == "json") {
+        VarRecord* http_res_rec = lookup_var("__http_res");
+        if (!http_res_rec || !http_res_rec->alloca_ptr) return i64(0);
+        llvm::Value* res_val = builder_->CreateLoad(i8ptr_ty(), http_res_rec->alloca_ptr, "res");
+        llvm::Value* body = node->args ? gen_expr(node->args.get()) : i64(0);
+        if (body) {
+            if (body->getType() != i8ptr_ty())
+                body = builder_->CreateIntToPtr(body, i8ptr_ty(), "body_ptr");
+            auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+            if (as_cstr)
+                body = builder_->CreateCall(as_cstr, { body }, "json_cstr");
+        }
+        auto* fn_set_json = module_->getFunction("aurora_http_response_set_json");
+        if (fn_set_json && body)
+            builder_->CreateCall(fn_set_json, { res_val, body });
+        return i64(0);
+    }
+
+    /* ── status(code) — set HTTP response status code ── */
+    if (node->value == "status") {
+        VarRecord* http_res_rec = lookup_var("__http_res");
+        if (!http_res_rec || !http_res_rec->alloca_ptr) return i64(0);
+        llvm::Value* res_val = builder_->CreateLoad(i8ptr_ty(), http_res_rec->alloca_ptr, "res");
+        llvm::Value* code = node->args ? gen_expr(node->args.get()) : i64(200);
+        auto* fn_set_status = module_->getFunction("aurora_http_response_set_status_code");
+        if (fn_set_status)
+            builder_->CreateCall(fn_set_status, { res_val, code });
         return i64(0);
     }
 
@@ -752,13 +839,16 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         /* C string: auto-convert to char* */
         /* For string literals: create GlobalStringPtr directly (already done above) */
         /* For non-literal Aurora strings: use aurora_str_as_cstr (zero-copy, no allocation) */
-        else if (is_cstring && !(arg->type == NodeType::Str) && v->getType()->isPointerTy()) {
+        else if (is_cstring && !(arg->type == NodeType::Str) && (v->getType()->isPointerTy() || v->getType()->isIntegerTy())) {
             auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
             if (!as_cstr)
                 as_cstr = llvm::Function::Create(
                     llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
                     llvm::Function::ExternalLinkage, "aurora_str_as_cstr", module_.get());
-            v = builder_->CreateCall(as_cstr, { v }, "cstr_view");
+            llvm::Value* ptr_v = v;
+            if (ptr_v->getType()->isIntegerTy())
+                ptr_v = builder_->CreateIntToPtr(v, i8ptr_ty(), "aurora_str_as_i8ptr");
+            v = builder_->CreateCall(as_cstr, { ptr_v }, "cstr_view");
             str_next++;
         } else if (is_cstring) {
             str_next++;

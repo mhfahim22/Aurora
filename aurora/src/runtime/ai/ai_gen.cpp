@@ -228,8 +228,23 @@ int64_t agent() {
     Agent* a = (Agent*)calloc(1, sizeof(Agent)); if (!a) return 0;
     a->id = g_nagents + 1; a->active = 1; g_agents[g_nagents++] = a; return (int64_t)a;
 }
-int64_t train_agent(int64_t p) { Agent* a = ag_find(p); if (!a) return 0; a->episodes++; return 1; }
-int64_t reward(int64_t p, double v) { Agent* a = ag_find(p); if (!a) return 0; a->reward += (int64_t)v; return 1; }
+int64_t train_agent(int64_t p) {
+    Agent* a = ag_find(p); if (!a) return 0;
+    a->episodes++;
+    /* Run a generation step as the "training" action */
+    char* result = model_generate(g_active_model, g_active_tokenizer, "agent training step", 50);
+    if (result) {
+        int64_t len = (int64_t)strlen(result);
+        a->reward += len > 20 ? 1 : (len > 0 ? -1 : -5);
+        free(result);
+    }
+    return 1;
+}
+int64_t reward(int64_t p, double v) {
+    Agent* a = ag_find(p); if (!a) return 0;
+    a->reward += (int64_t)v;
+    return 1;
+}
 
 int64_t ag_run(const void* task_a) {
     const char* task = aurora_str_ptr(task_a);

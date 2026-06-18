@@ -1,0 +1,8 @@
+## Image/Texture Loading Module
+## Usage: import "image"
+##
+## Loads images via stb_image and creates OpenGL textures.
+
+extern function aurora_image_load(path: pointer, width: pointer, height: pointer, channels: pointer) -> pointer
+extern function aurora_image_free(data: pointer)
+extern function aurora_image_create_gl_texture(path: cstring) -> u32

@@ -66,3 +66,13 @@ std::vector<std::string> get_dll_exports(const std::string& dll_path);
 void gen_native_au_binding(const std::string& pkg, const std::string& dll_path,
                             const std::vector<std::string>& exports,
                             std::ostream& os);
+
+/* ── JVM bridge ── */
+void gen_jvm_au_binding(const std::string& pkg, const JsonValue& json,
+                         const std::string& ver, std::ostream& os);
+void gen_jvm_c_wrapper(const std::string& pkg, const std::string& dir);
+
+/* ── Go bridge ── */
+void gen_go_au_binding(const std::string& pkg, const JsonValue& json,
+                        const std::string& ver, std::ostream& os);
+void gen_go_c_wrapper(const std::string& pkg, const std::string& dir);

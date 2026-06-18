@@ -2,7 +2,7 @@
 
 **A polyglot language with LLVM-native compilation — call Python, npm, Rust, C, C++, OpenGL, and more from a single language.**
 
-Aurora is a general-purpose programming language and polyglot runtime. Write once, use everything: from PyPI packages and npm modules to Cargo crates, native C/C++ libraries, OpenGL graphics, database drivers, HTTP servers, and AI/ML models — all without glue code or FFI boilerplate.
+Aurora is a general-purpose programming language and polyglot runtime. Write once, use everything: from PyPI packages and npm modules to Cargo crates, native C/C++ libraries, OpenGL graphics, 2D games, database drivers, HTTP servers, and AI/ML models — all without glue code or FFI boilerplate.
 
 ```python
 import libc:database
@@ -28,11 +28,14 @@ db_close(db)
 - **Pattern matching** — match/switch with struct destructuring, array patterns, wildcards
 - **Generics** — type parameters on functions, structs, and classes
 - **Ownership system** — compile-time lifetime analysis with `@move`/`@copy` annotations
+- **Type-checking** — full semantic analysis with type inference, safety checks, and detailed diagnostics
 
 ### Polyglot FFI
-- **PyPI (Python)** — import Python packages via C bridge DLL (GIL-thread-safe)
+- **PyPI (Python)** — import Python packages via C bridge DLL (GIL-thread-safe, zero-copy)
 - **npm (JavaScript/Node.js)** — QuickJS embedded engine for pure JS; subprocess bridge for native addons
 - **Cargo (Rust)** — auto-generate Rust FFI bridges with cdylib discovery
+- **Java/JVM** — full JVM bridge with 17+ `extern function` declarations (classpath, reflection, method calling)
+- **Go** — dlopen/LoadLibrary plugin bridge with Go plugin system
 - **Native C/C++** — `extern "library"` with lazy DLL loading; supports Win64/x64 calling convention
 
 ### Frameworks (built-in)
@@ -41,8 +44,11 @@ db_close(db)
 | `libc:backend` | HTTP server with router, middleware, sessions, auth, CORS, caching, WebSocket, file serving, hot-reload |
 | `libc:ui` | Cross-platform GUI (Win32/X11/Cocoa) with components, layout, style, animation |
 | `libc:game` | Game engine with entities, physics, sprites, audio, input, camera, animation |
-| `libc:ai` | Tensor operations, model training/prediction, layers (dense, conv, LSTM, transformer, attention) |
+| `libc:ai` | Tensor operations, autograd, model training/prediction, layers (dense, conv, LSTM, transformer, attention) |
+| `libc:sprite2d` | GPU-accelerated 2D sprite batcher — batched textured quads, rotation, tint, dynamic VBO |
 | `libc:gl` | 3D graphics via OpenGL + GLFW — window creation, shaders, VAO/VBO, textures, immediate mode |
+| `libc:audio` | Audio playback via SDL — play files, tones, stop/control |
+| `libc:image` | Image loading (stb_image) — load PNG/JPG/BMP to raw pixel data |
 
 ### Database & ORM
 - **PostgreSQL** (`libc:pq`) — 85+ FFI externs via libpq; connection pooling, parameterized queries
@@ -51,6 +57,28 @@ db_close(db)
 - **ORM** (`libc:orm`) — query builder with SELECT/INSERT/UPDATE/DELETE, joins, group_by
 - **Model** (`libc:model`) — lightweight ActiveRecord-style `find`/`save`/`delete` with validation
 - **Migrations** (`libc:migration`) — `apply`/`rollback`/`list`/`pending` with `_migrations` table
+
+### AI / ML
+- **Tensor operations** — add, sub, mul, matmul, relu, sigmoid, tanh
+- **Autograd** — automatic differentiation with DAG-based backward pass
+- **SGD Optimizer** — gradient descent with configurable learning rate
+- **INT8 Quantization** — symmetric scale-based quantization/dequantization for model compression
+- **ONNX Operators** — Gemm, Conv, Relu, Softmax, BatchNorm runtime support
+- **CUDA Kernels** — GPU-accelerated element-wise operations (add, sub, mul, div, relu, sigmoid)
+- **Model pipeline** — create, train, test, predict, save/load, export
+- **Layers** — Dense, Conv2D, LSTM, GRU, Dropout, BatchNorm, Attention, Transformer, Embedding
+
+### Game Development
+- **3D Engine** — OpenGL 3.3 core profile, shaders, camera, lighting, textures, model loading (Wavefront OBJ)
+- **2D Engine** — GPU sprite batcher with batching, texture atlases, rotation, color tint, pixel-perfect orthographic projection
+- **Input** — keyboard, mouse, joystick via GLFW
+- **Audio** — sound effects and music via SDL
+
+### Example Games
+| Game | Features | Source |
+|------|----------|--------|
+| **Flappy Bird** | 2D physics, AABB collision, pipe spawning, score, game-over, restart | `examples/2d/flappy_bird.aura` |
+| **FPS Shooter** | 3D WASD+QE movement, mouse look, 3 cube enemies | `examples/3d/shooter.aura` |
 
 ### Testing & Quality
 - **`libc:test`** — 12 assertion functions, test runner with setup/teardown, filtering
@@ -125,6 +153,57 @@ end
 ```
 See `examples/3d/triangle.aura` and `examples/3d/cube.aura`.
 
+### 2D Game — Flappy Bird (GPU-accelerated)
+```python
+import "sprite2d"
+import "glfw"
+
+glfwInit()
+window = glfwCreateWindow(800, 600, "Flappy Bird", null, null)
+glfwMakeContextCurrent(window)
+sprite2d_init(2048, 800, 600)
+
+while not glfwWindowShouldClose(window)
+    glfwPollEvents()
+    # physics, input, collision...
+    sprite2d_draw(0, bird_x, bird_y, 30, 30)  # draw bird
+    sprite2d_flush()
+    glfwSwapBuffers(window)
+end
+```
+See `examples/2d/flappy_bird.aura` for the full game.
+
+### AI/ML — Train a Neural Network
+```python
+import libc:ai
+
+data = csv("dataset.csv")
+X, y = split_data(data, 0.8)
+
+m = model_create()
+model_set_loss(m, "categorical_crossentropy")
+model_set_optimizer(m, "adam")
+add(m, dense(128, "relu", input_shape=784))
+add(m, dropout(0.5))
+add(m, dense(10, "softmax"))
+
+fit(m, X_train, y_train, epochs=10)
+accuracy = test(m, X_test, y_test)
+output("Accuracy: {accuracy}")
+```
+
+### Win32 Native GUI
+```python
+import libc:ui
+
+ui_win32_init()
+window = ui_win32_create_control("window", 0, 100, 100, 800, 600)
+btn = ui_win32_create_control("button", window, 10, 10, 100, 30)
+ui_win32_set_text(btn, "Click me")
+ui_win32_run()
+```
+See `examples/chat.aura` for a full 5-widget chat application.
+
 ### Call Python from Aurora
 ```python
 import pypi:markdown
@@ -151,37 +230,18 @@ for row in rows
 end
 ```
 
-### AI/ML — Train a Model
-```python
-import libc:ai
-
-data = csv("dataset.csv")
-X, y = split_data(data, 0.8)
-
-m = model_create()
-model_set_loss(m, "categorical_crossentropy")
-model_set_optimizer(m, "adam")
-add(m, dense(128, "relu", input_shape=784))
-add(m, dropout(0.5))
-add(m, dense(10, "softmax"))
-
-fit(m, X_train, y_train, epochs=10)
-accuracy = test(m, X_test, y_test)
-output("Accuracy: {accuracy}")
-```
-
 ---
 
 ## Installation
 
 ### Windows (PowerShell)
 ```powershell
-iwr -useb https://raw.githubusercontent.com/mhfahim22/Aurora/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/mhfahim22/Aurora/main/release/install.ps1 | iex
 ```
 
 ### Linux / macOS
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mhfahim22/Aurora/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mhfahim22/Aurora/main/release/install.sh | bash
 ```
 
 ### From GitHub Releases
@@ -206,13 +266,18 @@ cmake --build build --config Release
 ```
 aurora/              # Compiler + runtime source
 ├── src/compiler/    # Lexer, parser, IR, typechecker, codegen, optimizer
-├── src/runtime/     # Core runtime, FFI, UI, backend, game, AI
+├── src/runtime/     # Core runtime, FFI, UI, backend, game, AI, graphics
+│   └── gfx/         # gl_helper, sprite2d, audio_helper, image_helper, matrix, obj_helper
 ├── tools/voss/      # Package manager (voss)
-├── tests/           # C++ test suite + .aura test files
 libc/                # Standard library (.auf files)
 ├── glfw.auf         # GLFW 3 bindings
 ├── opengl.auf       # OpenGL 3.3 bindings
 ├── gl.auf           # Aurora 3D helpers
+├── sprite2d.auf     # GPU-accelerated 2D sprite batcher
+├── audio.auf        # Audio playback (SDL)
+├── image.auf        # Image loading (stb_image)
+├── ui.auf           # Win32 GUI components
+├── input.auf        # Input helper bindings
 ├── pq.auf           # PostgreSQL FFI
 ├── mysql.auf        # MySQL FFI
 ├── orm.auf          # Query builder
@@ -225,11 +290,17 @@ libc/                # Standard library (.auf files)
 ├── static.auf       # Static file server
 └── dev.auf          # Dev server with hot-reload
 examples/            # Example programs
-├── 3d/              # triangle.aura, cube.aura
-├── demo/            # Demo programs
+├── 2d/              # flappy_bird.aura
+├── 3d/              # triangle, cube, lighting, texture, model, shooter, etc.
+├── chat.aura        # Win32 GUI chat app
+├── todo_full.aura   # Full-stack todo with REST + frontend
+├── ai_classifier.aura# MrCode-powered image classifier
+├── ai_mnist.aura    # MNIST neural network benchmark
+├── poly_pipeline.aura# Data pipeline (CSV → train → predict)
 packages/            # Aurora packages + bridges
 scripts/             # Build scripts, test runner
-deps/                # External dependencies
+deps/                # External dependencies (stb_image.h, etc.)
+release/             # Installers and release assets
 ```
 
 ---
@@ -270,29 +341,6 @@ voss run
 | [Bridge Developer Guide](aurora/docs/bridge_developer_guide.md) | FFI bridge patterns, threading, packaging |
 | [Security](SECURITY.md) | Memory safety, thread safety, supply chain |
 | [Contributing](CONTRIBUTING.md) | Development workflow, code style, PR guidelines |
-
----
-
-## Test Status
-
-All 13 test suites pass (170+ tests, 0 failures):
-
-| Test Suite | Status |
-|-----------|--------|
-| Optimizer (IR, mem2reg, lowering) | ✅ 23/23 |
-| Leak Detector | ✅ 20/20 |
-| Smart Pointers | ✅ 27/27 |
-| FFI ABI | ✅ 21/21 |
-| FFI ABI Extra | ✅ 28/28 |
-| FFI ABI Edge | ✅ 63/63 |
-| FFI ABI Struct | ✅ 32/32 |
-| FFI Memory Safety | ✅ 18/18 |
-| Unified Type System | ✅ 52/52 |
-| PyPI Thread Safety | ✅ 4/4 |
-| Universal Bridge | ✅ 25/25 |
-| Bridge E2E | ✅ 15/15 |
-| Integration HTTP | ✅ 12/12 |
-| Fuzz Parser | ✅ 100 inputs, 0 crashes |
 
 ---
 

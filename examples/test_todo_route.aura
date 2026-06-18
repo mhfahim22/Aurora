@@ -1,0 +1,5 @@
+outputln("Testing todo_list in route...")
+server app
+    route "GET" "/"
+        json(aurora_todo_list())
+outputln("Server registered.")

@@ -1,0 +1,176 @@
+## 3D Shooter Demo — FPS camera, WASD movement, mouse look, cube enemies
+import "glfw"
+import "opengl"
+import "gl"
+import "glm"
+import "math"
+import "input"
+
+vert_src = "#version 330 core\nlayout(location=0)in vec3 aPos;layout(location=1)in vec3 aColor;out vec3 vColor;uniform mat4 uMVP;void main(){gl_Position=uMVP*vec4(aPos,1.0);vColor=aColor;}"
+frag_src = "#version 330 core\nin vec3 vColor;out vec4 fragColor;void main(){fragColor=vec4(vColor,1.0);}"
+
+glfwInit()
+glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
+glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+
+window = glfwCreateWindow(800, 600, "Aurora Shooter", null, null)
+if window == 0:
+    output("glfwCreateWindow failed")
+    glfwTerminate()
+else:
+    glfwMakeContextCurrent(window)
+    prog = gl_create_program(vert_src, frag_src)
+    if prog == 0:
+        output("Shader fail")
+        glfwDestroyWindow(window)
+        glfwTerminate()
+    else:
+        vert_ptr = aurora_gl_cube_vertices()
+        vert_cnt = aurora_gl_cube_vertex_count()
+        vert_str = aurora_gl_cube_vertex_stride()
+
+        vao = aurora_gl_gen_vertex_array()
+        glBindVertexArray(vao)
+        vbo = aurora_gl_gen_buffer()
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, vert_cnt * vert_str, vert_ptr, GL_STATIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vert_str, 0)
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vert_str, 12)
+        glEnableVertexAttribArray(1)
+
+        pos_x = 0.0; pos_y = 1.0; pos_z = 5.0
+        yaw = 0.0; pitch = 0.0
+        score = 0
+
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
+
+        proj = mat4_new()
+        mat4_perspective(proj, 60.0, 800.0 / 600.0, 0.1, 100.0)
+        view = mat4_new()
+        mvp = mat4_new()
+
+        glUseProgram(prog)
+        u_mvp = glGetUniformLocation(prog, "uMVP")
+        glEnable(GL_DEPTH_TEST)
+
+        ## Enemy state: {x, y, z, type, health}
+        enemies = list()
+        list_push(enemies, map())
+        e = list_get(enemies, 0)
+        map_set(e, "x", 0.0); map_set(e, "y", 0.5); map_set(e, "z", -8.0)
+        map_set(e, "type", 1); map_set(e, "health", 1)
+
+        list_push(enemies, map())
+        e = list_get(enemies, 1)
+        map_set(e, "x", 3.0); map_set(e, "y", 0.5); map_set(e, "z", -6.0)
+        map_set(e, "type", 1); map_set(e, "health", 1)
+
+        list_push(enemies, map())
+        e = list_get(enemies, 2)
+        map_set(e, "x", -3.0); map_set(e, "y", 0.5); map_set(e, "z", -7.0)
+        map_set(e, "type", 1); map_set(e, "health", 1)
+
+        output("Shooter started! WASD to move, mouse to look, SPACE to shoot")
+        output("Score: " + str(score))
+
+        while glfwWindowShouldClose(window) == 0:
+            dx = get_mouse_x(window)
+            dy = get_mouse_y(window)
+            if dx != 0.0 or dy != 0.0:
+                yaw = yaw + dx * 0.08
+                pitch = pitch - dy * 0.08
+                if pitch > 89.0: pitch = 89.0 end
+                if pitch < -89.0: pitch = -89.0 end
+            end
+
+            rad_yaw = yaw * pi() / 180.0
+            rad_pitch = pitch * pi() / 180.0
+            fwd_x = cos(rad_yaw) * cos(rad_pitch)
+            fwd_y = sin(rad_pitch)
+            fwd_z = sin(rad_yaw) * cos(rad_pitch)
+            right_x = cos(rad_yaw + pi() / 2.0)
+            right_z = sin(rad_yaw + pi() / 2.0)
+
+            speed = 0.08
+            if is_key_down(window, GLFW_KEY_W):
+                pos_x = pos_x + fwd_x * speed
+                pos_y = pos_y + fwd_y * speed
+                pos_z = pos_z + fwd_z * speed
+            end
+            if is_key_down(window, GLFW_KEY_S):
+                pos_x = pos_x - fwd_x * speed
+                pos_y = pos_y - fwd_y * speed
+                pos_z = pos_z - fwd_z * speed
+            end
+            if is_key_down(window, GLFW_KEY_A):
+                pos_x = pos_x - right_x * speed
+                pos_z = pos_z - right_z * speed
+            end
+            if is_key_down(window, GLFW_KEY_D):
+                pos_x = pos_x + right_x * speed
+                pos_z = pos_z + right_z * speed
+            end
+            if is_key_down(window, GLFW_KEY_Q):
+                pos_y = pos_y - speed
+            end
+            if is_key_down(window, GLFW_KEY_E):
+                pos_y = pos_y + speed
+            end
+            if is_key_down(window, GLFW_KEY_ESCAPE):
+                glfwSetWindowShouldClose(window, GLFW_TRUE)
+            end
+
+            glClearColor(0.05, 0.05, 0.1, 1.0)
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+            target_x = pos_x + fwd_x
+            target_y = pos_y + fwd_y
+            target_z = pos_z + fwd_z
+
+            mat4_lookat(view, pos_x, pos_y, pos_z, target_x, target_y, target_z, 0.0, 1.0, 0.0)
+
+            glUseProgram(prog)
+            glBindVertexArray(vao)
+
+            enemy_colors = {"1": "1.0,0.3,0.3", "2": "0.3,1.0,0.3"}
+
+            num_enemies = list_len(enemies)
+            i = 0
+            loop
+                if i >= num_enemies
+                    break
+                end
+                e = list_get(enemies, i)
+                ex = map_get(e, "x")
+                ey = map_get(e, "y")
+                ez = map_get(e, "z")
+                etype = map_get(e, "type")
+                health = map_get(e, "health")
+
+                if health > 0:
+                    model = mat4_new()
+                    mat4_translate(model, ex, ey, ez)
+                    mat4_mul(mvp, model, view)
+                    mat4_mul(mvp, mvp, proj)
+                    glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp)
+                    glDrawArrays(GL_TRIANGLES, 0, vert_cnt)
+                    mat4_free(model)
+                end
+                i = i + 1
+            end
+
+            glfwSwapBuffers(window)
+            glfwPollEvents()
+        end
+
+        mat4_free(proj)
+        mat4_free(view)
+        mat4_free(mvp)
+        glDeleteProgram(prog)
+        glfwDestroyWindow(window)
+        glfwTerminate()
+        output("Final score: " + str(score))
+    end
+end

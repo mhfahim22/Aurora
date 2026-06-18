@@ -142,7 +142,7 @@ void LLVMCodegen::run_optimization_passes() {
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     llvm::ModulePassManager MPM =
-        PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
+        PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
     MPM.run(*module_, MAM);
 
     {

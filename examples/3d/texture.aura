@@ -1,0 +1,114 @@
+## Textured Cube Demo — loads a checker texture and maps it onto a rotating cube
+import "glfw"
+import "opengl"
+import "gl"
+import "glm"
+
+vert_src = "#version 330 core\nlayout (location = 0) in vec3 aPos;\nlayout (location = 1) in vec2 aTexCoord;\nout vec2 vTexCoord;\nuniform mat4 uMVP;\nvoid main() {\n    gl_Position = uMVP * vec4(aPos, 1.0);\n    vTexCoord = aTexCoord;\n}"
+
+frag_src = "#version 330 core\nin vec2 vTexCoord;\nout vec4 fragColor;\nuniform sampler2D uTex;\nvoid main() {\n    fragColor = texture(uTex, vTexCoord);\n}"
+
+glfwInit()
+glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
+glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+
+window = glfwCreateWindow(800, 600, "Aurora Texture Demo", null, null)
+if window == 0:
+    output("glfwCreateWindow failed")
+    glfwTerminate()
+else:
+    glfwMakeContextCurrent(window)
+    prog = gl_create_program(vert_src, frag_src)
+    if prog == 0:
+        output("Shader failed")
+        glfwDestroyWindow(window)
+        glfwTerminate()
+    else:
+        output("Prog: " + str(prog))
+
+        ## Proper UV-mapped cube: position(3) + texcoord(2), 20 bytes stride
+        vert_ptr = aurora_gl_uv_cube_vertices()
+        vert_cnt = aurora_gl_uv_cube_vertex_count()
+        vert_str = aurora_gl_uv_cube_vertex_stride()
+
+        output("Verts: " + str(vert_cnt) + " stride: " + str(vert_str))
+
+        vao = aurora_gl_gen_vertex_array()
+        glBindVertexArray(vao)
+        vbo = aurora_gl_gen_buffer()
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, vert_cnt * vert_str, vert_ptr, GL_STATIC_DRAW)
+
+        ## position at location 0: 3 floats, offset 0
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vert_str, 0)
+        glEnableVertexAttribArray(0)
+        ## texcoord at location 1: 2 floats, offset 12 (skip position xyz)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, vert_str, 12)
+        glEnableVertexAttribArray(1)
+
+        ## Load texture
+        tex = aurora_image_create_gl_texture("D:\\Downloads\\aurora_restructured\\examples\\3d\\checker.png")
+        if tex == 0:
+            output("WARNING: texture load failed, using fallback color")
+        else:
+            output("Texture ID: " + str(tex))
+        end
+
+        proj = mat4_new()
+        mat4_perspective(proj, 60.0, 800.0 / 600.0, 0.1, 100.0)
+        view = mat4_new()
+        mat4_lookat(view, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+        model = mat4_new()
+        mvp = mat4_new()
+
+        glUseProgram(prog)
+        u_mvp = glGetUniformLocation(prog, "uMVP")
+        u_tex = glGetUniformLocation(prog, "uTex")
+        output("uMVP=" + str(u_mvp) + " uTex=" + str(u_tex))
+
+        glEnable(GL_DEPTH_TEST)
+        glUniform1i(u_tex, 0)
+        angle = 0.0
+
+        while glfwWindowShouldClose(window) == 0:
+            angle = angle + 0.6
+            if angle >= 360.0:
+                angle = 0.0
+            end
+            if glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS:
+                glfwSetWindowShouldClose(window, GLFW_TRUE)
+            end
+
+            mat4_identity(model)
+            mat4_rotate(model, angle, 0.0, 1.0, 0.0)
+            mat4_rotate(model, angle * 0.4, 1.0, 0.0, 0.0)
+
+            mat4_mul(mvp, view, model)
+            mat4_mul(mvp, proj, mvp)
+
+            glClearColor(0.1, 0.1, 0.15, 1.0)
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+            glUseProgram(prog)
+            glActiveTexture(GL_TEXTURE0)
+            if tex != 0:
+                glBindTexture(GL_TEXTURE_2D, tex)
+            end
+            glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp)
+            glBindVertexArray(vao)
+            glDrawArrays(GL_TRIANGLES, 0, vert_cnt)
+
+            glfwSwapBuffers(window)
+            glfwPollEvents()
+        end
+
+        mat4_free(proj)
+        mat4_free(view)
+        mat4_free(model)
+        mat4_free(mvp)
+        glDeleteProgram(prog)
+        glfwDestroyWindow(window)
+        glfwTerminate()
+    end
+end

@@ -40,6 +40,10 @@ extern function aurora_gl_compile_program(vert_src: cstring, frag_src: cstring) 
 extern function aurora_gl_free_string(s: pointer)
 
 ## ── High-level shader ──
+function gl_create_program(vert_src, frag_src):
+    return aurora_gl_compile_program(vert_src, frag_src)
+end
+
 function gl_compile_shader_from_source(source: cstring, shader_type):
     shader = aurora_gl_create_shader(shader_type)
     if shader == 0:
@@ -81,7 +85,54 @@ function gl_link_program(vert_shader, frag_shader):
     return program
 end
 
-## ── Simple 3D primitives ──
+## ── VBO/VAO convenience wrappers ──
+
+## Create a VBO and upload data. Returns buffer ID.
+## target: GL_ARRAY_BUFFER or GL_ELEMENT_ARRAY_BUFFER
+## data: pointer to float array
+## size: size in bytes
+## usage: GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.
+function gl_make_buffer(target, data_ptr, size, usage):
+    buf = aurora_gl_gen_buffer()
+    glBindBuffer(target, buf)
+    glBufferData(target, size, data_ptr, usage)
+    return buf
+end
+
+## Create a VAO. Returns VAO ID.
+function gl_make_vertex_array():
+    vao = aurora_gl_gen_vertex_array()
+    glBindVertexArray(vao)
+    return vao
+end
+
+## Set up a vertex attribute pointer.
+## index: layout location in shader
+## size: number of components (2, 3, or 4)
+## stride: byte stride between vertices (0 = tightly packed)
+## offset: byte offset within vertex
+function gl_set_attrib(index, size, stride, offset):
+    glVertexAttribPointer(index, size, GL_FLOAT, GL_FALSE, stride, offset)
+    glEnableVertexAttribArray(index)
+end
+
+## ── Camera (uses matrix math via glm.auf) ──
+
+## Create a perspective projection matrix in m.
+## fov_deg: vertical field of view in degrees
+## aspect: width/height ratio
+## near, far: near/far clipping planes
+function gl_perspective(m, fov_deg, aspect, near, far):
+    mat4_perspective(m, fov_deg, aspect, near, far)
+end
+
+## Create a look-at view matrix in m.
+## eye: camera position, target: look-at point, up: up vector
+function gl_lookat(m, ex, ey, ez, tx, ty, tz, ux, uy, uz):
+    mat4_lookat(m, ex, ey, ez, tx, ty, tz, ux, uy, uz)
+end
+
+## ── Simple 3D primitives (immediate mode, compat) ──
 function gl_draw_triangle():
     glBegin(GL_TRIANGLES)
     glVertex3f(0.0, 0.5, 0.0)
@@ -120,7 +171,7 @@ function gl_clear_color(r, g, b):
     gl_clear(r, g, b, 1.0)
 end
 
-## ── 3D cube (immediate mode) ──
+## ── 3D cube (immediate mode, compat) ──
 function gl_draw_cube(size):
     s = size / 2
     glBegin(GL_TRIANGLES)

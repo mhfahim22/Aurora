@@ -1,0 +1,138 @@
+## OBJ Model Viewer — load any OBJ, mouse orbit, scroll zoom
+import "glfw"
+import "opengl"
+import "gl"
+import "glm"
+import "math"
+import "input"
+import "obj"
+
+vert_src = "#version 330 core\nlayout (location = 0) in vec3 aPos;\nlayout (location = 1) in vec3 aNormal;\nlayout (location = 2) in vec2 aTexCoord;\nout vec3 vNormal;\nuniform mat4 uMVP;\nuniform mat4 uModel;\nvoid main() {\n    gl_Position = uMVP * vec4(aPos, 1.0);\n    vNormal = mat3(uModel) * aNormal;\n}"
+
+frag_src = "#version 330 core\nin vec3 vNormal;\nout vec4 fragColor;\nuniform vec3 uLightDir;\nvoid main() {\n    vec3 n = normalize(vNormal);\n    float diff = max(dot(n, normalize(uLightDir)), 0.0);\n    float intensity = 0.3 + diff * 0.7;\n    fragColor = vec4(vec3(intensity), 1.0);\n}"
+
+glfwInit()
+glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
+glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+
+window = glfwCreateWindow(800, 600, "Aurora Model Viewer", null, null)
+if window == 0:
+    output("glfwCreateWindow failed")
+    glfwTerminate()
+else:
+    glfwMakeContextCurrent(window)
+    prog = gl_create_program(vert_src, frag_src)
+    if prog == 0:
+        output("Shader failed")
+        glfwDestroyWindow(window)
+        glfwTerminate()
+    else:
+        output("Prog: " + str(prog))
+
+        obj_path = "D:\\Downloads\\aurora_restructured\\examples\\3d\\cube_model.obj"
+        output("Loading: " + obj_path)
+        obj = aurora_obj_load(obj_path)
+        if obj == 0:
+            output("Failed to load OBJ")
+            glfwDestroyWindow(window)
+            glfwTerminate()
+        else:
+            vert_cnt = aurora_obj_vertex_count(obj)
+            vert_ptr = aurora_obj_vertex_data(obj)
+            vert_str = 32
+            output("Vertices: " + str(vert_cnt))
+
+            vao = aurora_gl_gen_vertex_array()
+            glBindVertexArray(vao)
+            vbo = aurora_gl_gen_buffer()
+            glBindBuffer(GL_ARRAY_BUFFER, vbo)
+            glBufferData(GL_ARRAY_BUFFER, vert_cnt * vert_str, vert_ptr, GL_STATIC_DRAW)
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vert_str, 0)
+            glEnableVertexAttribArray(0)
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vert_str, 12)
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vert_str, 24)
+            glEnableVertexAttribArray(2)
+
+            radius = 4.0
+            theta = 0.0
+            phi = 20.0
+
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
+
+            proj = mat4_new()
+            mat4_perspective(proj, 60.0, 800.0 / 600.0, 0.1, 100.0)
+            view = mat4_new()
+            model = mat4_new()
+            mvp = mat4_new()
+
+            glUseProgram(prog)
+            u_mvp = glGetUniformLocation(prog, "uMVP")
+            u_model = glGetUniformLocation(prog, "uModel")
+            u_light = glGetUniformLocation(prog, "uLightDir")
+            glEnable(GL_DEPTH_TEST)
+            glUniform3f(u_light, -0.5, -1.0, -0.3)
+
+            while glfwWindowShouldClose(window) == 0:
+                dx = get_mouse_x(window)
+                dy = get_mouse_y(window)
+                if dx != 0.0 or dy != 0.0:
+                    theta = theta + dx * 0.15
+                    phi = phi - dy * 0.15
+                    if phi > 89.0:
+                        phi = 89.0
+                    end
+                    if phi < -89.0:
+                        phi = -89.0
+                    end
+                end
+
+                if is_key_down(window, GLFW_KEY_W):
+                    radius = radius - 0.05
+                end
+                if is_key_down(window, GLFW_KEY_S):
+                    radius = radius + 0.05
+                end
+                if is_key_down(window, GLFW_KEY_ESCAPE):
+                    glfwSetWindowShouldClose(window, GLFW_TRUE)
+                end
+
+                rad_phi = phi * pi() / 180.0
+                rad_theta = theta * pi() / 180.0
+                cx = radius * cos(rad_phi) * sin(rad_theta)
+                cy = radius * sin(rad_phi)
+                cz = radius * cos(rad_phi) * cos(rad_theta)
+
+                mat4_lookat(view, cx, cy, cz, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+
+                mat4_identity(model)
+                mat4_rotate(model, theta * 0.5, 0.0, 1.0, 0.0)
+
+                mat4_mul(mvp, view, proj)
+                mat4_mul(mvp, proj, mvp)
+
+                glClearColor(0.1, 0.15, 0.2, 1.0)
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+                glUseProgram(prog)
+                glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp)
+                glUniformMatrix4fv(u_model, 1, GL_FALSE, model)
+                glBindVertexArray(vao)
+                glDrawArrays(GL_TRIANGLES, 0, vert_cnt)
+
+                glfwSwapBuffers(window)
+                glfwPollEvents()
+            end
+
+            aurora_obj_free(obj)
+            mat4_free(proj)
+            mat4_free(view)
+            mat4_free(model)
+            mat4_free(mvp)
+            glDeleteProgram(prog)
+            glfwDestroyWindow(window)
+            glfwTerminate()
+        end
+    end
+end

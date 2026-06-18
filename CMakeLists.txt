@@ -186,22 +186,36 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/ui/component.cpp
     aurora/src/runtime/game/engine.cpp
     aurora/src/runtime/gfx/gl_helper.cpp
+    aurora/src/runtime/gfx/matrix.cpp
+    aurora/src/runtime/gfx/image_helper.cpp
+    aurora/src/runtime/gfx/obj_helper.cpp
+    aurora/src/runtime/gfx/audio_helper.cpp
+    aurora/src/runtime/gfx/sprite2d.cpp
     aurora/src/runtime/backend/server.cpp
+    aurora/src/runtime/backend/database.cpp
+    aurora/src/runtime/backend/miniz.c
+    aurora/src/runtime/backend/miniz_tdef.c
     aurora/src/std/math.cpp
     aurora/src/std/json.cpp
     aurora/src/std/fs.cpp
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
 )
+set_source_files_properties(aurora/src/runtime/backend/miniz.c PROPERTIES LANGUAGE CXX COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
+set_source_files_properties(aurora/src/runtime/backend/miniz_tdef.c PROPERTIES LANGUAGE CXX COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
 if(APPLE)
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
     target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
     set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX)
 else()
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp)
+    if(WIN32)
+        target_sources(aurora_runtime PRIVATE aurora/src/runtime/ui/ui_win32.cpp)
+    endif()
 endif()
 
-target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include
+    ${CMAKE_SOURCE_DIR}/aurora/src/runtime/backend)
 
 # ── OpenGL / 3D Graphics support (optional) ──
 if(WIN32)
@@ -237,7 +251,7 @@ find_package(CUDAToolkit QUIET)
 if(CUDAToolkit_FOUND)
     message(STATUS "Found CUDA ${CUDAToolkit_VERSION}")
     enable_language(CUDA)
-    target_sources(aurora_runtime PRIVATE aurora/src/runtime/ai/cuda_matmul.cu)
+    target_sources(aurora_runtime PRIVATE aurora/src/runtime/ai/cuda_matmul.cu aurora/src/runtime/ai/cuda_elewise.cu)
     target_include_directories(aurora_runtime PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
     set_property(TARGET aurora_runtime PROPERTY CUDA_ARCHITECTURES "75;80;86;89")
     target_compile_definitions(aurora_runtime PRIVATE AURORA_CUDA=1)
@@ -395,6 +409,8 @@ add_executable(voss
     aurora/tools/voss/bridge_cargo_impl.cpp
     aurora/tools/voss/bridge_cargo_gen.cpp
     aurora/tools/voss/bridge_native.cpp
+    aurora/tools/voss/bridge_jvm.cpp
+    aurora/tools/voss/bridge_go.cpp
     aurora/tools/voss/tool_detection.cpp
     aurora/tools/voss/registry_source.cpp
     aurora/src/runtime/interop/type_ir.cpp
@@ -427,6 +443,12 @@ function(add_npm_bridge name pkg c_file)
         message(STATUS "npm bridge '${name}': ${c_file} not found — skipping")
         return()
     endif()
+    foreach(qjs_src ${qjs_sources})
+        if(NOT EXISTS "${qjs_src}")
+            message(STATUS "npm bridge '${name}': missing QuickJS source ${qjs_src} — skipping")
+            return()
+        endif()
+    endforeach()
     add_library(${name} SHARED ${c_file} ${qjs_sources})
     set_target_properties(${name} PROPERTIES LINKER_LANGUAGE C)
     target_include_directories(${name} PRIVATE "${qjs_dir}")
@@ -543,6 +565,23 @@ if(Clang_FOUND)
     target_include_directories(aurora_cppwrap PRIVATE ${CLANG_INCLUDE_DIRS})
     target_link_libraries(aurora_cppwrap PRIVATE libclang)
 endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 4: AI Benchmark
+# ═══════════════════════════════════════════════════════════════
+add_executable(bench_ai
+    benchmarks/bench_ai.cpp
+)
+target_link_libraries(bench_ai PRIVATE aurora_runtime)
+target_include_directories(bench_ai PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 5: Cross-Ecosystem Bridge Benchmark
+# ═══════════════════════════════════════════════════════════════
+add_executable(bench_bridge
+    benchmarks/bench_bridge.cpp
+)
+target_include_directories(bench_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 1: Unified Type System — Test

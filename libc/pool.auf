@@ -1,0 +1,75 @@
+## Connection Pool (in-memory or PostgreSQL)
+## Usage: import "pool"  or  import libc:pool
+##
+## Thread-safe connection pool with configurable min/max size.
+## Uses Aurora's built-in in-memory DB engine (mock) by default.
+## When libpq becomes available, use "postgresql://..." URL for real PG.
+##
+## Example:
+##   import "pool"
+##   pool = db_pool_create("mock://mydb", 2, 10)
+##   db_pool_query(pool, "CREATE TABLE items (id INTEGER, name TEXT)")
+##   db_pool_query(pool, "INSERT INTO items VALUES (1, 'hello')")
+##   rows = db_pool_query(pool, "SELECT * FROM items")
+##   output(rows)
+##   db_pool_destroy(pool)
+
+## ── Pool lifecycle ──
+
+## Create a connection pool.
+## conn_str: "mock://dbname" for in-memory, "postgresql://user:pass@host:port/db" for real PG
+## min_size: connections kept alive (created immediately)
+## max_size: hard limit (callers block if all busy)
+## Returns pool handle (opaque pointer)
+function db_pool_create(conn_str, min_size, max_size)
+    return aurora_db_pool_create(conn_str, min_size, max_size)
+end
+
+## Destroy pool and close all connections.
+function db_pool_destroy(pool)
+    aurora_db_pool_destroy(pool)
+end
+
+## ── Query ──
+
+## Execute a query via pool (auto acquire + release).
+## Returns string result (pipe-delimited for SELECT, empty for non-SELECT).
+## Caller must free result with db_pool_query_free().
+function db_pool_query(pool, sql)
+    return aurora_db_pool_query(pool, sql)
+end
+
+## Free a result returned by db_pool_query().
+function db_pool_query_free(res)
+    aurora_db_pool_query_free(res)
+end
+
+## ── Low-level acquire/release ──
+
+## Acquire a connection from pool. timeout_ms: max wait in ms (0 = no wait, -1 = infinite).
+## Returns connection handle or null on timeout/error.
+function db_pool_acquire(pool, timeout_ms)
+    return aurora_db_pool_acquire(pool, timeout_ms)
+end
+
+## Return a connection to the pool.
+function db_pool_release(pool, conn)
+    aurora_db_pool_release(pool, conn)
+end
+
+## ── Monitoring ──
+
+## Number of currently active (in-use) connections.
+function db_pool_active_count(pool)
+    return aurora_db_pool_active_count(pool)
+end
+
+## Number of idle (available) connections.
+function db_pool_idle_count(pool)
+    return aurora_db_pool_idle_count(pool)
+end
+
+## Total connections in pool (active + idle).
+function db_pool_total_count(pool)
+    return aurora_db_pool_idle_count(pool) + aurora_db_pool_active_count(pool)
+end

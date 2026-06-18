@@ -578,13 +578,15 @@ void Codegen::gen_stmt(const ASTNode* node) {
                 builder_->CreateCall(comp_mount_, { comp });
 
                 auto* handler_cast = builder_->CreateBitCast(render_fn, i8ptr_ty());
-                if (route_register_)
-                    builder_->CreateCall(route_register_, { path_str, handler_cast });
+                if (route_register_) {
+                    llvm::Value* ui_method = builder_->CreateGlobalStringPtr("GET", "ui_method");
+                    builder_->CreateCall(route_register_, { ui_method, path_str, handler_cast });
+                }
             } else {
-                auto* fn_route = module_->getFunction("aurora_route_register");
-                if (fn_route) {
+                if (route_register_) {
                     auto* handler = llvm::ConstantPointerNull::get(i8ptr_ty());
-                    builder_->CreateCall(fn_route, { path_str, handler });
+                    llvm::Value* ui_method = builder_->CreateGlobalStringPtr("GET", "ui_method");
+                    builder_->CreateCall(route_register_, { ui_method, path_str, handler });
                 }
                 if (node->body) gen_block(node->body.get());
             }
@@ -636,8 +638,11 @@ void Codegen::gen_stmt(const ASTNode* node) {
         case NodeType::Transition:    gen_transition(node);    break;
         case NodeType::Server:        gen_server(node);        break;
         case NodeType::Request: {
-            /* Request: parse HTTP request data → calls aurora_http_parse_request */
-            if (http_parse_req_) {
+            /* Request: retrieve stored request from route handler context */
+            VarRecord* http_req_rec = lookup_var("__http_req");
+            if (http_req_rec && http_req_rec->alloca_ptr) {
+                builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "http_req");
+            } else if (http_parse_req_) {
                 llvm::Value* raw = llvm::ConstantPointerNull::get(i8ptr_ty());
                 if (node->left) {
                     raw = gen_expr(node->left.get());
@@ -649,15 +654,23 @@ void Codegen::gen_stmt(const ASTNode* node) {
             break;
         }
         case NodeType::Response: {
-            /* Response: build HTTP response → calls aurora_http_response_new + set_body */
-            if (http_resp_new_) {
-                llvm::Value* resp = builder_->CreateCall(http_resp_new_, {}, "resp");
-                if (node->left && http_resp_body_) {
-                    llvm::Value* body = gen_expr(node->left.get());
-                    if (body->getType() != i8ptr_ty())
-                        body = builder_->CreateBitCast(body, i8ptr_ty());
-                    builder_->CreateCall(http_resp_body_, { resp, body });
-                }
+            /* Response: use stored response from route handler if available */
+            VarRecord* http_res_rec = lookup_var("__http_res");
+            llvm::Value* resp = nullptr;
+            if (http_res_rec && http_res_rec->alloca_ptr) {
+                resp = builder_->CreateLoad(i8ptr_ty(), http_res_rec->alloca_ptr, "http_res");
+            } else if (http_resp_new_) {
+                resp = builder_->CreateCall(http_resp_new_, {}, "resp");
+            }
+            if (resp && node->left && http_resp_body_) {
+                llvm::Value* body = gen_expr(node->left.get());
+                if (body->getType() != i8ptr_ty())
+                    body = builder_->CreateBitCast(body, i8ptr_ty());
+                /* Convert AuroraStr* to const char* before setting body */
+                llvm::Function* str_to_c = module_->getFunction("aurora_str_as_cstr");
+                if (str_to_c)
+                    body = builder_->CreateCall(str_to_c, { body }, "cstr");
+                builder_->CreateCall(http_resp_body_, { resp, body });
             }
             break;
         }

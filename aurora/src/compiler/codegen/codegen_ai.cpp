@@ -17,6 +17,7 @@ void Codegen::declare_ai_runtime_helpers() {
     auto* ctx = &ctx_;
     auto* mod = module_.get();
     auto* dbl = llvm::Type::getDoubleTy(*ctx);
+    auto* i32 = llvm::Type::getInt32Ty(*ctx);
     auto* i64 = llvm::Type::getInt64Ty(*ctx);
     auto* ptr = llvm::PointerType::getUnqual(*ctx);
 
@@ -86,6 +87,28 @@ void Codegen::declare_ai_runtime_helpers() {
     predict_ = llvm::Function::Create(
         llvm::FunctionType::get(ptr, { ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_predict", mod);
+
+    /* Autograd operations */
+    /* void tensor_set_requires_grad(i8* tensor, i32 flag) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getVoidTy(*ctx), { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_tensor_set_requires_grad", mod);
+    /* void tensor_backward(i8* tensor) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getVoidTy(*ctx), { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_tensor_backward", mod);
+    /* void tensor_sgd_step(i8* param, double lr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getVoidTy(*ctx), { ptr, dbl }, false),
+        llvm::Function::ExternalLinkage, "aurora_tensor_sgd_step", mod);
+    /* i8* tensor_quantize_i8(i8* tensor) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_tensor_quantize_i8", mod);
+    /* i8* tensor_dequantize(i8* tensor) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_tensor_dequantize", mod);
 }
 
 /* ── Generate AI tensor expression ── */

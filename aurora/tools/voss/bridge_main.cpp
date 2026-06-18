@@ -37,6 +37,8 @@ void gen_manifest(const std::string& pkg, const std::string& ecosystem,
     else if (ecosystem == "npm")  os << "  - quickjs\n";
     else if (ecosystem == "cargo")os << "  - rust-std\n";
     else if (ecosystem == "native") os << "  - system\n";
+    else if (ecosystem == "jvm")  os << "  - jre\n";
+    else if (ecosystem == "go")   os << "  - go\n";
 }
 
 /* ── Write file helper ── */
@@ -77,7 +79,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
     Ecosystem eco_enum = ecosystem_from_name(ecosystem);
     if (eco_enum == Ecosystem::Unknown) {
         std::cerr << "[bridge] unknown ecosystem '" << ecosystem
-                  << "' (use pypi, npm, cargo, or native)\n";
+                  << "' (use pypi, npm, cargo, native, jvm, or go)\n";
         return 1;
     }
 
@@ -95,7 +97,7 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
     std::string ver = version;
     std::string desc;
 
-    if (ecosystem != "native") {
+    if (ecosystem != "native" && ecosystem != "jvm" && ecosystem != "go") {
         UnifiedPackageInfo info = resolver.resolve(pkg, eco_enum, version);
         if (!info.found) {
             /* If crates.io API is down (503), try CDN fallback for cargo */
@@ -150,6 +152,12 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
             std::vector<std::string> exports = get_dll_exports(dll_path);
             std::cout << "[bridge]   " << exports.size() << " exports discovered\n";
             gen_native_au_binding(pkg, dll_path, exports, au);
+        }
+        else if (ecosystem == "jvm") {
+            gen_jvm_au_binding(pkg, json, ver, au);
+        }
+        else if (ecosystem == "go") {
+            gen_go_au_binding(pkg, json, ver, au);
         }
         /* cargo: .au generated after function discovery below */
 
@@ -1885,6 +1893,10 @@ int cmd_bridge(const std::string& ecosystem, const std::string& pkg, const std::
             /* Pure JS: use QuickJS bridge (no Node.js needed) */
             gen_quickjs_npm_wrapper(pkg, dir);
         }
+    } else if (ecosystem == "jvm") {
+        gen_jvm_c_wrapper(pkg, dir);
+    } else if (ecosystem == "go") {
+        gen_go_c_wrapper(pkg, dir);
     }
 
 after_build:
@@ -1932,6 +1944,20 @@ after_build:
             tir << "    \"C_float\":{\"ir\": \"f32\",   \"cost\": \"zero\"},\n";
             tir << "    \"C_double\":{\"ir\": \"f64\",  \"cost\": \"zero\"},\n";
             tir << "    \"C_str\":  {\"ir\": \"cstring\",\"cost\": \"zero\"}\n";
+            tir << "  }\n";
+        } else if (ecosystem == "jvm") {
+            tir << "  \"types\": {\n";
+            tir << "    \"JVM_int\":    {\"ir\": \"i32\",     \"cost\": \"zero\"},\n";
+            tir << "    \"JVM_double\": {\"ir\": \"f64\",     \"cost\": \"zero\"},\n";
+            tir << "    \"JVM_String\": {\"ir\": \"String\",  \"cost\": \"alloc\"},\n";
+            tir << "    \"JVM_Object\": {\"ir\": \"pointer\", \"cost\": \"indirection\"}\n";
+            tir << "  }\n";
+        } else if (ecosystem == "go") {
+            tir << "  \"types\": {\n";
+            tir << "    \"Go_int\":    {\"ir\": \"i32\",     \"cost\": \"zero\"},\n";
+            tir << "    \"Go_float64\":{\"ir\": \"f64\",     \"cost\": \"zero\"},\n";
+            tir << "    \"Go_string\": {\"ir\": \"cstring\", \"cost\": \"zero\"},\n";
+            tir << "    \"Go_unsafe\": {\"ir\": \"pointer\", \"cost\": \"indirection\"}\n";
             tir << "  }\n";
         }
         tir << "}\n";
@@ -2141,7 +2167,7 @@ int cmd_bridge_auto(const std::string& pkg, const std::string& version, const st
         if (rc == 0) return 0;
     }
     /* Fallback: try all ecosystems */
-    const char* ecosystems[] = {"pypi", "npm", "cargo"};
+    const char* ecosystems[] = {"pypi", "npm", "cargo", "jvm", "go"};
     for (auto eco : ecosystems) {
         if (eco == hint_eco) continue; /* already tried */
         std::cout << "[bridge] trying " << eco << " for " << pkg << "\n";

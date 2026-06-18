@@ -70,6 +70,13 @@ typedef struct AuroraTensor {
     };
     int64_t  total_size;
     int      dtype;      /* TENSOR_F64 or TENSOR_F32 */
+
+    /* Autograd fields (zero-initialized → disabled by default) */
+    double*  grad;
+    int      requires_grad;
+    void   (*backward_fn)(struct AuroraTensor* self);
+    struct AuroraTensor* prev[8];
+    int      prev_count;
 } AuroraTensor;
 
 /* ── Tensor operations ── */

@@ -52,6 +52,13 @@ test_err*.txt
 test_std*.txt
 test_min*.txt
 
+# ── Test logs and artifacts ──
+examples/*.log
+examples/s1*
+examples/msbuild_*
+test_*.gz
+SMOOTH_PLAN.md
+
 # ── Model/ML files ──
 *.bin
 *.onnx

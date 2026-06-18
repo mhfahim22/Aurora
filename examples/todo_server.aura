@@ -1,0 +1,27 @@
+outputln("Todo Server starting on http://localhost:8080")
+outputln("  GET    /todos       - list all todos")
+outputln("  POST   /todos       - create a todo")
+outputln("  GET    /todos/:id   - get todo by id")
+outputln("  PUT    /todos/:id   - update todo")
+outputln("  DELETE /todos/:id   - delete todo")
+
+server app
+    route "GET" "/todos"
+        json(aurora_todo_list())
+
+    route "POST" "/todos"
+        title = request("body")
+        json(aurora_todo_create(title))
+
+    route "GET" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+
+    route "PUT" "/todos/:id"
+        id = request.params.id
+        title = request("body")
+        json(aurora_todo_update(id, title, 0))
+
+    route "DELETE" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_delete(id))

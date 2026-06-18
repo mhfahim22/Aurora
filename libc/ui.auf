@@ -1,0 +1,126 @@
+## Win32 native UI framework. Usage: import "ui"
+##
+##   import "ui"
+##   function main()
+##     ui_init("My App", 600, 400)
+##     root = component_create("root", 0, 0, 600, 400)
+##     btn = button_create(root, "Click Me", 10, 10, 100, 30)
+##     ui_mount(root)
+##     ui_run()
+##   end
+
+extern function aurora_component_create(name: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_component_destroy(c: pointer)
+extern function aurora_component_add_child(parent: pointer, child: pointer)
+extern function aurora_component_set_render_fn(c: pointer, fn: pointer)
+extern function aurora_component_set_update_fn(c: pointer, fn: pointer)
+extern function aurora_component_set_state(c: pointer, state: pointer)
+extern function aurora_component_set_widget_type(c: pointer, type: int)
+extern function aurora_component_mount(root: pointer)
+extern function aurora_component_set_pos(c: pointer, x: int, y: int)
+extern function aurora_component_set_size(c: pointer, w: int, h: int)
+extern function aurora_component_show(c: pointer)
+extern function aurora_component_hide(c: pointer)
+extern function aurora_component_render_tree(c: pointer)
+extern function aurora_component_update_tree(c: pointer, dt: float)
+
+extern function aurora_ui_win32_init(title: cstring, w: int, h: int) -> int
+extern function aurora_ui_win32_create_control(c: pointer) -> int
+extern function aurora_ui_win32_set_text(c: pointer, text: cstring)
+extern function aurora_ui_win32_get_text(c: pointer) -> cstring
+extern function aurora_ui_win32_listbox_add(c: pointer, item: cstring)
+extern function aurora_ui_win32_listbox_clear(c: pointer)
+extern function aurora_ui_win32_listbox_selected(c: pointer) -> int
+extern function aurora_ui_win32_listbox_count(c: pointer) -> int
+extern function aurora_ui_win32_mount(root: pointer)
+extern function aurora_ui_win32_run() -> int
+extern function aurora_ui_win32_event_type() -> int
+extern function aurora_ui_win32_event_source() -> pointer
+extern function aurora_ui_win32_event_data() -> int
+extern function aurora_ui_win32_shutdown()
+
+function ui_init(title, w, h)
+    return aurora_ui_win32_init(title, w, h)
+end
+
+function component_create(name, x, y, w, h)
+    c = aurora_component_create(name, x, y, w, h)
+    aurora_component_set_widget_type(c, 0)
+    return c
+end
+
+function button_create(parent, text, x, y, w, h)
+    c = aurora_component_create(text, x, y, w, h)
+    aurora_component_set_widget_type(c, 1)
+    aurora_component_add_child(parent, c)
+    return c
+end
+
+function label_create(parent, text, x, y, w, h)
+    c = aurora_component_create(text, x, y, w, h)
+    aurora_component_set_widget_type(c, 2)
+    aurora_component_add_child(parent, c)
+    return c
+end
+
+function textbox_create(parent, x, y, w, h)
+    c = aurora_component_create("", x, y, w, h)
+    aurora_component_set_widget_type(c, 3)
+    aurora_component_add_child(parent, c)
+    return c
+end
+
+function listbox_create(parent, x, y, w, h)
+    c = aurora_component_create("", x, y, w, h)
+    aurora_component_set_widget_type(c, 4)
+    aurora_component_add_child(parent, c)
+    return c
+end
+
+function set_text(c, text)
+    aurora_ui_win32_set_text(c, text)
+end
+
+function get_text(c)
+    return aurora_ui_win32_get_text(c)
+end
+
+function listbox_add(c, item)
+    aurora_ui_win32_listbox_add(c, item)
+end
+
+function listbox_clear(c)
+    aurora_ui_win32_listbox_clear(c)
+end
+
+function listbox_selected(c)
+    return aurora_ui_win32_listbox_selected(c)
+end
+
+function listbox_count(c)
+    return aurora_ui_win32_listbox_count(c)
+end
+
+function ui_mount(root)
+    aurora_ui_win32_mount(root)
+end
+
+function ui_run()
+    return aurora_ui_win32_run()
+end
+
+function ui_pump()
+    return aurora_ui_win32_pump()
+end
+
+function ui_event_type()
+    return aurora_ui_win32_event_type()
+end
+
+function ui_event_source()
+    return aurora_ui_win32_event_source()
+end
+
+function ui_event_data()
+    return aurora_ui_win32_event_data()
+end

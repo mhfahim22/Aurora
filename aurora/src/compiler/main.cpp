@@ -704,7 +704,7 @@ int main(int argc, char** argv) {
     bool package_mode = false;
     std::vector<std::string> package_args;
     std::string source_path;
-    int opt_level = 3;             /* -O flag: 0-3, default 3 */
+    int opt_level = 2;             /* -O flag: 0-3, default 2 */
     bool opt_size = false;         /* -Os: optimize for size */
     bool opt_size_aggressive = false; /* -Oz: aggressively optimize for size */
     bool fast_math = false;        /* -ffast-math: enable unsafe FP optimizations */
@@ -755,7 +755,12 @@ int main(int argc, char** argv) {
         if (arg == "--doc") { doc_state = 1; continue; }
         if (doc_state == 1) { source_path = arg; doc_state = 2; continue; }
         if (doc_state == 2) { doc_output = arg; doc_state = 0; continue; }
-        if (arg[0] == '-') { doc_state = 0; continue; }
+        if (arg[0] == '-') {
+            doc_state = 0;
+            /* Skip next arg for flags that take a value */
+            if ((arg == "-o" || arg == "-l" || arg == "-L") && i + 1 < argc) i++;
+            continue;
+        }
         source_path = arg;
         break;
     }

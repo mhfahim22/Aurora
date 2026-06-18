@@ -323,6 +323,8 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["rate_limit"]      = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["cors"]            = FunctionTypeInfo{{}, AuroraType::Bool};
     functions_["csrf"]            = FunctionTypeInfo{{}, AuroraType::Bool};
+    functions_["request"]         = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
+    functions_["status"]          = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Unknown};
 
     /* Session */
     functions_["session"]         = FunctionTypeInfo{{}, AuroraType::Int};
@@ -491,6 +493,122 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["test"]    = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
     functions_["predict"] = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Int};
     functions_["retrain"] = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+
+    /* ── Todo / In-memory Store (backend) ── */
+    functions_["aurora_todo_list"]   = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_todo_create"] = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
+    functions_["aurora_todo_get"]    = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
+    functions_["aurora_todo_update"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}, AuroraType::String};
+    functions_["aurora_todo_delete"] = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
+
+    /* ── Connection Pool ── */
+    functions_["aurora_db_pool_create"]       = FunctionTypeInfo{{AuroraType::String, AuroraType::Int, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_db_pool_acquire"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_db_pool_release"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_db_pool_query"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::String};
+    functions_["aurora_db_pool_query_free"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Void};
+    functions_["aurora_db_pool_destroy"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_db_pool_active_count"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_pool_idle_count"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+
+    /* ── 4x4 Matrix Math ── */
+    functions_["aurora_mat4_new"]         = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_mat4_free"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_mat4_identity"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_mat4_copy"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_mat4_mul"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_mat4_translate"]   = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_mat4_rotate"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_mat4_scale"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_mat4_perspective"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_mat4_lookat"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float,  AuroraType::Float, AuroraType::Float, AuroraType::Float,  AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+
+    /* ── Cube vertex data helpers ── */
+    functions_["aurora_gl_cube_vertices"]     = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_gl_cube_vertex_count"]  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_gl_cube_vertex_stride"] = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* ── Lit cube helpers ── */
+    functions_["aurora_gl_lit_cube_vertices"]     = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_gl_lit_cube_vertex_count"]  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_gl_lit_cube_vertex_stride"] = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* ── UV cube helpers ── */
+    functions_["aurora_gl_uv_cube_vertices"]     = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_gl_uv_cube_vertex_count"]  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_gl_uv_cube_vertex_stride"] = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* ── Component helpers ── */
+    functions_["aurora_component_create"]           = FunctionTypeInfo{
+        {AuroraType::Pointer, AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Int},
+        AuroraType::Pointer};
+    functions_["aurora_component_destroy"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_add_child"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_set_widget_type"]  = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_component_set_render_fn"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_set_update_fn"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_set_state"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_mount"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_set_pos"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_component_set_size"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_component_show"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_hide"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_render_tree"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_component_update_tree"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+
+    /* ── Win32 UI helpers ── */
+    functions_["aurora_ui_win32_init"]              = FunctionTypeInfo{
+        {AuroraType::Pointer, AuroraType::Int, AuroraType::Int},
+        AuroraType::Int};
+    functions_["aurora_ui_win32_create_control"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_ui_win32_destroy_control"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_ui_win32_set_text"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_ui_win32_get_text"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_ui_win32_listbox_add"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_ui_win32_listbox_clear"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_ui_win32_listbox_selected"]  = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_ui_win32_listbox_count"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_ui_win32_mount"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_ui_win32_sync_tree"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_ui_win32_run"]               = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_ui_win32_pump"]              = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_ui_win32_shutdown"]          = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_ui_win32_event_type"]        = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_ui_win32_event_source"]      = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_ui_win32_event_data"]        = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* ── GLFW cursor helpers ── */
+    functions_["aurora_glfw_get_cursor_x"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_glfw_get_cursor_y"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    /* ── Generic i32-pair helper ── */
+    functions_["aurora_glfw_get_i32_pair"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    /* ── Convenience window helpers ── */
+    functions_["aurora_glfw_window_width"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_glfw_window_height"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_glfw_framebuffer_width"]  = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_glfw_framebuffer_height"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_glfw_window_pos_x"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_glfw_window_pos_y"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+
+    /* ── GL buffer/VAO helpers ── */
+    functions_["aurora_gl_gen_buffer"]        = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_gl_gen_vertex_array"]  = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* ── Image helpers ── */
+    functions_["aurora_image_load"]              = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_image_free"]              = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_image_create_gl_texture"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+
+    /* ── OBJ helpers ── */
+    functions_["aurora_obj_load"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_obj_vertex_count"]  = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_obj_vertex_data"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_obj_free"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* ── Audio helpers ── */
+    functions_["aurora_audio_init"]       = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_audio_play_file"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_audio_shutdown"]    = FunctionTypeInfo{{}, AuroraType::Void};
 
     while (node) {
         if (node->type == NodeType::Function || node->type == NodeType::PerformanceFn) {

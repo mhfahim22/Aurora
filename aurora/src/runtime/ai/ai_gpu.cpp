@@ -14,8 +14,10 @@ extern "C" {
 /* Forward decls from other modules — stubs if not compiled */
 #if AURORA_CUDA
 int cuda_matmul_available();
+int cuda_elewise_available();
 #else
 int cuda_matmul_available() { return 0; }
+int cuda_elewise_available() { return 0; }
 #endif
 #if AURORA_HIP
 int hip_matmul_available();

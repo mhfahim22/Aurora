@@ -158,17 +158,27 @@ char* json_load(const void* path_a) {
 /* p_json alias for backward compatibility */
 char* p_json(const void* path_a) { return json_load(path_a); }
 
+/* Forward decl from gfx/image_helper.cpp */
+extern "C" void* aurora_image_load(const char* path, int* width, int* height, int* channels);
+extern "C" void aurora_image_free(void* data);
+
 char* image(const void* path_a) {
     const char* path = aurora_str_ptr(path_a);
     if (!path) return AURORA_STRDUP("image: no path");
-    FILE* f = fopen(path, "rb");
-    if (!f) return AURORA_STRDUP("image: not found");
-    unsigned char hdr[54];
-    if (fread(hdr, 1, 54, f) < 54) { fclose(f); return AURORA_STRDUP("image: invalid"); }
-    fclose(f);
-    if (hdr[0] != 'B' || hdr[1] != 'M') return AURORA_STRDUP("image: not BMP");
-    int w = *(int*)(hdr + 18), h = *(int*)(hdr + 22), bpp = *(short*)(hdr + 28);
-    char buf[256]; snprintf(buf, sizeof(buf), "image: %s (%dx%d, %d bpp)", path, w, h, bpp);
+    int w = 0, h = 0, ch = 0;
+    unsigned char* pixels = (unsigned char*)aurora_image_load(path, &w, &h, &ch);
+    if (!pixels) return AURORA_STRDUP("image: not found");
+    /* Compute average brightness and a hash for identity */
+    double avg = 0.0; uint64_t hash = 0;
+    int64_t n = (int64_t)w * h * ch;
+    for (int64_t i = 0; i < n && i < 65536; i++) {
+        avg += (double)pixels[i];
+        hash = hash * 31 + pixels[i];
+    }
+    avg = avg / (n < 65536 ? n : 65536);
+    aurora_image_free(pixels);
+    char buf[512];
+    snprintf(buf, sizeof(buf), "image:%d:%d:%d:%.1f:%llu:%s", w, h, ch, avg, (unsigned long long)hash, path);
     return AURORA_STRDUP(buf);
 }
 
@@ -191,11 +201,25 @@ char* audio(const void* path_a) {
     if (!path) return AURORA_STRDUP("audio: no path");
     FILE* f = fopen(path, "rb"); if (!f) return AURORA_STRDUP("audio: not found");
     unsigned char h[44]; if (fread(h, 1, 44, f) < 44) { fclose(f); return AURORA_STRDUP("audio: invalid"); }
-    fclose(f);
-    if (h[0] != 'R' || h[1] != 'I' || h[2] != 'F' || h[3] != 'F') return AURORA_STRDUP("audio: not WAV");
+    if (h[0] != 'R' || h[1] != 'I' || h[2] != 'F' || h[3] != 'F') { fclose(f); return AURORA_STRDUP("audio: not WAV"); }
     int ch = *(short*)(h + 22), sr = *(int*)(h + 24), bits = *(short*)(h + 34), ds = *(int*)(h + 40);
-    double dur = ds > 0 ? (double)ds / (double)(sr * ch * (bits / 8)) : 0.0;
-    char buf[256]; snprintf(buf, sizeof(buf), "audio: %s (%d Hz, %d ch, %d bit, %.1f s)", path, sr, ch, bits, dur);
+    /* Read PCM samples and compute RMS + peak */
+    int bps = bits / 8; if (bps < 1) bps = 2;
+    int64_t nsamples = ds > 0 ? ds / bps : 0;
+    int16_t* buf16 = (int16_t*)malloc(nsamples * bps > 0 ? (size_t)nsamples * bps : 1);
+    size_t read = fread(buf16, 1, nsamples * bps, f); fclose(f);
+    (void)read;
+    double rms = 0.0, peak = 0.0;
+    int64_t n = nsamples;
+    for (int64_t i = 0; i < n && i < 65536; i++) {
+        double s = bps == 1 ? (double)((int16_t)((int8_t*)buf16)[i] * 256) : (double)buf16[i];
+        rms += s * s; if (fabs(s) > peak) peak = fabs(s);
+    }
+    rms = sqrt(rms / (n < 65536 ? n : 65536));
+    free(buf16);
+    double dur = ds > 0 ? (double)ds / (double)(sr * ch * bps) : 0.0;
+    char buf[512];
+    snprintf(buf, sizeof(buf), "audio:%d:%d:%d:%.3f:%.1f:%.1f:%s", sr, ch, bits, dur, rms, peak, path);
     return AURORA_STRDUP(buf);
 }
 
@@ -203,13 +227,24 @@ char* video(const void* path_a) {
     const char* path = aurora_str_ptr(path_a);
     if (!path) return AURORA_STRDUP("video: no path");
     FILE* f = fopen(path, "rb"); if (!f) return AURORA_STRDUP("video: not found");
-    unsigned char h[12]; if (fread(h, 1, 12, f) < 12) { fclose(f); return AURORA_STRDUP("video: invalid"); }
-    fclose(f);
-    const char* fmt = "unknown";
-    if (h[4] == 0x66 && h[5] == 0x74 && h[6] == 0x79 && h[7] == 0x70) fmt = "MP4";
-    else if (h[0] == 0x1a && h[1] == 0x45 && h[2] == 0xDF && h[3] == 0xA3) fmt = "WebM/MKV";
-    else if (h[0] == 0x52 && h[1] == 0x49 && h[2] == 0x46 && h[3] == 0x46) fmt = "AVI";
-    char buf[256]; snprintf(buf, sizeof(buf), "video: %s (%s)", path, fmt);
+    unsigned char h[64]; int rd = (int)fread(h, 1, 64, f); fclose(f);
+    if (rd < 12) return AURORA_STRDUP("video: invalid");
+    const char* fmt = "unknown"; int64_t w = 0, hh = 0;
+    /* MP4: read width/height from tkhd box if present */
+    if (h[4] == 0x66 && h[5] == 0x74 && h[6] == 0x79 && h[7] == 0x70) {
+        fmt = "MP4";
+        for (int i = 0; i < rd - 30; i++)
+            if (h[i]==0x74 && h[i+1]==0x6B && h[i+2]==0x68 && h[i+3]==0x64 && h[i+4]==0x01) {
+                w  = (int64_t)h[i+24]*16777216 + (int64_t)h[i+25]*65536 + (int64_t)h[i+26]*256 + h[i+27];
+                hh = (int64_t)h[i+28]*16777216 + (int64_t)h[i+29]*65536 + (int64_t)h[i+30]*256 + h[i+31];
+                break;
+            }
+    } else if (h[0] == 0x1a && h[1] == 0x45 && h[2] == 0xDF && h[3] == 0xA3) fmt = "WebM/MKV";
+    else if (h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F') fmt = "AVI";
+    int64_t size_mb = 0;
+    f = fopen(path, "rb"); if (f) { fseek(f, 0, SEEK_END); size_mb = ftell(f) / (1024*1024); fclose(f); }
+    char buf[512];
+    snprintf(buf, sizeof(buf), "video:%s:%lld:%lldx%lld:%s", fmt, (long long)size_mb, (long long)w, (long long)hh, path);
     return AURORA_STRDUP(buf);
 }
 
@@ -358,7 +393,14 @@ int64_t gru(int64_t units) {
     return (int64_t)l;
 }
 
-int64_t dropout(double rate) { return (int64_t)((rate < 0.0 ? 0.0 : (rate >= 1.0 ? 0.5 : rate)) * 100); }
+int64_t dropout(double rate) {
+    Layer* l = (Layer*)calloc(1, sizeof(Layer));
+    if (!l) return 0;
+    l->type = LAYER_DROPOUT;
+    l->dropout_rate = (rate < 0.0 ? 0.0 : (rate >= 1.0 ? 0.5 : rate));
+    l->activation = ACT_LINEAR;
+    return (int64_t)l;
+}
 int64_t batchnorm() {
     Layer* l = (Layer*)calloc(1, sizeof(Layer));
     if (!l) return 0;
@@ -690,26 +732,156 @@ int64_t set_min_lr(int64_t model_ptr, double val) {
 char* detect(const void* img_a) {
     const char* img = aurora_str_ptr(img_a);
     if (!img) return AURORA_STRDUP("[]");
-    char buf[512]; snprintf(buf, sizeof(buf), "[{\"object\":\"%s\",\"confidence\":0.85,\"bbox\":[10,20,100,200]}]", guess_ext(img));
+    int w = 0, h = 0, ch = 0;
+    unsigned char* pixels = (unsigned char*)aurora_image_load(img, &w, &h, &ch);
+    if (!pixels) { char buf[256]; snprintf(buf, sizeof(buf), "[{\"object\":\"%s\",\"confidence\":0.0,\"bbox\":[0,0,%d,%d]}]", guess_ext(img), w, h); return AURORA_STRDUP(buf); }
+    /* Edge detection via simple horizontal gradient */
+    int n_boxes = 0; int boxes[16][4];
+    for (int y = 0; y < h - 1 && n_boxes < 8; y++) {
+        for (int x = 0; x < w - 1 && n_boxes < 8; x++) {
+            int idx = (y * w + x) * ch;
+            int gx = abs((int)pixels[idx] - (int)pixels[idx + ch]);
+            if (gx > 60) { /* edge detected */
+                boxes[n_boxes][0] = x; boxes[n_boxes][1] = y;
+                boxes[n_boxes][2] = x + 10 > w ? w - x : 10;
+                boxes[n_boxes][3] = 10;
+                n_boxes++; x += 12;
+            }
+        }
+    }
+    aurora_image_free(pixels);
+    char buf[1024]; int pos = 0; pos += snprintf(buf + pos, sizeof(buf) - pos, "[");
+    for (int i = 0; i < n_boxes; i++) {
+        if (i > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "{\"object\":\"edge_%d\",\"confidence\":0.6,\"bbox\":[%d,%d,%d,%d]}", i, boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3]);
+    }
+    if (n_boxes == 0) pos += snprintf(buf + pos, sizeof(buf) - pos, "{\"object\":\"%s\",\"confidence\":0.5,\"bbox\":[0,0,%d,%d]}", guess_ext(img), w, h);
+    pos += snprintf(buf + pos, sizeof(buf) - pos, "]");
     return AURORA_STRDUP(buf);
 }
 char* classify_image(const void* img_a) {
     const char* img = aurora_str_ptr(img_a);
     if (!img) return AURORA_STRDUP("unknown");
-    char buf[256]; snprintf(buf, sizeof(buf), "%s (classified)", guess_ext(img));
+    int w = 0, h = 0, ch = 0;
+    unsigned char* pixels = (unsigned char*)aurora_image_load(img, &w, &h, &ch);
+    if (!pixels) { char buf[128]; snprintf(buf, sizeof(buf), "%s (unreadable)", guess_ext(img)); return AURORA_STRDUP(buf); }
+    /* Color histogram-based classification */
+    int64_t n = (int64_t)w * h;
+    double hist[3][8] = {{0}}; /* 8-bin per channel (RGB) */
+    for (int64_t i = 0; i < n; i++) {
+        int idx = (int)(i * ch);
+        for (int c = 0; c < 3 && c < ch; c++) {
+            int bin = (int)(pixels[idx + c] / 32); if (bin > 7) bin = 7;
+            hist[c][bin]++;
+        }
+    }
+    for (int c = 0; c < 3; c++)
+        for (int b = 0; b < 8; b++)
+            hist[c][b] = hist[c][b] / n;
+    /* Dominant color class */
+    int dc = 0; double dm = 0;
+    for (int c = 0; c < 3; c++) {
+        double m = 0;
+        for (int b = 0; b < 8; b++) if (hist[c][b] > m) m = hist[c][b];
+        if (m > dm) { dm = m; dc = c; }
+    }
+    const char* classes[] = {"red_dominant", "green_dominant", "blue_dominant"};
+    double brightness = (hist[0][7] + hist[1][7] + hist[2][7]) / 3.0;
+    aurora_image_free(pixels);
+    char buf[512];
+    snprintf(buf, sizeof(buf), "{\"class\":\"%s\",\"dominant_ch\":%d,\"brightness\":%.3f,\"w\":%d,\"h\":%d,\"ch\":%d,\"fmt\":\"%s\"}",
+             classes[dc], dc, brightness, w, h, ch, guess_ext(img));
     return AURORA_STRDUP(buf);
 }
 char* segment(const void* img_a) {
     const char* img = aurora_str_ptr(img_a);
     if (!img) return AURORA_STRDUP("[]");
-    char buf[512]; snprintf(buf, sizeof(buf), "[{\"class\":\"%s\",\"mask\":\"rle\",\"score\":0.85}]", guess_ext(img));
+    int w = 0, h = 0, ch = 0;
+    unsigned char* pixels = (unsigned char*)aurora_image_load(img, &w, &h, &ch);
+    if (!pixels) { char buf[256]; snprintf(buf, sizeof(buf), "[{\"class\":\"%s\",\"mask\":\"rle\",\"score\":0.0}]", guess_ext(img)); return AURORA_STRDUP(buf); }
+    /* Simple color-based segmentation: cluster pixels into 4 regions by RGB */
+    double centroids[4][3];
+    for (int k = 0; k < 4; k++)
+        for (int c = 0; c < 3; c++)
+            centroids[k][c] = (double)rand() / RAND_MAX * 255;
+    int64_t n = (int64_t)w * h;
+    for (int iter = 0; iter < 5; iter++) {
+        int counts[4] = {0}; double sums[4][3] = {{0}};
+        for (int64_t i = 0; i < n; i++) {
+            int idx = (int)(i * ch); double best = 1e18; int bestk = 0;
+            for (int k = 0; k < 4; k++) {
+                double d = 0;
+                for (int c = 0; c < 3 && c < ch; c++) d += (pixels[idx + c] - centroids[k][c]) * (pixels[idx + c] - centroids[k][c]);
+                if (d < best) { best = d; bestk = k; }
+            }
+            counts[bestk]++;
+            for (int c = 0; c < 3 && c < ch; c++) sums[bestk][c] += pixels[idx + c];
+        }
+        for (int k = 0; k < 4; k++)
+            if (counts[k] > 0)
+                for (int c = 0; c < 3; c++)
+                    centroids[k][c] = sums[k][c] / counts[k];
+    }
+    aurora_image_free(pixels);
+    char buf[1024]; int pos = 0; pos += snprintf(buf + pos, sizeof(buf) - pos, "[");
+    const char* cnames[] = {"bg", "fg1", "fg2", "fg3"};
+    for (int k = 0; k < 4; k++) {
+        if (k > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "{\"class\":\"%s\",\"color\":[%.0f,%.0f,%.0f],\"score\":%.2f}",
+                        cnames[k], centroids[k][0], centroids[k][1], centroids[k][2], 0.25);
+    }
+    pos += snprintf(buf + pos, sizeof(buf) - pos, "]");
     return AURORA_STRDUP(buf);
 }
 char* face(const void* img_a) {
-    (void)img_a; return AURORA_STRDUP("[{\"bbox\":[30,40,80,120],\"confidence\":0.92}]");
+    const char* img = aurora_str_ptr(img_a);
+    if (!img) return AURORA_STRDUP("[]");
+    int w = 0, h = 0, ch = 0;
+    unsigned char* pixels = (unsigned char*)aurora_image_load(img, &w, &h, &ch);
+    if (!pixels) return AURORA_STRDUP("[]");
+    /* Skin-color detection: find largest skin-colored region */
+    int cx = 0, cy = 0, cnt = 0, minx = w, maxx = 0, miny = h, maxy = 0;
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int idx = (y * w + x) * ch;
+            int r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
+            if (r > 95 && g > 40 && b > 20 && r > g && r > b && abs(r - g) > 15) {
+                cx += x; cy += y; cnt++;
+                if (x < minx) minx = x; if (x > maxx) maxx = x;
+                if (y < miny) miny = y; if (y > maxy) maxy = y;
+            }
+        }
+    }
+    aurora_image_free(pixels);
+    char buf[512];
+    if (cnt > 50) {
+        double conf = cnt > 500 ? 0.92 : 0.5 + (double)cnt / 500.0 * 0.42;
+        snprintf(buf, sizeof(buf), "[{\"bbox\":[%d,%d,%d,%d],\"confidence\":%.2f}]", minx, miny, maxx - minx, maxy - miny, conf);
+    } else {
+        snprintf(buf, sizeof(buf), "[{\"bbox\":[%d,%d,%d,%d],\"confidence\":0.0}]", w/4, h/4, w/2, h/2);
+    }
+    return AURORA_STRDUP(buf);
 }
 char* ocr(const void* img_a) {
-    (void)img_a; return AURORA_STRDUP("OCR sample text");
+    const char* img = aurora_str_ptr(img_a);
+    if (!img) return AURORA_STRDUP("");
+    int w = 0, h = 0, ch = 0;
+    unsigned char* pixels = (unsigned char*)aurora_image_load(img, &w, &h, &ch);
+    if (!pixels) return AURORA_STRDUP("");
+    /* Simple connected-component analysis for text regions */
+    int text_regions = 0; double total_contrast = 0.0;
+    int64_t n = (int64_t)w * h;
+    for (int64_t i = ch; i < n * ch; i++) {
+        int diff = abs((int)pixels[i] - (int)pixels[i - ch]);
+        total_contrast += diff;
+        if (diff > 40) text_regions++;
+    }
+    total_contrast /= n;
+    aurora_image_free(pixels);
+    char buf[512];
+    snprintf(buf, sizeof(buf), "{\"text\":\"[OCR] %dx%d img, %.0f%% contrast, %d edges\",\"confidence\":%.2f}",
+             w, h, total_contrast, text_regions, text_regions > 100 ? 0.7 : 0.3);
+    return AURORA_STRDUP(buf);
 }
 
 } /* extern "C" */

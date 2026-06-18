@@ -1,0 +1,69 @@
+## 4x4 Matrix Math Library (column-major, matches OpenGL convention)
+## Usage: import "glm"
+##
+## All functions operate on opaque matrix handles created via mat4_new().
+## Matrices must be freed with mat4_free() when no longer needed.
+
+## ── Lifecycle ──
+
+## Create a new 4x4 identity matrix. Returns opaque handle.
+## Must be freed with mat4_free().
+function mat4_new()
+    return aurora_mat4_new()
+end
+
+## Free a matrix allocated by mat4_new().
+function mat4_free(m)
+    aurora_mat4_free(m)
+end
+
+## Set matrix to identity.
+function mat4_identity(m)
+    aurora_mat4_identity(m)
+end
+
+## Copy src matrix to dst matrix.
+function mat4_copy(dst, src)
+    aurora_mat4_copy(dst, src)
+end
+
+## ── Arithmetic ──
+
+## Multiply a * b, store in out. out = a * b.
+function mat4_mul(out, a, b)
+    aurora_mat4_mul(out, a, b)
+end
+
+## ── Transformations ──
+## These set the output matrix to the specified transformation.
+
+## Translation matrix.
+function mat4_translate(m, x, y, z)
+    aurora_mat4_translate(m, x, y, z)
+end
+
+## Rotation matrix (axis-angle). angle_deg in degrees.
+function mat4_rotate(m, angle_deg, x, y, z)
+    aurora_mat4_rotate(m, angle_deg, x, y, z)
+end
+
+## Scale matrix.
+function mat4_scale(m, x, y, z)
+    aurora_mat4_scale(m, x, y, z)
+end
+
+## ── Projection ──
+
+## Perspective projection matrix.
+## fov_deg: vertical field of view in degrees
+## aspect: width/height ratio
+## near, far: near/far clipping planes
+function mat4_perspective(m, fov_deg, aspect, near, far)
+    aurora_mat4_perspective(m, fov_deg, aspect, near, far)
+end
+
+## View matrix (look-at).
+## eye: camera position, target: look-at point, up: up vector
+function mat4_lookat(m, eye_x, eye_y, eye_z, target_x, target_y, target_z, up_x, up_y, up_z)
+    aurora_mat4_lookat(m, eye_x, eye_y, eye_z, target_x, target_y, target_z, up_x, up_y, up_z)
+end

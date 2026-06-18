@@ -21,23 +21,29 @@ enum class Ecosystem : uint8_t {
     Npm,
     Cargo,
     Native,
+    JVM,
+    Go,
 };
 
 inline const char* ecosystem_name(Ecosystem e) {
     switch (e) {
-        case Ecosystem::PyPI:  return "pypi";
-        case Ecosystem::Npm:   return "npm";
-        case Ecosystem::Cargo: return "cargo";
+        case Ecosystem::PyPI:   return "pypi";
+        case Ecosystem::Npm:    return "npm";
+        case Ecosystem::Cargo:  return "cargo";
         case Ecosystem::Native: return "native";
-        default:               return "unknown";
+        case Ecosystem::JVM:    return "jvm";
+        case Ecosystem::Go:     return "go";
+        default:                return "unknown";
     }
 }
 
 inline Ecosystem ecosystem_from_name(const std::string& name) {
-    if (name == "pypi")  return Ecosystem::PyPI;
-    if (name == "npm")   return Ecosystem::Npm;
-    if (name == "cargo") return Ecosystem::Cargo;
+    if (name == "pypi")   return Ecosystem::PyPI;
+    if (name == "npm")    return Ecosystem::Npm;
+    if (name == "cargo")  return Ecosystem::Cargo;
     if (name == "native") return Ecosystem::Native;
+    if (name == "jvm")    return Ecosystem::JVM;
+    if (name == "go")     return Ecosystem::Go;
     return Ecosystem::Unknown;
 }
 

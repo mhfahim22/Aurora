@@ -418,6 +418,13 @@ ASTNode::Ptr Parser::parse_stmt() {
     if (t0.is_keyword("route") && cnt > 1 && (toks[1].is_identifier() || toks[1].is_string())) {
         auto stmt = make_node(NodeType::Route, toks[1].value, ln);
         int idx = 2;
+        /* Support: route "METHOD" "/path" — if second token is also a string,
+           first token was the method, second is the path. */
+        if (idx < cnt && toks[idx].is_string()) {
+            stmt->left = make_node(NodeType::Str, stmt->value, ln);
+            stmt->value = toks[idx].value;
+            idx++;
+        }
         if (idx < cnt && toks[idx].is_operator(':')) idx++;
         require_token_end(toks, idx, "route declaration");
         advance();

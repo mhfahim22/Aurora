@@ -1,0 +1,14 @@
+## Audio Demo — plays a WAV file
+import "audio"
+
+output("Initializing audio...")
+if aurora_audio_init() == 0:
+    output("ERROR: audio init failed")
+else:
+    output("Playing WAV (requires a test.wav in the current directory)...")
+    result = aurora_audio_play_file("test.wav")
+    output("Play result: " + str(result))
+    output("Shutting down audio...")
+    aurora_audio_shutdown()
+end
+output("Audio demo finished")

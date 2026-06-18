@@ -1,0 +1,11 @@
+outputln("Testing 3 routes...")
+server app
+    route "GET" "/todos"
+        json(aurora_todo_list())
+    route "POST" "/todos"
+        body = request("body")
+        json(aurora_todo_create(body))
+    route "GET" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+outputln("Server registered.")

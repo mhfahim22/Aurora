@@ -1,0 +1,27 @@
+## Native GUI Chat App — textbox, send button, message list
+import "ui"
+
+function main()
+    ui_init("Aurora Chat", 500, 450)
+
+    root = component_create("root", 0, 0, 500, 450)
+
+    label_create(root, "Chat Messages:", 20, 10, 200, 20)
+    msg_box = listbox_create(root, 20, 35, 460, 320)
+
+    label_create(root, "Message:", 20, 365, 100, 20)
+    input_box = textbox_create(root, 20, 388, 340, 28)
+
+    btn = button_create(root, "Send", 370, 388, 110, 28)
+
+    listbox_add(msg_box, "--- Aurora Chat Started ---")
+    listbox_add(msg_box, "Type a message and press Send")
+    listbox_add(msg_box, "")
+
+    user_count = 0
+
+    ui_mount(root)
+    ui_run()
+
+    output("Chat app closed")
+end

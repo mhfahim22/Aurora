@@ -304,6 +304,11 @@ private:
     llvm::Function* http_resp_status_{ nullptr };
     llvm::Function* http_resp_body_  { nullptr };
     llvm::Function* http_resp_send_  { nullptr };
+    llvm::Function* http_resp_ct_    { nullptr };
+    llvm::Function* http_get_field_  { nullptr };
+    llvm::Function* http_get_param_  { nullptr };
+    llvm::Function* http_set_json_   { nullptr };
+    llvm::Function* server_run_      { nullptr };
     llvm::Function* router_new_      { nullptr };
     llvm::Function* route_add_       { nullptr };
     llvm::Function* route_dispatch_  { nullptr };

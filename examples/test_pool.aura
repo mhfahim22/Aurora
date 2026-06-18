@@ -1,0 +1,28 @@
+outputln("--- Connection Pool Test (Aurora) ---")
+import "pool"
+
+outputln("Creating pool...")
+pool = db_pool_create("mock://testdb", 2, 5)
+outputln("  pool = " + str(pool))
+outputln("  idle = " + str(db_pool_idle_count(pool)) + " active = " + str(db_pool_active_count(pool)))
+
+outputln("Creating table...")
+r1 = db_pool_query(pool, "CREATE TABLE items (id INTEGER, name TEXT)")
+outputln("  result = " + str(r1))
+
+outputln("Inserting...")
+r2 = db_pool_query(pool, "INSERT INTO items VALUES (1, 'hello')")
+outputln("  result = " + str(r2))
+
+r3 = db_pool_query(pool, "INSERT INTO items VALUES (2, 'world')")
+outputln("  result = " + str(r3))
+
+outputln("Querying...")
+r4 = db_pool_query(pool, "SELECT * FROM items")
+outputln("  result = " + str(r4))
+
+outputln("Active = " + str(db_pool_active_count(pool)) + " idle = " + str(db_pool_idle_count(pool)))
+
+outputln("Destroying pool...")
+db_pool_destroy(pool)
+outputln("Done!")

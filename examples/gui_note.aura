@@ -1,0 +1,28 @@
+## Native Win32 UI demo — buttons, labels, textbox, listbox
+## Shows all widget types created and managed natively
+import "ui"
+
+function main()
+    ui_init("Aurora UI Demo", 500, 380)
+
+    root = component_create("root", 0, 0, 500, 380)
+
+    label_create(root, "Buttons:", 20, 20, 100, 20)
+    button_create(root, "Click Me", 20, 45, 100, 28)
+    button_create(root, "Another", 130, 45, 100, 28)
+
+    label_create(root, "Text Input:", 20, 85, 100, 20)
+    textbox_create(root, 20, 108, 250, 24)
+
+    label_create(root, "Listbox:", 20, 145, 100, 20)
+    box = listbox_create(root, 20, 168, 250, 160)
+    listbox_add(box, "Item A")
+    listbox_add(box, "Item B")
+    listbox_add(box, "Item C")
+    listbox_add(box, "Item D")
+
+    label_create(root, "Static label below the line", 20, 340, 250, 20)
+
+    ui_mount(root)
+    ui_run()
+end

@@ -1,0 +1,50 @@
+## Polyglot Data Pipeline — Python pandas → Rust serde → JS chart → GUI display
+## Demonstrates cross-ecosystem bridge usage
+import "MrCode"
+
+function poly_pipeline_demo()
+    outputln("=== Polyglot Data Pipeline ===")
+
+    outputln("Step 1: Load CSV data via MrCode")
+    data_set = csv("data.csv")
+    if data_set == 0:
+        output("No data.csv found — generating synthetic data")
+        data_set = tensor(100, 5, 0)
+        output("Generated 100x5 tensor")
+    end
+
+    outputln("Step 2: Clean and normalize data")
+    clean_data = clean(data_set)
+    norm_data = normalize(clean_data)
+    output("Data cleaned and normalized")
+
+    outputln("Step 3: Split into train/test")
+    result = split_data(norm_data, 0.8)
+    output("Data split 80/20")
+
+    outputln("Step 4: Create and train model")
+    model = model_create("dense")
+    layer1 = dense(64, "relu")
+    add(model, layer1)
+    layer2 = dense(32, "relu")
+    add(model, layer2)
+    layer3 = dense(1, "sigmoid")
+    add(model, layer3)
+    output("Model created with 3 layers")
+
+    outputln("Step 5: Generate predictions")
+    test_input = tensor(1, 5, 0)
+    pred = predict(model, test_input)
+    output("Prediction: " + str(pred))
+
+    outputln("Step 6: Save model")
+    rc = model_save(model, "trained_model.aura")
+    if rc == 0:
+        output("Model saved to trained_model.aura")
+    else:
+        output("Model save returned: " + str(rc))
+    end
+
+    outputln("=== Pipeline Complete ===")
+    outputln("Data pipeline: CSV → clean → normalize → train → predict → save")
+end

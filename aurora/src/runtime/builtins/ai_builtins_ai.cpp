@@ -645,12 +645,20 @@ int64_t backward() {
 
 int64_t optimizer(const void* type_a) {
     const char* t = aurora_str_ptr(type_a); if (!t) return 0;
-    if (strcmp(t, "adam") == 0) return 1; if (strcmp(t, "sgd") == 0) return 2; if (strcmp(t, "rmsprop") == 0) return 3;
-    return 0;
+    return (int64_t)optim_from_name(t);
 }
-int64_t adam() { return 1; }
-int64_t sgd() { return 2; }
-int64_t rmsprop() { return 3; }
+int64_t adam() {
+    if (g_active_model) { g_active_model->optimizer_type = OPTIM_ADAM; return 1; }
+    return (int64_t)OPTIM_ADAM;
+}
+int64_t sgd() {
+    if (g_active_model) { g_active_model->optimizer_type = OPTIM_SGD; return 1; }
+    return (int64_t)OPTIM_SGD;
+}
+int64_t rmsprop() {
+    if (g_active_model) { g_active_model->optimizer_type = OPTIM_RMSPROP; return 1; }
+    return (int64_t)OPTIM_RMSPROP;
+}
 
 /* === Transformer Builder (returns layer ptr, use add(model, layer)) === */
 int64_t embedding(int64_t vocab, int64_t dim) {

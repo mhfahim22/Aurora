@@ -1,0 +1,42 @@
+## Image Classifier — Load ONNX model, classify input image, display result
+## Uses MrCode for model loading and image classification
+import "MrCode"
+
+function classify_image_demo()
+    outputln("=== Aurora Image Classifier ===")
+
+    img_path = "test.jpg"
+    if file_exists(img_path):
+        output("Loading image: " + img_path)
+        img_data = image(img_path)
+        output("Image data: " + img_data)
+
+        output("Loading model...")
+        model = model_load("model.onnx")
+        if model != 0:
+            output("Model loaded, classifying...")
+            result = classify_image(img_path)
+            output("Classification result: " + result)
+            output("Labels detected: " + result)
+        else:
+            output("No model.onnx found — creating demo model")
+            model = model_create("dense")
+            layer = dense(128, "relu")
+            add(model, layer)
+            layer2 = dense(10, "softmax")
+            add(model, layer2)
+            output("Demo model created (requires training data)")
+        end
+    else:
+        output("No test.jpg found — run with an image file")
+        output("Usage: place test.jpg in the current directory")
+        info = image("test.jpg")
+        if info == "":
+            output("Image not available")
+        else:
+            output("Image info: " + info)
+        end
+    end
+
+    output("=== Classifier Demo Complete ===")
+end

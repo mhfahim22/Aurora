@@ -1,0 +1,7 @@
+outputln("Testing POST...")
+server app
+    route "POST" "/create"
+        json(aurora_todo_create("from_post"))
+    route "GET" "/todos"
+        json(aurora_todo_list())
+outputln("Server registered.")

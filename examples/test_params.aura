@@ -1,0 +1,6 @@
+outputln("Testing request.params...")
+server app
+    route "GET" "/:id"
+        id = request.params.id
+        json(id)
+outputln("Server registered.")

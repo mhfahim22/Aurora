@@ -1,6 +1,7 @@
 #include "runtime/backend.hpp"
 #include "common/platform.hpp"
 #include "runtime/memory.hpp"
+#include "std/json.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -14,11 +15,12 @@
 #include <unordered_map>
 #include <sstream>
 #include <algorithm>
+#include <atomic>
 #include <sys/stat.h>
-
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include "miniz.h"
 #pragma comment(lib, "ws2_32.lib")
 #else
 #include <sys/socket.h>
@@ -51,6 +53,7 @@ static int64_t now_ms() {
 
 /* ── Server ── */
 AuroraServer* aurora_server_init(int64_t port) {
+    setbuf(stdout, NULL);
     AuroraServer* srv = (AuroraServer*)calloc(1, sizeof(AuroraServer));
     srv->port = (int)port;
     srv->running = 0;
@@ -83,7 +86,7 @@ void aurora_server_start(AuroraServer* srv) {
         closesocket(sock);
         return;
     }
-    listen(sock, 5);
+    listen(sock, SOMAXCONN);
     srv->handle = (void*)(intptr_t)sock;
 #else
     int sock = (int)socket(AF_INET, SOCK_STREAM, 0);
@@ -103,7 +106,7 @@ void aurora_server_start(AuroraServer* srv) {
         close(sock);
         return;
     }
-    listen(sock, 5);
+    listen(sock, SOMAXCONN);
     srv->handle = (void*)(intptr_t)(int64_t)sock;
 #endif
     srv->running = 1;
@@ -191,14 +194,34 @@ const char* aurora_http_get_header(AuroraHttpRequest* req, const char* name) {
     return nullptr;
 }
 
+const char* aurora_http_get_field(AuroraHttpRequest* req, const char* field) {
+    if (!req || !field) return nullptr;
+    if (strcmp(field, "method") == 0) return req->method;
+    if (strcmp(field, "path") == 0) return req->path;
+    if (strcmp(field, "body") == 0) return req->body;
+    if (strcmp(field, "query_string") == 0) return req->query_string;
+    if (strcmp(field, "version") == 0) return req->version;
+    return nullptr;
+}
+
+const char* aurora_http_get_param(AuroraHttpRequest* req, const char* name) {
+    if (!req || !name) return nullptr;
+    for (int i = 0; i < req->param_count; i++) {
+        if (strcmp(req->param_names[i], name) == 0)
+            return req->param_values[i];
+    }
+    return nullptr;
+}
+
 /* ── HTTP Request Parser ── */
 AuroraHttpRequest* aurora_http_parse_request(const char* raw) {
     if (!raw) return nullptr;
     AuroraHttpRequest* req = (AuroraHttpRequest*)calloc(1, sizeof(AuroraHttpRequest));
 
-    char buf[8192];
-    strncpy(buf, raw, sizeof(buf) - 1);
-    buf[sizeof(buf) - 1] = '\0';
+    size_t raw_len = strlen(raw);
+    char* buf = (char*)malloc(raw_len + 1);
+    if (!buf) { free(req); return nullptr; }
+    memcpy(buf, raw, raw_len + 1);
 
     char* line = buf;
     char* end = strstr(line, "\r\n");
@@ -231,6 +254,9 @@ AuroraHttpRequest* aurora_http_parse_request(const char* raw) {
     req->query_param_names = nullptr;
     req->query_param_values = nullptr;
     req->query_param_count = 0;
+    req->param_names = nullptr;
+    req->param_values = nullptr;
+    req->param_count = 0;
 
     char* hdr_line = end ? end + 2 : nullptr;
     while (hdr_line && *hdr_line) {
@@ -263,6 +289,7 @@ AuroraHttpRequest* aurora_http_parse_request(const char* raw) {
     }
 
     printf("[http] %s %s\n", req->method ? req->method : "?", req->path ? req->path : "?");
+    free(buf);
     return req;
 }
 
@@ -285,6 +312,12 @@ void aurora_http_request_free(AuroraHttpRequest* req) {
     }
     free(req->query_param_names);
     free(req->query_param_values);
+    for (int i = 0; i < req->param_count; i++) {
+        free(req->param_names[i]);
+        free(req->param_values[i]);
+    }
+    free(req->param_names);
+    free(req->param_values);
     free(req->body);
     free(req);
 }
@@ -350,6 +383,14 @@ void aurora_http_response_set_status_code(AuroraHttpResponse* res, int code) {
 
 void aurora_http_response_set_header(AuroraHttpResponse* res, const char* name, const char* value) {
     if (!res || !name || !value) return;
+    /* Replace existing header with same name */
+    for (int i = 0; i < res->header_count; i++) {
+        if (strcmp(res->header_names[i], name) == 0) {
+            free(res->header_values[i]);
+            res->header_values[i] = strdup(value);
+            return;
+        }
+    }
     if (res->header_count >= res->header_cap) {
         res->header_cap *= 2;
         res->header_names = (char**)aurora_safe_realloc(res->header_names, (size_t)res->header_cap * sizeof(char*));
@@ -371,18 +412,37 @@ void aurora_http_response_set_body(AuroraHttpResponse* res, const char* body) {
     res->body = body ? strdup(body) : nullptr;
 }
 
+void aurora_http_response_set_json(AuroraHttpResponse* res, const char* body) {
+    if (!res) return;
+    aurora_http_response_set_content_type(res, "application/json");
+    aurora_http_response_set_body(res, body);
+}
+
 int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
     if (!res || res->sent) return -1;
     char header_buf[4096];
     int len = snprintf(header_buf, sizeof(header_buf),
         "HTTP/1.1 %d %s\r\n", res->status_code, res->status_text ? res->status_text : "Unknown");
+
+    /* Track if Content-Length is already explicitly set (e.g. for gzip) */
+    int content_length_set = 0;
+    size_t body_len = res->body ? strlen(res->body) : 0;
+
     for (int i = 0; i < res->header_count; i++) {
+        if (strcmp(res->header_names[i], "Content-Length") == 0) {
+            content_length_set = 1;
+            body_len = (size_t)atoll(res->header_values[i]);
+        }
         len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1,
             "%s: %s\r\n", res->header_names[i], res->header_values[i]);
     }
-    size_t body_len = res->body ? strlen(res->body) : 0;
-    len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1,
-        "Content-Length: %zu\r\n\r\n", body_len);
+
+    if (!content_length_set) {
+        len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1,
+            "Content-Length: %zu\r\n\r\n", body_len);
+    } else {
+        len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1, "\r\n");
+    }
 
     const char* p = header_buf;
     int remaining = len;
@@ -411,7 +471,106 @@ int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
         }
     }
     res->sent = 1;
-    printf("[http] response %d sent\n", res->status_code);
+    fprintf(stderr, "[http] response %d sent (body_len=%zu, content_length_set=%d)\n", res->status_code, body_len, content_length_set);
+    return 0;
+}
+
+/* ── Chunked transfer encoding response sender ── */
+int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int chunk_size) {
+    if (!res || res->sent) return -1;
+    if (chunk_size <= 0) chunk_size = 4096;
+    char header_buf[4096];
+    int len = snprintf(header_buf, sizeof(header_buf),
+        "HTTP/1.1 %d %s\r\n", res->status_code, res->status_text ? res->status_text : "Unknown");
+
+    /* Write all user-set headers EXCEPT Content-Length (chunked doesn't use it) */
+    for (int i = 0; i < res->header_count; i++) {
+        if (strcmp(res->header_names[i], "Content-Length") == 0)
+            continue;
+        len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1,
+            "%s: %s\r\n", res->header_names[i], res->header_values[i]);
+    }
+
+    /* Add Transfer-Encoding: chunked */
+    len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1,
+        "Transfer-Encoding: chunked\r\n\r\n");
+
+    /* Send headers */
+    {
+        const char* p = header_buf;
+        int remaining = len;
+        while (remaining > 0) {
+#ifdef _WIN32
+            int n = (int)send((SOCKET)(intptr_t)sock, p, remaining, 0);
+#else
+            int n = (int)send((int)sock, p, (size_t)remaining, MSG_NOSIGNAL);
+#endif
+            if (n <= 0) return -1;
+            p += n;
+            remaining -= n;
+        }
+    }
+
+    /* Send body in chunks */
+    if (res->body) {
+        size_t body_len = strlen(res->body);
+        const char* p = res->body;
+        while (body_len > 0) {
+            size_t this_chunk = (size_t)chunk_size;
+            if (this_chunk > body_len) this_chunk = body_len;
+            char size_buf[32];
+            int size_len = snprintf(size_buf, sizeof(size_buf), "%zx\r\n", this_chunk);
+            {
+                const char* sp = size_buf;
+                int s_remaining = size_len;
+                while (s_remaining > 0) {
+#ifdef _WIN32
+                    int n = (int)send((SOCKET)(intptr_t)sock, sp, s_remaining, 0);
+#else
+                    int n = (int)send((int)sock, sp, (size_t)s_remaining, MSG_NOSIGNAL);
+#endif
+                    if (n <= 0) return -1;
+                    sp += n;
+                    s_remaining -= n;
+                }
+            }
+            {
+                int c_remaining = (int)this_chunk;
+                while (c_remaining > 0) {
+#ifdef _WIN32
+                    int n = (int)send((SOCKET)(intptr_t)sock, p, c_remaining, 0);
+#else
+                    int n = (int)send((int)sock, p, (size_t)c_remaining, MSG_NOSIGNAL);
+#endif
+                    if (n <= 0) return -1;
+                    p += n;
+                    c_remaining -= n;
+                }
+            }
+            {
+                const char* crlf = "\r\n";
+#ifdef _WIN32
+                send((SOCKET)(intptr_t)sock, crlf, 2, 0);
+#else
+                send((int)sock, crlf, 2, MSG_NOSIGNAL);
+#endif
+            }
+            body_len -= this_chunk;
+        }
+    }
+
+    /* Terminating chunk: 0\r\n\r\n */
+    {
+        const char* term = "0\r\n\r\n";
+#ifdef _WIN32
+        send((SOCKET)(intptr_t)sock, term, 5, 0);
+#else
+        send((int)sock, term, 5, MSG_NOSIGNAL);
+#endif
+    }
+
+    res->sent = 1;
+    fprintf(stderr, "[http] chunked response %d sent (chunk_size=%d)\n", res->status_code, chunk_size);
     return 0;
 }
 
@@ -476,37 +635,297 @@ void aurora_route_add(AuroraRouter* router, const char* method, const char* path
     printf("[router] %s %s registered\n", method, path_pattern);
 }
 
+/* ── Match path with :param patterns (e.g. /user/:id matches /user/42) ── */
+static int match_route_pattern(const char* pattern, const char* path,
+                                char*** out_names, char*** out_vals, int* out_count) {
+    *out_names = nullptr;
+    *out_vals = nullptr;
+    *out_count = 0;
+    if (!pattern || !path) return 0;
+
+    /* Quick exact match check first */
+    if (strcmp(pattern, path) == 0) return 1;
+    if (!strchr(pattern, ':')) return 0; /* no params, already checked exact */
+
+    /* Split both by '/' and compare segment by segment */
+    char pat_copy[1024], path_copy[1024];
+    strncpy(pat_copy, pattern, sizeof(pat_copy) - 1);
+    pat_copy[sizeof(pat_copy) - 1] = '\0';
+    strncpy(path_copy, path, sizeof(path_copy) - 1);
+    path_copy[sizeof(path_copy) - 1] = '\0';
+
+    /* Count segments */
+    int pat_seg_count = 0, path_seg_count = 0;
+    for (const char* p = pat_copy; *p; p++) if (*p == '/') pat_seg_count++;
+    for (const char* p = path_copy; *p; p++) if (*p == '/') path_seg_count++;
+    pat_seg_count++; path_seg_count++; /* count first segment */
+    if (pat_seg_count != path_seg_count) return 0;
+
+    /* Extract and compare segments */
+    char* pat_save, *path_save;
+    char* pat_seg = AURORA_STRTOK(pat_copy, "/", &pat_save);
+    char* path_seg = AURORA_STRTOK(path_copy, "/", &path_save);
+
+    /* Temporary storage */
+    char* names[64];
+    char* vals[64];
+    int count = 0;
+
+    while (pat_seg && path_seg) {
+        if (pat_seg[0] == ':') {
+            /* Parameter capture */
+            if (count < 64) {
+                names[count] = strdup(pat_seg + 1);
+                vals[count] = strdup(path_seg);
+                count++;
+            }
+        } else if (strcmp(pat_seg, path_seg) != 0) {
+            /* Mismatch */
+            for (int j = 0; j < count; j++) { free(names[j]); free(vals[j]); }
+            return 0;
+        }
+        pat_seg = AURORA_STRTOK(nullptr, "/", &pat_save);
+        path_seg = AURORA_STRTOK(nullptr, "/", &path_save);
+    }
+
+    if (count > 0) {
+        *out_names = (char**)malloc((size_t)count * sizeof(char*));
+        *out_vals = (char**)malloc((size_t)count * sizeof(char*));
+        for (int i = 0; i < count; i++) {
+            (*out_names)[i] = names[i];
+            (*out_vals)[i] = vals[i];
+        }
+        *out_count = count;
+    }
+    return 1;
+}
+
 int aurora_route_dispatch(AuroraRouter* router, AuroraHttpRequest* req, AuroraHttpResponse* res) {
     if (!router || !req || !res) return -1;
     const char* path_match = req->path_without_query ? req->path_without_query : req->path;
 
     for (int i = 0; i < router->count; i++) {
-        if (strcmp(router->entries[i].method, req->method) != 0)
+        /* Method match */
+        if (strcmp(router->entries[i].method, "*") != 0 &&
+            strcmp(router->entries[i].method, req->method) != 0)
             continue;
 
+        /* Path match with optional :param extraction */
+        char** param_names = nullptr;
+        char** param_vals = nullptr;
+        int param_count = 0;
+
+        int matched = 0;
         if (router->use_prefix_match) {
             size_t plen = strlen(router->entries[i].path_pattern);
-            if (strncmp(router->entries[i].path_pattern, path_match, plen) == 0) {
-                typedef void (*HandlerFn)(AuroraHttpRequest*, AuroraHttpResponse*);
-                HandlerFn fn = (HandlerFn)router->entries[i].handler;
-                fn(req, res);
-                return 0;
-            }
+            if (strncmp(router->entries[i].path_pattern, path_match, plen) == 0)
+                matched = 1;
+        } else if (strchr(router->entries[i].path_pattern, ':')) {
+            matched = match_route_pattern(router->entries[i].path_pattern, path_match,
+                                          &param_names, &param_vals, &param_count);
         } else {
-            if (strcmp(router->entries[i].path_pattern, path_match) == 0) {
-                typedef void (*HandlerFn)(AuroraHttpRequest*, AuroraHttpResponse*);
-                HandlerFn fn = (HandlerFn)router->entries[i].handler;
-                fn(req, res);
-                return 0;
-            }
+            matched = (strcmp(router->entries[i].path_pattern, path_match) == 0);
         }
+
+        if (matched) {
+            /* Attach path params to request */
+            if (param_count > 0) {
+                req->param_names = param_names;
+                req->param_values = param_vals;
+                req->param_count = param_count;
+            }
+            typedef void (*HandlerFn)(AuroraHttpRequest*, AuroraHttpResponse*);
+            HandlerFn fn = (HandlerFn)router->entries[i].handler;
+            fn(req, res);
+            return 0;
+        }
+        free(param_names);
+        free(param_vals);
     }
     aurora_http_response_set_status(res, 404, "Not Found");
     aurora_http_response_set_body(res, "404 Not Found");
     return 1;
 }
 
-/* ── Server accept + handle (with middleware) ── */
+/* ── Check a header value in raw HTTP request (case-insensitive name) ── */
+static int has_header_value(const char* raw, const char* header_name, const char* expected_val) {
+    if (!raw || !header_name || !expected_val) return 0;
+    const char* hdr = strstr(raw, header_name);
+    if (!hdr) {
+        /* Try lowercase version of header name */
+        std::string lower;
+        for (const char* p = header_name; *p; p++) lower += (char)tolower(*p);
+        hdr = strstr(raw, lower.c_str());
+    }
+    if (!hdr) {
+        fprintf(stderr, "[gzip-debug] hdr NOT found in raw for '%s'\n", header_name);
+        fprintf(stderr, "[gzip-debug] raw=%.200s\n", raw);
+        return 0;
+    }
+    hdr += strlen(header_name);
+    while (*hdr == ' ') hdr++;
+    /* Search for expected_val as a token in comma-separated list */
+    size_t ev_len = strlen(expected_val);
+    int ret = 0;
+    const char* p = hdr;
+    while (*p) {
+        while (*p == ' ' || *p == ',') p++;
+        if (strncmp(p, expected_val, ev_len) == 0) {
+            char after = p[ev_len];
+            if (after == '\0' || after == ',' || after == ' ' || after == '\r' || after == '\n') {
+                ret = 1;
+                break;
+            }
+        }
+        while (*p && *p != ',') p++;
+    }
+    fprintf(stderr, "[gzip-debug] hdr found, value='%.30s' searching for '%s' => %d\n", hdr, expected_val, ret);
+    return ret;
+}
+
+/* ── Check if raw request has Connection: keep-alive ── */
+static int has_keep_alive(const char* raw) {
+    return has_header_value(raw, "Connection:", "keep-alive");
+}
+
+/* ── Check if raw request accepts gzip ── */
+static int accepts_gzip(const char* raw) {
+    int ret = has_header_value(raw, "Accept-Encoding:", "gzip");
+    fprintf(stderr, "[gzip-debug] accepts_gzip returning %d\n", ret);
+    if (!ret && raw) {
+        const char* ae = strstr(raw, "Accept");
+        if (ae) {
+            const char* newline = strstr(ae, "\r\n");
+            if (!newline) newline = ae + 80;
+            int len = (int)(newline - ae);
+            if (len > 80) len = 80;
+            fprintf(stderr, "[gzip-debug] Accept header near match: %.*s\n", len, ae);
+        } else {
+            fprintf(stderr, "[gzip-debug] No 'Accept' in raw request\n");
+        }
+    }
+    return ret;
+}
+
+/* ── Set socket receive timeout ── */
+static void set_recv_timeout(int64_t client_sock, int timeout_sec) {
+#ifdef _WIN32
+    DWORD tv = (DWORD)timeout_sec * 1000;
+    setsockopt((SOCKET)(intptr_t)client_sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+#else
+    struct timeval tv;
+    tv.tv_sec = timeout_sec;
+    tv.tv_usec = 0;
+    setsockopt((int)client_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+#endif
+}
+
+/* Forward decls for gzip compression */
+static unsigned int gzip_crc32(const unsigned char* buf, size_t len);
+static unsigned char* gzip_compress(const unsigned char* input, size_t input_len, size_t* out_len);
+
+/* ── Per-client request handling (runs in its own thread) ── */
+static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* router) {
+#ifdef _WIN32
+    SOCKET client = (SOCKET)(intptr_t)client_sock;
+#else
+    int client = (int)client_sock;
+#endif
+    /* Set 5-second receive timeout for keep-alive idle */
+    set_recv_timeout(client_sock, 5);
+    char raw[65536];
+    int keep_alive_max = 100;
+    for (int ka_count = 0; ka_count < keep_alive_max; ka_count++) {
+#ifdef _WIN32
+        int n = recv(client, raw, sizeof(raw) - 1, 0);
+#else
+        int n = (int)recv(client, raw, sizeof(raw) - 1, 0);
+#endif
+        if (n <= 0) break;
+        raw[n] = '\0';
+        char* body_start = strstr(raw, "\r\n\r\n");
+        if (body_start) {
+            int header_end = (int)(body_start - raw) + 4;
+            int content_length = 0;
+            char* cl = strstr(raw, "Content-Length:");
+            if (!cl) cl = strstr(raw, "content-length:");
+            if (cl) {
+                cl += 15;
+                while (*cl == ' ') cl++;
+                content_length = atoi(cl);
+            }
+            int needed = header_end + content_length;
+            if (needed > (int)sizeof(raw) - 1)
+                needed = (int)sizeof(raw) - 1;
+            while (n < needed) {
+#ifdef _WIN32
+                int r = recv(client, raw + n, needed - n, 0);
+#else
+                int r = (int)recv(client, raw + n, needed - n, 0);
+#endif
+                if (r <= 0) break;
+                n += r;
+                raw[n] = '\0';
+            }
+        }
+        int ka = has_keep_alive(raw);
+        int gzip_accepted = accepts_gzip(raw);
+        AuroraHttpRequest* req = aurora_http_parse_request(raw);
+        AuroraHttpResponse* res = aurora_http_response_new();
+        aurora_http_response_set_header(res, "Content-Type", "text/plain");
+        if (ka) {
+            aurora_http_response_set_header(res, "Connection", "keep-alive");
+            aurora_http_response_set_header(res, "Keep-Alive", "timeout=5, max=100");
+        }
+        if (req) {
+            int mw_result = aurora_middleware_run_chain(
+                srv->middleware_handlers, srv->middleware_count, req, res);
+            if (mw_result == 0) {
+                if (!aurora_server_serve_static(req, res, srv))
+                    aurora_route_dispatch(router, req, res);
+            }
+        } else {
+            aurora_http_response_set_status(res, 400, "Bad Request");
+            aurora_http_response_set_body(res, "Bad Request");
+        }
+        /* Gzip compress response body if accepted and body is large enough */
+        if (gzip_accepted && res->body) {
+            size_t orig_len = strlen(res->body);
+            fprintf(stderr, "[gzip-debug] accepted=true orig_len=%zu\n", orig_len);
+            if (orig_len > 512) {
+                size_t gz_len = 0;
+                unsigned char* gz = gzip_compress((const unsigned char*)res->body, orig_len, &gz_len);
+                fprintf(stderr, "[gzip-debug] compress returned=%p gz_len=%zu\n", gz, gz_len);
+                if (gz) {
+                    free(res->body);
+                    res->body = (char*)gz;
+                    aurora_http_response_set_header(res, "Content-Encoding", "gzip");
+                    char cl_buf[32];
+                    snprintf(cl_buf, sizeof(cl_buf), "%zu", gz_len);
+                    aurora_http_response_set_header(res, "Content-Length", cl_buf);
+                    fprintf(stderr, "[gzip-debug] compression applied: %zu -> %zu bytes\n", orig_len, gz_len);
+                } else {
+                    fprintf(stderr, "[gzip-debug] compression failed\n");
+                }
+            }
+        }
+#ifdef _WIN32
+        aurora_http_response_send(res, (int64_t)(intptr_t)client);
+#else
+        aurora_http_response_send(res, (int64_t)client);
+#endif
+        aurora_http_request_free(req);
+        aurora_http_response_free(res);
+        if (!ka) break; /* close after single request if not keep-alive */
+    }
+#ifdef _WIN32
+    closesocket(client);
+#else
+    close(client);
+#endif
+}
+
+/* ── Server accept + handle (single-thread, backward compat) ── */
 void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
     if (!srv || !srv->handle || !srv->running) return;
 #ifdef _WIN32
@@ -515,63 +934,52 @@ void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
     int addr_len = sizeof(client_addr);
     SOCKET client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
     if (client == INVALID_SOCKET) return;
-
-    char raw[8192];
-    int n = recv(client, raw, sizeof(raw) - 1, 0);
-    if (n > 0) {
-        raw[n] = '\0';
-        AuroraHttpRequest* req = aurora_http_parse_request(raw);
-        AuroraHttpResponse* res = aurora_http_response_new();
-        aurora_http_response_set_header(res, "Content-Type", "text/plain");
-        if (req) {
-            /* Run middleware chain first */
-            int mw_result = aurora_middleware_run_chain(
-                srv->middleware_handlers, srv->middleware_count, req, res);
-            if (mw_result == 0) {
-                /* Try static file routes before router dispatch */
-                if (!aurora_server_serve_static(req, res, srv))
-                    aurora_route_dispatch(router, req, res);
-            }
-        } else {
-            aurora_http_response_set_status(res, 400, "Bad Request");
-            aurora_http_response_set_body(res, "Bad Request");
-        }
-        aurora_http_response_send(res, (int64_t)(intptr_t)client);
-        aurora_http_request_free(req);
-        aurora_http_response_free(res);
-    }
-    closesocket(client);
+    handle_client((int64_t)(intptr_t)client, srv, router);
 #else
     int listen_sock = (int)(intptr_t)srv->handle;
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
     int client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
     if (client < 0) return;
-
-    char raw[8192];
-    int n = (int)recv(client, raw, sizeof(raw) - 1, 0);
-    if (n > 0) {
-        raw[n] = '\0';
-        AuroraHttpRequest* req = aurora_http_parse_request(raw);
-        AuroraHttpResponse* res = aurora_http_response_new();
-        aurora_http_response_set_header(res, "Content-Type", "text/plain");
-        if (req) {
-            int mw_result = aurora_middleware_run_chain(
-                srv->middleware_handlers, srv->middleware_count, req, res);
-            if (mw_result == 0) {
-                if (!aurora_server_serve_static(req, res, srv))
-                    aurora_route_dispatch(router, req, res);
-            }
-        } else {
-            aurora_http_response_set_status(res, 400, "Bad Request");
-            aurora_http_response_set_body(res, "Bad Request");
-        }
-        aurora_http_response_send(res, (int64_t)client);
-        aurora_http_request_free(req);
-        aurora_http_response_free(res);
-    }
-    close(client);
+    handle_client((int64_t)client, srv, router);
 #endif
+}
+
+/* ── Thread-per-connection accept loop ── */
+static std::atomic<int> g_active_connections{0};
+static std::atomic<int64_t> g_total_connections{0};
+
+void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
+    if (!srv || !srv->handle || !srv->running) return;
+    printf("[server] accept loop (thread-per-connection) started on port %d\n", srv->port);
+    while (srv->running) {
+#ifdef _WIN32
+        SOCKET listen_sock = (SOCKET)(intptr_t)srv->handle;
+        struct sockaddr_in client_addr;
+        int addr_len = sizeof(client_addr);
+        SOCKET client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
+        if (client == INVALID_SOCKET) {
+            if (!srv->running) break;
+            continue;
+        }
+#else
+        int listen_sock = (int)(intptr_t)srv->handle;
+        struct sockaddr_in client_addr;
+        socklen_t addr_len = sizeof(client_addr);
+        int client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
+        if (client < 0) {
+            if (!srv->running) break;
+            continue;
+        }
+#endif
+        g_active_connections.fetch_add(1);
+        g_total_connections.fetch_add(1);
+        std::thread([client, srv, router]() {
+            handle_client((int64_t)(intptr_t)client, srv, router);
+            g_active_connections.fetch_sub(1);
+        }).detach();
+    }
+    printf("[server] accept loop ended (total connections: %lld)\n", (long long)g_total_connections.load());
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -666,14 +1074,6 @@ int aurora_server_serve_static(AuroraHttpRequest* req, AuroraHttpResponse* res, 
         return 1;
     }
     return 0;
-}
-
-void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
-    if (!srv || !srv->handle || !srv->running) return;
-    printf("[server] accept loop started on port %d\n", srv->port);
-    while (srv->running) {
-        aurora_server_accept_and_handle(srv, router);
-    }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -847,6 +1247,32 @@ static void dev_server_handle_request(AuroraHttpRequest* req, AuroraHttpResponse
         "</body></html>");
 }
 
+/* ── Global router + route_register (used by codegen) ── */
+static AuroraRouter* g_global_router = nullptr;
+static AuroraServer* g_global_server = nullptr;
+
+void aurora_route_register(const char* method, const char* path, void* handler) {
+    if (!g_global_router) {
+        g_global_router = aurora_router_new();
+    }
+    aurora_route_add(g_global_router, method ? method : "GET", path, handler);
+}
+
+void aurora_server_set_router(AuroraServer* srv, AuroraRouter* router) {
+    g_global_server = srv;
+    if (router) g_global_router = router;
+}
+
+void aurora_server_run(AuroraServer* srv) {
+    if (!srv) return;
+    if (!g_global_router) g_global_router = aurora_router_new();
+    aurora_server_start(srv);
+    if (srv->running) {
+        printf("[server] running on port %d\n", srv->port);
+        aurora_server_accept_loop(srv, g_global_router);
+    }
+}
+
 void aurora_dev_server(int64_t port, const char* src_dir) {
     printf("[dev] starting dev server on port %lld, serving %s\n", (long long)port, src_dir);
     AuroraServer* srv = aurora_server_init(port);
@@ -997,31 +1423,42 @@ struct DBResult {
     int affected_rows;
 };
 
-/* Helper: trim whitespace */
+/* Helper: trim whitespace (C-string, no std::string to avoid LLD CRT issues) */
 static std::string trim(const std::string& s) {
-    size_t start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = s.find_last_not_of(" \t\r\n");
-    return s.substr(start, end - start + 1);
+    if (s.empty()) return std::string();
+    const char* cstr = s.c_str();
+    const char* start = cstr;
+    while (*start && (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n'))
+        start++;
+    if (!*start) return std::string();
+    const char* end = start + strlen(start) - 1;
+    while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
+        end--;
+    return std::string(start, (size_t)(end - start + 1));
 }
 
-/* Helper: split string by delimiter */
+/* Helper: split string by delimiter (uses C-string iteration, avoids stringstream) */
 static std::vector<std::string> split(const std::string& s, char delim) {
     std::vector<std::string> parts;
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, delim))
-        parts.push_back(trim(item));
+    const char* p = s.c_str();
+    while (*p) {
+        while (*p == delim) p++;
+        if (!*p) break;
+        const char* start = p;
+        while (*p && *p != delim) p++;
+        parts.push_back(trim(std::string(start, (size_t)(p - start))));
+    }
     return parts;
 }
 
 /* Helper: split keeping quoted strings together */
 static std::vector<std::string> split_sql_args(const std::string& s) {
     std::vector<std::string> parts;
+    const char* p = s.c_str();
     std::string cur;
     bool in_quote = false;
-    for (size_t i = 0; i < s.size(); i++) {
-        char c = s[i];
+    while (*p) {
+        char c = *p;
         if (c == '\'') {
             in_quote = !in_quote;
             cur += c;
@@ -1031,6 +1468,7 @@ static std::vector<std::string> split_sql_args(const std::string& s) {
         } else {
             cur += c;
         }
+        p++;
     }
     if (!cur.empty()) parts.push_back(trim(cur));
     return parts;
@@ -1248,16 +1686,11 @@ void* aurora_db_query(AuroraDB* db, const char* query) {
     if (!db || !db->connected || !query) return nullptr;
     printf("[database] query: %s\n", query);
     std::string result = exec_sql(query);
-    if (result.empty()) {
-        /* Return 1 to indicate success for non-SELECT queries */
-        return (void*)(intptr_t)1;
-    }
-    /* Return result as a duplicated string */
     return (void*)strdup(result.c_str());
 }
 
 void aurora_db_query_free(void* result) {
-    if (result && result != (void*)(intptr_t)1)
+    if (result)
         free(result);
 }
 
@@ -1439,6 +1872,77 @@ static int aurora_const_time_cmp(const char* a, const char* b) {
     return diff;
 }
 
+/* ════════════════════════════════════════════════════════════
+   Gzip compression (Windows Compress API → gzip format)
+   ════════════════════════════════════════════════════════════ */
+
+static unsigned int gzip_crc32(const unsigned char* buf, size_t len) {
+    static unsigned int table[256];
+    static int init = 0;
+    if (!init) {
+        for (unsigned int i = 0; i < 256; i++) {
+            unsigned int crc = i;
+            for (int j = 0; j < 8; j++)
+                crc = (crc >> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+            table[i] = crc;
+        }
+        init = 1;
+    }
+    unsigned int crc = 0xFFFFFFFF;
+    for (size_t i = 0; i < len; i++)
+        crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >> 8);
+    return crc ^ 0xFFFFFFFF;
+}
+
+/* Compress data to gzip using miniz. Returns malloc'd buffer, sets out_len. NULL on failure. */
+static unsigned char* gzip_compress(const unsigned char* input, size_t input_len, size_t* out_len) {
+    *out_len = 0;
+    if (!input || input_len == 0) return nullptr;
+
+    size_t max_out = input_len + (input_len / 100) + 128;
+    std::vector<unsigned char> deflate_buf(max_out);
+
+    size_t deflate_len = tdefl_compress_mem_to_mem(
+        deflate_buf.data(), max_out,
+        input, input_len,
+        TDEFL_DEFAULT_MAX_PROBES);
+    if (deflate_len == 0) {
+        fprintf(stderr, "[gzip] tdefl_compress_mem_to_mem failed\n");
+        return nullptr;
+    }
+
+    /* Build gzip: 10-byte header + raw DEFLATE + 4-byte CRC32 + 4-byte ISIZE */
+    *out_len = 10 + deflate_len + 8;
+    unsigned char* gz = (unsigned char*)malloc(*out_len);
+    if (!gz) return nullptr;
+
+    gz[0] = 0x1F; gz[1] = 0x8B;       /* ID1, ID2 */
+    gz[2] = 0x08;                       /* CM = deflate */
+    gz[3] = 0;                          /* FLG */
+    uint32_t mtime = (uint32_t)time(NULL);
+    gz[4] = (unsigned char)(mtime); gz[5] = (unsigned char)(mtime >> 8);
+    gz[6] = (unsigned char)(mtime >> 16); gz[7] = (unsigned char)(mtime >> 24);
+    gz[8] = 0;                          /* XFL */
+    gz[9] = 0xFF;                       /* OS = unknown */
+
+    memcpy(gz + 10, deflate_buf.data(), deflate_len);
+
+    uint32_t crc = gzip_crc32(input, input_len);
+    size_t off = 10 + deflate_len;
+    gz[off]     = (unsigned char)(crc);
+    gz[off + 1] = (unsigned char)(crc >> 8);
+    gz[off + 2] = (unsigned char)(crc >> 16);
+    gz[off + 3] = (unsigned char)(crc >> 24);
+
+    uint32_t isize = (uint32_t)input_len;
+    gz[off + 4] = (unsigned char)(isize);
+    gz[off + 5] = (unsigned char)(isize >> 8);
+    gz[off + 6] = (unsigned char)(isize >> 16);
+    gz[off + 7] = (unsigned char)(isize >> 24);
+
+    return gz;
+}
+
 /* ── Auth ── */
 int aurora_auth_login(const char* user, const char* pass) {
     if (!user || !pass) return 0;
@@ -1588,6 +2092,113 @@ const char* aurora_auth_hash_password(const char* password) {
         hash[r % 16] ^= 0xA5;
     }
     return to_hex(hash, 16);
+}
+
+/* ════════════════════════════════════════════════════════════
+   In-memory Todo Store (persistent across requests)
+   ════════════════════════════════════════════════════════════ */
+static std::mutex g_todo_mutex;
+static int64_t g_todo_next_id = 1;
+struct TodoItem {
+    int64_t id;
+    std::string title;
+    bool done;
+};
+static std::vector<TodoItem> g_todos;
+
+const char* aurora_todo_list() {
+    std::lock_guard<std::mutex> lock(g_todo_mutex);
+    std::string result = "[";
+    for (size_t i = 0; i < g_todos.size(); i++) {
+        if (i > 0) result += ",";
+        result += "{\"id\":" + std::to_string(g_todos[i].id) +
+                  ",\"title\":\"" + g_todos[i].title + "\"" +
+                  ",\"done\":" + (g_todos[i].done ? "true" : "false") + "}";
+    }
+    result += "]";
+    return strdup(result.c_str());
+}
+
+const char* aurora_todo_create(const char* body) {
+    if (!body) return strdup("");
+    /* Parse "title" from JSON body */
+    std::string title;
+    JsonValue* jv = aurora_json_parse(body);
+    if (jv) {
+        char* t = aurora_json_get_str(jv, "title");
+        if (t) title = t;
+        aurora_json_free(jv);
+    }
+    if (title.empty()) title = body;
+    std::lock_guard<std::mutex> lock(g_todo_mutex);
+    TodoItem t;
+    t.id = g_todo_next_id++;
+    t.title = title;
+    t.done = false;
+    g_todos.push_back(t);
+    std::string result = "{\"id\":" + std::to_string(t.id) +
+                         ",\"title\":\"" + t.title + "\"" +
+                         ",\"done\":false}";
+    return strdup(result.c_str());
+}
+
+const char* aurora_todo_get(const char* id_str) {
+    if (!id_str || !*id_str) return strdup("");
+    int64_t id = atoll(id_str);
+    std::lock_guard<std::mutex> lock(g_todo_mutex);
+    for (auto& t : g_todos) {
+        if (t.id == id) {
+            std::string result = "{\"id\":" + std::to_string(t.id) +
+                                 ",\"title\":\"" + t.title + "\"" +
+                                 ",\"done\":" + (t.done ? "true" : "false") + "}";
+            return strdup(result.c_str());
+        }
+    }
+    return strdup("");
+}
+
+const char* aurora_todo_update(const char* id_str, const char* body, int64_t done) {
+    if (!id_str || !*id_str) return strdup("");
+    int64_t id = atoll(id_str);
+    /* Parse "title" from JSON body */
+    std::string title;
+    if (body && *body) {
+        JsonValue* jv = aurora_json_parse(body);
+        if (jv) {
+            char* t = aurora_json_get_str(jv, "title");
+            if (t) title = t;
+            aurora_json_free(jv);
+        }
+        if (title.empty()) title = body;
+    }
+    std::lock_guard<std::mutex> lock(g_todo_mutex);
+    for (auto& t : g_todos) {
+        if (t.id == id) {
+            if (!title.empty()) t.title = title;
+            t.done = done != 0;
+            std::string result = "{\"id\":" + std::to_string(t.id) +
+                                 ",\"title\":\"" + t.title + "\"" +
+                                 ",\"done\":" + (t.done ? "true" : "false") + "}";
+            return strdup(result.c_str());
+        }
+    }
+    return strdup("");
+}
+
+const char* aurora_todo_delete(const char* id_str) {
+    if (!id_str || !*id_str) return strdup("");
+    int64_t id = atoll(id_str);
+    std::lock_guard<std::mutex> lock(g_todo_mutex);
+    for (auto it = g_todos.begin(); it != g_todos.end(); ++it) {
+        if (it->id == id) {
+            std::string result = "{\"id\":" + std::to_string(it->id) +
+                                 ",\"title\":\"" + it->title + "\"" +
+                                 ",\"done\":" + (it->done ? "true" : "false") + "}";
+            g_todos.erase(it);
+            return strdup(result.c_str());
+        }
+    }
+    return strdup("");
 }
 
 }

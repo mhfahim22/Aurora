@@ -1,0 +1,46 @@
+outputln("--- 4x4 Matrix Test ---")
+import "glm"
+
+outputln("Creating identity matrix...")
+m = mat4_new()
+outputln("  m = " + str(m))
+
+outputln("Creating translation matrix...")
+t = mat4_new()
+mat4_translate(t, 1.0, 2.0, 3.0)
+outputln("  translate done")
+
+outputln("Creating rotation matrix...")
+r = mat4_new()
+mat4_rotate(r, 45.0, 0.0, 1.0, 0.0)
+outputln("  rotate done")
+
+outputln("Creating perspective matrix...")
+p = mat4_new()
+mat4_perspective(p, 60.0, 1.333, 0.1, 100.0)
+outputln("  perspective done")
+
+outputln("Creating lookat matrix...")
+v = mat4_new()
+mat4_lookat(v, 0.0, 0.0, 5.0,  0.0, 0.0, 0.0,  0.0, 1.0, 0.0)
+outputln("  lookat done")
+
+outputln("Multiplying matrices...")
+result = mat4_new()
+mat4_mul(result, t, r)
+outputln("  mul done")
+
+outputln("Copying matrix...")
+cp = mat4_new()
+mat4_copy(cp, result)
+outputln("  copy done")
+
+outputln("Freeing matrices...")
+mat4_free(m)
+mat4_free(t)
+mat4_free(r)
+mat4_free(p)
+mat4_free(v)
+mat4_free(result)
+mat4_free(cp)
+outputln("All tests passed!")

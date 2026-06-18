@@ -1,0 +1,6 @@
+outputln("Testing request body...")
+server app
+    route "POST" "/"
+        body = request("body")
+        json(aurora_todo_create(body))
+outputln("Server registered.")

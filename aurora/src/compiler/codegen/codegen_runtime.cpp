@@ -500,6 +500,7 @@ void Codegen::declare_domain_runtime_helpers() {
     auto* mod = module_.get();
     auto* v   = llvm::Type::getVoidTy(*ctx);
     auto* i64 = llvm::Type::getInt64Ty(*ctx);
+    auto* i32 = llvm::Type::getInt32Ty(*ctx);
     auto* ptr = llvm::PointerType::getUnqual(*ctx);
 
     /* ── Game Engine ── */
@@ -672,6 +673,18 @@ void Codegen::declare_domain_runtime_helpers() {
     http_resp_send_ = llvm::Function::Create(
         llvm::FunctionType::get(i64, { ptr, i64 }, false),
         llvm::Function::ExternalLinkage, "aurora_http_response_send", mod);
+    /* http_response_send_chunked(i8*, i64, i32) → i64 */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, i64, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_send_chunked", mod);
+    /* http_response_set_content_type(i8*, i8*) */
+    http_resp_ct_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_set_content_type", mod);
+    /* server_run(i8*) — starts server accept loop */
+    server_run_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_server_run", mod);
     /* router_new() → i8* */
     router_new_ = llvm::Function::Create(
         llvm::FunctionType::get(ptr, {}, false),
@@ -685,6 +698,281 @@ void Codegen::declare_domain_runtime_helpers() {
         llvm::FunctionType::get(i64, { ptr, ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_route_dispatch", mod);
 
+    /* http_get_field(i8*, i8*) → i8* - get a field from HTTP request */
+    http_get_field_ = llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_get_field", mod);
+    /* http_get_param(i8*, i8*) → i8* - get a route param from HTTP request */
+    http_get_param_ = llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_get_param", mod);
+    /* http_response_set_json(i8*, i8*) - set JSON response */
+    http_set_json_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_set_json", mod);
+    /* http_str_as_cstr(i8*) → i8* - AuroraStr* to const char* */
+    /* (already declared earlier, but store a member pointer) */
+
+    /* ── Todo Store ── */
+    /* aurora_todo_list() → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_todo_list", mod);
+    /* aurora_todo_create(i8*) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_todo_create", mod);
+    /* aurora_todo_get(i8*) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_todo_get", mod);
+    /* aurora_todo_update(i8*, i8*, i64) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_todo_update", mod);
+    /* aurora_todo_delete(i8*) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_todo_delete", mod);
+    /* Mark todo functions: first params (id) are cstrings,
+       return values are cstrings that need wrapping. */
+    extern_string_info_["aurora_todo_list"]   = { {}, true, false };
+    extern_string_info_["aurora_todo_create"] = { {0}, true, false };
+    extern_string_info_["aurora_todo_get"]    = { {0}, true, false };
+    extern_string_info_["aurora_todo_update"] = { {0, 1}, true, false };
+    extern_string_info_["aurora_todo_delete"] = { {0}, true, false };
+
+    /* ── Connection Pool ── */
+    /* aurora_db_pool_create(i8*, i32, i32) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_create", mod);
+    /* aurora_db_pool_acquire(i8*, i32) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_acquire", mod);
+    /* aurora_db_pool_release(i8*, i8*) → void */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_release", mod);
+    /* aurora_db_pool_query(i8*, i8*) → i8* */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_query", mod);
+    /* aurora_db_pool_query_free(i8*) → void */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_query_free", mod);
+    /* aurora_db_pool_destroy(i8*) → void */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_destroy", mod);
+    /* aurora_db_pool_active_count(i8*) → i32 */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_active_count", mod);
+    /* aurora_db_pool_idle_count(i8*) → i32 */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_db_pool_idle_count", mod);
+    extern_string_info_["aurora_db_pool_create"]  = { {0}, false, false };
+    extern_string_info_["aurora_db_pool_acquire"] = { {}, false, false };
+    extern_string_info_["aurora_db_pool_release"] = { {}, false, false };
+    extern_string_info_["aurora_db_pool_query"]   = { {1}, true, false };
+    extern_string_info_["aurora_db_pool_query_free"] = { {}, false, false };
+    extern_string_info_["aurora_db_pool_destroy"] = { {}, false, false };
+    extern_string_info_["aurora_db_pool_active_count"] = { {}, false, false };
+    extern_string_info_["aurora_db_pool_idle_count"] = { {}, false, false };
+
+    /* ── Matrix Math (4x4) ── */
+    auto* f32 = llvm::Type::getFloatTy(*ctx);
+    /* i8* aurora_mat4_new() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_new", mod);
+    /* void aurora_mat4_free(i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_free", mod);
+    /* void aurora_mat4_identity(i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_identity", mod);
+    /* void aurora_mat4_copy(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_copy", mod);
+    /* void aurora_mat4_mul(i8*, i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_mul", mod);
+    /* void aurora_mat4_translate(i8*, f32, f32, f32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, f32, f32, f32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_translate", mod);
+    /* void aurora_mat4_rotate(i8*, f32, f32, f32, f32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, f32, f32, f32, f32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_rotate", mod);
+    /* void aurora_mat4_scale(i8*, f32, f32, f32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, f32, f32, f32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_scale", mod);
+    /* void aurora_mat4_perspective(i8*, f32, f32, f32, f32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, f32, f32, f32, f32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_perspective", mod);
+    /* void aurora_mat4_lookat(i8*, f32, f32, f32,  f32, f32, f32,  f32, f32, f32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, f32, f32, f32,  f32, f32, f32,  f32, f32, f32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_mat4_lookat", mod);
+    extern_string_info_["aurora_mat4_new"]         = { {}, false, false };
+    extern_string_info_["aurora_mat4_free"]        = { {}, false, false };
+    extern_string_info_["aurora_mat4_identity"]    = { {}, false, false };
+    extern_string_info_["aurora_mat4_copy"]        = { {}, false, false };
+    extern_string_info_["aurora_mat4_mul"]         = { {}, false, false };
+    extern_string_info_["aurora_mat4_translate"]   = { {}, false, false };
+    extern_string_info_["aurora_mat4_rotate"]      = { {}, false, false };
+    extern_string_info_["aurora_mat4_scale"]       = { {}, false, false };
+    extern_string_info_["aurora_mat4_perspective"] = { {}, false, false };
+    extern_string_info_["aurora_mat4_lookat"]      = { {}, false, false };
+
+    /* ── Pre-built cube vertex data ── */
+    /* i8* aurora_gl_cube_vertices() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_cube_vertices", mod);
+    /* i32 aurora_gl_cube_vertex_count() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_cube_vertex_count", mod);
+    /* i32 aurora_gl_cube_vertex_stride() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_cube_vertex_stride", mod);
+
+    /* ── Lit cube helpers ── */
+    /* i8* aurora_gl_lit_cube_vertices() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_lit_cube_vertices", mod);
+    /* i32 aurora_gl_lit_cube_vertex_count() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_lit_cube_vertex_count", mod);
+    /* i32 aurora_gl_lit_cube_vertex_stride() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_lit_cube_vertex_stride", mod);
+
+    /* ── UV cube helpers ── */
+    /* i8* aurora_gl_uv_cube_vertices() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_uv_cube_vertices", mod);
+    /* i32 aurora_gl_uv_cube_vertex_count() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_uv_cube_vertex_count", mod);
+    /* i32 aurora_gl_uv_cube_vertex_stride() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_uv_cube_vertex_stride", mod);
+
+    /* ── GLFW cursor helpers ── */
+    /* double aurora_glfw_get_cursor_x(ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getDoubleTy(ctx_), { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_get_cursor_x", mod);
+    /* double aurora_glfw_get_cursor_y(ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getDoubleTy(ctx_), { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_get_cursor_y", mod);
+
+    /* ── Generic i32-pair helper ── */
+    /* i64 aurora_glfw_get_i32_pair(ptr, i32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_get_i32_pair", mod);
+    /* Convenience window helpers */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_window_width", mod);
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_window_height", mod);
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_framebuffer_width", mod);
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_framebuffer_height", mod);
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_window_pos_x", mod);
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_glfw_window_pos_y", mod);
+
+    /* ── GL buffer/VAO helpers ── */
+    /* u32 aurora_gl_gen_buffer() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_gen_buffer", mod);
+    /* u32 aurora_gl_gen_vertex_array() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_gl_gen_vertex_array", mod);
+
+    /* ── Image helpers ── */
+    /* void* aurora_image_load(cstring, i32*, i32*, i32*) */
+    {
+        auto* i32ptr = llvm::PointerType::getUnqual(i32);
+        llvm::Function::Create(
+            llvm::FunctionType::get(ptr, { ptr, i32ptr, i32ptr, i32ptr }, false),
+            llvm::Function::ExternalLinkage, "aurora_image_load", mod);
+    }
+    /* void aurora_image_free(void*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_image_free", mod);
+    /* u32 aurora_image_create_gl_texture(cstring) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_image_create_gl_texture", mod);
+
+    /* ── OBJ helpers ── */
+    /* void* aurora_obj_load(cstring) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_obj_load", mod);
+    /* i32 aurora_obj_vertex_count(void*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_obj_vertex_count", mod);
+    /* float* aurora_obj_vertex_data(void*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_obj_vertex_data", mod);
+    /* void aurora_obj_free(void*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_obj_free", mod);
+
+    /* ── Audio helpers ── */
+    /* i32 aurora_audio_init() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_audio_init", mod);
+    /* i32 aurora_audio_play_file(cstring) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_audio_play_file", mod);
+    /* void aurora_audio_shutdown() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_audio_shutdown", mod);
+
     /* ── UI Framework ── */
     /* component_init() / component_render() */
     ui_init_ = llvm::Function::Create(
@@ -697,9 +985,9 @@ void Codegen::declare_domain_runtime_helpers() {
         llvm::FunctionType::get(v, {}, false),
         llvm::Function::ExternalLinkage, "aurora_ui_render", mod);
 
-    /* route_register(i8*, i8*) */
+    /* route_register(i8* method, i8* path, i8* handler) */
     route_register_ = llvm::Function::Create(
-        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::FunctionType::get(v, { ptr, ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_route_register", mod);
 
     /* style_apply(i8*, i8*) */
@@ -709,7 +997,6 @@ void Codegen::declare_domain_runtime_helpers() {
 
     /* ── Component runtime ── */
     /* AuroraComponent* aurora_component_create(i8* name, i32 x, i32 y, i32 w, i32 h) */
-    auto* i32 = llvm::Type::getInt32Ty(ctx_);
     comp_create_ = llvm::Function::Create(
         llvm::FunctionType::get(ptr, { ptr, i32, i32, i32, i32 }, false),
         llvm::Function::ExternalLinkage, "aurora_component_create", mod);
@@ -757,6 +1044,84 @@ void Codegen::declare_domain_runtime_helpers() {
     comp_update_tree_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr, llvm::Type::getDoubleTy(ctx_) }, false),
         llvm::Function::ExternalLinkage, "aurora_component_update_tree", mod);
+    /* void aurora_component_set_widget_type(AuroraComponent*, i32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_set_widget_type", mod);
+    /* void aurora_component_set_update_fn(AuroraComponent*, void(*)(void*,double)) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_component_set_update_fn", mod);
+
+    /* ── Win32 UI ── */
+    /* int aurora_ui_win32_init(i8* title, i32 w, i32 h) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_init", mod);
+    /* int aurora_ui_win32_create_control(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_create_control", mod);
+    /* void aurora_ui_win32_destroy_control(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_destroy_control", mod);
+    /* void aurora_ui_win32_set_text(AuroraComponent*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_set_text", mod);
+    /* i8* aurora_ui_win32_get_text(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_get_text", mod);
+    /* void aurora_ui_win32_listbox_add(AuroraComponent*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_listbox_add", mod);
+    /* void aurora_ui_win32_listbox_clear(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_listbox_clear", mod);
+    /* i32 aurora_ui_win32_listbox_selected(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_listbox_selected", mod);
+    /* i32 aurora_ui_win32_listbox_count(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_listbox_count", mod);
+    /* void aurora_ui_win32_mount(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_mount", mod);
+    /* void aurora_ui_win32_sync_tree(AuroraComponent*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_sync_tree", mod);
+    /* int aurora_ui_win32_run() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_run", mod);
+    /* int aurora_ui_win32_pump() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_pump", mod);
+    /* void aurora_ui_win32_shutdown() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_shutdown", mod);
+    /* int aurora_ui_win32_event_type() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_event_type", mod);
+    /* i8* aurora_ui_win32_event_source() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_event_source", mod);
+    /* int aurora_ui_win32_event_data() */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_ui_win32_event_data", mod);
 
     /* ── Utility ── */
     /* aurora_sleep(i64 ms) */

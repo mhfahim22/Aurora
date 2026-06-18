@@ -1,0 +1,31 @@
+import MrCode
+
+output("=== MNIST Training Demo ===")
+output("Loading synthetic MNIST CSV...")
+d = csv("mnist_synthetic.csv")
+
+output("Creating sequential model...")
+m = model_create("sequential")
+add(m, dense(128, "relu"))
+add(m, dense(10, "softmax"))
+
+set_loss(m, "categorical_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.001)
+set_batch_size(m, 32)
+set_epochs(m, 5)
+set_validation_split(m, 0.2)
+set_verbose(m, 1)
+
+output("Training...")
+r = train(m, d)
+
+output("Results:")
+output(model_info(m))
+output("Params:")
+sz = model_size(m)
+output(sz)
+output("Accuracy:")
+acc = model_accuracy(m)
+output(acc)
+output("=== Done ===")

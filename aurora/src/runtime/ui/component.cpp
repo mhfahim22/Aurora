@@ -3,21 +3,9 @@
 #include <cstring>
 #include <cstdint>
 #include "runtime/memory.hpp"
+#include "runtime/ui/component.h"
 
 extern "C" {
-
-/* ── Component structure ── */
-typedef struct AuroraComponent {
-    char*    name;
-    int      x, y, w, h;
-    int      visible;
-    void*    state;          /* user-defined state pointer */
-    void   (*render_fn)(void* state, int x, int y, int w, int h);
-    void   (*update_fn)(void* state, double dt);
-    struct AuroraComponent* parent;
-    struct AuroraComponent** children;
-    int      child_count;
-} AuroraComponent;
 
 /* ── Global component root ── */
 static AuroraComponent* root_component = nullptr;
@@ -92,6 +80,11 @@ void aurora_component_set_update_fn(AuroraComponent* c, void (*fn)(void*, double
 void aurora_component_show(AuroraComponent* c) { if (c) c->visible = 1; }
 void aurora_component_hide(AuroraComponent* c) { if (c) c->visible = 0; }
 
+/* ── Set widget type (0=container,1=button,2=label,3=textbox,4=listbox) ── */
+void aurora_component_set_widget_type(AuroraComponent* c, int type) {
+    if (c) c->widget_type = type;
+}
+
 /* ── Mount component tree ── */
 void aurora_component_mount(AuroraComponent* c) {
     if (!c) return;
@@ -119,7 +112,7 @@ typedef struct { char path[256]; void* handler; } Route;
 static Route routes[64];
 static int route_count = 0;
 
-void aurora_route_register(const char* path, void* handler) {
+void aurora_ui_route_register(const char* path, void* handler) {
     if (!path || route_count >= 64) return;
     strncpy(routes[route_count].path, path, sizeof(routes[route_count].path) - 1);
     routes[route_count].handler = handler;
