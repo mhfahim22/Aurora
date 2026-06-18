@@ -32,7 +32,7 @@ ChangesEnvironment=yes
 ;SetupIconFile=..\aurora.ico
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.iso"
+Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
 SetupAppTitle=Install Aurora {#MyAppVersion}
@@ -40,6 +40,9 @@ SetupWindowTitle=Install Aurora {#MyAppVersion}
 
 [CustomMessages]
 AppDescription=Aurora Programming Language — Polyglot with LLVM-native compilation
+
+[Dirs]
+; Ensure libc subdirectory exists even if empty during compile
 
 [Files]
 ; ── Core compiler & tools ──
@@ -109,15 +112,3 @@ begin
   end;
   Result := Pos(LowerCase(Param), LowerCase(OrigPath)) = 0;
 end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssPostInstall then
-  begin
-    // Broadcast ENVIRONMENT change so new PATH takes effect
-    SendBroadcastMessage(WM_WININICHANGE, 0, 'Environment');
-  end;
-end;
-
-[UninstallRun]
-; Nothing special needed — remove bin dir from PATH on uninstall
