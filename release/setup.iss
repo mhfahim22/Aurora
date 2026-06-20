@@ -91,14 +91,14 @@ Name: "{group}\Uninstall Aurora"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\Aurora REPL"; Filename: "{app}\aurorac.exe"; Parameters: "--repl"; WorkingDir: "{app}"
 
 [Run]
-; Optionally run after install
-Filename: "{app}\aurorac.exe"; Parameters: "--repl"; Description: "Launch Aurora REPL"; Flags: postinstall nowait skipifsilent unchecked
+; Optionally run after install — disabled by default
+; Filename: "{app}\aurorac.exe"; Parameters: "--repl"; Description: "Launch Aurora REPL"; Flags: postinstall nowait skipifsilent unchecked
 
 [Registry]
 ; Add Aurora to PATH (HKCU so it doesn't require admin)
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
-Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_PATH"; ValueData: "{app}\libc"; Flags: deletevalue
-Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_LIB"; ValueData: "{app}\libc"; Flags: deletevalue
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_PATH"; ValueData: "{app}\libc"
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_LIB"; ValueData: "{app}\libc"
 
 [Code]
 const
