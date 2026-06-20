@@ -220,6 +220,7 @@ private:
     llvm::Function* fn_str_append_   { nullptr };
     llvm::Function* fn_str_reserve_  { nullptr };
     llvm::Function* fn_int_to_str_   { nullptr };
+    llvm::Function* fn_float_to_str_ { nullptr };
 
     /* ── Async runtime functions ── */
     llvm::Function* fn_task_create_ { nullptr };

@@ -18,7 +18,7 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
         "match", "case", "default", "switch",
 
         /* functions & classes */
-        "function", "return", "lambda",
+        "function", "return", "lambda", "fn",
         "class", "new",
 
         /* logic */

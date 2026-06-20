@@ -45,6 +45,16 @@ ch = chan()                         # unbuffered channel
 ch = chan(5)                        # buffered channel (capacity 5)
 send(ch, "hello")
 msg = recv(ch)                      # blocking receive
+
+# Producer-consumer pattern
+async function producer(ch)
+    for i in 10
+        send(ch, i)
+
+async function consumer(ch)
+    loop
+        val = recv(ch)
+        output(val)
 ```
 
 ## Fibers
@@ -66,18 +76,11 @@ event_emit("user.login", data)
 event_off("user.login", handler)
 ```
 
-## Signal / Emit (alternative event syntax)
+## Signal / Emit
 
 ```aura
 signal my_signal                    # declare signal
 emit my_signal(42)                  # emit signal with args
-```
-
-## Event Declaration
-
-```aura
-event my_event:
-    # handler body
 ```
 
 ## Thread
@@ -104,3 +107,7 @@ thread expr                         # spawn OS thread
 | `event_on(n, h)`      | Register event handler       |
 | `event_emit(n, a)`    | Emit event                   |
 | `event_off(n, h)`     | Remove event handler         |
+
+---
+
+**Next:** [Modules & Imports](12-modules-imports.md)

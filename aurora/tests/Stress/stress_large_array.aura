@@ -1,29 +1,33 @@
 # Phase 8: Large array stress test
-@arena
 function large_array()
+    @arena arr = 0
+    @arena total = 0
     arr = []
     for i in 100000
-        arr = arr + [i]
+        push(arr, i)
     total = 0
     for i in 10000
         total = total + arr[i]
     return total
 
-@arena
 function large_nested()
     total = 0
     for i in 1000
         row = []
         for j in 100
-            row = row + [i * j]
+            push(row, i * j)
         total = total + row[50]
     return total
 
-@raii
 function deep_recursion_arr(n)
-    if n <= 0
-        return []
-    return [n] + deep_recursion_arr(n - 1)
+    @raii result = 0
+    result = []
+    i = 1
+    while i <= n
+        push(result, i)
+        i = i + 1
+    end
+    return result
 
 function sum_list(arr, n)
     if n <= 0

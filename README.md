@@ -1,101 +1,162 @@
-# Aurora
+<p align="center">
+  <img src="assets/logo.png" alt="Aurora" width="200"/>
+</p>
 
-**A polyglot language with LLVM-native compilation — call Python, npm, Rust, C, C++, OpenGL, and more from a single language.**
+<h1 align="center">Aurora</h1>
 
-Aurora is a general-purpose programming language and polyglot runtime. Write once, use everything: from PyPI packages and npm modules to Cargo crates, native C/C++ libraries, OpenGL graphics, 2D games, database drivers, HTTP servers, and AI/ML models — all without glue code or FFI boilerplate.
+<p align="center">
+  <b>A polyglot language with LLVM-native compilation — call Python, npm, Rust, C, C++, OpenGL, and more from a single language.</b>
+</p>
 
-```python
-import libc:database
-import pypi:requests
-
-db = db_connect("postgresql://user:pass@localhost/mydb")
-rows = db_query(db, "SELECT * FROM users")
-for row in rows
-    resp = requests_get("https://api.example.com/users/{row_get(row, "id")}")
-    output(resp)
-db_close(db)
-```
+<p align="center">
+  <a href="https://github.com/mhfahim22/Aurora/releases"><img src="https://img.shields.io/github/v/release/mhfahim22/Aurora?style=flat-square&label=version" alt="Version"/></a>
+  <a href="https://github.com/mhfahim22/Aurora/actions"><img src="https://img.shields.io/github/actions/workflow/status/mhfahim22/Aurora/build.yml?style=flat-square&label=build" alt="Build"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"/></a>
+  <img src="https://img.shields.io/badge/platform-windows%20|%20linux%20|%20macOS-lightgrey?style=flat-square" alt="Platform"/>
+  <img src="https://img.shields.io/badge/standard-C%2B%2B23-purple?style=flat-square" alt="C++23"/>
+  <img src="https://img.shields.io/badge/LLVM-18-yellow?style=flat-square" alt="LLVM 18"/>
+</p>
 
 ---
 
-## Features at a Glance
+## 📋 Table of Contents
 
-### Core Language
+- [Why Aurora?](#why-aurora)
+- [Quick Start](#quick-start)
+- [Features at a Glance](#features-at-a-glance)
+- [See Aurora in Action](#see-aurora-in-action)
+- [Installation](#installation)
+- [Project Structure](#project-structure)
+- [Running Aurora Programs](#running-aurora-programs)
+- [Documentation](#documentation)
+- [Community & Contributing](#community--contributing)
+- [License](#license)
+
+---
+
+## 🎯 Why Aurora?
+
+Most languages force you to pick an ecosystem. Aurora lets you use **everything**.
+
+| Challenge | Aurora's Solution |
+|-----------|-------------------|
+| **Language lock-in** | Call Python, JavaScript, Rust, Java, Go, C/C++ from one codebase |
+| **FFI boilerplate** | Zero-copy, auto-generated bridges — no glue code |
+| **Slow iteration** | JIT mode for instant feedback, AOT for production |
+| **Complex build systems** | Single `aurorac` command — compile, run, or REPL |
+| **Fragmented frameworks** | Built-in UI, backend, game, and AI frameworks |
+| **Memory management tax** | 4 strategies — stack, arena, RAII, ARC, GC — per variable |
+| **Cross-ecosystem packages** | Import PyPI, npm, Cargo packages like native modules |
+
+---
+
+## ⚡ Quick Start
+
+```bash
+# Install (Windows PowerShell)
+iwr -useb https://raw.githubusercontent.com/mhfahim22/Aurora/main/release/install.ps1 | iex
+
+# Install (Linux / macOS)
+curl -fsSL https://raw.githubusercontent.com/mhfahim22/Aurora/main/release/install.sh | bash
+```
+
+**Hello World in 5 seconds:**
+
+```python
+output("Hello, World!")
+```
+
+```bash
+aurorac hello.aura --run    # JIT compile & run
+```
+
+Under the hood: `aurorac` parses Aurora IR → generates LLVM IR → optimizes (O3, znver3) → executes via JIT or produces a standalone `.exe`.
+
+---
+
+## 🧠 Features at a Glance
+
+### 🧩 Core Language
 - **LLVM-native compilation** — Aurora IR → LLVM IR → optimized machine code (O3, znver3)
-- **Memory management** — 4 strategies: arena, RAII, ARC, GC (per-variable `@arena`/`@raii`/`@rc`/`@gc`)
-- **Async/await** — spawn, wait, parallel blocks, channels, fibers, event bus
+- **Memory management** — 4 strategies per variable: `@stack` / `@arena` / `@raii` / `@arc` / `@gc`
+- **Async/await** — `spawn`, `wait`, `parallel` blocks, channels, fibers, event bus
 - **OOP** — classes with inheritance, abstract, interfaces, encapsulation, polymorphism, vtables
-- **Pattern matching** — match/switch with struct destructuring, array patterns, wildcards
+- **Pattern matching** — `match`/`switch` with struct destructuring, array patterns, wildcards
 - **Generics** — type parameters on functions, structs, and classes
-- **Ownership system** — compile-time lifetime analysis with `@move`/`@copy` annotations
-- **Type-checking** — full semantic analysis with type inference, safety checks, and detailed diagnostics
+- **Ownership system** — compile-time lifetime analysis with `move`/`copy`/`borrow` annotations
+- **Type-checking** — full semantic analysis with type inference, safety checks, detailed diagnostics
 
-### Polyglot FFI
-- **PyPI (Python)** — import Python packages via C bridge DLL (GIL-thread-safe, zero-copy)
-- **npm (JavaScript/Node.js)** — QuickJS embedded engine for pure JS; subprocess bridge for native addons
-- **Cargo (Rust)** — auto-generate Rust FFI bridges with cdylib discovery
-- **Java/JVM** — full JVM bridge with 17+ `extern function` declarations (classpath, reflection, method calling)
-- **Go** — dlopen/LoadLibrary plugin bridge with Go plugin system
-- **Native C/C++** — `extern "library"` with lazy DLL loading; supports Win64/x64 calling convention
+### 🌐 Polyglot FFI
+| Ecosystem | Method | Thread Safety |
+|-----------|--------|---------------|
+| **PyPI (Python)** | C bridge DLL | GIL-locked, zero-copy |
+| **npm (JavaScript)** | QuickJS embedded / subprocess | Mutex-guarded |
+| **Cargo (Rust)** | Auto-generated cdylib bridge | `Arc<Mutex<T>>` |
+| **Java/JVM** | 17+ extern function declarations | JVM-guarded |
+| **Go** | dlopen plugin system | Platform-dependent |
+| **Native C/C++** | `extern "library"` with lazy DLL loading | Manual |
 
-### Frameworks (built-in)
-| Framework | What it does |
-|-----------|-------------|
-| `libc:backend` | HTTP server with router, middleware, sessions, auth, CORS, caching, WebSocket, file serving, hot-reload |
-| `libc:ui` | Cross-platform GUI (Win32/X11/Cocoa) with components, layout, style, animation |
-| `libc:game` | Game engine with entities, physics, sprites, audio, input, camera, animation |
-| `libc:ai` | Tensor operations, autograd, model training/prediction, layers (dense, conv, LSTM, transformer, attention) |
-| `libc:sprite2d` | GPU-accelerated 2D sprite batcher — batched textured quads, rotation, tint, dynamic VBO |
-| `libc:gl` | 3D graphics via OpenGL + GLFW — window creation, shaders, VAO/VBO, textures, immediate mode |
-| `libc:audio` | Audio playback via SDL — play files, tones, stop/control |
-| `libc:image` | Image loading (stb_image) — load PNG/JPG/BMP to raw pixel data |
+### 🏗️ Built-in Frameworks
+| Framework | Purpose |
+|-----------|---------|
+| `libc:backend` | HTTP server — router, middleware, sessions, auth, CORS, caching, WebSocket, hot-reload |
+| `libc:ui` | Cross-platform GUI — components, layout, style, animation, Win32/X11/Cocoa |
+| `libc:game` | 2D/3D game engine — entities, physics, sprites, audio, input, camera |
+| `libc:ai` | ML pipeline — tensor ops, autograd, layers (dense, conv, LSTM, transformer), ONNX |
+| `libc:sprite2d` | GPU-accelerated 2D sprite batcher |
+| `libc:gl` | OpenGL 3.3+ graphics — shaders, VAO/VBO, textures, window management |
+| `libc:audio` | Audio playback via SDL |
+| `libc:image` | Image loading — PNG/JPG/BMP via stb_image |
 
-### Database & ORM
-- **PostgreSQL** (`libc:pq`) — 85+ FFI externs via libpq; connection pooling, parameterized queries
-- **MySQL** (`libc:mysql`) — 50+ FFI externs via libmysqlclient
-- **Unified DB** (`libc:database`) — URL-based auto-detect (`postgresql://` / `mysql://`)
-- **ORM** (`libc:orm`) — query builder with SELECT/INSERT/UPDATE/DELETE, joins, group_by
-- **Model** (`libc:model`) — lightweight ActiveRecord-style `find`/`save`/`delete` with validation
-- **Migrations** (`libc:migration`) — `apply`/`rollback`/`list`/`pending` with `_migrations` table
+### 🗄️ Database & ORM
+| Library | Description |
+|---------|-------------|
+| `libc:pq` | PostgreSQL via libpq — 85+ externs, connection pooling, parameterized queries |
+| `libc:mysql` | MySQL via libmysqlclient — 50+ externs |
+| `libc:database` | Unified URL-based auto-detect (`postgresql://` / `mysql://`) |
+| `libc:orm` | Query builder — SELECT/INSERT/UPDATE/DELETE, joins, group_by |
+| `libc:model` | ActiveRecord-style — `find`/`save`/`delete` with validation |
+| `libc:migration` | Schema migrations — `apply`/`rollback`/`list`/`pending` |
 
-### AI / ML
+### 🤖 AI / ML
 - **Tensor operations** — add, sub, mul, matmul, relu, sigmoid, tanh
 - **Autograd** — automatic differentiation with DAG-based backward pass
 - **SGD Optimizer** — gradient descent with configurable learning rate
-- **INT8 Quantization** — symmetric scale-based quantization/dequantization for model compression
-- **ONNX Operators** — Gemm, Conv, Relu, Softmax, BatchNorm runtime support
-- **CUDA Kernels** — GPU-accelerated element-wise operations (add, sub, mul, div, relu, sigmoid)
-- **Model pipeline** — create, train, test, predict, save/load, export
+- **INT8 Quantization** — symmetric scale-based quantization for model compression
+- **ONNX Runtime** — Gemm, Conv, Relu, Softmax, BatchNorm operators
+- **CUDA Kernels** — GPU-accelerated operations (add, sub, mul, div, relu, sigmoid)
+- **Model pipeline** — create, train, test, predict, save/load, export ONNX
 - **Layers** — Dense, Conv2D, LSTM, GRU, Dropout, BatchNorm, Attention, Transformer, Embedding
 
-### Game Development
-- **3D Engine** — OpenGL 3.3 core profile, shaders, camera, lighting, textures, model loading (Wavefront OBJ)
-- **2D Engine** — GPU sprite batcher with batching, texture atlases, rotation, color tint, pixel-perfect orthographic projection
+### 🎮 Game Development
+- **3D Engine** — OpenGL 3.3 core profile, shaders, camera, lighting, textures, OBJ model loading
+- **2D Engine** — GPU sprite batcher, texture atlases, rotation, color tint, orthographic projection
 - **Input** — keyboard, mouse, joystick via GLFW
 - **Audio** — sound effects and music via SDL
 
-### Example Games
-| Game | Features | Source |
-|------|----------|--------|
+| Example Game | Features | Source |
+|-------------|----------|--------|
 | **Flappy Bird** | 2D physics, AABB collision, pipe spawning, score, game-over, restart | `examples/2d/flappy_bird.aura` |
-| **FPS Shooter** | 3D WASD+QE movement, mouse look, 3 cube enemies | `examples/3d/shooter.aura` |
+| **FPS Shooter** | 3D WASD+QE movement, mouse look, enemies | `examples/3d/shooter.aura` |
 
-### Testing & Quality
+### ✅ Testing & Quality
 - **`libc:test`** — 12 assertion functions, test runner with setup/teardown, filtering
 - **`libc:mock`** — spy/mock with call tracking and history
 - **Coverage** — `--coverage` flag with codegen instrumentation + text report
 - **Memory safety** — leak detector with backtrace capture, smart pointers, ASAN-clean builds
 - **Fuzz testing** — automated parser fuzzer, 0 crashes across 100+ random inputs
 
-### Package Manager (voss)
-- `voss new` — scaffold projects (web-api, library, desktop-app templates)
-- `voss bridge` — auto-generate FFI bridges for PyPI/npm/Cargo/native packages
-- `voss doc` — generate HTML docs from `##` comments
-- `voss publish` — package, sign, and publish to registries
-- `voss test` / `voss bench` — run tests and benchmarks
-- `voss sandbox` — isolated package execution with policy files
+### 📦 Package Manager (voss)
+| Command | Description |
+|---------|-------------|
+| `voss new` | Scaffold projects (web-api, library, desktop-app) |
+| `voss bridge` | Auto-generate FFI bridges for PyPI/npm/Cargo/native |
+| `voss doc` | Generate HTML docs from `##` comments |
+| `voss publish` | Package, sign, and publish to registries |
+| `voss test` / `voss bench` | Run tests and benchmarks |
+| `voss sandbox` | Isolated package execution with policy files |
 
-### Tooling
+### 🔧 Tooling
 - **LSP server** (`aurora_lsp`) — completion, hover, signature help, diagnostics, go-to-definition
 - **REPL** — `aurorac --repl` for interactive experimentation
 - **JIT execution** — `aurorac hello.aura --run` for instant feedback
@@ -103,7 +164,7 @@ db_close(db)
 
 ---
 
-## Zero to Hero: See Aurora in Action
+## 🚀 See Aurora in Action
 
 ### Hello World
 ```python
@@ -113,7 +174,9 @@ output("Hello, World!")
 aurorac hello.aura --run
 ```
 
-### Web Server with Auth
+---
+
+### Web Server with Routing
 ```python
 import libc:backend
 
@@ -126,6 +189,8 @@ server_get(server, "/api/data", fn(request, response)
 end)
 server_start(server)
 ```
+
+---
 
 ### 3D Graphics — Rotating Cube
 ```python
@@ -151,9 +216,11 @@ while not glfwWindowShouldClose(window)
     glfwSwapBuffers(window)
 end
 ```
-See `examples/3d/triangle.aura` and `examples/3d/cube.aura`.
+Full examples: `examples/3d/triangle.aura` | `examples/3d/cube.aura`
 
-### 2D Game — Flappy Bird (GPU-accelerated)
+---
+
+### 2D Game — Flappy Bird
 ```python
 import "sprite2d"
 import "glfw"
@@ -165,13 +232,14 @@ sprite2d_init(2048, 800, 600)
 
 while not glfwWindowShouldClose(window)
     glfwPollEvents()
-    # physics, input, collision...
-    sprite2d_draw(0, bird_x, bird_y, 30, 30)  # draw bird
+    sprite2d_draw(0, bird_x, bird_y, 30, 30)  # draw bird sprite
     sprite2d_flush()
     glfwSwapBuffers(window)
 end
 ```
-See `examples/2d/flappy_bird.aura` for the full game.
+Full game: `examples/2d/flappy_bird.aura`
+
+---
 
 ### AI/ML — Train a Neural Network
 ```python
@@ -192,6 +260,8 @@ accuracy = test(m, X_test, y_test)
 output("Accuracy: {accuracy}")
 ```
 
+---
+
 ### Win32 Native GUI
 ```python
 import libc:ui
@@ -202,7 +272,9 @@ btn = ui_win32_create_control("button", window, 10, 10, 100, 30)
 ui_win32_set_text(btn, "Click me")
 ui_win32_run()
 ```
-See `examples/chat.aura` for a full 5-widget chat application.
+Full app: `examples/chat.aura` (5-widget chat application)
+
+---
 
 ### Call Python from Aurora
 ```python
@@ -212,6 +284,8 @@ mod = markdown_import()
 html = markdown_call1(mod, "markdown", markdown_str("# Hello"))
 printf("HTML: %s\n", markdown_to_cstr(html))
 ```
+
+---
 
 ### PostgreSQL + ORM
 ```python
@@ -232,7 +306,7 @@ end
 
 ---
 
-## Installation
+## 📦 Installation
 
 ### Windows (PowerShell)
 ```powershell
@@ -257,55 +331,66 @@ cmake -B build
 cmake --build build --config Release
 ```
 
-**Requirements:** C++23 compiler (MSVC 2022+, GCC 13+, Clang 16+), LLVM 18+, CMake 3.20+. Optional: Python 3.8+ (PyPI bridge), Node.js 18+ (npm subprocess bridge), Rust 1.70+ (Cargo bridge).
+### Requirements
+| Dependency | Required | Version |
+|------------|----------|---------|
+| C++ Compiler | ✓ | MSVC 2022+ / GCC 13+ / Clang 16+ |
+| LLVM | ✓ | 18+ |
+| CMake | ✓ | 3.20+ |
+| Python | Optional (PyPI bridge) | 3.8+ |
+| Node.js | Optional (npm bridge) | 18+ |
+| Rust | Optional (Cargo bridge) | 1.70+ |
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-aurora/              # Compiler + runtime source
-├── src/compiler/    # Lexer, parser, IR, typechecker, codegen, optimizer
-├── src/runtime/     # Core runtime, FFI, UI, backend, game, AI, graphics
-│   └── gfx/         # gl_helper, sprite2d, audio_helper, image_helper, matrix, obj_helper
-├── tools/voss/      # Package manager (voss)
-libc/                # Standard library (.auf files)
-├── glfw.auf         # GLFW 3 bindings
-├── opengl.auf       # OpenGL 3.3 bindings
-├── gl.auf           # Aurora 3D helpers
-├── sprite2d.auf     # GPU-accelerated 2D sprite batcher
-├── audio.auf        # Audio playback (SDL)
-├── image.auf        # Image loading (stb_image)
-├── ui.auf           # Win32 GUI components
-├── input.auf        # Input helper bindings
-├── pq.auf           # PostgreSQL FFI
-├── mysql.auf        # MySQL FFI
-├── orm.auf          # Query builder
-├── model.auf        # ActiveRecord-style model
-├── migration.auf    # Database migrations
-├── template.auf     # Server-side templates
-├── test.auf         # Test framework
-├── mock.auf         # Mock library
-├── string.auf       # String utilities
-├── static.auf       # Static file server
-└── dev.auf          # Dev server with hot-reload
-examples/            # Example programs
-├── 2d/              # flappy_bird.aura
-├── 3d/              # triangle, cube, lighting, texture, model, shooter, etc.
-├── chat.aura        # Win32 GUI chat app
-├── todo_full.aura   # Full-stack todo with REST + frontend
-├── ai_classifier.aura# MrCode-powered image classifier
-├── ai_mnist.aura    # MNIST neural network benchmark
-├── poly_pipeline.aura# Data pipeline (CSV → train → predict)
-packages/            # Aurora packages + bridges
-scripts/             # Build scripts, test runner
-deps/                # External dependencies (stb_image.h, etc.)
-release/             # Installers and release assets
+aurora/                  # Compiler + runtime source
+├── src/compiler/        # Lexer, parser, IR, typechecker, codegen, optimizer
+├── src/runtime/         # Core runtime, FFI, UI, backend, game, AI, graphics
+│   └── gfx/             # gl_helper, sprite2d, audio_helper, image_helper, matrix, obj_helper
+├── tools/voss/          # Package manager
+├── tests/               # 230+ test files
+├── docs/                # Language reference, API reference, tutorials
+└── include/             # Public headers
+libc/                    # Standard library (.auf bindings)
+├── glfw.auf             # GLFW 3 bindings
+├── opengl.auf           # OpenGL 3.3 bindings
+├── gl.auf               # Aurora 3D helpers
+├── sprite2d.auf         # 2D sprite batcher
+├── audio.auf            # Audio (SDL)
+├── image.auf            # Image loading (stb_image)
+├── ui.auf               # Win32 GUI
+├── input.auf            # Input helpers
+├── pq.auf               # PostgreSQL FFI
+├── mysql.auf            # MySQL FFI
+├── orm.auf              # Query builder
+├── model.auf            # ActiveRecord-style model
+├── migration.auf        # Database migrations
+├── template.auf         # Server-side templates
+├── test.auf             # Test framework
+├── mock.auf             # Mock library
+├── string.auf           # String utilities
+├── static.auf           # Static file server
+└── dev.auf              # Dev server with hot-reload
+examples/                # Example programs
+├── 2d/                  # flappy_bird.aura
+├── 3d/                  # triangle, cube, lighting, texture, model, shooter
+├── chat.aura            # Win32 GUI chat
+├── todo_full.aura       # Full-stack todo with REST + frontend
+├── ai_classifier.aura   # MrCode image classifier
+├── ai_mnist.aura        # MNIST benchmark
+└── poly_pipeline.aura   # Data pipeline
+packages/                # Aurora packages + bridges
+scripts/                 # Build/test scripts
+deps/                    # External dependencies (stb_image.h, etc.)
+release/                 # Installers and release assets
 ```
 
 ---
 
-## Running Aurora Programs
+## ▶️ Running Aurora Programs
 
 ```bash
 # JIT compile and run (no files on disk)
@@ -318,32 +403,66 @@ aurorac hello.aura -o hello.exe
 # REPL (interactive mode)
 aurorac --repl
 
-# With coverage
+# With coverage instrumentation
 aurorac test.aura --run --coverage
 
-# With voss package manager
+# Using the package manager
 voss init my-project
 voss run
 ```
 
 ---
 
-## Documentation
+## 📚 Documentation
 
 | Resource | Description |
 |----------|-------------|
-| [Language Reference](aurora/docs/language.md) | Full language syntax, types, memory model, FFI |
+| [Language Reference](aurora/docs/reference/01-syntax-basics.md) | Complete language specification (17 chapters) |
 | [Tutorial](aurora/docs/tutorial.md) | Step-by-step from Hello World to bridges |
 | [API Reference](aurora/docs/api_reference.md) | 250+ built-in functions |
 | [UI Framework](aurora/docs/ui_framework.md) | Components, layout, style, animation |
 | [Backend Framework](aurora/docs/backend_framework.md) | HTTP, middleware, auth, caching, WebSocket |
 | [Game Engine](aurora/docs/game_engine.md) | Entities, physics, sprites, audio, input |
 | [Bridge Developer Guide](aurora/docs/bridge_developer_guide.md) | FFI bridge patterns, threading, packaging |
+| [Package Ecosystem](aurora/docs/package_ecosystem.md) | voss CLI, registries, sandboxing |
 | [Security](SECURITY.md) | Memory safety, thread safety, supply chain |
 | [Contributing](CONTRIBUTING.md) | Development workflow, code style, PR guidelines |
+| [Changelog](CHANGELOG.md) | Release history and version notes |
 
 ---
 
-## License
+## 👥 Community & Contributing
 
-MIT
+Aurora is an open-source project under the MIT license. We welcome contributions of all kinds:
+
+- **🐛 Found a bug?** Open an [issue](https://github.com/mhfahim22/Aurora/issues)
+- **💡 Have an idea?** Start a [discussion](https://github.com/mhfahim22/Aurora/discussions)
+- **🔧 Want to contribute?** See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+  - Build and test setup
+  - Branch strategy and PR process  
+  - Code style guidelines
+  - Bridge development workflows
+
+### Development Setup
+```bash
+git clone https://github.com/mhfahim22/Aurora.git
+cd Aurora
+cmake -B build
+cmake --build build --config Release
+ctest --test-dir build --config Release
+```
+
+### Project Status
+Current version: **0.2.0** — Active development. API may change as we approach 1.0.
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  Made with ❤️ by the Aurora community
+</p>

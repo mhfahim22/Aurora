@@ -64,12 +64,19 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
             p += 3; col += 3;
             goto push_token;
         }
+        if (p[0]=='.' && p[1]=='.' && p[2]=='=') {
+            t.type  = TokenType::Operator;
+            t.value = "..=";
+            p += 3; col += 3;
+            goto push_token;
+        }
         /* ── two-char operators ── */
         if ((p[0]=='=' && p[1]=='=') || (p[0]=='!' && p[1]=='=') ||
             (p[0]=='<' && p[1]=='=') || (p[0]=='>' && p[1]=='=') ||
             (p[0]=='-' && p[1]=='>') || (p[0]=='*' && p[1]=='*') ||
             (p[0]=='/' && p[1]=='/') || (p[0]=='.' && p[1]=='.') ||
-            (p[0]=='<' && p[1]=='<') || (p[0]=='>' && p[1]=='>')) {
+            (p[0]=='<' && p[1]=='<') || (p[0]=='>' && p[1]=='>') ||
+            (p[0]=='&' && p[1]=='&') || (p[0]=='|' && p[1]=='|')) {
             t.type  = TokenType::Operator;
             t.value = std::string(p, 2);
             p += 2; col += 2;
@@ -195,7 +202,7 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
             auto& dst = result[ml_line].tokens;
 
             if (close_idx >= 0) {
-                lexed.tokens[close_idx].value = ")";
+                lexed.tokens[close_idx].value = "]";
                 for (int i = 0; i <= close_idx; ++i)
                     dst.push_back(std::move(lexed.tokens[i]));
                 ml_line = -1;
@@ -211,16 +218,25 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
 
         for (int i = 0; i < (int)lexed.tokens.size(); ++i) {
             if (lexed.tokens[i].value == "<<") {
+                /* Only treat << as multi-line bracket if it is at the start of a line
+                   or immediately after '=' (assignment). Otherwise it's a shift operator. */
+                bool is_ml_bracket = (i == 0);
+                if (i > 0) {
+                    is_ml_bracket = lexed.tokens[i-1].is_operator('=');
+                }
+
+                if (!is_ml_bracket) continue;
+
                 int close_idx = -1;
                 for (int j = i + 1; j < (int)lexed.tokens.size(); ++j) {
                     if (lexed.tokens[j].value == ">>") { close_idx = j; break; }
                 }
 
                 if (close_idx >= 0) {
-                    lexed.tokens[i].value = "(";
-                    lexed.tokens[close_idx].value = ")";
+                    lexed.tokens[i].value = "[";
+                    lexed.tokens[close_idx].value = "]";
                 } else {
-                    lexed.tokens[i].value = "(";
+                    lexed.tokens[i].value = "[";
                     ml_line = (int)result.size();
                     ml_tok  = i;
                 }

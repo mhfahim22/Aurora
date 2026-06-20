@@ -4,13 +4,13 @@ Aurora provides multiple memory management strategies. Default depends on contex
 
 ## Allocation Attributes
 
-| Attribute  | Strategy | Description                            |
-|------------|----------|----------------------------------------|
-| `@stack`   | Stack    | Fast, no deallocation cost, limited lifetime |
-| `@arena`   | Arena    | Bulk-free, good for batch workloads     |
-| `@raii`    | RAII     | Deterministic destructor on scope exit  |
-| `@arc`     | ARC      | Automatic reference counting            |
-| `@gc`      | GC       | Tracing garbage collector               |
+| Attribute  | Strategy | Description                            | Best For            |
+|------------|----------|----------------------------------------|---------------------|
+| `@stack`   | Stack    | Fast, no deallocation cost             | Small, short-lived  |
+| `@arena`   | Arena    | Bulk-free, batch workloads             | Temporary data      |
+| `@raii`    | RAII     | Deterministic destructor on scope exit | Resources (files)   |
+| `@arc`     | ARC      | Automatic reference counting           | Shared data         |
+| `@gc`      | GC       | Tracing garbage collector              | Long-lived data     |
 
 ```aura
 @stack a = 100                  # stack-allocated integer
@@ -19,6 +19,16 @@ Aurora provides multiple memory management strategies. Default depends on contex
 @arc shared = [1, 2, 3]        # reference-counted array
 @gc big_data = load_large()    # garbage-collected data
 ```
+
+## Choosing a Strategy
+
+| Use Case                          | Recommended |
+|-----------------------------------|-------------|
+| Local variables, small data       | `@stack`    |
+| Temporary allocations in a batch  | `@arena`    |
+| File handles, locks, resources    | `@raii`     |
+| Shared across threads/modules     | `@arc`      |
+| Complex data structures, caches   | `@gc`       |
 
 ## Ownership Keywords
 
@@ -71,3 +81,9 @@ safe
 unsafe
     # low-level operations (pointer arithmetic, manual free)
 ```
+
+> **Guideline:** Prefer `safe` blocks by default. Use `unsafe` only when interfacing with raw memory or FFI code. Most Aurora code never needs `unsafe`.
+
+---
+
+**Next:** [Error Handling](10-error-handling.md)

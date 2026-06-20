@@ -67,6 +67,12 @@ release/*.zip
 *.onnx
 *.mrc
 
+# ── Generated PyPI stubs ──
+*_pypi/
+
+# ── Session / internal notes ──
+SESSION_SUMMARY.md
+
 # ── IDE / Editor ──
 .vs/
 .vscode/

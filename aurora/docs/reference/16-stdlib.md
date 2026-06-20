@@ -106,22 +106,22 @@ The standard library provides ready-to-use FFI bindings and utility functions in
 
 ## kernel32.auf (Windows API)
 
-Time: `GetTickCount`, `Sleep`, `QueryPerformanceCounter`, `QueryPerformanceFrequency`  
-Process: `ExitProcess`, `GetCurrentProcess`, `GetCurrentProcessId`, `TerminateProcess`  
-Library: `LoadLibraryA/W`, `GetProcAddress`, `FreeLibrary`  
-File I/O: `CreateFileA/W`, `ReadFile`, `WriteFile`, `CloseHandle`, `GetFileSize`  
-Console: `GetStdHandle`, `WriteConsoleA/W`, `ReadConsoleA/W`, `SetConsoleTitle`  
-Memory: `VirtualAlloc`, `VirtualFree`, `HeapAlloc`, `HeapFree`  
-Environment: `GetEnvironmentVariableA/W`, `SetEnvironmentVariableA/W`, `GetCommandLineA/W`  
-System: `GetSystemInfo`, `GetComputerNameA/W`, `GetUserNameA/W`  
-Error: `GetLastError`, `FormatMessageA/W`  
-Fibers: `ConvertThreadToFiber`, `CreateFiber`, `SwitchToFiber`, `DeleteFiber`
+| Category     | Functions |
+|--------------|-----------|
+| **Time**     | `GetTickCount`, `Sleep`, `QueryPerformanceCounter`, `QueryPerformanceFrequency` |
+| **Process**  | `ExitProcess`, `GetCurrentProcess`, `GetCurrentProcessId`, `TerminateProcess` |
+| **Library**  | `LoadLibraryA/W`, `GetProcAddress`, `FreeLibrary` |
+| **File I/O** | `CreateFileA/W`, `ReadFile`, `WriteFile`, `CloseHandle`, `GetFileSize` |
+| **Console**  | `GetStdHandle`, `WriteConsoleA/W`, `ReadConsoleA/W`, `SetConsoleTitle` |
+| **Memory**   | `VirtualAlloc`, `VirtualFree`, `HeapAlloc`, `HeapFree` |
+| **Env**      | `GetEnvironmentVariableA/W`, `SetEnvironmentVariableA/W`, `GetCommandLineA/W` |
+| **System**   | `GetSystemInfo`, `GetComputerNameA/W`, `GetUserNameA/W` |
+| **Error**    | `GetLastError`, `FormatMessageA/W` |
+| **Fibers**   | `ConvertThreadToFiber`, `CreateFiber`, `SwitchToFiber`, `DeleteFiber` |
 
 ## user32.auf (Windows GUI)
 
-Message boxes, window management (CreateWindowEx, ShowWindow, UpdateWindow),  
-window class registration, message loop (GetMessage, DispatchMessage, TranslateMessage),  
-drawing (BeginPaint, EndPaint, InvalidateRect), resources, timers, clipboard, dialogs.
+Message boxes, window management (`CreateWindowEx`, `ShowWindow`, `UpdateWindow`), window class registration, message loop (`GetMessage`, `DispatchMessage`, `TranslateMessage`), drawing (`BeginPaint`, `EndPaint`, `InvalidateRect`), resources, timers, clipboard, dialogs.
 
 ## gui.auf (Cross-platform)
 
@@ -150,7 +150,10 @@ drawing (BeginPaint, EndPaint, InvalidateRect), resources, timers, clipboard, di
 
 ## pq.auf (PostgreSQL libpq)
 
-Connection management, query execution, result handling, prepared statements,  
-async query support, COPY operations, large object support.  
+Connection management, query execution, result handling, prepared statements, async query support, COPY operations, large object support.
 
 Constants: `PGRES_COMMAND_OK`, `PGRES_TUPLES_OK`, etc.
+
+---
+
+**Next:** [Frameworks](17-frameworks.md)

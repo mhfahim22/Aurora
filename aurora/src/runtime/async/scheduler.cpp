@@ -57,6 +57,8 @@ void aurora_scheduler_init(int32_t thread_count) {
     for (int32_t i = 0; i < thread_count; i++) {
         g_sched.workers.emplace_back(worker_loop);
     }
+
+    std::atexit(aurora_scheduler_shutdown);
 }
 
 void aurora_scheduler_shutdown() {
@@ -80,6 +82,11 @@ int32_t aurora_scheduler_default_threads() {
 
 void aurora_spawn(AuroraTask* task) {
     if (!task) return;
+    static bool init_once = false;
+    if (!init_once) {
+        aurora_scheduler_init(aurora_scheduler_default_threads());
+        init_once = true;
+    }
     {
         std::lock_guard<std::mutex> lock(g_sched.mtx);
         g_sched.tasks.push(task);

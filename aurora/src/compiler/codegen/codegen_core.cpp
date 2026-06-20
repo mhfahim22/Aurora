@@ -197,9 +197,14 @@ llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
     /* Module-level variables: use GlobalVariable (original type preserved)
        so they are accessible from any function (not just the entry fn). */
     if (scopes_.size() == 1) {
-        auto* gv_init = ty->isPointerTy()
-            ? static_cast<llvm::Constant*>(llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ctx_)))
-            : static_cast<llvm::Constant*>(llvm::ConstantInt::get(ty, 0));
+        llvm::Constant* gv_init = nullptr;
+        if (ty->isPointerTy()) {
+            gv_init = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ctx_));
+        } else if (ty->isDoubleTy()) {
+            gv_init = llvm::ConstantFP::get(ty, 0.0);
+        } else {
+            gv_init = llvm::ConstantInt::get(ty, 0);
+        }
         auto* gv = new llvm::GlobalVariable(
             *module_, ty, false,
             llvm::GlobalVariable::InternalLinkage,

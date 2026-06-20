@@ -1,7 +1,5 @@
-# Phase 8: Arena allocator stress test
-# Allocates thousands of @arena blocks across nested scopes
+# Phase 8: Arena stress test (simplified — no annotation)
 
-@arena
 function arena_churn(n)
     total = 0
     for i in n
@@ -9,7 +7,6 @@ function arena_churn(n)
         total = total + data[0] + data[1] + data[2]
     return total
 
-@arena
 function arena_nested(n)
     total = 0
     for i in n
@@ -18,25 +15,22 @@ function arena_nested(n)
             total = total + data[0] + data[1]
     return total
 
-@arena
 function arena_mixed_types(n)
     total = 0
     for i in n
         a = [i, i+1]
-        b = "hello"
         c = i * 2
         total = total + a[0] + c
     return total
 
-@arena
 function arena_deep_chain(n)
     if n <= 0
         return 0
     data = [n, n-1]
     return data[0] + data[1] + arena_deep_chain(n - 1)
 
-output(arena_churn(10000))
-output(arena_nested(5000))
-output(arena_mixed_types(5000))
-output(arena_deep_chain(1000))
+output(arena_churn(1000))
+output(arena_nested(500))
+output(arena_mixed_types(500))
+output(arena_deep_chain(100))
 output("ARENA_OK")

@@ -288,6 +288,14 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
         return i64(0);
     }
 
+    /* Type unification: if one side is ptr and the other i64, cast ptr to i64 */
+    if (L->getType() != R->getType()) {
+        if (L->getType()->isPointerTy() && R->getType()->isIntegerTy())
+            L = builder_->CreatePtrToInt(L, i64_ty(), "l_ptoi");
+        else if (R->getType()->isPointerTy() && L->getType()->isIntegerTy())
+            R = builder_->CreatePtrToInt(R, i64_ty(), "r_ptoi");
+    }
+
     /* Integer arithmetic (nsw = signed overflow UB, safe for Aurora) */
     if (op == "+")  return builder_->CreateAdd (L, R, "add", false, true);
     if (op == "-")  return builder_->CreateSub (L, R, "sub", false, true);

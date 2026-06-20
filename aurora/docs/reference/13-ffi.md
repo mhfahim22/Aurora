@@ -1,5 +1,7 @@
 # FFI (Foreign Function Interface)
 
+FFI allows calling C/C++ libraries, OS APIs, and other languages directly from Aurora.
+
 ## External Functions
 
 ```aura
@@ -30,13 +32,15 @@ extern function malloc(size: i64) -> pointer
 extern function query_database(query: cstring) -> i32
 ```
 
-### Supported Calling Conventions
+## Supported Calling Conventions
 
 | Convention | Description                |
 |------------|----------------------------|
-| (default)  | Platform default           |
-| `cdecl`    | C declaration (x86)        |
+| (default)  | Platform default (Win64)   |
+| `cdecl`    | C declaration (x86 only)   |
 | `stdcall`  | Standard call (Win32)      |
+
+> **Note:** On x86-64, Windows uses a single calling convention. `cdecl` and `stdcall` only differ on x86 (32-bit).
 
 ## External Structs
 
@@ -50,6 +54,15 @@ extern struct Point {
     x: i32
     y: i32
 }
+
+# Practical usage:
+extern struct RECT
+    left int
+    top int
+    right int
+    bottom int
+
+extern "user32" function GetWindowRect(hwnd: pointer, rect: pointer) -> i32
 ```
 
 ## External Unions
@@ -81,12 +94,21 @@ function vec_push(v: pointer, val: f64) -> void
 function vec_len(v: pointer) -> i64
 ```
 
-Library bindings in `libc/` provide ready-to-use FFI declarations for:
-- `kernel32.auf` (Windows API)
-- `user32.auf` (Windows GUI)
-- `stdio.auf` (C standard I/O)
-- `stdlib.auf` (C standard library)
-- `string.auf` (C string functions)
-- `gui.auf` (cross-platform GUI)
-- `libtorch.auf` (PyTorch bindings)
-- `pq.auf` (PostgreSQL libpq)
+## Library Bindings
+
+Ready-to-use FFI declarations in `libc/`:
+
+| File            | Library             |
+|-----------------|---------------------|
+| `kernel32.auf`  | Windows API         |
+| `user32.auf`    | Windows GUI         |
+| `stdio.auf`     | C standard I/O      |
+| `stdlib.auf`    | C standard library  |
+| `string.auf`    | C string functions  |
+| `gui.auf`       | Cross-platform GUI  |
+| `libtorch.auf`  | PyTorch bindings    |
+| `pq.auf`        | PostgreSQL libpq    |
+
+---
+
+**Next:** [Attributes](14-attributes.md)

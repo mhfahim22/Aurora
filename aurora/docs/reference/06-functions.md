@@ -20,7 +20,15 @@ function fib(n) {
 }
 ```
 
-Functions return the last expression value implicitly. Use `return` to exit early.
+Functions return the **last expression value** implicitly. Use `return` to exit early.
+
+```aura
+function max(a, b)
+    if a > b
+        a                        # implicit return
+    else
+        b                        # implicit return
+```
 
 ## Anonymous Functions (`fn`)
 
@@ -49,11 +57,16 @@ lambda(a, b):
     return a + b
 ```
 
+**`fn` vs `lambda`:** Both create anonymous functions. `fn` supports the arrow syntax (`->`), while `lambda` uses a more traditional form. Choose based on style preference.
+
 ## Callback
 
 ```aura
 callback my_cb(x):
     output(x)
+
+# For FFI callback parameters:
+extern function set_handler(cb: callback(int, int))
 ```
 
 ## Return / Yield
@@ -76,10 +89,11 @@ yield expr                        # yield value (generators)
 @inline function small_helper(x) x + 1
 @constexpr function compile_time_val() 42
 
-# Inline attribute form:
-@performance function renderer()
-    # body
+@noinline function rarely_used()
+    output("keep separate")
 ```
+
+See [Attributes](14-attributes.md) for full details.
 
 ## `inline` / `noinline` / `constexpr` (statement forms)
 
@@ -94,4 +108,11 @@ constexpr val = compile_fn()  # evaluate at compile time
 ```aura
 function add(a: int, b: int) -> int
     return a + b
+
+function greet(name: string) -> string
+    return "Hello, " + name
 ```
+
+---
+
+**Next:** [OOP](07-oop.md)

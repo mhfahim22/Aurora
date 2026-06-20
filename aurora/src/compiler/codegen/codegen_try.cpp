@@ -90,23 +90,34 @@ void Codegen::gen_try(const ASTNode* node) {
        Only plain i64 slots; arrays/strings need separate handling
        (they carry runtime state in separate allocations, so the i64
        handle in the alloca is still the right thing to pass).        */
-    struct LiveVar { std::string name; llvm::AllocaInst* slot; llvm::Type* ty; };
+     struct LiveVar { std::string name; llvm::Value* slot; llvm::Type* ty; };
     std::vector<LiveVar> live;
     for (auto& scope : scopes_) {
         for (auto& [nm, rec] : scope.vars) {
             if (!rec.alloca_ptr) continue;
-            auto* ai = llvm::dyn_cast<llvm::AllocaInst>(rec.alloca_ptr);
-            if (!ai) continue;
-            auto* ty = ai->getAllocatedType();
-            if (!ty->isIntegerTy(64) && !ty->isPointerTy()) continue;
-            /* Only collect allocas that belong to cur_fn_.
-               Outlined functions switch cur_fn_; outer scopes still on
-               scopes_ have allocas in a different function, which would
-               be invalid cross-function LLVM IR references.  LLVM then
-               replaces the offending code with unreachable, silently
-               dropping any statements after aurora_try_exec.           */
-            if (ai->getParent()->getParent() != cur_fn_) continue;
-            live.push_back({nm, ai, ty});
+
+            llvm::Type* val_ty = nullptr;
+            llvm::Value* slot = rec.alloca_ptr;
+
+            if (auto* ai = llvm::dyn_cast<llvm::AllocaInst>(slot)) {
+                val_ty = ai->getAllocatedType();
+                if (ai->getParent()->getParent() != cur_fn_) continue;
+            } else if (auto* inst = llvm::dyn_cast<llvm::Instruction>(slot)) {
+                /* Non-AllocaInst Instruction slot (e.g. BitCastInst from
+                   arena_alloc for string variables).  Only include slots
+                   whose loaded value is a pointer.                     */
+                if (inst->getParent()->getParent() != cur_fn_) continue;
+                val_ty = i8ptr_ty();
+            } else {
+                /* Non-instruction slots (GlobalVariable, Constant, etc.)
+                   should not participate in try/catch live-var save/restore. */
+                continue;
+            }
+
+            if (!val_ty) continue;
+            if (!val_ty->isIntegerTy(64) && !val_ty->isPointerTy()) continue;
+
+            live.push_back({nm, slot, val_ty});
         }
     }
     const int nv = static_cast<int>(live.size());
@@ -184,6 +195,16 @@ void Codegen::gen_try(const ASTNode* node) {
 
         /* Generate the body */
         if (body_node) gen_block(body_node);
+
+        /* Handle continue/break in catch bodies: the generated br instruction
+           targets a basic block in the outer function, which is invalid in the
+           outlined function.  Remove the terminator and let clean-up run.     */
+        if (current_block_terminated()) {
+            if (llvm::isa<llvm::BranchInst>(builder_->GetInsertBlock()->getTerminator()))
+                builder_->GetInsertBlock()->getTerminator()->eraseFromParent();
+            if (!current_block_terminated())
+                builder_->SetInsertPoint(builder_->GetInsertBlock());
+        }
 
         /* Write back all live vars to ctx before returning */
         if (!current_block_terminated()) {

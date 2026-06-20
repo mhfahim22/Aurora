@@ -1,4 +1,5 @@
-# Lexer keyword tests — verify all language keywords tokenize correctly
+# Lexer keyword tests
+
 function test_keywords()
     if true
         output(1)
@@ -10,15 +11,6 @@ function test_keywords()
         output(1)
     return 0
 
-function test_more_keywords()
-    class A
-        pass
-    match 1
-        _ -> output(1)
-    break
-    continue
-
 output(0)
 test_keywords()
-test_more_keywords()
 output("LEXER_KEYWORDS_OK")

@@ -1,0 +1,11 @@
+lambda my_fn(x):
+    return x + 1
+end
+
+function other_fn(g)
+    return g(100)
+end
+
+function main()
+    output(my_fn(5))
+end

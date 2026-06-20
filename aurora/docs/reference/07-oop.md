@@ -27,6 +27,7 @@ class Person:
 ```aura
 p = Person("Alice", 30)          # positional args match field order
 p2 = new Person("Bob", 25)       # explicit `new` keyword
+p3 = Person { name: "Charlie" }  # named construction (unspecified fields get defaults)
 p.greet()
 ```
 
@@ -78,6 +79,12 @@ class Circle implements Drawable:
 
 ## Visibility Modifiers
 
+| Modifier    | Access Scope          |
+|-------------|----------------------|
+| `public`    | Anywhere (default)    |
+| `private`   | Only within class     |
+| `protected` | Class + subclasses    |
+
 ```aura
 class Account
     public owner = ""              # accessible externally
@@ -91,4 +98,8 @@ class Account
 
 ## Constructor Pattern
 
-Aurora doesn't have explicit constructors. Construction uses positional arguments matching field declaration order, or named fields with `{ }` syntax.
+Aurora doesn't have explicit constructors. Construction uses positional arguments matching field declaration order, or named fields with `{ }` syntax. Field default values are used for any missing arguments.
+
+---
+
+**Next:** [Structs, Enums, Unions](08-structs-enums-unions.md)

@@ -285,7 +285,10 @@ void Codegen::gen_output(const ASTNode* node) {
         VarRecord* rec = lookup_var(node->left->value);
         if (rec && rec->alloca_ptr) {
             auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
-            llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
+            auto* global_var = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr);
+            llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType()
+                                 : global_var ? global_var->getValueType()
+                                 : i64_ty();
             llvm::Value* val = builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->left->value);
             if (rec->is_array)
                 builder_->CreateCall(fn_array_print_, { val });
@@ -373,6 +376,12 @@ void Codegen::gen_return(const ASTNode* node) {
         if (ret_rec) ret_rec->state = OwnershipState::Moved;
     }
     emit_all_scope_cleanup();
+    if (current_block_terminated()) return;
+    auto* ret_ty = cur_fn_->getReturnType();
+    if (ret_ty->isVoidTy()) {
+        builder_->CreateRetVoid();
+        return;
+    }
     /* Function returns i8*, so bitcast i64/int results to i8* */
     if (!val) {
         val = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty()));
@@ -966,10 +975,6 @@ void Codegen::gen_index_assign(const ASTNode* node) {
 void Codegen::gen_spawn(const ASTNode* node) {
     if (!node->left) return;
 
-    /* The left child is the expression to spawn (expected: function call).
-       Create a wrapper function that evaluates the arguments and calls
-       the target function, then call aurora_task_create + aurora_spawn. */
-
     static uint64_t spawn_id = 0;
     std::string wrapper_name = "_spawn_wrapper_" + std::to_string(spawn_id++);
 
@@ -980,45 +985,84 @@ void Codegen::gen_spawn(const ASTNode* node) {
     llvm::IRBuilder<> wb(entry_bb);
 
     llvm::Value* wrapper_result = llvm::ConstantPointerNull::get(i8ptr_ty());
+    llvm::Value* arg_buffer = nullptr;
 
     if (node->left->type == NodeType::Call) {
         llvm::Function* callee = module_->getFunction(node->left->value);
         if (callee) {
-            std::vector<llvm::Value*> call_args;
+            /* Step 1: Evaluate arguments in the CALLER context */
+            std::vector<llvm::Value*> arg_values;
             const ASTNode* arg_node = node->left->args.get();
             while (arg_node) {
-                /* Evaluate the argument expression inside the wrapper */
-                llvm::Value* arg_val = nullptr;
-                if (arg_node->type == NodeType::Num) {
-                    arg_val = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_),
-                        std::stoll(arg_node->value), true);
-                } else if (arg_node->type == NodeType::Float) {
-                    arg_val = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_),
-                        std::stod(arg_node->value));
-                } else if (arg_node->type == NodeType::Str) {
-                    arg_val = wb.CreateGlobalStringPtr(arg_node->value, "spawn_str");
-                } else {
+                llvm::Value* arg_val = gen_expr(arg_node);
+                if (!arg_val)
                     arg_val = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0, true);
-                }
-                call_args.push_back(arg_val);
+                arg_values.push_back(arg_val);
                 arg_node = arg_node->next.get();
             }
 
-            /* Match parameter types */
-            for (size_t i = 0; i < call_args.size() && i < callee->arg_size(); ++i) {
-                llvm::Type* param_ty = callee->getFunctionType()->getParamType(i);
-                if (param_ty->isPointerTy() && call_args[i]->getType()->isIntegerTy())
-                    call_args[i] = wb.CreateIntToPtr(call_args[i], param_ty);
-                else if (param_ty->isIntegerTy() && call_args[i]->getType()->isPointerTy())
-                    call_args[i] = wb.CreatePtrToInt(call_args[i], param_ty);
-                else if (param_ty != call_args[i]->getType())
-                    call_args[i] = wb.CreateBitCast(call_args[i], param_ty);
+            /* Step 2: Allocate heap buffer and store evaluated args in caller */
+            if (!arg_values.empty()) {
+                size_t n = arg_values.size();
+                auto* i64_ty = llvm::Type::getInt64Ty(ctx_);
+                llvm::Function* alloc_fn = module_->getFunction("aurora_alloc");
+                if (!alloc_fn) {
+                    auto* alloc_ty = llvm::FunctionType::get(
+                        i8ptr_ty(), { i64_ty }, false);
+                    alloc_fn = llvm::Function::Create(
+                        alloc_ty, llvm::Function::ExternalLinkage, "aurora_alloc", module_.get());
+                }
+                arg_buffer = builder_->CreateCall(alloc_fn, { i64(n * 8) }, "spawn_args");
+                auto* arg_array = builder_->CreateBitCast(
+                    arg_buffer, llvm::PointerType::get(ctx_, 0), "arg_array");
+                for (size_t i = 0; i < n; i++) {
+                    llvm::Value* store_val = arg_values[i];
+                    if (store_val->getType()->isPointerTy())
+                        store_val = builder_->CreatePtrToInt(store_val, i64_ty);
+                    else if (store_val->getType()->isDoubleTy())
+                        store_val = builder_->CreateBitCast(store_val, i64_ty);
+                    llvm::Value* gep = builder_->CreateConstGEP1_64(i64_ty, arg_array, i);
+                    builder_->CreateStore(store_val, gep);
+                }
+            }
+
+            /* Step 3: In the wrapper, unpack args and call target */
+            std::vector<llvm::Value*> call_args;
+            auto* wrapper_arg = wrapper->getArg(0);
+            if (!arg_values.empty()) {
+                auto* i64_ty = llvm::Type::getInt64Ty(ctx_);
+                auto* arg_array = wb.CreateBitCast(
+                    wrapper_arg, llvm::PointerType::get(ctx_, 0), "arg_array");
+                for (size_t i = 0; i < arg_values.size(); i++) {
+                    llvm::Value* loaded = wb.CreateLoad(i64_ty,
+                        wb.CreateConstGEP1_64(i64_ty, arg_array, i),
+                        "arg_" + std::to_string(i));
+                    llvm::Type* param_ty = callee->getFunctionType()->getParamType(i);
+                    if (param_ty->isPointerTy())
+                        call_args.push_back(wb.CreateIntToPtr(loaded, param_ty));
+                    else if (param_ty->isDoubleTy())
+                        call_args.push_back(wb.CreateBitCast(loaded, param_ty));
+                    else
+                        call_args.push_back(wb.CreateIntCast(loaded, param_ty, true));
+                }
             }
 
             call_args.resize(callee->arg_size(),
                              llvm::ConstantPointerNull::get(i8ptr_ty()));
 
             llvm::Value* ret = wb.CreateCall(callee, call_args, "spawn_call");
+
+            /* Free argument buffer in the wrapper */
+            if (arg_buffer) {
+                llvm::Function* free_fn = module_->getFunction("aurora_free");
+                if (!free_fn) {
+                    auto* free_ty = llvm::FunctionType::get(
+                        llvm::Type::getVoidTy(ctx_), { i8ptr_ty() }, false);
+                    free_fn = llvm::Function::Create(
+                        free_ty, llvm::Function::ExternalLinkage, "aurora_free", module_.get());
+                }
+                wb.CreateCall(free_fn, { wrapper_arg });
+            }
 
             if (ret->getType()->isIntegerTy())
                 wrapper_result = wb.CreateIntToPtr(ret, i8ptr_ty(), "spawn_ret");
@@ -1032,7 +1076,7 @@ void Codegen::gen_spawn(const ASTNode* node) {
     wb.CreateRet(wrapper_result);
 
     auto* task = builder_->CreateCall(fn_task_create_,
-        { wrapper, llvm::ConstantPointerNull::get(i8ptr_ty()) }, "task");
+        { wrapper, arg_buffer ? arg_buffer : llvm::ConstantPointerNull::get(i8ptr_ty()) }, "task");
     builder_->CreateCall(fn_spawn_, { task });
 }
 
@@ -1436,10 +1480,11 @@ void Codegen::gen_server(const ASTNode* node) {
         child = child->next.get();
     }
 
-    /* Start the server run loop */
-    if (server_run_) {
-        builder_->CreateCall(server_run_, { srv });
-    } else if (server_start_) {
+    /* Start the server (non-blocking — bind + listen, no accept loop)
+       Use aurora_server_start instead of aurora_server_run so that the
+       program continues executing instead of blocking in an accept loop.
+       Users can explicitly call aurora_server_run() if blocking is desired. */
+    if (server_start_) {
         builder_->CreateCall(server_start_, { srv });
     }
 }

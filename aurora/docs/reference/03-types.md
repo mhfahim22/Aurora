@@ -2,34 +2,34 @@
 
 ## Primitive Types
 
-| Type      | Aliases                      | Description                    |
-|-----------|------------------------------|--------------------------------|
-| `int`     | `i64`, `Int`, `u64`, `i32`   | Integer (various widths)       |
-|           | `u32`, `i16`, `i8`, `char`   |                                |
-| `float`   | `f64`, `Float`, `double`, `f32` | Floating-point               |
-| `string`  | `String`, `str`              | UTF-8 string                   |
-| `bool`    | `Bool`                       | Boolean (`true`, `false`)      |
-| `void`    | `Void`                       | No value                       |
-| `ptr<T>`  | `pointer`, `Pointer`, `void*` | Raw pointer                   |
-| `cstring` | `char*`                      | C-style null-terminated string |
+| Type      | Aliases                      | Description                    | Default |
+|-----------|------------------------------|--------------------------------|---------|
+| `int`     | `i64`, `Int`, `u64`, `i32`   | Integer (various widths)       | `0`     |
+|           | `u32`, `i16`, `i8`, `char`   |                                |         |
+| `float`   | `f64`, `Float`, `double`, `f32` | Floating-point               | `0.0`   |
+| `string`  | `String`, `str`              | UTF-8 string                   | `""`    |
+| `bool`    | `Bool`                       | Boolean (`true`, `false`)      | `false` |
+| `void`    | `Void`                       | No value                       | —       |
+| `ptr<T>`  | `pointer`, `Pointer`, `void*` | Raw pointer                   | `null`  |
+| `cstring` | `char*`                      | C-style null-terminated string | `null`  |
 
 ## Compound Types
 
-| Type      | Description                         |
-|-----------|-------------------------------------|
-| `array`   | Dynamic array `[1, 2, 3]`           |
-| `struct`  | Named field collection               |
-| `class`   | Object with methods and inheritance  |
-| `enum`    | Named variant constants              |
-| `list`    | Generic list                         |
-| `map`     | Key-value dictionary                 |
-| `set`     | Unique element collection            |
-| `stack`   | LIFO stack                           |
-| `queue`   | FIFO queue                           |
-| `vector`  | 3D vector (x, y, z)                  |
-| `tuple`   | Fixed-size heterogeneous collection  |
-| `json`    | JSON value                           |
-| `function`| Callable                             |
+| Type      | Description                         | Example                     |
+|-----------|-------------------------------------|-----------------------------|
+| `array`   | Dynamic array                       | `[1, 2, 3]`                |
+| `struct`  | Named field collection               | `struct Point { x, y }`    |
+| `class`   | Object with methods and inheritance  | `class Person { ... }`     |
+| `enum`    | Named variant constants              | `enum Color { Red }`       |
+| `list`    | Generic list                         | `list_new()`               |
+| `map`     | Key-value dictionary                 | `map_new()`                |
+| `set`     | Unique element collection            | `set_new()`                |
+| `stack`   | LIFO stack                           | `stack_new()`              |
+| `queue`   | FIFO queue                           | `queue_new()`              |
+| `vector`  | 3D vector (x, y, z)                  | `vector_new(1, 2, 3)`     |
+| `tuple`   | Fixed-size heterogeneous collection  | `(1, "hello", true)`       |
+| `json`    | JSON value                           | `json_parse(str)`          |
+| `function`| Callable                             | `fn(x) -> x * 2`          |
 
 ## Type Aliases
 
@@ -53,11 +53,18 @@ struct Point
     x = 0
     y = 0
 
+# With field types:
+struct Point
+    x: int = 0
+    y: int = 0
+
 p1 = Point(10, 20)                 # positional args
 p2 = Point { x: 10, y: 20 }       # named fields
 p3 = Point { x: 10; y: 20 }       # semicolons also work
 output(p.x)                        # 10
 ```
+
+See [Structs, Enums, Unions](08-structs-enums-unions.md) for more details.
 
 ## Enum Declaration
 
@@ -94,6 +101,8 @@ extern union Data
     f float
 ```
 
+> **Warning:** Unions are for FFI only. Accessing the wrong field is undefined behavior.
+
 ## Function Type
 
 ```aura
@@ -102,3 +111,7 @@ callback handler = fn(x) output(x) end   # callback type
 ```
 
 See [Functions](06-functions.md) for full details.
+
+---
+
+**Next:** [Operators](04-operators.md)

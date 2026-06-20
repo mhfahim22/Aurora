@@ -42,12 +42,13 @@ function test_multi_handler():
     output("Multi handler done")
 
 /* ── Test 5: fiber with lambda ── */
+lambda fib_fn(arg):
+    output("Fiber worker running")
+    return 77
+end
+
 function test_fiber_basic():
     output("--- test_fiber_basic ---")
-    fib_fn = lambda(arg):
-        output("Fiber worker running")
-        return 77
-    end
     f = fiber_create(fib_fn, 0)
     fiber_resume(f)
     done = fiber_is_done(f)

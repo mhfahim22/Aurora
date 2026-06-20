@@ -8,42 +8,42 @@ function test_scene():
 
 function test_entity():
     output("--- test_entity ---")
-    entity player(1):
+    entity player:
         output("Entity created")
 
 function test_sprite():
     output("--- test_sprite ---")
-    sprite 0, 10.0, 10.0:
+    sprite player_sprite:
         output("Sprite created")
 
 function test_camera():
     output("--- test_camera ---")
-    camera 0.0, 0.0, 10.0:
+    camera main_cam:
         output("Camera created")
 
 function test_physics():
     output("--- test_physics ---")
-    physics 0.016:
+    physics step_sim:
         output("Physics stepped")
 
 function test_collision():
     output("--- test_collision ---")
-    collision 0, 0:
+    collision check:
         output("Collision checked")
 
 function test_audio():
     output("--- test_audio ---")
-    audio "test.wav":
+    audio bgm:
         output("Audio played")
 
 function test_animation():
     output("--- test_animation ---")
-    animation 0, 0:
+    animation idle:
         output("Animation played")
 
 function test_input():
     output("--- test_input ---")
-    input 32:  // space key
+    input 32:
         output("Input handled")
 
 function test_update():

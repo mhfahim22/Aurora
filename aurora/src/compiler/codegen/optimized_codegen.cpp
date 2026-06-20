@@ -596,9 +596,10 @@ void OptimizedCodegen::gen_function(const ASTNode* node) {
     int ai = 0;
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
-        arg.addAttr(llvm::Attribute::NoCapture);
-        if (arg.getType()->isPointerTy())
+        if (arg.getType()->isPointerTy()) {
+            arg.addAttr(llvm::Attribute::NoCapture);
             arg.addAttr(llvm::Attribute::NoAlias);
+        }
         ai++;
     }
 
@@ -663,6 +664,13 @@ llvm::Value* OptimizedCodegen::gen_binop(const ASTNode* node) {
     if (!lhs || !rhs) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
 
     const std::string& op = node->value;
+    /* Type unification: if one side is ptr and the other i64, cast ptr to i64 */
+    if (lhs->getType() != rhs->getType()) {
+        if (lhs->getType()->isPointerTy() && rhs->getType()->isIntegerTy())
+            lhs = builder_->CreatePtrToInt(lhs, llvm::Type::getInt64Ty(ctx_), "l_ptoi");
+        else if (rhs->getType()->isPointerTy() && lhs->getType()->isIntegerTy())
+            rhs = builder_->CreatePtrToInt(rhs, llvm::Type::getInt64Ty(ctx_), "r_ptoi");
+    }
     if (op == "+")  return builder_->CreateAdd(lhs, rhs, "add");
     if (op == "-")  return builder_->CreateSub(lhs, rhs, "sub");
     if (op == "*")  return builder_->CreateMul(lhs, rhs, "mul");
@@ -725,16 +733,38 @@ void OptimizedCodegen::gen_output(const ASTNode* node) {
     auto* val = gen_expr(node->left.get());
     if (!val) return;
 
-    /* Declare aurora_print_int if not already declared */
-    llvm::Function* fn_print = module_->getFunction("aurora_print_int");
-    if (!fn_print) {
-        auto* fty = llvm::FunctionType::get(
-            llvm::Type::getVoidTy(ctx_),
-            { llvm::Type::getInt64Ty(ctx_) }, false);
-        fn_print = llvm::Function::Create(fty, llvm::Function::ExternalLinkage,
-                                          "aurora_print_int", module_.get());
+    llvm::Type* ty = val->getType();
+    if (ty->isDoubleTy()) {
+        llvm::Function* fn = module_->getFunction("aurora_print_float");
+        if (!fn) {
+            auto* fty = llvm::FunctionType::get(
+                llvm::Type::getVoidTy(ctx_),
+                { llvm::Type::getDoubleTy(ctx_) }, false);
+            fn = llvm::Function::Create(fty, llvm::Function::ExternalLinkage,
+                                        "aurora_print_float", module_.get());
+        }
+        builder_->CreateCall(fn, { val });
+    } else if (ty->isPointerTy()) {
+        llvm::Function* fn = module_->getFunction("aurora_print_str");
+        if (!fn) {
+            auto* fty = llvm::FunctionType::get(
+                llvm::Type::getVoidTy(ctx_),
+                { i8ptr_ty() }, false);
+            fn = llvm::Function::Create(fty, llvm::Function::ExternalLinkage,
+                                        "aurora_print_str", module_.get());
+        }
+        builder_->CreateCall(fn, { val });
+    } else {
+        llvm::Function* fn = module_->getFunction("aurora_print_int");
+        if (!fn) {
+            auto* fty = llvm::FunctionType::get(
+                llvm::Type::getVoidTy(ctx_),
+                { llvm::Type::getInt64Ty(ctx_) }, false);
+            fn = llvm::Function::Create(fty, llvm::Function::ExternalLinkage,
+                                        "aurora_print_int", module_.get());
+        }
+        builder_->CreateCall(fn, { val });
     }
-    builder_->CreateCall(fn_print, { val });
 }
 
 /* ════════════════════════════════════════════════════════════

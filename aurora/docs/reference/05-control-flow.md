@@ -12,7 +12,7 @@ if condition
     body()
 
 if condition:
-    body()                       # colon optional
+    body()                       # colon optional — same meaning
 
 if condition:
     body()
@@ -28,10 +28,11 @@ if n <= 1 return n               # inline after condition
 if n <= 1 { return n }           # brace block inline
 ```
 
-### Ruby-style (with `do` / `end`)
+### Guard Pattern
 ```aura
-if cond do body() end
-if i >= n break end
+function process(x)
+    if x < 0 return -1           # early return, no else needed
+    return x * 2
 ```
 
 ---
@@ -48,6 +49,10 @@ while condition:
 while condition {                # brace block
     body()
 }
+
+# Common pattern: read until empty
+while (line = read_line())
+    output(line)
 ```
 
 ---
@@ -57,7 +62,7 @@ while condition {                # brace block
 ```aura
 # Count form: iterate 0..n-1
 for i in 5
-    output(i)
+    output(i)                    # 0, 1, 2, 3, 4
 
 # Explicit range (exclusive)
 for i in 0..10
@@ -99,6 +104,13 @@ loop:                           # colon optional
 loop {                          # brace block
     body()
 }
+
+# Typical use: event loop
+loop
+    event = poll_event()
+    if event == EVENT_QUIT
+        break
+    handle_event(event)
 ```
 
 ---
@@ -113,6 +125,12 @@ until condition
 repeat:                         # colon optional
     body()
 until condition
+
+# Practical: input validation
+repeat
+    value = ask("Enter a number: ")
+    n = int(value)
+until n > 0
 ```
 
 ---
@@ -122,11 +140,11 @@ until condition
 ```aura
 for i in 100
     if i == 5
-        break                    # exit loop
+        break                    # exit loop entirely
     if i % 2 == 0
-        continue                 # next iteration
+        continue                 # skip to next iteration
     skip                         # alias for continue
-    output(i)
+    output(i)                    # only odd numbers < 5
 ```
 
 ---
@@ -142,7 +160,7 @@ match value
     case 2, 3
         output("two or three")
     case _
-        output("other")          # wildcard
+        output("other")          # wildcard (catch-all)
 
 # With colons
 match value:
@@ -151,26 +169,26 @@ match value:
     default:
         output("other")
 
-# Arrow syntax
+# Arrow syntax (concise)
 match x
     0 -> output("zero")
     1 -> output("one")
     _ -> output("other")
 ```
 
-### Pattern types
+### Pattern Types
 
 ```aura
 match value
     case 42                      # literal match
-    case x                       # variable binding
+    case x                       # variable binding (captures value)
     case _                       # wildcard (ignore)
     case [a, b, c]               # array destructuring
     case Point(0, 0)             # struct/constructor pattern
     default                      # fallback (same as case _)
 ```
 
-### Switch alias
+### Switch Alias
 
 ```aura
 switch x
@@ -179,3 +197,7 @@ switch x
     case 2:
         output("two")
 ```
+
+---
+
+**Next:** [Functions](06-functions.md)

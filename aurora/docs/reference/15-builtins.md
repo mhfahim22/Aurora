@@ -22,6 +22,8 @@ outputN()                         # just newline
 outputf("Sum: %d\n", total)       # formatted
 ```
 
+> **`debug` vs `log`:** `debug` prints with source location info; `log` adds a timestamp prefix.
+
 ## String
 
 | Function           | Description              |
@@ -30,7 +32,7 @@ outputf("Sum: %d\n", total)       # formatted
 | `upper(s)`         | Uppercase                |
 | `lower(s)`         | Lowercase                |
 | `trim(s)`          | Trim whitespace          |
-| `replace(s, a, b)` | Replace substring         |
+| `replace(s, a, b)` | Replace substring        |
 | `split(s, d)`      | Split by delimiter       |
 | `join(arr, sep)`   | Join array               |
 | `has(s, sub)`      | Contains substring       |
@@ -189,3 +191,7 @@ outputf("Sum: %d\n", total)       # formatted
 | `random`     | Random number            |
 | `sleep expr` | Sleep (statement form)   |
 | `pass`       | No-op                    |
+
+---
+
+**Next:** [Standard Library](16-stdlib.md)

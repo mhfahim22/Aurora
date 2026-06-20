@@ -11,6 +11,11 @@ struct Point
 struct Point
     x = 0
     y = 0
+
+# With typed fields:
+struct Point
+    x: int = 0
+    y: int = 0
 ```
 
 ### Construction
@@ -27,6 +32,18 @@ p = Point { x: 10; y: 20 }
 
 # Field access
 output(p.x)                        # 10
+```
+
+### Value Semantics
+
+Structs are value types — assignment creates a copy:
+
+```aura
+a = Point(1, 2)
+b = a                              # b is a copy
+b.x = 99
+output(a.x)                        # 1 (unchanged)
+output(b.x)                        # 99
 ```
 
 ## Enum
@@ -55,7 +72,11 @@ extern union Value {
 }
 ```
 
+> **Warning:** Unions are for FFI interop only. Accessing the wrong field is undefined behavior.
+
 ## Typed Struct Fields (extern)
+
+For FFI compatibility with C structs:
 
 ```aura
 extern struct Point
@@ -67,3 +88,16 @@ extern struct Point {
     y: i32
 }
 ```
+
+## Struct vs Class
+
+| Aspect      | Struct | Class |
+|-------------|--------|-------|
+| Semantics   | Value  | Reference |
+| Inheritance | No     | Yes   |
+| Methods     | No     | Yes   |
+| Visibility  | N/A    | Public/private/protected |
+
+---
+
+**Next:** [Memory Model](09-memory.md)

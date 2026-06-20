@@ -90,3 +90,19 @@ neural network:
     dropout(0.5)
     dense(10, softmax)
 ```
+
+## Cross-reference
+
+| Framework   | Backend Module     | Low-level FFI      |
+|-------------|---------------------|---------------------|
+| UI          | `libc:ui`           | `user32.auf`        |
+| Backend     | `libc:backend`      | `libc:database`     |
+| Game        | `libc:game`         | `libc:sprite2d`     |
+| AI/ML       | `libc:ai`           | `libtorch.auf`      |
+| 3D Graphics | `libc:gl`           | `opengl.auf`        |
+| Audio       | `libc:audio`        | SDL                 |
+| Images      | `libc:image`        | stb_image           |
+
+---
+
+**Next:** [Built-in Functions](15-builtins.md)

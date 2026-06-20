@@ -136,7 +136,7 @@ void Codegen::declare_runtime_helpers() {
         llvm::Function::ExternalLinkage, "aurora_int_to_str", module_.get());
 
     /* AuroraStr* aurora_float_to_str(double) — convert float to AuroraStr */
-    llvm::Function::Create(
+    fn_float_to_str_ = llvm::Function::Create(
         llvm::FunctionType::get(i8ptr_ty(), { llvm::Type::getDoubleTy(ctx_) }, false),
         llvm::Function::ExternalLinkage, "aurora_float_to_str", module_.get());
 

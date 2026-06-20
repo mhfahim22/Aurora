@@ -125,7 +125,10 @@ AuroraType TypeChecker::get_type(const std::string& var_name) const {
 }
 
 bool TypeChecker::has_type(const std::string& var_name) const {
-    return get_type(var_name) != AuroraType::Unknown;
+    for (int i = (int)scopes_.size() - 1; i >= 0; --i) {
+        if (scopes_[i].find(var_name) != scopes_[i].end()) return true;
+    }
+    return false;
 }
 
 std::string TypeChecker::type_describe(const std::string& var_name) const {
@@ -209,6 +212,7 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["map_get"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
     functions_["map_has"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["map_set"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["map_copy"]      = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
     functions_["map_free"]      = FunctionTypeInfo{{AuroraType::Unknown}};
     functions_["set_add"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
     functions_["set_has"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
@@ -1022,6 +1026,14 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             bool saved_inside = inside_function_;
             AuroraType saved_return = current_return_type_;
 
+            /* Register named lambda as a variable in the enclosing scope before pushing the function's scope */
+            if (node->type == NodeType::Lambda && !node->value.empty()) {
+                bool starts_with_underscore = node->value.rfind("__lambda_", 0) == 0;
+                if (!starts_with_underscore) {
+                    define_var(node->value, AuroraType::Unknown);
+                }
+            }
+
             inside_function_ = true;
             current_return_type_ = AuroraType::Unknown;
             push_scope();
@@ -1181,7 +1193,13 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
         case NodeType::Var: {
             if (tracking_var_refs_)
                 var_refs_.insert(node->value);
-            return lookup_var(node->value, node->src_line);
+            try {
+                return lookup_var(node->value, node->src_line);
+            } catch (const TypeError&) {
+                if (functions_.count(node->value))
+                    return AuroraType::Unknown;
+                throw;
+            }
         }
         case NodeType::Index: {
             AuroraType arr_type = lookup_var(node->value, node->src_line);
@@ -1257,9 +1275,7 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
                 return AuroraType::String;
             if (left == AuroraType::String && right == AuroraType::String)
                 return AuroraType::String;
-            std::ostringstream msg;
-            msg << "string '+' needs both sides to be string";
-            throw TypeError(msg.str(), node->src_line);
+            return AuroraType::String;
         }
         return common_numeric(left, right, node->src_line);
     }
@@ -1276,7 +1292,7 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
         throw TypeError(msg.str(), node->src_line);
     }
 
-    if (op == "and" || op == "or") {
+    if (op == "and" || op == "or" || op == "&&" || op == "||") {
         if (is_boolish(left) && is_boolish(right)) return AuroraType::Bool;
         std::ostringstream msg;
         msg << "'" << op << "' needs numeric or bool values";
@@ -1308,7 +1324,7 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
         return AuroraType::Bool;
     }
 
-    if (op == "&" || op == "|") {
+    if (op == "&" || op == "|" || op == "<<" || op == ">>") {
         if ((left == AuroraType::Int || left == AuroraType::Unknown) &&
             (right == AuroraType::Int || right == AuroraType::Unknown))
             return AuroraType::Int;
@@ -1412,6 +1428,13 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
     if (global_class_registry().has(node->value)) {
         oop_check_new_object(node->value, node->args.get(), node->src_line);
         return AuroraType::Class;
+    }
+
+    /* Check if the call name is a known variable (function pointer / lambda) */
+    if (has_type(node->value)) {
+        const ASTNode* arg = node->args.get();
+        while (arg) { infer_expr(arg); arg = arg->next.get(); }
+        return AuroraType::Unknown;
     }
 
     auto it = functions_.find(node->value);

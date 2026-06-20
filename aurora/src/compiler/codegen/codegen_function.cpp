@@ -29,9 +29,10 @@ void Codegen::gen_function(const ASTNode* node) {
     int ai = 0;
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
-        arg.addAttr(llvm::Attribute::NoCapture);
-        if (arg.getType()->isPointerTy())
+        if (arg.getType()->isPointerTy()) {
+            arg.addAttr(llvm::Attribute::NoCapture);
             arg.addAttr(llvm::Attribute::NoAlias);
+        }
         ai++;
     }
 
@@ -260,10 +261,16 @@ llvm::Value* Codegen::gen_expr_in_method(const ASTNode* node,
         if (op == "+") {
             if (L->getType()->isPointerTy() || R->getType()->isPointerTy()) {
                 /* string concat — convert non-string to string, allocate new */
-                if (!L->getType()->isPointerTy())
-                    L = builder_->CreateCall(fn_int_to_str_, { L }, "l_int_str");
-                if (!R->getType()->isPointerTy())
-                    R = builder_->CreateCall(fn_int_to_str_, { R }, "r_int_str");
+                auto to_str = [&](llvm::Value*& V, const char* name) {
+                    if (!V->getType()->isPointerTy()) {
+                        if (V->getType()->isDoubleTy())
+                            V = builder_->CreateCall(fn_float_to_str_, { V }, name);
+                        else
+                            V = builder_->CreateCall(fn_int_to_str_, { V }, name);
+                    }
+                };
+                to_str(L, "l_str");
+                to_str(R, "r_str");
                 auto* str_ty = llvm::StructType::get(
                     ctx_, { i8ptr_ty(), i64_ty(), i64_ty() }, false);
                 auto* rdata_gep = builder_->CreateStructGEP(str_ty, R, 0, "rdata");

@@ -1,5 +1,7 @@
 # Attributes
 
+Attributes modify the behavior of functions, variables, and FFI declarations.
+
 ## Function Attributes
 
 | Attribute         | Description                              |
@@ -42,6 +44,16 @@
 @gc big_data = load_large()
 ```
 
+### When to Use Each
+
+| Attribute | Use When                                          |
+|-----------|---------------------------------------------------|
+| `@stack`  | Local variables with known size, short lifetime   |
+| `@arena`  | Many temporary allocations in a loop/scope        |
+| `@raii`   | Managing OS resources (files, sockets, locks)      |
+| `@arc`    | Shared ownership across multiple owners           |
+| `@gc`     | Complex data structures, caches, long-lived data   |
+
 ## FFI Cost Attributes
 
 | Attribute               | Description                     |
@@ -72,3 +84,9 @@ function fast_sum(n)
 @performance function renderer()
     # body
 ```
+
+Both forms are equivalent. Use separate line for readability with long attribute lists.
+
+---
+
+**Next:** [Built-in Functions](15-builtins.md)

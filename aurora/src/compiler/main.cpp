@@ -1165,6 +1165,9 @@ int main(int argc, char** argv) {
     } catch (const OwnershipError& e) {
         std::cerr << "\n\033[1;31m[Ownership Error]\033[0m\n  " << e.what() << "\n";
         return 1;
+    } catch (const TypeError& e) {
+        std::cerr << "\n\033[1;31m[Error]\033[0m Line " << e.line << ": " << e.what() << "\n";
+        return 1;
     } catch (const std::exception& e) {
         std::cerr << "\n\033[1;31m[Error]\033[0m " << e.what() << "\n";
         return 1;

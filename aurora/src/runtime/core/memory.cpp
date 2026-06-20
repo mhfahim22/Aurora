@@ -850,46 +850,46 @@ void aurora_gc_trigger_check(void) {
 } /* extern "C" GC */
 
 // ═══════════════════════════════════════════════════════════════
-// Exception Handling (C++ exception-based, replaces setjmp/longjmp)
+// Exception Handling (return-based for JIT compatibility)
+// C++ exceptions cannot propagate through JIT-compiled frames
+// because ORC JIT does not emit unwind tables.  Instead, we use
+// a thread-local flag: aurora_throw sets the flag and returns
+// normally.  The try/catch in gen_throw generates a `ret` after
+// the throw call (dead code path), so execution unwinds via
+// normal function returns.  aurora_try_exec checks the flag
+// after try_fn returns and runs the catch handler if set.
 // ═══════════════════════════════════════════════════════════════
 
-struct AuroraThrow {
+struct AuroraThrowState {
+    bool    thrown;
     int64_t val;
-    int     has;
 };
+
+static thread_local AuroraThrowState g_throw_state = {false, 0};
 
 extern "C" {
 
-#ifdef _WIN32
-__declspec(noinline)
-#else
-__attribute__((noinline))
-#endif
 void aurora_try_exec(AuroraTryFn try_fn, AuroraCatchFn catch_fn, int64_t* ctx,
                      AuroraFinallyFn finally_fn) {
-    try {
-        try_fn(ctx);
-        if (finally_fn) finally_fn(ctx);
-    } catch (const AuroraThrow& e) {
-        int64_t val = e.val;
+    AuroraThrowState prev = g_throw_state;
+    g_throw_state = {false, 0};
+
+    try_fn(ctx);
+
+    if (g_throw_state.thrown) {
+        int64_t val = g_throw_state.val;
+        g_throw_state = {false, 0};
         if (catch_fn) catch_fn(ctx, val);
-        if (finally_fn) finally_fn(ctx);
     }
+
+    if (finally_fn) finally_fn(ctx);
+
+    g_throw_state = prev;
 }
 
-#ifdef _WIN32
-#pragma warning(push)
-#pragma warning(disable: 4297) /* extern "C" function throws C++ exception */
-__declspec(noinline)
-#else
-__attribute__((noinline))
-#endif
-void aurora_throw(int64_t val, int64_t has) {
-    throw AuroraThrow{val, (int)has};
+void aurora_throw(int64_t val, int64_t /*has*/) {
+    g_throw_state = {true, val};
 }
-#ifdef _WIN32
-#pragma warning(pop)
-#endif
 
 }
 

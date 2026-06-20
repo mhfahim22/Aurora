@@ -47,14 +47,16 @@ private:
     ASTNode::Ptr parse_interface();
     ASTNode::Ptr parse_type_alias();
     ASTNode::Ptr parse_extern();
-    ASTNode::Ptr parse_expr  (const std::vector<Token>& toks, int& idx);
-    ASTNode::Ptr parse_cmp   (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_expr   (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_cmp    (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_logical(const std::vector<Token>& toks, int& idx);
     ASTNode::Ptr parse_bitwise(const std::vector<Token>& toks, int& idx);
-    ASTNode::Ptr parse_range (const std::vector<Token>& toks, int& idx);
-    ASTNode::Ptr parse_add   (const std::vector<Token>& toks, int& idx);
-    ASTNode::Ptr parse_term  (const std::vector<Token>& toks, int& idx);
-    ASTNode::Ptr parse_unary (const std::vector<Token>& toks, int& idx);
-    ASTNode::Ptr parse_factor(const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_shift  (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_range  (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_add    (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_term   (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_unary  (const std::vector<Token>& toks, int& idx);
+    ASTNode::Ptr parse_factor (const std::vector<Token>& toks, int& idx);
 
     ASTNode::Ptr parse_trailing_chains(ASTNode::Ptr base,
                                        const std::vector<Token>& toks,

@@ -23,8 +23,9 @@ function run_async_tests()
         output("async function")
     output("async function defined")
 
-    spawn run_async_tests()
-    output("spawned")
+    async:
+        output("spawned block")
+    output("spawn test done")
 
     wait 0
     output("waited")

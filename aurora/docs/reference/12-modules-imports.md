@@ -3,11 +3,11 @@
 ## Import Forms
 
 ```aura
-import "path/to/file.aura"       # file path
-import stdio                      # library module
-import kernel32                   # FFI module
+import "path/to/file.aura"       # file path (relative or absolute)
+import stdio                      # library module (std lib)
+import kernel32                   # FFI module (Windows API)
 import MrCode                     # third-party package
-import libc:string                # scoped import
+import libc:string                # scoped import (from libc package)
 from "utils" import helper        # selective import
 ```
 
@@ -16,6 +16,7 @@ from "utils" import helper        # selective import
 ```aura
 module com.example.myapp          # module declaration
 package myapp                     # package declaration
+
 namespace Graphics:               # namespace with block
     function render()
         output("rendering")
@@ -30,7 +31,7 @@ namespace mylib
 
 ```aura
 alias math = Aurora.Math
-alias MyInt = int
+alias MyInt = int                 # type alias
 ```
 
 ## Global / Outer
@@ -42,7 +43,9 @@ outer :: varName                  # access outer scope
 
 ## Module Resolution Order
 
-1. Exact file path
+When you write `import "module"`, Aurora searches:
+
+1. Exact file path match
 2. Path + `.aura` extension
 3. Search path / name
 4. Search path / name.aura
@@ -62,11 +65,15 @@ outer :: varName                  # access outer scope
 }
 ```
 
-## Package Commands (programmatic)
+| Field         | Required | Description             |
+|---------------|----------|-------------------------|
+| `name`        | Yes      | Package name            |
+| `version`     | Yes      | SemVer version          |
+| `author`      | No       | Author name             |
+| `description` | No       | Short description       |
+| `entry`       | Yes      | Main entry point file   |
+| `depends`     | No       | Dependency list         |
 
-```aura
-import package_manager
-install("my-package")
-update("my-package")
-results = search("keyword")
-```
+---
+
+**Next:** [FFI](13-ffi.md)
