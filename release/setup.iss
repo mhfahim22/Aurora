@@ -83,6 +83,9 @@ Source: "..\examples\*"; DestDir: "{app}\examples"; Flags: ignoreversion recurse
 ; ── deps (stb_image.h) ──
 Source: "..\deps\stb_image.h"; DestDir: "{app}\deps"; Flags: ignoreversion
 
+; ── Helper scripts ──
+Source: "run.bat"; DestDir: "{app}"; Flags: ignoreversion
+
 [Icons]
 Name: "{group}\Aurora REPL"; Filename: "{app}\aurorac.exe"; Parameters: "--repl"; WorkingDir: "{app}"
 Name: "{group}\Aurora Documentation"; Filename: "{app}\docs\language.md"
@@ -98,5 +101,12 @@ Name: "{commondesktop}\Aurora REPL"; Filename: "{app}\aurorac.exe"; Parameters: 
 ; Note: PATH is managed by install.ps1 to avoid Inno Setup type-mismatch errors
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_PATH"; ValueData: "{app}\libc"
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_LIB"; ValueData: "{app}\libc"
+
+; ── File association: .aura → run.bat ──
+Root: HKCU; Subkey: "Software\Classes\.aura"; ValueType: string; ValueName: ""; ValueData: "AuroraSourceFile"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile"; ValueType: string; ValueName: ""; ValueData: "Aurora Source File"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell"; ValueType: string; ValueName: ""; ValueData: "run"
+Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell\run"; ValueType: string; ValueName: ""; ValueData: "Run with Aurora"
+Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\run.bat"" ""%1"" --run"
 
 ; [Code] section intentionally empty — PATH is managed by install.ps1
