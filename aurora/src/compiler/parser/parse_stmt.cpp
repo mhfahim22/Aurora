@@ -5,6 +5,51 @@
 /* Forward declaration for pattern parsing */
 static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln);
 
+/* ── Helper: parse attributed function definition ──
+   Handles common pattern: @attribute function name(params): body (brace or indent).
+   Sets up stmt->args, stmt->body, advances, and returns the completed node.
+   The Parser& is needed for advance(), parse_block(), parse_brace_block(). */
+static ASTNode::Ptr parse_attributed_fn_body(Parser& parser, ASTNode::Ptr stmt,
+                                              const std::vector<Token>& toks, int& idx,
+                                              int cnt, int ln, int ci) {
+    /* Parse function name */
+    if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        throw std::runtime_error("Line " + std::to_string(ln) + ": expected function name");
+    stmt->value = toks[idx].value;
+    idx++;
+
+    /* Parse params: (a, b, c) */
+    if (idx < cnt && toks[idx].is_operator('(')) {
+        idx++;
+        ASTNode* ptail = nullptr;
+        while (idx < cnt && !toks[idx].is_operator(')')) {
+            if (toks[idx].is_operator(',')) { idx++; continue; }
+            auto p = make_node(NodeType::Var, toks[idx++].value);
+            ASTNode* raw = p.get();
+            if (!stmt->args) { stmt->args = std::move(p); ptail = raw; }
+            else             { ptail->next = std::move(p); ptail = raw; }
+        }
+        if (idx < cnt) idx++;
+        else throw std::runtime_error("Line " + std::to_string(ln) + ": missing ')' in function parameters");
+    }
+    if (idx < cnt && toks[idx].is_operator(':')) idx++;
+
+    bool has_brace = (idx < cnt && toks[idx].is_operator('{'));
+    if (has_brace) {
+        idx++;
+        if (idx < cnt) parser.require_token_end(toks, idx, "attributed function definition");
+    } else {
+        parser.require_token_end(toks, idx, "attributed function definition");
+    }
+    parser.advance();
+
+    if (has_brace)
+        stmt->body = parser.parse_brace_block(1);
+    else
+        stmt->body = parser.parse_block(ci);
+    return stmt;
+}
+
 ASTNode::Ptr Parser::parse_stmt() {
     if (!skip_blanks()) return nullptr;
 
@@ -106,104 +151,29 @@ ASTNode::Ptr Parser::parse_stmt() {
     if (t0.is_attribute("performance")) {
         /* Check if next token on same line has function keyword */
         if (cnt > 1 && toks[1].is_keyword("function")) {
-            /* Parse as @performance function on same line */
-            int idx = 2;  /* skip @performance and function */
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
-                std::string fname = toks[idx].value;
-                auto stmt = make_node(NodeType::PerformanceFn, fname, ln);
-                idx++;
-
-                /* Parse params: function name(a, b, c): */
-                if (idx < cnt && toks[idx].is_operator('(')) {
-                    idx++;
-                    ASTNode* ptail = nullptr;
-                    while (idx < cnt && !toks[idx].is_operator(')')) {
-                        if (toks[idx].is_operator(',')) { idx++; continue; }
-                        auto p = make_node(NodeType::Var, toks[idx++].value);
-                        ASTNode* raw = p.get();
-                        if (!stmt->args) { stmt->args = std::move(p); ptail = raw; }
-                        else { ptail->next = std::move(p); ptail = raw; }
-                    }
-                    if (idx < cnt) idx++;  /* ')' */
-                    else throw std::runtime_error("Line " + std::to_string(ln) + ": missing ')' in function parameters");
-                }
-                if (idx < cnt && toks[idx].is_operator(':')) idx++;
-
-                bool perf_has_brace = (idx < cnt && toks[idx].is_operator('{'));
-                if (perf_has_brace) {
-                    idx++;
-                    if (idx < cnt) require_token_end(toks, idx, "@performance function definition");
-                } else {
-                    require_token_end(toks, idx, "@performance function definition");
-                }
-                advance();
-
-                if (perf_has_brace) {
-                    stmt->body = parse_brace_block(1);
-                } else {
-                    stmt->body = parse_block(ci);
-                }
-                stmt->memory_meta.alloc_strategy = AllocStrategy::Stack;  /* default for perf mode */
-                return stmt;
-            }
+            int idx = 2;
+            auto stmt = make_node(NodeType::PerformanceFn, "", ln);
+            stmt = parse_attributed_fn_body(*this, std::move(stmt), toks, idx, cnt, ln, ci);
+            stmt->memory_meta.alloc_strategy = AllocStrategy::Stack;
+            return stmt;
         }
         /* Check if next line has function keyword */
         else if (cnt == 1) {
-            /* @performance is alone on line, check next line */
-            advance();  /* skip @performance line */
+            advance();
             if (!at_end()) {
                 const LexedLine& next_ll = cur_line();
                 const auto& next_toks = next_ll.tokens;
                 int next_cnt = (int)next_toks.size();
-
                 if (next_cnt > 0 && next_toks[0].is_keyword("function") && next_cnt > 1) {
-                    /* Parse as @performance function on next line */
-                    int idx = 1;  /* skip function keyword */
-                    if (idx < next_cnt && (next_toks[idx].is_identifier() || next_toks[idx].is(TokenType::Keyword))) {
-                        std::string fname = next_toks[idx].value;
-                        auto stmt = make_node(NodeType::PerformanceFn, fname, next_ll.line_no);
-                        idx++;
-
-                        /* Parse params: function name(a, b, c): */
-                        if (idx < next_cnt && next_toks[idx].is_operator('(')) {
-                            idx++;
-                            ASTNode* ptail = nullptr;
-                            while (idx < next_cnt && !next_toks[idx].is_operator(')')) {
-                                if (next_toks[idx].is_operator(',')) { idx++; continue; }
-                                auto p = make_node(NodeType::Var, next_toks[idx++].value);
-                                ASTNode* raw = p.get();
-                                if (!stmt->args) { stmt->args = std::move(p); ptail = raw; }
-                                else { ptail->next = std::move(p); ptail = raw; }
-                            }
-                            if (idx < next_cnt) idx++;  /* ')' */
-                            else throw std::runtime_error("Line " + std::to_string(next_ll.line_no) + ": missing ')' in function parameters");
-                        }
-                        if (idx < next_cnt && next_toks[idx].is_operator(':')) idx++;
-
-                        bool perf2_has_brace = (idx < next_cnt && next_toks[idx].is_operator('{'));
-                        if (perf2_has_brace) {
-                            idx++;
-                            if (idx < next_cnt) require_token_end(next_toks, idx, "@performance function definition");
-                        } else {
-                            require_token_end(next_toks, idx, "@performance function definition");
-                        }
-                        advance();
-
-                        if (perf2_has_brace) {
-                            stmt->body = parse_brace_block(1);
-                        } else {
-                            stmt->body = parse_block(next_ll.indent);
-                        }
-                        stmt->memory_meta.alloc_strategy = AllocStrategy::Stack;  /* default for perf mode */
-                        return stmt;
-                    }
+                    int idx = 1;
+                    auto stmt = make_node(NodeType::PerformanceFn, "", next_ll.line_no);
+                    stmt = parse_attributed_fn_body(*this, std::move(stmt), next_toks, idx, next_cnt, next_ll.line_no, next_ll.indent);
+                    stmt->memory_meta.alloc_strategy = AllocStrategy::Stack;
+                    return stmt;
                 }
             }
-            /* If we get here, something went wrong */
             throw std::runtime_error("Line " + std::to_string(ln) + ": @performance must be followed by 'function' keyword");
-        }
-        /* @performance on same line without function keyword - error */
-        else {
+        } else {
             throw std::runtime_error("Line " + std::to_string(ln) + ": @performance must be followed by 'function' keyword");
         }
     }
@@ -237,42 +207,10 @@ ASTNode::Ptr Parser::parse_stmt() {
         /* Next must be a function: @stack function name(): */
         else if (cnt > 1 && toks[1].is_keyword("function")) {
             int idx = 2;
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
-                std::string fname = toks[idx].value;
-                auto stmt = make_node(NodeType::PerformanceFn, fname, ln);
-                idx++;
-                if (idx < cnt && toks[idx].is_operator('(')) {
-                    idx++;
-                    ASTNode* ptail = nullptr;
-                    while (idx < cnt && !toks[idx].is_operator(')')) {
-                        if (toks[idx].is_operator(',')) { idx++; continue; }
-                        auto p = make_node(NodeType::Var, toks[idx++].value);
-                        ASTNode* raw = p.get();
-                        if (!stmt->args) { stmt->args = std::move(p); ptail = raw; }
-                        else { ptail->next = std::move(p); ptail = raw; }
-                    }
-                    if (idx < cnt) idx++;
-                    else throw std::runtime_error("Line " + std::to_string(ln) + ": missing ')' in function parameters");
-                }
-                if (idx < cnt && toks[idx].is_operator(':')) idx++;
-
-                bool alloc_has_brace = (idx < cnt && toks[idx].is_operator('{'));
-                if (alloc_has_brace) {
-                    idx++;
-                    if (idx < cnt) require_token_end(toks, idx, "@alloc function definition");
-                } else {
-                    require_token_end(toks, idx, "@alloc function definition");
-                }
-                advance();
-
-                if (alloc_has_brace) {
-                    stmt->body = parse_brace_block(1);
-                } else {
-                    stmt->body = parse_block(ci);
-                }
-                stmt->memory_meta.forced_strategy = forced;
-                return stmt;
-            }
+            auto stmt = make_node(NodeType::PerformanceFn, "", ln);
+            stmt = parse_attributed_fn_body(*this, std::move(stmt), toks, idx, cnt, ln, ci);
+            stmt->memory_meta.forced_strategy = forced;
+            return stmt;
         }
         throw std::runtime_error("Line " + std::to_string(ln) + ": @" + t0.value + " must be followed by 'variable = expr' or 'function'");
     }
@@ -787,7 +725,8 @@ ASTNode::Ptr Parser::parse_stmt() {
     /* ── constant / mutable as declaration prefix ── */
     if ((t0.is_keyword("constant") || t0.is_keyword("mutable")) && cnt > 2 && toks[2].is_operator('=')) {
         std::string qual = t0.value;
-        auto stmt  = make_node(NodeType::Assign, qual, ln);  /* store qualifier in value */
+        auto stmt  = make_node(NodeType::Assign, "", ln);
+        stmt->is_mutable = (qual == "mutable");  /* use dedicated field instead of overloading value */
         stmt->left = make_node(NodeType::Var, toks[1].value, ln);
         int idx = 3;
         stmt->right = parse_expr(toks, idx);
@@ -1000,7 +939,8 @@ ASTNode::Ptr Parser::parse_stmt() {
         int match_indent = ci;
         advance();
 
-        ASTNode::Ptr* slot = &stmt->args;
+        /* Use stmt->body (cases list) instead of overloading stmt->args for case nodes */
+        ASTNode::Ptr* slot = &stmt->body;
         bool seen_default = false;
         while (!at_end()) {
             if (!skip_blanks()) break;
@@ -1082,8 +1022,11 @@ ASTNode::Ptr Parser::parse_stmt() {
 
     /* ── for x in expr: ── */
     if (t0.is_keyword("for")) {
-        if (cnt < 4 || !toks[1].is_identifier() || !toks[2].is_keyword("in"))
-            throw std::runtime_error("Line " + std::to_string(ln) + ": expected 'for name in expression'");
+        if (cnt < 4 || !toks[1].is_identifier() || !toks[2].is_keyword("in")) {
+            std::string ctx;
+            if (cnt > 1) ctx = " (got '" + toks[1].value + "')";
+            throw std::runtime_error("Line " + std::to_string(ln) + ": expected 'for name in expression'" + ctx);
+        }
         std::string var = (cnt > 1) ? toks[1].value : "";
         auto stmt  = make_node(NodeType::For, var, ln);
         int idx = 3;   /* skip var and 'in' */

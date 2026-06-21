@@ -90,11 +90,11 @@ void Codegen::declare_ai_runtime_helpers() {
 
     /* Autograd operations */
     /* void tensor_set_requires_grad(i8* tensor, i32 flag) */
-    llvm::Function::Create(
+    tensor_set_requires_grad_ = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getVoidTy(*ctx), { ptr, i32 }, false),
         llvm::Function::ExternalLinkage, "aurora_tensor_set_requires_grad", mod);
     /* void tensor_backward(i8* tensor) */
-    llvm::Function::Create(
+    tensor_backward_ = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getVoidTy(*ctx), { ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_tensor_backward", mod);
     /* void tensor_sgd_step(i8* param, double lr) */

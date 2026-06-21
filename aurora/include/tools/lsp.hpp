@@ -44,7 +44,7 @@ private:
 };
 
 /* ── LSP types ── */
-struct LspPosition { int line; int character; };
+struct LspPosition { uint32_t line; uint32_t character; };
 struct LspRange { LspPosition start; LspPosition end; };
 struct LspLocation { std::string uri; LspRange range; };
 struct LspDiagnostic {
@@ -62,7 +62,7 @@ struct LspCompletionItem {
 };
 struct LspSymbol {
     std::string name;
-    std::string kind;
+    int kind = 0;
     LspRange range;
     LspRange selectionRange;
 };

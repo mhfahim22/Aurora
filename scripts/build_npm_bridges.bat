@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set QJSDIR=%~dp0quickjs
+set QJSDIR=%~dp0..\deps\quickjs
 set OUTDIR=%~dp0
 
-set ZIG=C:\Users\user\AppData\Local\opencode\tools\zig-0.13.0\zig-windows-x86_64-0.13.0\zig.exe
+if defined ZIG_PATH (set "ZIG=%ZIG_PATH%") else (set "ZIG=zig")
 
 echo === Building left-pad_npm.dll ===
 set BASE_FLAGS=-I"%QJSDIR%" -include "%QJSDIR%\quickjs_config.h" -mcpu=x86_64 -O2 -lbcrypt

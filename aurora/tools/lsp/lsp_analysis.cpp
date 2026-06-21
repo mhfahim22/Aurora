@@ -33,13 +33,18 @@ std::vector<LspDiagnostic> LspServer::analyze(DocumentState& doc) {
 
     /* ── Report parse errors from the real parser ── */
     if (!doc.parseError.empty()) {
-        std::regex err_line_re(R"(line (\d+))");
+        std::regex err_line_re(R"(line[:\s]+(\d+))");
         std::smatch m;
         int err_line = 0;
         if (std::regex_search(doc.parseError, m, err_line_re)) {
             err_line = std::stoi(m[1]) - 1;
         }
-        add_diag(diags, err_line, 0, err_line < (int)lines.size() ? (int)lines[err_line].tokens.size() : 1, 1, doc.parseError, "aurorac");
+        int col_end = 1;
+        if (err_line >= 0 && err_line < (int)lines.size()) {
+            auto& toks = lines[err_line].tokens;
+            if (!toks.empty()) col_end = toks.back().col + (int)toks.back().value.size();
+        }
+        add_diag(diags, err_line, 0, col_end, 1, doc.parseError, "aurorac");
     }
 
     /* ── Use the real AST for semantic analysis ── */
@@ -53,16 +58,19 @@ std::vector<LspDiagnostic> LspServer::analyze(DocumentState& doc) {
         std::string func_name;
         bool has_return = false;
 
+        int function_depth = 0;
         walk_ast(doc.ast.get(), [&](ASTNode* n) {
             if (n->type == NodeType::Function) {
                 defined_funcs.insert(n->value);
-                if (in_function) {
-                    add_diag(diags, func_start_line, 0, 1, 1, "Missing 'end function' for '" + func_name + "'", "aurora-lint");
+                if (function_depth > 0) {
+                    /* nested function — don't report false positive */
+                } else {
+                    in_function = true;
+                    func_start_line = n->src_line;
+                    func_name = n->value;
+                    has_return = false;
                 }
-                in_function = true;
-                func_start_line = n->src_line;
-                func_name = n->value;
-                has_return = false;
+                function_depth++;
             }
             if (n->type == NodeType::Return) {
                 has_return = true;
@@ -85,20 +93,22 @@ std::vector<LspDiagnostic> LspServer::analyze(DocumentState& doc) {
             }
         });
 
-        /* Collect var uses */
+        /* Collect var uses with count */
+        std::map<std::string, int> use_count;
         walk_ast(doc.ast.get(), [&](ASTNode* n) {
             if (n->type == NodeType::Var && n->src_line > 0) {
                 std::string vname = n->value;
                 const auto& keywords = aurora_keywords();
                 if (keywords.find(vname) == keywords.end() && !vname.empty()) {
                     used_vars[vname] = n->src_line;
+                    use_count[vname]++;
                 }
             }
         });
 
-        /* Report unused variables */
+        /* Report unused variables (must be used more than once — definition alone doesn't count) */
         for (auto& [vname, def_line] : defined_vars) {
-            if (used_vars.find(vname) == used_vars.end() || used_vars[vname] == def_line) {
+            if (use_count[vname] < 2) {
                 add_diag(diags, def_line - 1, 0, 1, 3, "Unused variable '" + vname + "'", "aurora-lint");
             }
         }
@@ -288,6 +298,7 @@ std::vector<LspCompletionItem> LspServer::get_completions(DocumentState& doc, in
     }
 
     /* Identifiers from lexed tokens across all open documents */
+    /* TODO: cache this — rebuilding on every keystroke is O(N) across all docs */
     for (auto& [uri, d] : documents_) {
         for (auto& ll : d.lines) {
             for (auto& t : ll.tokens) {
@@ -391,7 +402,7 @@ std::vector<LspSymbol> LspServer::get_symbols(DocumentState& doc) {
 
         LspSymbol sym;
         sym.name = n->value;
-        sym.kind = std::to_string(kind);
+        sym.kind = kind;
         sym.range.start = {n->src_line - 1, 0};
         sym.range.end = {n->src_line - 1, (int)n->value.size()};
         sym.selectionRange = sym.range;
@@ -481,23 +492,23 @@ std::string LspServer::get_hover_info(DocumentState& doc, int line, int col) {
         });
     }
 
-    /* Fallback lexer search */
-    if (hover_text.find("*Defined") == std::string::npos && hover_text.find("*Variable defined") == std::string::npos) {
-        for (auto& [uri, d] : documents_) {
-            for (auto& ll : d.lines) {
-                const auto& toks = ll.tokens;
-                for (size_t i = 0; i < toks.size(); i++) {
-                    if (toks[i].is_identifier() && toks[i].value == word && i > 0) {
-                        if (toks[i-1].is_keyword("function") || toks[i-1].is_keyword("class") ||
-                            toks[i-1].is_keyword("struct") || toks[i-1].is_keyword("enum")) {
-                            hover_text += "\n---\n*Defined at line " + std::to_string(ll.line_no) + "*";
-                            break;
-                        }
+    /* Fallback lexer search using boolean flag */
+    bool found = false;
+    for (auto& [uri, d] : documents_) {
+        if (found) break;
+        for (auto& ll : d.lines) {
+            if (found) break;
+            const auto& toks = ll.tokens;
+            for (size_t i = 0; i < toks.size(); i++) {
+                if (toks[i].is_identifier() && toks[i].value == word && i > 0) {
+                    if (toks[i-1].is_keyword("function") || toks[i-1].is_keyword("class") ||
+                        toks[i-1].is_keyword("struct") || toks[i-1].is_keyword("enum")) {
+                        hover_text += "\n---\n*Defined at line " + std::to_string(ll.line_no) + "*";
+                        found = true;
+                        break;
                     }
                 }
-                if (hover_text.find("*Defined") != std::string::npos) break;
             }
-            if (hover_text.find("*Defined") != std::string::npos) break;
         }
     }
 

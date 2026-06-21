@@ -1,4 +1,4 @@
-#include "..\aurora\tests\cpp_interop\shapes_test_cppwrap.h"
+#include "shapes_test_cppwrap.h"
 #include <cstdio>
 
 int main() {

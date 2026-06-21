@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <cctype>
 
+#define JSON_BOOL 5
+
 extern "C" {
 
 /* ── Internal parser state ── */
@@ -94,7 +96,7 @@ static JsonValue* json_parse_number(JsonParser* ps) {
     JsonValue* v = (JsonValue*)aurora_safe_calloc(1, sizeof(JsonValue));
     v->type = JSON_NUM;
     v->num_val = strtod(num_str, nullptr);
-    free(num_str);
+    aurora_free(num_str);
     return v;
 }
 
@@ -102,14 +104,14 @@ static JsonValue* json_parse_keyword(JsonParser* ps) {
     if (strncmp(ps->p, "true", 4) == 0) {
         ps->p += 4;
         JsonValue* v = (JsonValue*)aurora_safe_calloc(1, sizeof(JsonValue));
-        v->type = JSON_NUM;
+        v->type = JSON_BOOL;
         v->num_val = 1.0;
         return v;
     }
     if (strncmp(ps->p, "false", 5) == 0) {
         ps->p += 5;
         JsonValue* v = (JsonValue*)aurora_safe_calloc(1, sizeof(JsonValue));
-        v->type = JSON_NUM;
+        v->type = JSON_BOOL;
         v->num_val = 0.0;
         return v;
     }
@@ -163,7 +165,7 @@ static JsonValue* json_parse_object(JsonParser* ps) {
             obj->keys[obj->count - 1] = key;
             obj->items[obj->count - 1] = val;
         } else {
-            free(key);
+            aurora_free(key);
         }
         json_skip_ws(ps);
         if (*ps->p == '}') { ps->p++; break; }
@@ -204,6 +206,13 @@ static void json_serialize_impl(JsonValue* val, char** buf, size_t* cap, size_t*
         case JSON_NULL: {
             ensure(5);
             memcpy(*buf + *len, "null", 4); *len += 4;
+            break;
+        }
+        case JSON_BOOL: {
+            const char* s = val->num_val != 0.0 ? "true" : "false";
+            int n = (int)strlen(s);
+            ensure((size_t)n);
+            memcpy(*buf + *len, s, (size_t)n); *len += (size_t)n;
             break;
         }
         case JSON_NUM: {
@@ -301,7 +310,11 @@ JsonValue* aurora_json_new_object() {
 
 void aurora_json_set(JsonValue* obj, const char* key, double num) {
     if (!obj) return;
-    obj->type = JSON_OBJECT;
+    if (obj->type != JSON_OBJECT && obj->type != JSON_ARRAY) {
+        obj->type = JSON_OBJECT;
+        obj->count = 0;
+        obj->items = nullptr;
+    }
     for (int i = 0; i < obj->count; i++) {
         if (obj->keys[i] && strcmp(obj->keys[i], key) == 0) {
             if (obj->items[i]) {
@@ -405,19 +418,22 @@ int aurora_json_array_len(JsonValue* arr) {
 
 void aurora_json_free(JsonValue* val) {
     if (!val) return;
-    if (val->type == JSON_STR) free(val->str_val);
-    for (int i = 0; i < val->count; i++) {
-        free(val->keys[i]);
-        if (val->items[i]) {
-            free(val->items[i]->str_val);
-            free(val->items[i]->items);
-            free(val->items[i]->keys);
-            free(val->items[i]);
-        }
+    if (val->type == JSON_STR) {
+        aurora_free(val->str_val);
     }
-    free(val->keys);
-    free(val->items);
-    free(val);
+    if (val->type == JSON_OBJECT || val->type == JSON_ARRAY) {
+        if (val->type == JSON_OBJECT && val->keys) {
+            for (int i = 0; i < val->count; i++) {
+                aurora_free(val->keys[i]);
+            }
+            aurora_free(val->keys);
+        }
+        for (int i = 0; i < val->count; i++) {
+            aurora_json_free(val->items[i]);
+        }
+        aurora_free(val->items);
+    }
+    aurora_free(val);
 }
 
 }

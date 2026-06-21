@@ -194,8 +194,6 @@ extern "glfw3" function glfwShowWindow(window: pointer)
 
 extern "glfw3" function glfwFocusWindow(window: pointer)
 
-extern "glfw3" function glfwSetWindowShouldClose(window: pointer, value: i32)
-
 extern "glfw3" function glfwWindowHint(hint: i32, value: i32)
 
 ## ── Window callbacks ──

@@ -27,6 +27,9 @@ extern "C" {
 #endif
 
 /* ── SharedBox structure ── */
+#ifdef __cplusplus
+}
+#endif
 struct SharedBox {
     uint64_t             magic;
     std::atomic<int64_t> strong_count;
@@ -34,6 +37,9 @@ struct SharedBox {
     void*                data;
     void               (*destructor)(void*);
 };
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* ════════════════════════════════════════════════════════════
    Arena Allocator API

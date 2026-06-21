@@ -2,7 +2,7 @@
     [string]$Compiler = "build/Release/aurorac.exe"
 )
 
-$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$Root = Split-Path -Parent $PSScriptRoot
 $CompilerPath = Join-Path $Root $Compiler
 
 if (!(Test-Path $CompilerPath)) {

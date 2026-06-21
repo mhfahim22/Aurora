@@ -359,6 +359,7 @@ void aurora_http_response_set_status(AuroraHttpResponse* res, int code, const ch
 void aurora_http_response_set_status_code(AuroraHttpResponse* res, int code) {
     if (!res) return;
     res->status_code = code;
+    free(res->status_text);
     switch (code) {
         case 200: res->status_text = strdup("OK"); break;
         case 201: res->status_text = strdup("Created"); break;
@@ -748,21 +749,31 @@ int aurora_route_dispatch(AuroraRouter* router, AuroraHttpRequest* req, AuroraHt
 }
 
 /* ── Check a header value in raw HTTP request (case-insensitive name) ── */
+#ifdef _WIN32
+#define aurora_strncasecmp _strnicmp
+#else
+#define aurora_strncasecmp strncasecmp
+#endif
+
 static int has_header_value(const char* raw, const char* header_name, const char* expected_val) {
     if (!raw || !header_name || !expected_val) return 0;
-    const char* hdr = strstr(raw, header_name);
-    if (!hdr) {
-        /* Try lowercase version of header name */
-        std::string lower;
-        for (const char* p = header_name; *p; p++) lower += (char)tolower(*p);
-        hdr = strstr(raw, lower.c_str());
+    size_t hdr_len = strlen(header_name);
+    const char* hdr = nullptr;
+    const char* p = raw;
+    while (*p) {
+        if (aurora_strncasecmp(p, header_name, hdr_len) == 0 &&
+            (p[hdr_len] == ':' || p[hdr_len] == ' ')) {
+            hdr = p;
+            break;
+        }
+        p++;
     }
     if (!hdr) {
         fprintf(stderr, "[gzip-debug] hdr NOT found in raw for '%s'\n", header_name);
         fprintf(stderr, "[gzip-debug] raw=%.200s\n", raw);
         return 0;
     }
-    hdr += strlen(header_name);
+    hdr += hdr_len;
     while (*hdr == ' ') hdr++;
     /* Search for expected_val as a token in comma-separated list */
     size_t ev_len = strlen(expected_val);
@@ -1396,6 +1407,12 @@ void aurora_dev_server(int64_t port, const char* src_dir) {
     }
     aurora_fs_watch_free(watch);
     aurora_server_stop(srv);
+    aurora_server_clear_middleware(srv);
+    for (int i = 0; i < srv->static_count; i++) {
+        free(srv->static_routes[i].prefix);
+        free(srv->static_routes[i].directory);
+    }
+    free(srv->static_routes);
     free(srv);
     printf("[dev] dev server stopped\n");
 }
@@ -1702,9 +1719,13 @@ void aurora_db_close(AuroraDB* db) {
     free(db);
 }
 
+/* ── Cache mutex for thread safety ── */
+static std::mutex g_cache_mutex;
+
 /* ── Cache (in-memory with optional TTL) ── */
 AuroraCache* aurora_cache_init() {
     AuroraCache* c = (AuroraCache*)calloc(1, sizeof(AuroraCache));
+    if (!c) return nullptr;
     c->cap = 16;
     c->count = 0;
     c->keys = (char**)calloc((size_t)c->cap, sizeof(char*));
@@ -1738,6 +1759,7 @@ void aurora_cache_set(AuroraCache* cache, const char* key, const char* val) {
 
 void aurora_cache_set_with_ttl(AuroraCache* cache, const char* key, const char* val, int64_t ttl_ms) {
     if (!cache || !key || !val) return;
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
     int idx = cache_find(cache, key);
     if (idx >= 0) {
         free(cache->values[idx]);
@@ -1746,10 +1768,17 @@ void aurora_cache_set_with_ttl(AuroraCache* cache, const char* key, const char* 
         return;
     }
     if (cache->count >= cache->cap) {
-        cache->cap *= 2;
-        cache->keys = (char**)aurora_safe_realloc(cache->keys, (size_t)cache->cap * sizeof(char*));
-        cache->values = (char**)aurora_safe_realloc(cache->values, (size_t)cache->cap * sizeof(char*));
-        cache->expires_at = (int64_t*)aurora_safe_realloc(cache->expires_at, (size_t)cache->cap * sizeof(int64_t));
+        int new_cap = cache->cap * 2;
+        char** new_keys = (char**)aurora_safe_realloc(cache->keys, (size_t)new_cap * sizeof(char*));
+        if (!new_keys) return;
+        char** new_vals = (char**)aurora_safe_realloc(cache->values, (size_t)new_cap * sizeof(char*));
+        if (!new_vals) { free(new_keys); return; }
+        int64_t* new_exp = (int64_t*)aurora_safe_realloc(cache->expires_at, (size_t)new_cap * sizeof(int64_t));
+        if (!new_exp) { free(new_keys); free(new_vals); return; }
+        cache->keys = new_keys;
+        cache->values = new_vals;
+        cache->expires_at = new_exp;
+        cache->cap = new_cap;
     }
     cache->keys[cache->count] = strdup(key);
     cache->values[cache->count] = strdup(val);
@@ -1759,6 +1788,7 @@ void aurora_cache_set_with_ttl(AuroraCache* cache, const char* key, const char* 
 
 char* aurora_cache_get(AuroraCache* cache, const char* key) {
     if (!cache || !key) return nullptr;
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
     int idx = cache_find(cache, key);
     if (idx < 0) return nullptr;
     /* Check expiry */
@@ -1783,6 +1813,7 @@ int aurora_cache_has(AuroraCache* cache, const char* key) {
 
 void aurora_cache_delete(AuroraCache* cache, const char* key) {
     if (!cache || !key) return;
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
     int idx = cache_find(cache, key);
     if (idx < 0) return;
     free(cache->keys[idx]);
@@ -1797,6 +1828,7 @@ void aurora_cache_delete(AuroraCache* cache, const char* key) {
 
 void aurora_cache_clear(AuroraCache* cache) {
     if (!cache) return;
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
     for (int i = 0; i < cache->count; i++) {
         free(cache->keys[i]);
         free(cache->values[i]);
@@ -1806,6 +1838,7 @@ void aurora_cache_clear(AuroraCache* cache) {
 
 void aurora_cache_clean_expired(AuroraCache* cache) {
     if (!cache) return;
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
     int64_t now = now_ms();
     for (int i = cache->count - 1; i >= 0; i--) {
         if (cache->expires_at[i] > 0 && now > cache->expires_at[i]) {

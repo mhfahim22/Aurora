@@ -26,21 +26,25 @@ std::vector<LspCodeAction> LspServer::get_code_actions(DocumentState& doc, const
         action.kind = "quickfix";
         action.diagnosticMessage = diagMsg;
 
-        /* Find last non-empty line */
+        /* Find last non-empty line and detect indentation */
         std::istringstream stream(doc.text);
         std::string line;
         int last_line = 0;
         int total_lines = 0;
+        std::string file_indent = "    ";
         while (std::getline(stream, line)) {
-            if (!line.empty() && line.find_first_not_of(" \t\r") != std::string::npos)
+            if (!line.empty() && line.find_first_not_of(" \t\r") != std::string::npos) {
                 last_line = total_lines;
+                size_t indent_end = line.find_first_not_of(" \t");
+                if (indent_end > 0) file_indent = line.substr(0, indent_end);
+            }
             total_lines++;
         }
 
         LspTextEdit edit;
-        edit.range.start = {total_lines, 0};
-        edit.range.end = {total_lines, 0};
-        edit.newText = "\nend function";
+        edit.range.start = {(int)doc.lines.size(), 0};
+        edit.range.end = {(int)doc.lines.size(), 0};
+        edit.newText = "\n" + file_indent + "end function";
         action.edits.push_back(edit);
         actions.push_back(action);
     }
@@ -51,15 +55,41 @@ std::vector<LspCodeAction> LspServer::get_code_actions(DocumentState& doc, const
         action.title = "Remove unused variable declaration";
         action.kind = "quickfix";
         action.diagnosticMessage = diagMsg;
+
+        /* Parse variable name from message: "Unused variable 'foo'" */
+        std::string vname;
+        size_t q1 = diagMsg.find('\'');
+        size_t q2 = (q1 != std::string::npos) ? diagMsg.find('\'', q1 + 1) : std::string::npos;
+        if (q1 != std::string::npos && q2 != std::string::npos)
+            vname = diagMsg.substr(q1 + 1, q2 - q1 - 1);
+
+        /* Search AST for the variable declaration to get its line */
+        if (!vname.empty() && doc.ast) {
+            int decl_line = -1;
+            walk_ast(doc.ast.get(), [&](ASTNode* n) {
+                if (n->type == NodeType::Var && n->value == vname && decl_line < 0) {
+                    decl_line = n->src_line - 1;
+                }
+            });
+            if (decl_line >= 0) {
+                LspTextEdit edit;
+                edit.range.start = {decl_line, 0};
+                edit.range.end = {decl_line + 1, 0};
+                edit.newText = "";
+                action.edits.push_back(edit);
+            }
+        }
         actions.push_back(action);
     }
 
-    /* ── Generic quick fix: add comment ── */
-    LspCodeAction suppress;
-    suppress.title = "Suppress warning with comment";
-    suppress.kind = "quickfix";
-    suppress.diagnosticMessage = diagMsg;
-    actions.push_back(suppress);
+    /* ── Generic quick fix: add comment (only when diagnostic present) ── */
+    if (!diagMsg.empty()) {
+        LspCodeAction suppress;
+        suppress.title = "Suppress warning with comment";
+        suppress.kind = "quickfix";
+        suppress.diagnosticMessage = diagMsg;
+        actions.push_back(suppress);
+    }
 
     return actions;
 }

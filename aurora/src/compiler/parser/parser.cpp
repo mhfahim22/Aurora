@@ -28,8 +28,7 @@ void Parser::require_token_end(const std::vector<Token>& toks, int idx, const ch
     } else if (t.value == ";") {
         hint = "Aurora doesn't use semicolons. Remove it.";
     } else if (t.value == "{" || t.value == "}") {
-        /* braces are now allowed for block delimiters */
-        return;
+        hint = "braces are not allowed here. Check your brace placement.";
     }
 
     if (!hint.empty()) {

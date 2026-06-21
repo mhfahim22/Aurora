@@ -122,6 +122,8 @@ private:
     std::unordered_map<std::string, OwnershipInfo> ownership_info_;
 
     /* ── Unscoped fallback map (backward compat for single-function programs) ── */
+    /* TODO: remove ownership_info_unscoped_ fallback once all callers are
+       updated to use scoped keys (func::name). */
     std::unordered_map<std::string, OwnershipInfo> ownership_info_unscoped_;
 
     /* ── Borrow tracking ── */

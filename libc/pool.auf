@@ -14,6 +14,15 @@
 ##   output(rows)
 ##   db_pool_destroy(pool)
 
+extern function aurora_db_pool_create(conn_str: cstring, min_size: i32, max_size: i32) -> pointer
+extern function aurora_db_pool_destroy(pool: pointer)
+extern function aurora_db_pool_query(pool: pointer, sql: cstring) -> cstring
+extern function aurora_db_pool_query_free(res: cstring)
+extern function aurora_db_pool_acquire(pool: pointer, timeout_ms: i32) -> pointer
+extern function aurora_db_pool_release(pool: pointer, conn: pointer)
+extern function aurora_db_pool_active_count(pool: pointer) -> i32
+extern function aurora_db_pool_idle_count(pool: pointer) -> i32
+
 ## ── Pool lifecycle ──
 
 ## Create a connection pool.

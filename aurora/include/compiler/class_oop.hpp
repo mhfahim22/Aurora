@@ -283,6 +283,8 @@ private:
 };
 
 /* ── Global singleton — সব stage এ একই registry use করবে ── */
+/* TODO: add thread-safety (mutex) for global_class_registry if used from multiple threads.
+   Currently safe for single-threaded single-pass compilation only. */
 inline ClassRegistry& global_class_registry() {
     static ClassRegistry reg;
     return reg;
@@ -290,6 +292,7 @@ inline ClassRegistry& global_class_registry() {
 
 /* Global set of Aurora functions that return strings.
    Populated during typechecking, checked during codegen. */
+/* TODO: add thread-safety for global_string_fns if used from multiple threads. */
 inline std::unordered_set<std::string>& global_string_fns() {
     static std::unordered_set<std::string> fns;
     return fns;

@@ -9,7 +9,7 @@
 #define MyAppExeName "aurorac.exe"
 
 [Setup]
-AppId={{A8B4C5D6-E7F8-9012-3456-7890ABCDEF12}
+AppId={{B8C5D6E7-F8A9-0123-4567-89ABCDEF0123}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -53,6 +53,7 @@ Source: "..\build\Release\aurora_bindgen.exe"; DestDir: "{app}"; Flags: ignoreve
 Source: "..\build\Release\aurora_cppwrap.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; ── Runtime DLLs (required for library imports) ──
+; NOTE: glfw3.dll is an external dependency — it must be present in build\Release\ before compiling this installer
 Source: "..\build\Release\glfw3.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\Release\cpp_interop_test.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\Release\mysql_native.dll"; DestDir: "{app}"; Flags: ignoreversion

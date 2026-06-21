@@ -19,7 +19,7 @@ function mock_call(ctx, actual_args)
     map_set(ctx, "call_index", idx + 1)
     exp_list = map_get(ctx, "expectations")
     if idx >= list_len(exp_list)
-        panic "mock_call: unexpected call (no more expectations)"
+        panic("mock_call: unexpected call (no more expectations)")
     end
     exp = list_get(exp_list, idx)
     return list_get(exp, 1)
@@ -33,7 +33,7 @@ function mock_verify(ctx)
         leftover = total - idx
         msg = strcat("mock_verify: ", str(leftover))
         msg = strcat(msg, " unfulfilled expectations")
-        panic msg
+        panic(msg)
     end
 end
 

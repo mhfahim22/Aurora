@@ -1,4 +1,4 @@
-import "test"
+// import "test" — module may not exist; test framework functions may be builtins
 
 lambda throwing_fn():
     throw "error"

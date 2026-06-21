@@ -26,7 +26,7 @@ jobs:
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
       with:
-        vs-version: '[18,19)'
+        vs-version: '[17,18)'
 
     - name: Configure CMake
       run: |
@@ -39,7 +39,7 @@ jobs:
         cmake --build build --config Release --target aurora_bindgen -j2 2>$null; if (-not $?) { Write-Host "  ⚠️ aurora_bindgen skipped (libclang not found)" }
         cmake --build build --config Release --target aurora_cppwrap -j2 2>$null; if (-not $?) { Write-Host "  ⚠️ aurora_cppwrap skipped (libclang not found)" }
         # npm bridge DLLs (require cl.exe via MSVC):
-        cmake --build build --config Release --target bridge_moment --target bridge_lodash --target bridge_chalk --target bridge_execa --target bridge_got --target bridge_leftpad --target bridge_mobx --target bridge_uuid -j2 2>$null
+        cmake --build build --config Release --target bridge_moment --target bridge_lodash --target bridge_chalk --target bridge_execa --target bridge_got --target bridge_leftpad --target bridge_mobx --target bridge_uuid -j2 2>$null; if (-not $?) { Write-Warning "Bridge build failed" }
 
     - name: Build All Test Targets
       run: |
@@ -108,7 +108,7 @@ jobs:
     - name: ASAN Build (AddressSanitizer)
       run: |
         cmake -B build_asan -DCMAKE_BUILD_TYPE=Debug `
-          -DCMAKE_CXX_FLAGS_DEBUG="/fsanitize=address /MDd /Od /Zi /D_ITERATOR_DEBUG_LEVEL=0" `
+          -DCMAKE_CXX_FLAGS_DEBUG="/fsanitize=address /Od /Zi /D_ITERATOR_DEBUG_LEVEL=0" `
           -DCMAKE_EXE_LINKER_FLAGS_DEBUG="/DEBUG" `
           -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
         cmake --build build_asan --config Debug `
@@ -117,8 +117,9 @@ jobs:
 
     - name: Run ASAN Memory Tests
       run: |
-        # Find ASAN runtime DLL
-        $asanDll = Get-ChildItem -Recurse "C:\Program Files\Microsoft Visual Studio" -Filter "clang_rt.asan_dbg_dynamic-x86_64.dll" | Select-Object -First 1 -ExpandProperty DirectoryName
+        # Find ASAN runtime DLL via vswhere
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        $asanDll = Get-ChildItem -Path "$vsPath\VC\Tools\MSVC" -Recurse -Filter "clang_rt.asan_dbg_dynamic-x86_64.dll" | Select-Object -First 1 -ExpandProperty DirectoryName
         if ($asanDll) { $env:Path = "$asanDll;$env:Path" }
         build_asan\Debug\test_ffi_memory_safety.exe
 

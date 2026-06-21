@@ -2,6 +2,19 @@
 #include <stdexcept>
 #include <sstream>
 
+/* ── Helper: consistent error for missing closing delimiter ── */
+[[noreturn]] static void throw_missing_close(int line, int col, char expected, const char* context) {
+    const char* hints[] = {
+        "every opening '(' needs a matching ')'",
+        "every opening '[' needs a matching ']'",
+        "every opening '{' needs a matching '}'",
+    };
+    const char* hint = (expected == ')') ? hints[0] :
+                        (expected == ']') ? hints[1] : hints[2];
+    std::string msg = "missing '" + std::string(1, expected) + "' to close " + context;
+    throw std::runtime_error(format_error_with_hint(line, col, msg, hint));
+}
+
 /* ════════════════════════════════════════════════════════════
    Helper: parse trailing chains (.field, .method(), [idx], ())
    ════════════════════════════════════════════════════════════
@@ -26,17 +39,25 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
             /* method call: obj.method(args) */
             if (idx < cnt && toks[idx].is_operator('(')) {
                 idx++;
-                /* Rebuild call: value = "Base.field", left = base, args = ... */
-                /* Extract base name for the call value */
+                /* Build qualified name from base chain: collect all segments */
                 std::string call_name;
-                if (base->type == NodeType::Var)
-                    call_name = base->value + "." + field;
-                else if (base->type == NodeType::Call)
-                    call_name = base->value + "." + field;
-                else if (base->type == NodeType::Attribute)
-                    call_name = base->value + "." + field;
-                else
-                    call_name = field;
+                {
+                    /* Walk the base chain to reconstruct a dotted qualified name */
+                    std::vector<std::string> segs;
+                    const ASTNode* cur = base.get();
+                    while (cur) {
+                        if (cur->type == NodeType::Var || cur->type == NodeType::Call ||
+                            cur->type == NodeType::Attribute) {
+                            segs.push_back(cur->value);
+                        }
+                        cur = cur->left.get();
+                    }
+                    /* Reverse: innermost first */
+                    for (auto it = segs.rbegin(); it != segs.rend(); ++it)
+                        call_name += (it == segs.rbegin() ? "" : ".") + *it;
+                    if (!call_name.empty()) call_name += ".";
+                    call_name += field;
+                }
 
                 auto call  = make_node(NodeType::Call, call_name, src_ln);
                 call->left = std::move(base);
@@ -49,13 +70,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
                     else             { tail->next = std::move(arg); tail = raw; }
                 }
                 if (idx < cnt) idx++;
-                else {
-                    throw std::runtime_error(format_error_with_hint(
-                        src_ln, 0,
-                        "missing ')' to close method call",
-                        "every opening '(' needs a matching ')'. "
-                        "Check the method call and add the missing ')'."));
-                }
+                else throw_missing_close(src_ln, 0, ')', "method call");
                 base = std::move(call);
                 continue;
             }
@@ -73,13 +88,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
             int src_ln = toks[idx-1].line;
             auto index_expr = parse_expr(toks, idx);
             if (idx < cnt && toks[idx].is_operator(']')) idx++;
-            else {
-                throw std::runtime_error(format_error_with_hint(
-                    src_ln, 0,
-                    "missing ']' to close index expression",
-                    "every opening '[' needs a matching ']'. "
-                    "Check the brackets and add the missing ']'."));
-            }
+            else throw_missing_close(src_ln, 0, ']', "index expression");
             /* Create Index node with base as right child */
             auto idx_node = make_node(NodeType::Index, "", src_ln);
             idx_node->left = std::move(index_expr);
@@ -123,24 +132,12 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             }
 
             if (idx < cnt && toks[idx].is_operator(')')) idx++;
-            else {
-                throw std::runtime_error(format_error_with_hint(
-                    t.line, t.col,
-                    "missing ')' to close tuple literal",
-                    "every opening '(' needs a matching ')'. "
-                    "Add ')' at the end to close the tuple."));
-            }
+            else throw_missing_close(t.line, t.col, ')', "tuple literal");
             return tup;
         }
 
         if (idx < cnt && toks[idx].is_operator(')')) idx++;
-        else {
-            throw std::runtime_error(format_error_with_hint(
-                t.line, t.col,
-                "missing ')' to close grouped expression",
-                "every opening '(' needs a matching ')'. "
-                "Count your parentheses — you may have forgotten one."));
-        }
+        else throw_missing_close(t.line, t.col, ')', "grouped expression");
         return inner;
     }
 
@@ -157,13 +154,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             else            { tail->next = std::move(elem); tail = raw; }
         }
         if (idx < cnt) idx++;
-        else {
-            throw std::runtime_error(format_error_with_hint(
-                t.line, t.col,
-                "missing ']' to close array literal",
-                "every opening '[' needs a matching ']'. "
-                "Add ']' at the end to close the array."));
-        }
+        else throw_missing_close(t.line, t.col, ']', "array literal");
         return arr;
     }
 
@@ -216,8 +207,13 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     }
 
     /* ── Phase 2: memory keywords usable inside expressions ── */
+    /* Helper: check if the next token is '(' (function-call-like) */
+    auto next_is_open_paren = [&]() -> bool {
+        return idx + 1 < cnt && toks[idx + 1].is_operator('(');
+    };
+
     if (t.is_keyword("move")) {
-        if (idx + 1 < cnt && toks[idx + 1].is_operator('('))
+        if (next_is_open_paren())
             ; /* treat as function call, fall through to phase 3 */
         else {
             int src_ln = t.line; idx++;
@@ -249,7 +245,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
         return make_node(NodeType::Borrow, var, src_ln);
     }
     if (t.is_keyword("copy")) {
-        if (idx + 1 < cnt && toks[idx + 1].is_operator('('))
+        if (next_is_open_paren())
             ; /* treat as function call, fall through to phase 3 */
         else {
             int src_ln = t.line; idx++;

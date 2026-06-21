@@ -260,6 +260,8 @@ private:
     llvm::Function* tensor_reshape_ { nullptr };
     llvm::Function* neural_forward_ { nullptr };
     llvm::Function* predict_        { nullptr };
+    llvm::Function* tensor_set_requires_grad_ { nullptr };
+    llvm::Function* tensor_backward_          { nullptr };
 
     /* ── Game Engine runtime functions ── */
     llvm::Function* scene_init_            { nullptr };

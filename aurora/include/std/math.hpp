@@ -1,26 +1,27 @@
 #pragma once
 #include <cstdint>
+#include "common/platform.hpp"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-double aurora_math_sin(double x);
-double aurora_math_cos(double x);
-double aurora_math_tan(double x);
-double aurora_math_sqrt(double x);
-double aurora_math_abs(double x);
-double aurora_math_floor(double x);
-double aurora_math_ceil(double x);
-double aurora_math_round(double x);
-double aurora_math_pow(double x, double y);
-double aurora_math_log(double x);
-double aurora_math_log10(double x);
-double aurora_math_exp(double x);
-double aurora_math_random();
-int64_t aurora_math_random_int(int64_t min, int64_t max);
-double aurora_math_pi();
-double aurora_math_e();
+AURORA_EXPORT double aurora_math_sin(double x);
+AURORA_EXPORT double aurora_math_cos(double x);
+AURORA_EXPORT double aurora_math_tan(double x);
+AURORA_EXPORT double aurora_math_sqrt(double x);
+AURORA_EXPORT double aurora_math_abs(double x);
+AURORA_EXPORT double aurora_math_floor(double x);
+AURORA_EXPORT double aurora_math_ceil(double x);
+AURORA_EXPORT double aurora_math_round(double x);
+AURORA_EXPORT double aurora_math_pow(double x, double y);
+AURORA_EXPORT double aurora_math_log(double x);
+AURORA_EXPORT double aurora_math_log10(double x);
+AURORA_EXPORT double aurora_math_exp(double x);
+AURORA_EXPORT double aurora_math_random();
+AURORA_EXPORT int64_t aurora_math_random_int(int64_t min, int64_t max);
+AURORA_EXPORT double aurora_math_pi();
+AURORA_EXPORT double aurora_math_e();
 
 #ifdef __cplusplus
 }

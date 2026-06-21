@@ -502,6 +502,8 @@ void gen_npm_cpp_wrapper(const std::string& pkg, const std::string& dir,
         cw << "    return 1;\n";
         cw << "}\n\n";
 
+        /* ── Forward declarations ── */
+        cw << "static void flush_deferred_free(void);\n\n";
         /* ── Cleanup bridge process ── */
         cw << "static void cleanup_bridge(void) {\n";
         cw << "    if (!g_rpc_ok) return;\n";

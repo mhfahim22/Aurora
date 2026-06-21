@@ -92,7 +92,6 @@ void gen_go_c_wrapper(const std::string& pkg, const std::string& dir)
     cw << "    fn_void_cstr_t f = (fn_void_cstr_t)get_fn(fn);\n";
     cw << "    if (!f) return NULL;\n    return f();\n}\n\n";
     cw << "EXPORT int " << safe << "_call_i32_ret_i32(const char* fn, int a) {\n";
-    cw << "    typedef int (*fn_i32_i32_t)(int);\n";
     cw << "    fn_i32_i32_t f = (fn_i32_i32_t)get_fn(fn);\n";
     cw << "    if (!f) return 0;\n    return f(a);\n}\n\n";
     cw << "EXPORT int " << safe << "_free_str(char* s) {\n";

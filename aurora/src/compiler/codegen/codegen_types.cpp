@@ -234,7 +234,7 @@ llvm::Value* codegen_struct_gep(
                     else if (f.type_name == "f32")
                         field_ty = llvm::Type::getFloatTy(ctx);
                     else if (f.type_name == "bool" || f.type_name == "Bool")
-                        field_ty = llvm::Type::getInt64Ty(ctx);
+                        field_ty = llvm::Type::getInt8Ty(ctx);
                     else
                         field_ty = llvm::PointerType::get(ctx, 0);
                     break;

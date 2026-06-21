@@ -147,7 +147,7 @@ static pthread_mutex_t arena_blocks_lock = PTHREAD_MUTEX_INITIALIZER;
 #define UNLOCK_ARENA_BLOCKS() pthread_mutex_unlock(&arena_blocks_lock)
 #endif
 
-static std::vector<ArenaBlockRange>* arena_blocks_global = nullptr;
+static std::vector<ArenaBlockRange>* arena_blocks_global = nullptr; /* intentionally not deleted — exists until process exit */
 
 static void track_arena_block(void* start, size_t size) {
     LOCK_ARENA_BLOCKS();
@@ -561,6 +561,7 @@ void* aurora_alloc(size_t size) {
 
 void aurora_free(void* ptr) {
     aurora_leak_untrack(ptr);
+    update_stats_free();
     free(ptr);
 }
 
@@ -630,8 +631,8 @@ static void gc_scan_and_mark_range(void* start, void* end, std::vector<GCRecord>
     }
 }
 
-static std::vector<GCRecord>*  gc_objects = nullptr;
-static std::vector<void*>*     gc_unknown_roots = nullptr;
+static std::vector<GCRecord>*  gc_objects = nullptr; /* intentionally not deleted — exists until process exit */
+static std::vector<void*>*     gc_unknown_roots = nullptr; /* intentionally not deleted — exists until process exit */
 static std::atomic<size_t>     gc_live_objects{0};
 static std::atomic<size_t>     gc_collected{0};
 static std::atomic<size_t>     gc_alloc_since_last{0};
@@ -908,7 +909,7 @@ static pthread_mutex_t arena_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 #define LOCK_ARENA_GC() pthread_mutex_lock(&arena_gc_lock)
 #define UNLOCK_ARENA_GC() pthread_mutex_unlock(&arena_gc_lock)
 #endif
-static std::vector<void*>* arena_gc_roots = nullptr;
+static std::vector<void*>* arena_gc_roots = nullptr; /* intentionally not deleted — exists until process exit */
 
 extern "C" {
 

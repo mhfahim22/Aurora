@@ -104,6 +104,10 @@ std::vector<std::string> get_dll_exports(const std::string& dll_path) {
         return rva; /* fallback */
     };
 
+    /* Validate section_offset before using sections pointer */
+    if (section_offset > fsize - sizeof(IMAGE_SECTION_HEADER) * num_sections) {
+        UnmapViewOfFile(base); CloseHandle(hMap); CloseHandle(hFile); return exports;
+    }
     /* Get export directory (convert RVA to file offset) */
     DWORD export_rva = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
     if (export_rva == 0) { UnmapViewOfFile(base); CloseHandle(hMap); CloseHandle(hFile); return exports; }

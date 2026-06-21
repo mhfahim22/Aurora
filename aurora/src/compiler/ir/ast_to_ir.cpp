@@ -179,7 +179,7 @@ void AstToIr::walk(const ASTNode* node) {
 
     case NodeType::Match: {
         walk(node->left.get());
-        const ASTNode* cp = node->args.get();
+        const ASTNode* cp = node->body.get();
         while (cp) {
             walk_block(cp->body.get());
             cp = cp->next.get();
@@ -319,15 +319,18 @@ void AstToIr::gen_output(const ASTNode* node) {
 
     /* Declare aurora_print_int */
     bool found = false;
-    for (auto& fn : mod_.functions) {
+    for (auto& fn : mod_.functions)
         if (fn.name == "aurora_print_int") { found = true; break; }
+    if (!found) {
+        for (auto& d : mod_.declarations)
+            if (d.name == "aurora_print_int") { found = true; break; }
     }
     if (!found) {
         IrFunction print_fn;
         print_fn.name = "aurora_print_int";
         print_fn.ret_type_idx = void_type();
         print_fn.params.push_back({"n", i64_type()});
-        mod_.functions.push_back(std::move(print_fn));
+        mod_.declarations.push_back(std::move(print_fn));
     }
 
     emit_inst(IrCall{"aurora_print_int", {val}, "", void_type()});
@@ -560,7 +563,7 @@ IrValue AstToIr::gen_num(const ASTNode* node) {
     v.name = std::to_string(std::stoll(node->value));
     v.type_idx = i64_type();
     v.is_const = true;
-    v.i64 = std::stoll(node->value);
+    v.set_i64(std::stoll(node->value));
     return v;
 }
 
@@ -569,7 +572,7 @@ IrValue AstToIr::gen_float(const ASTNode* node) {
     v.name = std::to_string(std::stod(node->value));
     v.type_idx = f64_type();
     v.is_const = true;
-    v.f64 = std::stod(node->value);
+    v.set_f64(std::stod(node->value));
     return v;
 }
 
@@ -690,16 +693,21 @@ IrValue AstToIr::gen_call(const ASTNode* node) {
         arg = arg->next.get();
     }
 
-    /* Ensure the callee function exists in the module */
+    /* Ensure the callee function exists in the module (as declaration, not definition) */
     int32_t ret_ty = is_void ? void_type() : i64_type();
     auto* fn = mod_.get_function(target);
     if (!fn) {
-        IrFunction decl;
-        decl.name = target;
-        decl.ret_type_idx = ret_ty;
-        for (size_t i = 0; i < args.size(); i++)
-            decl.params.push_back({"p" + std::to_string(i), i64_type()});
-        mod_.functions.push_back(std::move(decl));
+        bool already_declared = false;
+        for (const auto& d : mod_.declarations)
+            if (d.name == target) { already_declared = true; break; }
+        if (!already_declared) {
+            IrFunction decl;
+            decl.name = target;
+            decl.ret_type_idx = ret_ty;
+            for (size_t i = 0; i < args.size(); i++)
+                decl.params.push_back({"p" + std::to_string(i), i64_type()});
+            mod_.declarations.push_back(std::move(decl));
+        }
     }
 
     if (is_void) {

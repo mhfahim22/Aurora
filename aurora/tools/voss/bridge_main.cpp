@@ -3,18 +3,19 @@
 #include <set>
 #include <array>
 
-/* ── Capture stdout of a shell command (≤64KB) ── */
+/* ── Capture stdout of a shell command (dynamic reallocation) ── */
 static std::string exec_capture(const std::string& cmd) {
-    std::array<char, 4096> buf;
     std::string result;
+    char buffer[4096];
 #ifdef _WIN32
     FILE* pipe = _popen(cmd.c_str(), "r");
 #else
     FILE* pipe = popen(cmd.c_str(), "r");
 #endif
     if (!pipe) return result;
-    while (fgets(buf.data(), (int)buf.size(), pipe))
-        result += buf.data();
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        result += buffer;
+    }
 #ifdef _WIN32
     _pclose(pipe);
 #else

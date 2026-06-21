@@ -11,9 +11,10 @@ extern "C" {
 #define JSON_STR     2
 #define JSON_ARRAY   3
 #define JSON_OBJECT  4
+#define JSON_BOOL    5
 
 typedef struct JsonValue {
-    int type; /* 0=null, 1=num, 2=str, 3=array, 4=object */
+    int type; /* 0=null, 1=num, 2=str, 3=array, 4=object, 5=bool */
     double num_val;
     char* str_val;
     struct JsonValue** items;

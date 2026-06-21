@@ -34,6 +34,7 @@ double aurora_predict_knn(AuroraTensor* X_train, AuroraTensor* y_train,
     /* Compute distances */
     typedef struct { double dist; double label; } Neighbor;
     Neighbor* neighbors = (Neighbor*)malloc((size_t)N * sizeof(Neighbor));
+    if (!neighbors) return 0.0;
     for (int64_t i = 0; i < N; i++) {
         double dist = 0.0;
         for (int64_t j = 0; j < D && j < input->total_size; j++) {

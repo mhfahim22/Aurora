@@ -32,6 +32,8 @@ extern "C" {
 struct aurora_mutex {
     CRITICAL_SECTION cs;
     aurora_mutex()  { InitializeCriticalSection(&cs); }
+    /* Destructor runs during static destruction — ensure no other thread
+       tries to lock g_callback_mutex after this point */
     ~aurora_mutex() { DeleteCriticalSection(&cs); }
     void lock()     { EnterCriticalSection(&cs); }
     void unlock()   { LeaveCriticalSection(&cs); }
@@ -50,6 +52,9 @@ static std::vector<void*>& get_dl_handles() {
     static std::vector<void*> handles;
     return handles;
 }
+/* WARNING: g_dl_handle_mtx (std::mutex) has non-trivial destructor.
+   Ensure it outlives all dl operations during static destruction.
+   g_dl_cleanup (line 830) runs first, before mutex destruction. */
 static std::mutex g_dl_handle_mtx;
 
 /* ── Open a shared library ── */
@@ -165,6 +170,10 @@ void aurora_dl_close(void* lib) {
 #endif
 }
 
+/* NOTE: g_dl_cleanup (line 830) runs ~DlCleanup during static destruction.
+   It calls aurora_dl_cleanup_all which locks g_dl_handle_mtx. Ensure
+   g_dl_handle_mtx is still alive at that point. */
+
 /* ── Last error message ── */
 /* Thread-safe: uses thread-local storage for the error buffer. */
 const char* aurora_dl_error(void) {
@@ -215,7 +224,9 @@ void* aurora_dl_try_open(const char* name) {
 /* Searches bridge dirs, packages/, and cwd for the bridge DLL. */
 
 /* Validate that a loaded bridge DLL has the expected entry points.
-   Prints clear diagnostics on failure. Returns true if valid. */
+   Prints clear diagnostics on failure. Returns true if valid.
+   NOTE: The library handle is owned by the caller (aurora_ecosystem_resolve).
+   Handle tracking uses g_dl_handle_mtx/g_dl_cleanup for shutdown. */
 static bool aurora_validate_bridge(void* lib, const char* ecs, const char* pkg,
                                      const char* func_name) {
     if (!lib) {
@@ -518,6 +529,14 @@ struct CallbackSlot {
 #include <vector>
 static std::vector<CallbackSlot> callback_slots;
 
+/* Cleanup callback executable memory on shutdown */
+namespace {
+    struct CallbackCleanup {
+        ~CallbackCleanup() { aurora_callback_cleanup(); }
+    };
+    static CallbackCleanup g_callback_cleanup;
+}
+
 /* ── Allocates executable memory (platform-agnostic) ── */
 static void* alloc_exec_memory(size_t size) {
 #ifdef _WIN32
@@ -707,14 +726,22 @@ static void py_lock_init(void) {
 static std::atomic<void*> s_python_dll{NULL};
 static std::atomic<int> s_python_inited{0};
 /* Use recursive mutex to prevent deadlock if Py_Initialize() re-enters */
-static pthread_mutex_t s_py_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+#if defined(__linux__)
+    static pthread_mutex_t s_py_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+#else
+    static pthread_mutex_t s_py_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 static std::once_flag s_py_lock_init_flag;
 static void py_lock_init(void) {}
 #endif
 
 /* Initialize Python once per process. Returns 1 on success, 0 on failure.
    Thread-safe: subsequent calls return cached status. */
+#if defined(_MSC_VER)
 extern "C" __declspec(dllexport) int aurora_py_ensure_initialized(void) {
+#else
+extern "C" int aurora_py_ensure_initialized(void) {
+#endif
     py_lock_init();
 #ifdef _WIN32
     EnterCriticalSection(&s_py_lock);
@@ -814,7 +841,11 @@ extern "C" __declspec(dllexport) int aurora_py_ensure_initialized(void) {
 }
 
 /* Get Python C API function pointer. Thread-safe. Returns NULL on failure. */
+#if defined(_MSC_VER)
 extern "C" __declspec(dllexport) void* aurora_py_get_api(const char* name) {
+#else
+extern "C" void* aurora_py_get_api(const char* name) {
+#endif
     if (!s_python_dll) {
         if (!aurora_py_ensure_initialized()) return NULL;
     }

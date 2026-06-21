@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0.."
 setlocal
 
 :: Auto-detect build config (prefer Release, fallback Debug)

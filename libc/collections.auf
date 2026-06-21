@@ -26,7 +26,9 @@
 # ════════════════════════════════════════════════════════════
 
 function list_last(lst)
+    if list_len(lst) == 0 return null end
     return list_get(lst, list_len(lst) - 1)
+end
 
 function list_first(lst)
     return list_get(lst, 0)

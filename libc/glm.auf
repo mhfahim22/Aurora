@@ -4,6 +4,17 @@
 ## All functions operate on opaque matrix handles created via mat4_new().
 ## Matrices must be freed with mat4_free() when no longer needed.
 
+extern function aurora_mat4_new() -> pointer
+extern function aurora_mat4_free(m: pointer)
+extern function aurora_mat4_identity(m: pointer)
+extern function aurora_mat4_copy(dst: pointer, src: pointer)
+extern function aurora_mat4_mul(out: pointer, a: pointer, b: pointer)
+extern function aurora_mat4_translate(m: pointer, x: f64, y: f64, z: f64)
+extern function aurora_mat4_rotate(m: pointer, angle_deg: f64, x: f64, y: f64, z: f64)
+extern function aurora_mat4_scale(m: pointer, x: f64, y: f64, z: f64)
+extern function aurora_mat4_perspective(m: pointer, fov_deg: f64, aspect: f64, near: f64, far: f64)
+extern function aurora_mat4_lookat(m: pointer, eye_x: f64, eye_y: f64, eye_z: f64, target_x: f64, target_y: f64, target_z: f64, up_x: f64, up_y: f64, up_z: f64)
+
 ## ── Lifecycle ──
 
 ## Create a new 4x4 identity matrix. Returns opaque handle.

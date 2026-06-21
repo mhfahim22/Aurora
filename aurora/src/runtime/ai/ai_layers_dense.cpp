@@ -256,7 +256,6 @@ AuroraTensor* dense_backward(Layer* l, AuroraTensor* dout, AuroraTensor* input) 
 
         AuroraTensor* xA = aurora_tensor_matmul(input_f64_2, l->lora_A);
 
-        int64_t dB_shape[2] = { l->lora_r, l->w->shape[1] };
         memset(l->lora_B_grad->data, 0, (size_t)l->lora_B_grad->total_size * sizeof(double));
         for (int64_t ri = 0; ri < l->lora_r; ri++) {
             for (int64_t j = 0; j < l->w->shape[1]; j++) {

@@ -26,7 +26,9 @@ function db_connect(url)
         return mysql_connect(url)
     else
         output("db_connect: unsupported URL: " + url)
-        return map()
+        info = map()
+        map_set(info, "error", "unsupported URL: " + url)
+        return info
     end
 end
 
@@ -66,9 +68,11 @@ function pg_connect(url)
     info = map()
     conn = PQconnectdb(url)
     if conn == null
+        map_set(info, "error", "PQconnectdb failed")
         return info
     end
     if PQstatus(conn) != CONNECTION_OK
+        map_set(info, "error", "connection failed")
         PQfinish(conn)
         return info
     end
@@ -139,6 +143,7 @@ function mysql_connect(url)
     rest = url
     p = index(rest, "://")
     if p < 0
+        map_set(info, "error", "invalid MySQL URL format")
         return info
     end
     rest = substr(rest, p + 3, len(rest))
@@ -174,10 +179,12 @@ function mysql_connect(url)
     end
     mysql = mysql_init(null)
     if mysql == null
+        map_set(info, "error", "mysql_init failed")
         return info
     end
     conn = mysql_real_connect(mysql, host, user, pass, dbname, port, null, 0)
     if conn == null
+        map_set(info, "error", "mysql_real_connect failed")
         mysql_close(mysql)
         return info
     end

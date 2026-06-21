@@ -6,6 +6,7 @@
 /* ── helpers ── */
 bool version_in_range(const std::string& ver, const std::string& range) {
     if (range.empty()) return true;
+    if (range.size() < 2) return false;
     if (range[0] == '>') return semver_cmp(ver, range.substr(1)) > 0;
     if (range[0] == '<') return semver_cmp(ver, range.substr(1)) < 0;
     if (range.find("||") != std::string::npos) {

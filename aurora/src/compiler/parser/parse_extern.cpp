@@ -2,6 +2,48 @@
 #include <stdexcept>
 #include <sstream>
 
+/* ── Helper: parse struct/union fields from a token list ── */
+static void parse_extern_fields(const std::vector<Token>& ftoks, ASTNode* stmt, int ln) {
+    ASTNode* ftail = nullptr;
+    for (int fi = 0; fi < (int)ftoks.size(); ) {
+        if (ftoks[fi].is_operator(',') || ftoks[fi].is_operator(';')) { fi++; continue; }
+        if (!ftoks[fi].is_identifier())
+            throw std::runtime_error("Line " + std::to_string(ln) + ": expected field name in struct/union");
+        auto field = make_node(NodeType::Var, ftoks[fi].value, ln);
+        fi++;
+        if (fi < (int)ftoks.size() && ftoks[fi].is_operator(':')) {
+            fi++;
+            if (fi < (int)ftoks.size() && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenType::Keyword))) {
+                field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
+                fi++;
+            }
+        }
+        ASTNode* raw = field.get();
+        if (!stmt->args) { stmt->args = std::move(field); ftail = raw; }
+        else             { ftail->next = std::move(field); ftail = raw; }
+    }
+}
+
+/* ── Helper: collect tokens inside { ... } potentially spanning lines ── */
+static std::vector<Token> collect_braced_tokens(Parser& parser, const std::vector<Token>& toks, int& idx, int cnt, int ln, const char* kind) {
+    std::vector<Token> ftoks;
+    for (int i = idx; i < cnt; i++) {
+        if (toks[i].is_operator('}')) { idx = i + 1; return ftoks; }
+        ftoks.push_back(toks[i]);
+    }
+    /* } not on opening line — advance and read subsequent lines */
+    while (!parser.at_end()) {
+        parser.advance();
+        if (parser.at_end()) break;
+        const auto& nt = parser.cur_line().tokens;
+        for (int i = 0; i < (int)nt.size(); i++) {
+            if (nt[i].is_operator('}')) { idx = cnt; return ftoks; }
+            ftoks.push_back(nt[i]);
+        }
+    }
+    throw std::runtime_error("Line " + std::to_string(ln) + ": unclosed '{' in " + kind);
+}
+
 ASTNode::Ptr Parser::parse_extern() {
     auto& toks = cur_line().tokens;
     int ln = cur_line().line_no;
@@ -84,44 +126,8 @@ ASTNode::Ptr Parser::parse_extern() {
             /* Parse fields: { field1: type1, field2: type2 } or multi-line */
             if (idx < cnt && toks[idx].is_operator('{')) {
                 idx++;
-                /* Collect tokens within { ... } — may span multiple lines */
-                std::vector<Token> ftoks;
-                /* Copy remaining tokens from opening line after { */
-                for (int i = idx; i < cnt; i++) {
-                    if (toks[i].is_operator('}')) { idx = i + 1; goto parse_fields; }
-                    ftoks.push_back(toks[i]);
-                }
-                /* } not on opening line — advance and read subsequent lines */
-                while (!at_end()) {
-                    advance();
-                    if (at_end()) break;
-                    const auto& nt = cur_line().tokens;
-                    for (int i = 0; i < (int)nt.size(); i++) {
-                        if (nt[i].is_operator('}')) { idx = cnt; goto parse_fields; }
-                        ftoks.push_back(nt[i]);
-                    }
-                }
-                throw std::runtime_error("Line " + std::to_string(ln) + ": unclosed '{' in struct");
-                parse_fields:
-                /* Parse field definitions from collected tokens */
-                ASTNode* ftail = nullptr;
-                for (int fi = 0; fi < (int)ftoks.size(); ) {
-                    if (ftoks[fi].is_operator(',') || ftoks[fi].is_operator(';')) { fi++; continue; }
-                    if (!ftoks[fi].is_identifier())
-                        throw std::runtime_error("Line " + std::to_string(ln) + ": expected field name in struct");
-                    auto field = make_node(NodeType::Var, ftoks[fi].value, ln);
-                    fi++;
-                    if (fi < (int)ftoks.size() && ftoks[fi].is_operator(':')) {
-                        fi++;
-                        if (fi < (int)ftoks.size() && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenType::Keyword))) {
-                            field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
-                            fi++;
-                        }
-                    }
-                    ASTNode* raw = field.get();
-                    if (!stmt->args) { stmt->args = std::move(field); ftail = raw; }
-                    else             { ftail->next = std::move(field); ftail = raw; }
-                }
+                auto ftoks = collect_braced_tokens(*this, toks, idx, cnt, ln, "struct");
+                parse_extern_fields(ftoks, stmt.get(), ln);
             }
 
             require_token_end(toks, idx, "extern struct declaration");
@@ -145,40 +151,8 @@ ASTNode::Ptr Parser::parse_extern() {
             /* Parse fields: { field1: type1, field2: type2 } — may span multiple lines */
             if (idx < cnt && toks[idx].is_operator('{')) {
                 idx++;
-                std::vector<Token> ftoks;
-                for (int i = idx; i < cnt; i++) {
-                    if (toks[i].is_operator('}')) { idx = i + 1; goto parse_union_fields; }
-                    ftoks.push_back(toks[i]);
-                }
-                while (!at_end()) {
-                    advance();
-                    if (at_end()) break;
-                    const auto& nt = cur_line().tokens;
-                    for (int i = 0; i < (int)nt.size(); i++) {
-                        if (nt[i].is_operator('}')) { idx = cnt; goto parse_union_fields; }
-                        ftoks.push_back(nt[i]);
-                    }
-                }
-                throw std::runtime_error("Line " + std::to_string(ln) + ": unclosed '{' in union");
-                parse_union_fields:
-                ASTNode* ftail = nullptr;
-                for (int fi = 0; fi < (int)ftoks.size(); ) {
-                    if (ftoks[fi].is_operator(',') || ftoks[fi].is_operator(';')) { fi++; continue; }
-                    if (!ftoks[fi].is_identifier())
-                        throw std::runtime_error("Line " + std::to_string(ln) + ": expected field name in union");
-                    auto field = make_node(NodeType::Var, ftoks[fi].value, ln);
-                    fi++;
-                    if (fi < (int)ftoks.size() && ftoks[fi].is_operator(':')) {
-                        fi++;
-                        if (fi < (int)ftoks.size() && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenType::Keyword))) {
-                            field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
-                            fi++;
-                        }
-                    }
-                    ASTNode* raw = field.get();
-                    if (!stmt->args) { stmt->args = std::move(field); ftail = raw; }
-                    else             { ftail->next = std::move(field); ftail = raw; }
-                }
+                auto ftoks = collect_braced_tokens(*this, toks, idx, cnt, ln, "union");
+                parse_extern_fields(ftoks, stmt.get(), ln);
             }
 
             require_token_end(toks, idx, "extern union declaration");

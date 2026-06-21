@@ -42,6 +42,8 @@ int32_t ir_make_struct(std::vector<IrType>& pool, const std::string& name, std::
     return ir_type_pool_add(pool, std::move(t));
 }
 
+/* Simple linear-scan deduplication for primitive types.
+   Callers (e.g. AstToIr) maintain a type_cache_ to avoid repeated O(n) scans. */
 int32_t ir_make_primitive(std::vector<IrType>& pool, IrTypeKind kind) {
     for (int32_t i = 0; i < (int32_t)pool.size(); i++)
         if (pool[i].kind == kind) return i;
@@ -53,21 +55,21 @@ int32_t ir_make_primitive(std::vector<IrType>& pool, IrTypeKind kind) {
 IrValue ir_const_i64(int64_t v) {
     IrValue val;
     val.is_const = true;
-    val.i64 = v;
+    val.set_i64(v);
     return val;
 }
 
 IrValue ir_const_i32(int32_t v) {
     IrValue val;
     val.is_const = true;
-    val.i64 = v;
+    val.set_i64(v);
     return val;
 }
 
 IrValue ir_const_f64(double v) {
     IrValue val;
     val.is_const = true;
-    val.f64 = v;
+    val.set_f64(v);
     return val;
 }
 
@@ -76,7 +78,7 @@ IrValue ir_ssa(const std::string& name, int32_t type_idx) {
     val.name = name;
     val.type_idx = type_idx;
     val.is_const = false;
-    val.i64 = 0;
+    val.set_i64(0);
     return val;
 }
 
@@ -87,11 +89,15 @@ IrValue ir_ssa(const std::string& name, int32_t type_idx) {
 IrFunction* IrModule::get_function(const std::string& name) {
     for (auto& fn : functions)
         if (fn.name == name) return &fn;
+    for (auto& fn : declarations)
+        if (fn.name == name) return &fn;
     return nullptr;
 }
 
 const IrFunction* IrModule::get_function(const std::string& name) const {
     for (const auto& fn : functions)
+        if (fn.name == name) return &fn;
+    for (const auto& fn : declarations)
         if (fn.name == name) return &fn;
     return nullptr;
 }
@@ -179,7 +185,7 @@ static std::string val_str(const IrValue& v, const std::vector<IrType>& pool) {
     if (v.type_idx >= 0 && (size_t)v.type_idx < pool.size())
         t = type_str(pool[v.type_idx], pool) + " ";
     if (v.is_const) {
-        return t + std::to_string(v.i64);
+        return t + std::to_string(v.i64());
     }
     return t + "%" + v.name;
 }

@@ -3,11 +3,13 @@
 #include <cstddef>
 
 /* ════════════════════════════════════════════════════════════
-   types.hpp — Common Type Aliases
-   ════════════════════════════════════════════════════════════
-   Fixed-size integer types and commonly used type aliases
-   shared across the Aurora compiler and runtime.
-   ════════════════════════════════════════════════════════════ */
+    types.hpp — Common Type Aliases
+    ════════════════════════════════════════════════════════════
+    Fixed-size integer types and commonly used type aliases
+    shared across the Aurora compiler and runtime.
+    ════════════════════════════════════════════════════════════ */
+
+namespace aurora {
 
 /* ── Fixed-width integers ── */
 using i8  = std::int8_t;
@@ -28,3 +30,20 @@ using isize = std::ptrdiff_t;
 
 /* ── Byte ── */
 using byte = unsigned char;
+
+} // namespace aurora
+
+/* ── Global aliases for convenience ── */
+using aurora::i8;
+using aurora::i16;
+using aurora::i32;
+using aurora::i64;
+using aurora::u8;
+using aurora::u16;
+using aurora::u32;
+using aurora::u64;
+using aurora::f32;
+using aurora::f64;
+using aurora::usize;
+using aurora::isize;
+using aurora::byte;

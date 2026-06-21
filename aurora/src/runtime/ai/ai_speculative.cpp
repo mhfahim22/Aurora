@@ -5,18 +5,14 @@ extern "C" {
 /* Generate a single token from model (helper - just like generate_step but with model pointer) */
 static int64_t draft_step(Model* m, int64_t token, int64_t* cache_len_ptr) {
     if (!m) return 0;
-    int64_t embed_dim = 0;
-    Layer* embed = nullptr;
+    int has_embed = 0;
     for (int i = 0; i < m->n_layers; i++) {
         if (m->layers[i].type == LAYER_EMBEDDING) {
-            embed = &m->layers[i];
-            embed_dim = m->layers[i].w->shape[1];
+            has_embed = 1;
             break;
         }
     }
-    if (!embed) return 0;
-    int64_t clen = cache_len_ptr ? *cache_len_ptr : 0;
-    (void)clen;
+    if (!has_embed) return 0;
     int64_t is[2] = {1, 1};
     AuroraTensor* in = aurora_tensor_new(2, is);
     in->data[0] = (double)token;
@@ -146,10 +142,10 @@ char* speculative_decode(Model* target, Model* draft, int64_t start_token, int64
         /* Sync draft model's position to target's (reset draft, fast-forward) */
         reset_cache(draft);
         draft_clen = 0;
-        /* Replay accepted tokens through draft */
+        int64_t replay_tok = start_token;
         for (int64_t i = 0; i < accept_count && pos < 4000; i++) {
-            draft_step(draft, start_token, &draft_clen);
-            start_token = draft_tokens[i];
+            draft_step(draft, replay_tok, &draft_clen);
+            replay_tok = draft_tokens[i];
         }
 
         if (cur_tok == 0) break;

@@ -9,6 +9,7 @@ AuroraTensor* mul_forward(Layer* l, AuroraTensor* input, int training) {
     if (!input) return nullptr;
     int64_t half = input->total_size / 2;
     AuroraTensor* out = aurora_tensor_new(input->ndim, input->shape);
+    if (!out) return nullptr;
     if (input->ndim == 2) {
         int64_t n = input->shape[0], d = input->shape[1] / 2;
         for (int64_t i = 0; i < n; i++) {
@@ -28,7 +29,8 @@ AuroraTensor* mul_forward(Layer* l, AuroraTensor* input, int training) {
     if (training) {
         if (l->cache) aurora_tensor_free(l->cache);
         l->cache = aurora_tensor_new(input->ndim, input->shape);
-        memcpy(l->cache->data, input->data, (size_t)input->total_size * sizeof(double));
+        if (l->cache)
+            memcpy(l->cache->data, input->data, (size_t)input->total_size * sizeof(double));
     }
     return out;
 }
@@ -38,6 +40,7 @@ AuroraTensor* mul_backward(Layer* l, AuroraTensor* dout, AuroraTensor* input) {
     if (!dout || !l->cache) return nullptr;
     int64_t half = l->cache->total_size / 2;
     AuroraTensor* dx = aurora_tensor_new(l->cache->ndim, l->cache->shape);
+    if (!dx) return nullptr;
     memcpy(dx->data, l->cache->data, (size_t)l->cache->total_size * sizeof(double));
     if (l->cache->ndim == 2) {
         int64_t n = l->cache->shape[0], d = l->cache->shape[1] / 2;
@@ -117,6 +120,7 @@ AuroraTensor* mha_forward(Layer* l, AuroraTensor* input, int training) {
                 ? aurora_tensor_new_f32(input->ndim, input->shape)
                 : aurora_tensor_new(input->ndim, input->shape);
             if (!out) { aurora_tensor_free(qkv); return nullptr; }
+            double scale = 1.0 / sqrt((double)d_h);
             double scale = 1.0 / sqrt((double)d_h);
             for (int64_t ri = 0; ri < new_n; ri++) {
                 double* k_ptr = (qkv->dtype == TENSOR_F32)
@@ -451,6 +455,7 @@ AuroraTensor* mha_backward(Layer* l, AuroraTensor* dout, AuroraTensor* input) {
         }
 
     double* dqkv = (double*)calloc((size_t)n * 3 * d, sizeof(double));
+    if (!dqkv) { free(d_attn); return nullptr; }
 
     for (int64_t h = 0; h < nh; h++) {
         int64_t ho = h * hd;

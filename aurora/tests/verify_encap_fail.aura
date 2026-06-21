@@ -1,3 +1,4 @@
+// NOTE: Near-duplicate of verify_visibility_fail.aura; both test private field access
 class Person
     public name = "unknown"
     private age = 0

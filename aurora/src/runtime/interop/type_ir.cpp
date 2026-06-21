@@ -290,7 +290,7 @@ static InteropType g_prebuilt_types[] = {
 
 const InteropType& InteropType::prebuilt(InteropTypeKind kind) {
     size_t idx = static_cast<size_t>(kind);
-    if (idx < sizeof(g_prebuilt_types)/sizeof(g_prebuilt_types[0]) - 1)
+    if (idx < sizeof(g_prebuilt_types)/sizeof(g_prebuilt_types[0]))
         return g_prebuilt_types[idx];
     return g_prebuilt_types[sizeof(g_prebuilt_types)/sizeof(g_prebuilt_types[0]) - 1];
 }

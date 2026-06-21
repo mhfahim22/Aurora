@@ -54,7 +54,7 @@ void Codegen::generate(const ASTNode* root) {
     /* Step 4 — declare runtime helpers */
     declare_runtime_helpers();
 
-    /* Step 4 — check if the user defines "function main():" in the AST.
+    /* Step 5 — check if the user defines "function main():" in the AST.
        If so, we need to avoid a name collision with the synthetic entry
        point we create for top-level code. */
     bool user_has_main = false;
@@ -68,7 +68,7 @@ void Codegen::generate(const ASTNode* root) {
         }
     }
 
-    /* Step 5 — create a function for top-level code.  If the user also
+    /* Step 6 — create a function for top-level code.  If the user also
        has "function main():", use a temp name to avoid a collision so
        the user gets "main" and the top-level block gets "__entry".
        Use CRT-compatible signature: int main(int argc, char** argv). */
@@ -106,7 +106,7 @@ void Codegen::generate(const ASTNode* root) {
         builder_->CreateCall(init_crash, {});
     }
 
-    /* Step 6 — generate IR for the AST */
+    /* Step 7 — generate IR for the AST */
     push_scope();
     gen_block(root);
     pop_scope_and_drop();
@@ -115,7 +115,7 @@ void Codegen::generate(const ASTNode* root) {
     if (!current_block_terminated())
         safe_ret(llvm::ConstantInt::get(i32_ty, 0));
 
-    /* Step 7 — if the user defined "function main():", rename the user's
+    /* Step 8 — if the user defined "function main():", rename the user's
        function to "main_user" and create a real @main(i32, ptr) entry point
        matching the CRT's expected main(argc, argv) signature. */
     if (user_has_main) {

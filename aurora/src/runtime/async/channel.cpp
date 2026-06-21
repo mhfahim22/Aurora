@@ -15,6 +15,7 @@ AuroraChannel* aurora_chan_create(int32_t capacity) {
     ch->head = 0;
     ch->tail = 0;
     ch->count = 0;
+    ch->closed = false;
     return ch;
 }
 
@@ -28,7 +29,8 @@ void aurora_chan_destroy(AuroraChannel* ch) {
 void aurora_chan_send(AuroraChannel* ch, void* val) {
     if (!ch) return;
     std::unique_lock<std::mutex> lock(ch->mtx);
-    ch->cv.wait(lock, [ch] { return ch->count < ch->capacity; });
+    ch->cv.wait(lock, [ch] { return (ch->count < ch->capacity) || ch->closed; });
+    if (ch->closed) return;
     ch->buf[ch->tail] = val;
     ch->tail = (ch->tail + 1) % ch->capacity;
     ch->count++;
@@ -39,13 +41,23 @@ void aurora_chan_send(AuroraChannel* ch, void* val) {
 void* aurora_chan_recv(AuroraChannel* ch) {
     if (!ch) return nullptr;
     std::unique_lock<std::mutex> lock(ch->mtx);
-    ch->cv.wait(lock, [ch] { return ch->count > 0; });
+    ch->cv.wait(lock, [ch] { return (ch->count > 0) || ch->closed; });
+    if (ch->closed || ch->count == 0) return nullptr;
     void* val = ch->buf[ch->head];
     ch->head = (ch->head + 1) % ch->capacity;
     ch->count--;
     lock.unlock();
     ch->cv.notify_one();
     return val;
+}
+
+void aurora_chan_close(AuroraChannel* ch) {
+    if (!ch) return;
+    {
+        std::lock_guard<std::mutex> lock(ch->mtx);
+        ch->closed = true;
+    }
+    ch->cv.notify_all();
 }
 
 int32_t aurora_chan_try_send(AuroraChannel* ch, void* val) {

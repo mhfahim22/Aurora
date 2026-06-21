@@ -10,7 +10,7 @@ echo.
 
 :: First build
 echo [BUILD] Running cmake build first...
-cmake --build build --config Release
+cmake --build ..\build --config Release
 if %errorlevel% neq 0 (
     echo [WARNING] Build had errors, continuing anyway...
 )

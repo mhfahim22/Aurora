@@ -58,7 +58,8 @@ void aurora_scheduler_init(int32_t thread_count) {
         g_sched.workers.emplace_back(worker_loop);
     }
 
-    std::atexit(aurora_scheduler_shutdown);
+    /* atexit removed — use manual shutdown via aurora_scheduler_shutdown
+       to avoid static destruction order UB. Call before process exit. */
 }
 
 void aurora_scheduler_shutdown() {

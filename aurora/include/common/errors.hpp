@@ -203,6 +203,9 @@ private:
     std::string current_file_;
 };
 
+/* Destruction-order safety: global_diag returns a reference to a
+   function-local static, ensuring it is constructed before first use
+   and destroyed after last use (inverse construction order). */
 inline DiagnosticEngine& global_diag() {
     static DiagnosticEngine engine;
     return engine;

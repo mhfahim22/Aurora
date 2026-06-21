@@ -56,7 +56,7 @@ int aurora_fs_copy(const char* src, const char* dst) {
     char* content = aurora_fs_read_file(src);
     if (!content) return 0;
     int result = aurora_fs_write_file(dst, content);
-    free(content);
+    aurora_free(content);
     return result;
 }
 

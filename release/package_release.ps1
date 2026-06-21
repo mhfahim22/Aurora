@@ -11,7 +11,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $BuildDir  = Join-Path $RepoRoot "build\Release"
 $ReleaseDir = $PSScriptRoot
 
-$Version = "0.2.0"
+$Version = (Get-Content -Path (Join-Path $PSScriptRoot "..\VERSION")).Trim()
 $ZipName = "Aurora-$Version-windows-x64.zip"
 $ZipPath = Join-Path $ReleaseDir $ZipName
 

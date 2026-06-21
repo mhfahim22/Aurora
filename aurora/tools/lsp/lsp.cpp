@@ -51,7 +51,6 @@ std::string DocumentState::get_word_at(int line, int col) const {
     auto* ll = find_line(line);
     if (!ll) return "";
 
-    const std::string& ln = text;
     std::istringstream ss(text);
     std::string cur_line;
     int l = 0;
@@ -151,8 +150,8 @@ std::string LspServer::get_json_field(const std::string& json, const std::string
 
 void LspServer::handle_message(const std::string& json) {
     JsonValue msg = JsonParser::parse(json);
-    std::string method = msg.get("method").as_string();
-    current_msg_id_ = msg.get("id").as_string();
+    std::string method = msg.has("method") ? msg.get("method").as_string() : "";
+    if (msg.has("id")) current_msg_id_ = msg.get("id").as_string();
     JsonValue params = msg.get("params");
 
     std::string response;
@@ -220,6 +219,7 @@ std::string LspServer::handle_initialize(const std::string& params) {
 
     JsonValue p = JsonParser::parse(params);
     workspace_root_ = p.get("rootUri").as_string();
+    if (workspace_root_.empty()) workspace_root_ = p.get("rootPath").as_string();
 
     std::string caps = R"({
         "textDocumentSync":{"openClose":true,"change":2,"save":true},
@@ -407,7 +407,7 @@ std::string LspServer::handle_document_symbol(const std::string& params) {
         if (i > 0) sym_json += ",";
         JsonBuilder jb;
         jb.add("name", escape_json(s.name));
-        jb.add_int("kind", std::stoi(s.kind));
+        jb.add_int("kind", s.kind);
         std::string rng = "{\"start\":{\"line\":" + std::to_string(s.range.start.line) +
                           ",\"character\":" + std::to_string(s.range.start.character) + "}" +
                           ",\"end\":{\"line\":" + std::to_string(s.range.end.line) +
@@ -461,6 +461,7 @@ std::string LspServer::handle_formatting(const std::string& params) {
 
     if (!documents_.count(uri)) return make_response(current_msg_id_, "null");
     auto& doc = documents_[uri];
+    doc.reparse();
     auto edits = get_formatting_edits(doc);
 
     std::string edits_json = "[";

@@ -200,4 +200,6 @@ private:
     void decide_allocation(const std::string& name, VariableInfo& var);
     bool can_use_stack(const VariableInfo& var) const;
     bool can_use_arena(const VariableInfo& var) const;
+    /* TODO: separate analysis-phase structs from decision-phase structs
+       to improve clarity and reduce accidental coupling. */
 };

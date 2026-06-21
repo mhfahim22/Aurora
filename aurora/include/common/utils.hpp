@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
+#include <functional>
 
 /* ════════════════════════════════════════════════════════════
    utils.hpp — Common Utility Functions

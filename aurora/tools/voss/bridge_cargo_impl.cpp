@@ -524,14 +524,15 @@ int count_positional_args(const std::string& args_str) {
     return raw_args + 1;
 }
 
-/* ── Check if return type string indicates Result<T, E> ── */
-    std::string turbofish_type(const std::string& type_ref) {
-        size_t ga = type_ref.find('<');
-        if (ga == std::string::npos) return type_ref;
-        return type_ref.substr(0, ga) + "::<" + type_ref.substr(ga + 1);
-    }
+/* ── Convert a generic type to turbofish syntax ── */
+std::string turbofish_type(const std::string& type_ref) {
+    size_t ga = type_ref.find('<');
+    if (ga == std::string::npos) return type_ref;
+    return type_ref.substr(0, ga) + "::<" + type_ref.substr(ga + 1);
+}
 
-    bool is_result_type(const std::string& rt) {
+/* ── Check if return type string indicates Result<T, E> ── */
+bool is_result_type(const std::string& rt) {
     if (rt.empty()) return false;
     if (rt == "Result") return true;
     if (rt.rfind("Result<", 0) == 0) return true;
@@ -1095,7 +1096,7 @@ bool is_raw_ptr_type(const std::string& rt) {
             base != "i8" && base != "i16" && base != "i32" && base != "i64" && base != "i128" &&
             base != "f32" && base != "f64" && base != "usize" && base != "isize" &&
             base != "char" && base != "str" && base != "String" &&
-            base != "String" && base != "()" && base != "Vec") {
+            base != "()" && base != "Vec") {
             return pkg + "::" + base + generic_suffix;
         }
         return type_name;

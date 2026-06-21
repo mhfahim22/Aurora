@@ -23,10 +23,7 @@ function migrate_apply(db, name, up_sql)
     end
     rc = db_execute(db, up_sql)
     if rc >= 0
-        sql = "INSERT INTO _migrations (name) VALUES ('"
-        sql = strcat(sql, name)
-        sql = strcat(sql, "')")
-        db_execute(db, sql)
+        db_execute(db, "INSERT INTO _migrations (name) VALUES (?)", name)
     end
     return rc
 end
@@ -37,19 +34,13 @@ function migrate_rollback(db, name, down_sql)
     end
     rc = db_execute(db, down_sql)
     if rc >= 0
-        sql = "DELETE FROM _migrations WHERE name = '"
-        sql = strcat(sql, name)
-        sql = strcat(sql, "'")
-        db_execute(db, sql)
+        db_execute(db, "DELETE FROM _migrations WHERE name = ?", name)
     end
     return rc
 end
 
 function migrate_is_applied(db, name)
-    sql = "SELECT 1 FROM _migrations WHERE name = '"
-    sql = strcat(sql, name)
-    sql = strcat(sql, "'")
-    rows = db_query(db, sql)
+    rows = db_query(db, "SELECT 1 FROM _migrations WHERE name = ?", name)
     return list_len(rows) > 0
 end
 

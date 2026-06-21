@@ -135,6 +135,8 @@ private:
     std::unordered_map<std::string, std::string>   type_aliases_;
 };
 
+/* TODO: add thread-safety (mutex) if registry is accessed from multiple compilation threads.
+   Currently the function-local static is safe for single-threaded use only. */
 inline TypeRegistry& global_type_registry() {
     static TypeRegistry reg;
     return reg;

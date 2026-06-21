@@ -41,7 +41,11 @@ static AuroraTensor* make_tensor_f32(int64_t rows, int64_t cols, const float* sr
     int64_t shape[2] = { rows, cols };
     AuroraTensor* t = aurora_tensor_new_f32(2, shape);
     if (!t) return nullptr;
-    memcpy(t->data_f32, src, (size_t)(rows * cols) * sizeof(float));
+    if (src) {
+        memcpy(t->data_f32, src, (size_t)(rows * cols) * sizeof(float));
+    } else {
+        memset(t->data_f32, 0, (size_t)(rows * cols) * sizeof(float));
+    }
     return t;
 }
 

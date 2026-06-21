@@ -86,7 +86,7 @@ bool ir_fold_constants(IrFunction& fn, std::vector<IrType>& pool) {
             /* Fold binary ops with both constants */
             if (auto* binop = std::get_if<IrBinOpInst>(&inst)) {
                 if (binop->lhs.is_const && binop->rhs.is_const) {
-                    uint64_t l = (uint64_t)binop->lhs.i64, r = (uint64_t)binop->rhs.i64, v = 0;
+                    uint64_t l = (uint64_t)binop->lhs.i64(), r = (uint64_t)binop->rhs.i64(), v = 0;
                     bool ok = true;
                     switch (binop->op) {
                         case IrBinOp::Add: v = l + r; break;
@@ -116,7 +116,7 @@ bool ir_fold_constants(IrFunction& fn, std::vector<IrType>& pool) {
             /* Fold icmp with both constants */
             if (auto* icmp = std::get_if<IrICmp>(&inst)) {
                 if (icmp->lhs.is_const && icmp->rhs.is_const) {
-                    int64_t l = icmp->lhs.i64, r = icmp->rhs.i64;
+                    int64_t l = icmp->lhs.i64(), r = icmp->rhs.i64();
                     bool v = false;
                     switch (icmp->pred) {
                         case IrCmpPred::EQ: v = l == r; break;
@@ -141,7 +141,7 @@ bool ir_fold_constants(IrFunction& fn, std::vector<IrType>& pool) {
             /* Fold conditional branch with constant condition */
             if (auto* cbr = std::get_if<IrCondBr>(&inst)) {
                 if (cbr->cond.is_const) {
-                    const std::string& target = cbr->cond.i64 != 0 ? cbr->true_bb : cbr->false_bb;
+                    const std::string& target = cbr->cond.i64() != 0 ? cbr->true_bb : cbr->false_bb;
                     bb.instructions[i] = IrBr{target};
                     changed = true;
                 }
@@ -267,7 +267,7 @@ bool ir_strength_reduce(IrFunction& fn, std::vector<IrType>& pool) {
             if (!binop) continue;
             if (!binop->rhs.is_const) continue;
 
-            int64_t c = binop->rhs.i64;
+            int64_t c = binop->rhs.i64();
             IrValue lhs = binop->lhs;
             int32_t ti = binop->lhs.type_idx >= 0 ? binop->lhs.type_idx : binop->rhs.type_idx;
 

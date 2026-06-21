@@ -95,7 +95,8 @@ void write_lockfile(const LockData& lf) {
 std::string cache_dir() {
 #ifdef _WIN32
     const char* local = getenv("LOCALAPPDATA");
-    std::string dir = (local ? std::string(local) : std::string(getenv("USERPROFILE") ? getenv("USERPROFILE") : "") + "/.cache") + "/aura/cache";
+    const char* userprofile = getenv("USERPROFILE");
+    std::string dir = (local ? std::string(local) : (userprofile ? std::string(userprofile) + "/.cache" : "/tmp/.cache")) + "/aura/cache";
 #else
     const char* home = getenv("HOME");
     std::string dir = (home ? std::string(home) : "/tmp") + "/.aura/cache";

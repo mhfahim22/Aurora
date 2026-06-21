@@ -16,16 +16,19 @@ void aurora_mat4_free(void* m) {
 }
 
 void aurora_mat4_identity(void* m) {
+    if (!m) return;
     float* M = (float*)m;
     memset(M, 0, 16 * sizeof(float));
     M[0] = M[5] = M[10] = M[15] = 1.0f;
 }
 
 void aurora_mat4_copy(void* dst, const void* src) {
+    if (!dst || !src) return;
     memcpy(dst, src, 16 * sizeof(float));
 }
 
 void aurora_mat4_mul(void* out, const void* a, const void* b) {
+    if (!out || !a || !b) return;
     const float* A = (const float*)a;
     const float* B = (const float*)b;
     float* O = (float*)out;

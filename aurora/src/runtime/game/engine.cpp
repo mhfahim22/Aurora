@@ -234,8 +234,15 @@ AuroraAnimation* aurora_animation_create(double* keyframes, double* values,
                                           int num_frames, double duration) {
     if (!keyframes || !values || num_frames < 2) return nullptr;
     AuroraAnimation* a = (AuroraAnimation*)calloc(1, sizeof(AuroraAnimation));
+    if (!a) return nullptr;
     a->keyframes = (double*)malloc((size_t)num_frames * sizeof(double));
     a->values = (double*)malloc((size_t)num_frames * sizeof(double));
+    if (!a->keyframes || !a->values) {
+        free(a->keyframes);
+        free(a->values);
+        free(a);
+        return nullptr;
+    }
     memcpy(a->keyframes, keyframes, (size_t)num_frames * sizeof(double));
     memcpy(a->values, values, (size_t)num_frames * sizeof(double));
     a->num_frames = num_frames;

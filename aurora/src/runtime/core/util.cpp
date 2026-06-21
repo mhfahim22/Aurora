@@ -3,10 +3,13 @@
 #include <ctime>
 #include <thread>
 #include <chrono>
+#include <random>
 #include "runtime/async.hpp"
 
 /* ── Thread-local yield value for generator/coroutine support ── */
 static thread_local int64_t tls_yield_value = 0;
+
+static thread_local std::mt19937 g_rng(std::random_device{}());
 
 extern "C" {
 
@@ -21,14 +24,8 @@ int64_t aurora_time() {
 }
 
 /* ── Get random integer between 0 and RAND_MAX ── */
-static int random_seeded = 0;
-
 int64_t aurora_random() {
-    if (!random_seeded) {
-        srand((unsigned)time(nullptr));
-        random_seeded = 1;
-    }
-    return (int64_t)rand();
+    return (int64_t)g_rng();
 }
 
 /* ── Yield — suspends current generator/coroutine with value ── */

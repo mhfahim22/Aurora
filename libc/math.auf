@@ -36,6 +36,9 @@ end
 function ln(x):
     return aurora_math_log(x)
 end
+function log(x):
+    return ln(x)
+end
 function log10(x):
     return aurora_math_log10(x)
 end

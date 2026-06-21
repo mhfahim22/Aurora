@@ -3,7 +3,6 @@
 #include <string>
 #include <cctype>
 #include <cstdlib>
-#include "bridge_shared.h"
 
 /* ── Detect if an npm package has native addon (N-API / node-gyp) ── */
 bool npm_has_native_addon(const JsonValue& json) {

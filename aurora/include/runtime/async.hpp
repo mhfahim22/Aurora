@@ -7,8 +7,6 @@
 #include <condition_variable>
 #include <csetjmp>
 
-extern "C" {
-
 /* ── Task handle ── */
 typedef struct AuroraTask {
     void*            (*func)(void*);
@@ -18,6 +16,30 @@ typedef struct AuroraTask {
     std::mutex        mtx;
     std::condition_variable cv;
 } AuroraTask;
+
+/* ── Channel (async bounded queue) ── */
+typedef struct AuroraChannel {
+    std::mutex              mtx;
+    std::condition_variable cv;
+    void**                  buf;        /* circular buffer */
+    int32_t                 capacity;
+    int32_t                 head;
+    int32_t                 tail;
+    int32_t                 count;
+    bool                    closed;
+} AuroraChannel;
+
+/* ── Fiber (cooperative task) ── */
+typedef struct AuroraFiber {
+    void*             (*func)(void*);
+    void*              arg;
+    void*              result;
+    int                state;       /* 0=ready, 1=running, 2=yielded, 3=done */
+    void*              context;     /* platform-specific fiber handle / jmp_buf */
+    struct AuroraFiber* next;       /* for scheduler queue */
+} AuroraFiber;
+
+extern "C" {
 
 /* Create a new task */
 AuroraTask* aurora_task_create(void* (*func)(void*), void* arg);
@@ -52,15 +74,6 @@ void aurora_spawn(AuroraTask* task);
 void aurora_wait(AuroraTask* task);
 
 /* ── Channel (async bounded queue) ── */
-typedef struct AuroraChannel {
-    std::mutex              mtx;
-    std::condition_variable cv;
-    void**                  buf;        /* circular buffer */
-    int32_t                 capacity;
-    int32_t                 head;
-    int32_t                 tail;
-    int32_t                 count;
-} AuroraChannel;
 
 /* Create a channel with given capacity */
 AuroraChannel* aurora_chan_create(int32_t capacity);
@@ -73,6 +86,9 @@ void aurora_chan_send(AuroraChannel* ch, void* val);
 
 /* Receive a value (blocks if empty) */
 void* aurora_chan_recv(AuroraChannel* ch);
+
+/* Close a channel (wakes up all waiters, future sends/recvs return immediately) */
+void aurora_chan_close(AuroraChannel* ch);
 
 /* Try send (non-blocking) — returns 1 on success */
 int32_t aurora_chan_try_send(AuroraChannel* ch, void* val);
@@ -96,16 +112,6 @@ void aurora_event_emit(const char* event_name, void* arg);
 
 /* Shutdown the event bus and clean up */
 void aurora_event_bus_shutdown(void);
-
-/* ── Fiber (cooperative task) ── */
-typedef struct AuroraFiber {
-    void*             (*func)(void*);
-    void*              arg;
-    void*              result;
-    int                state;       /* 0=ready, 1=running, 2=yielded, 3=done */
-    void*              context;     /* platform-specific fiber handle / jmp_buf */
-    struct AuroraFiber* next;       /* for scheduler queue */
-} AuroraFiber;
 
 /* Create a fiber */
 AuroraFiber* aurora_fiber_create(void* (*func)(void*), void* arg);

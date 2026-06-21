@@ -46,8 +46,8 @@ int list_len(void* list) {
 
 void list_free(void* list) {
     List* l = (List*)list;
-    free(l->data);
-    free(l);
+    aurora_free(l->data);
+    aurora_free(l);
 }
 
 /* ── Simple map (linear scan, small scale) ── */
@@ -107,8 +107,8 @@ int map_has(void* map, const char* key) {
 
 void map_free(void* map) {
     Map* m = (Map*)map;
-    free(m->entries);
-    free(m);
+    aurora_free(m->entries);
+    aurora_free(m);
 }
 
 void map_copy(void* dst, void* src) {
@@ -165,8 +165,8 @@ int set_has(void* set, long long val) {
 
 void set_free(void* set) {
     Set* s = (Set*)set;
-    free(s->data);
-    free(s);
+    aurora_free(s->data);
+    aurora_free(s);
 }
 
 /* ── Vector (math) ── */
@@ -216,7 +216,7 @@ long long stack_pop(void* stack) {
 int stack_empty(void* stack) { return ((Stack*)stack)->len == 0; }
 void stack_free(void* stack) {
     Stack* s = (Stack*)stack;
-    free(s->data); free(s);
+    aurora_free(s->data); aurora_free(s);
 }
 
 /* ── Queue (ring buffer) ── */
@@ -242,7 +242,7 @@ void queue_enqueue(void* queue, long long val) {
         long long* nd = (long long*)aurora_alloc(q->cap * sizeof(long long));
         for (int i = 0; i < q->count; i++)
             nd[i] = q->data[(q->head + i) % (q->cap / 2)];
-        free(q->data);
+        aurora_free(q->data);
         q->data = nd;
         q->head = 0;
         q->tail = q->count;
@@ -264,7 +264,7 @@ long long queue_dequeue(void* queue) {
 int queue_empty(void* queue) { return ((Queue*)queue)->count == 0; }
 void queue_free(void* queue) {
     Queue* q = (Queue*)queue;
-    free(q->data); free(q);
+    aurora_free(q->data); aurora_free(q);
 }
 
 /* ── JSON (forwarding to std/json.cpp) ── */

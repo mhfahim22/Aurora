@@ -34,6 +34,7 @@ static std::ofstream        g_ofs;
 static std::set<std::string> g_emitted_types;     /* avoid duplicate struct defs */
 static std::vector<std::string> g_header_paths;
 static std::vector<const char*> g_clang_args;     /* extra clang arguments (from -I, -D, etc.) */
+static std::vector<std::string> g_clang_args_storage;  /* owns the string data */
 
 /* ── Helpers ──────────────────────────────────────────────── */
 static std::string cxstr(CXString s) {
@@ -76,7 +77,7 @@ static std::string c_type_to_aurora(CXType ct) {
         case CXType_ULong:
         case CXType_ULongLong: return "u64";
         case CXType_Float:     return "f32";
-        case CXType_Double:    return "double";
+        case CXType_Double:    return "f64";
         case CXType_WChar:
         case CXType_Char16:
         case CXType_Char32:    return "i32";
@@ -207,6 +208,7 @@ static void emit_macro(CXCursor cursor, int depth);
 /* ── Cursor visitor ──────────────────────────────────────── */
 static CXChildVisitResult visitor(CXCursor cursor, CXCursor parent, CXClientData data) {
     (void)parent; (void)data;
+    if (data == nullptr) return CXChildVisit_Continue;
     CXCursorKind kind = clang_getCursorKind(cursor);
     int depth = *((int*)data);
 
@@ -564,23 +566,30 @@ int main(int argc, char* argv[]) {
         } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
             std::string inc = "-I";
             inc += argv[++i];
-            g_clang_args.push_back(strdup(inc.c_str()));
+            g_clang_args_storage.push_back(inc);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strncmp(argv[i], "-I", 2) == 0) {
-            g_clang_args.push_back(strdup(argv[i]));
+            g_clang_args_storage.push_back(argv[i]);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
             std::string def = "-D";
             def += argv[++i];
-            g_clang_args.push_back(strdup(def.c_str()));
+            g_clang_args_storage.push_back(def);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strncmp(argv[i], "-D", 2) == 0) {
-            g_clang_args.push_back(strdup(argv[i]));
+            g_clang_args_storage.push_back(argv[i]);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "-std") == 0 && i + 1 < argc) {
             std::string st = "-std=";
             st += argv[++i];
-            g_clang_args.push_back(strdup(st.c_str()));
+            g_clang_args_storage.push_back(st);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "--include") == 0 && i + 1 < argc) {
             std::string inc = "-include";
-            g_clang_args.push_back(strdup(inc.c_str()));
-            g_clang_args.push_back(strdup(argv[++i]));
+            g_clang_args_storage.push_back(inc);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
+            g_clang_args_storage.push_back(argv[++i]);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "--no-macros") == 0) {
             g_no_macros = true;
         } else if (strcmp(argv[i], "--no-functions") == 0) {

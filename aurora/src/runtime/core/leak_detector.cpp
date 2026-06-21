@@ -90,7 +90,8 @@ static size_t hash_ptr(void* ptr) {
         h ^= (k >> (i * 8)) & 0xFF;
         h *= 0x100000001b3ULL;
     }
-    return (size_t)(h & (uint64_t)(g_state.capacity - 1));
+    size_t cap = g_state.capacity;
+    return cap ? (size_t)(h & (uint64_t)(cap - 1)) : 0;
 }
 
 /* ── Init ── */
@@ -138,6 +139,7 @@ int aurora_leak_is_enabled(void) {
 void aurora_leak_track(void* ptr, size_t size, const char* allocator) {
     if (!ptr || !g_state.enabled.load()) return;
     ensure_init();
+    if (!g_state.records) return;
     if (size < g_state.min_size) return;
 
     state_lock();
@@ -147,9 +149,10 @@ void aurora_leak_track(void* ptr, size_t size, const char* allocator) {
     }
 
     size_t idx = hash_ptr(ptr);
-    /* Linear probing */
+    size_t probes = 0;
     while (g_state.records[idx].ptr != nullptr && g_state.records[idx].ptr != ptr) {
         idx = (idx + 1) & (g_state.capacity - 1);
+        if (++probes >= g_state.capacity) { state_unlock(); return; }
     }
 
     if (g_state.records[idx].ptr == ptr) {
@@ -176,6 +179,7 @@ void aurora_leak_track(void* ptr, size_t size, const char* allocator) {
 void aurora_leak_untrack(void* ptr) {
     if (!ptr || !g_state.enabled.load()) return;
     ensure_init();
+    if (!g_state.records) return;
 
     state_lock();
     size_t idx = hash_ptr(ptr);
@@ -199,6 +203,7 @@ void aurora_leak_untrack(void* ptr) {
 /* ── Report (text) ── */
 void aurora_leak_report(void) {
     ensure_init();
+    if (!g_state.records) return;
     state_lock();
     size_t n = g_state.count.load();
     size_t bytes = 0;
@@ -254,6 +259,7 @@ void aurora_leak_report(void) {
 /* ── Report (JSON) ── */
 char* aurora_leak_report_json(void) {
     ensure_init();
+    if (!g_state.records) { return nullptr; }
     state_lock();
     size_t n = g_state.count.load();
     size_t bytes = 0;
@@ -298,6 +304,7 @@ char* aurora_leak_report_json(void) {
 /* ── Clear ── */
 void aurora_leak_clear(void) {
     ensure_init();
+    if (!g_state.records) return;
     state_lock();
     for (size_t i = 0; i < g_state.capacity; i++) {
         g_state.records[i].ptr = nullptr;
@@ -318,6 +325,7 @@ size_t aurora_leak_count(void) {
 
 size_t aurora_leak_bytes(void) {
     ensure_init();
+    if (!g_state.records) return 0;
     state_lock();
     size_t bytes = 0;
     for (size_t i = 0; i < g_state.capacity; i++) {

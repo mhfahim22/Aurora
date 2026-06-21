@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <atomic>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -70,12 +71,12 @@ int aurora_send_all(int64_t sock, const char* data, int len) {
 extern "C" {
 
 #ifdef _WIN32
-static int net_initialized = 0;
+static std::atomic<bool> net_initialized{false};
 static void ensure_winsock() {
-    if (!net_initialized) {
+    if (!net_initialized.load()) {
         WSADATA wsa;
         WSAStartup(MAKEWORD(2, 2), &wsa);
-        net_initialized = 1;
+        net_initialized.store(true);
     }
 }
 #endif

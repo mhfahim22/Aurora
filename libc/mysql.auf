@@ -73,7 +73,6 @@ extern "libmysql" function mysql_stat(mysql: pointer) -> cstring
 
 ## ── Field metadata ──
 extern "libmysql" function mysql_fetch_field_direct(result: pointer, fieldnr: u32) -> pointer
-extern "libmysql" function mysql_field_seek(result: pointer, offset: u32) -> u32
 extern "libmysql" function mysql_field_tell(result: pointer) -> u32
 
 ## ── Transaction ──

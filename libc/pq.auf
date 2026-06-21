@@ -62,7 +62,6 @@ extern "libpq" function PQcmdStatus(res: pointer) -> cstring
 extern "libpq" function PQcmdTuples(res: pointer) -> cstring
 extern "libpq" function PQoidValue(res: pointer) -> u32
 extern "libpq" function PQclear(res: pointer)
-extern "libpq" function PQntuples(res: pointer) -> i32
 extern "libpq" function PQnparams(res: pointer) -> i32
 extern "libpq" function PQparamtype(res: pointer, idx: i32) -> u32
 

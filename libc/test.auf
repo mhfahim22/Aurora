@@ -216,7 +216,7 @@ function test_cases(cases, fn)
         end
         c = list_get(cases, i)
         name = strcat("case ", str(i))
-        if map_has(c, "name") != 0
+        if c != 0 and map_has(c, "name") != 0
             name = map_get(c, "name")
         end
         if _matches_filter(name) == 0

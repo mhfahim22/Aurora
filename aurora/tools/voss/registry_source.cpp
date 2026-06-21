@@ -125,8 +125,7 @@ struct GitHubAPISource : RegistrySource {
         pclose(pipe);
 #endif
         if (result.find("Not Found") != std::string::npos ||
-            result.find("Bad credentials") != std::string::npos ||
-            result.find("Not Found") != std::string::npos)
+            result.find("Bad credentials") != std::string::npos)
             return {};
         return result;
     }

@@ -109,6 +109,8 @@ function ui_run()
     return aurora_ui_win32_run()
 end
 
+extern function aurora_ui_win32_pump()
+
 function ui_pump()
     return aurora_ui_win32_pump()
 end

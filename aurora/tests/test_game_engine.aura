@@ -1,3 +1,4 @@
+// TODO: Requires language features that may not be fully implemented
 /* Phase 5 — Game Engine Integration Test */
 /* Covers: scene, entity, sprite, camera, physics, collision, audio, animation, input, update */
 

@@ -287,7 +287,9 @@ inline int semver_cmp(const std::string& a, const std::string& b) {
     auto parse = [](const std::string& s) -> std::vector<int> {
         std::vector<int> parts;
         std::stringstream ss(s); std::string p;
-        while (std::getline(ss, p, '.')) parts.push_back(std::stoi(p));
+        while (std::getline(ss, p, '.')) {
+            try { parts.push_back(std::stoi(p)); } catch (...) { parts.push_back(0); }
+        }
         return parts;
     };
     auto va = parse(a), vb = parse(b);
@@ -361,7 +363,6 @@ int cmd_clean();
 int cmd_info();
 int cmd_list();
 int cmd_tree();
-int cmd_verify();
 int cmd_audit();
 int cmd_health();
 int cmd_snapshot(const std::string& label);

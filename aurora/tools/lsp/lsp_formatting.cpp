@@ -10,11 +10,7 @@ std::vector<LspTextEdit> LspServer::get_formatting_edits(DocumentState& doc) {
     std::vector<LspTextEdit> edits;
     const auto& lines = doc.lines;
 
-    /* Check each line's indentation */
-    std::istringstream stream(doc.text);
-    std::string raw_line;
-    int line_num = 0;
-    int expected_indent = 0;
+    /* Use doc.lines directly for indentation analysis */
     int indent_level = 0;
 
     /* Track keywords that increase indent */
@@ -32,29 +28,22 @@ std::vector<LspTextEdit> LspServer::get_formatting_edits(DocumentState& doc) {
         "elseif", "else", "catch", "finally", "case", "default",
     };
 
-    while (std::getline(stream, raw_line)) {
-        /* Skip CR */
-        if (!raw_line.empty() && raw_line.back() == '\r') raw_line.pop_back();
+    for (int line_num = 0; line_num < (int)lines.size(); line_num++) {
+        const auto& ll = lines[line_num];
+        const auto& toks = ll.tokens;
+        int raw_indent = ll.indent;
 
-        std::string trimmed = raw_line;
-        size_t first_non_space = trimmed.find_first_not_of(" \t");
-        if (first_non_space == std::string::npos) {
-            /* Empty line or whitespace-only — keep as is */
-            line_num++;
-            continue;
-        }
+        if (toks.empty()) continue;
 
-        /* Check if line starts with a dedent keyword */
-        std::string first_word;
-        {
-            std::istringstream ws(trimmed.substr(first_non_space));
-            ws >> first_word;
-        }
+        /* Get first token value */
+        std::string first_word = toks[0].value;
+
+        /* Process dedent BEFORE indent (handle else/elseif/catch/finally correctly) */
         if (dedent_keywords.count(first_word) && indent_level > 0) {
             indent_level--;
         }
 
-        int actual_indent = (int)first_non_space;
+        int actual_indent = raw_indent;
         int target_indent = indent_level * 4;
 
         if (actual_indent != target_indent) {
@@ -74,8 +63,6 @@ std::vector<LspTextEdit> LspServer::get_formatting_edits(DocumentState& doc) {
         if (first_word == "end") {
             if (indent_level > 0) indent_level--;
         }
-
-        line_num++;
     }
 
     return edits;

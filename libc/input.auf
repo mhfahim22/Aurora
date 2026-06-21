@@ -7,6 +7,15 @@ function is_key_down(window, key):
     return glfwGetKey(window, key)
 end
 
+extern function aurora_glfw_get_cursor_x(window: pointer) -> f64
+extern function aurora_glfw_get_cursor_y(window: pointer) -> f64
+extern function aurora_glfw_window_width(window: pointer) -> i32
+extern function aurora_glfw_window_height(window: pointer) -> i32
+extern function aurora_glfw_framebuffer_width(window: pointer) -> i32
+extern function aurora_glfw_framebuffer_height(window: pointer) -> i32
+extern function aurora_glfw_window_pos_x(window: pointer) -> i32
+extern function aurora_glfw_window_pos_y(window: pointer) -> i32
+
 ## ── Mouse ──
 function get_mouse_x(window):
     return aurora_glfw_get_cursor_x(window)

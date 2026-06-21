@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
-call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x64 2>nul || call vcvarsall.bat x64 2>nul || echo [WARN] vcvarsall not found — hoping MSVC is in PATH
-set SRCDIR=%~dp0
+call "C:\Program Files\Microsoft Visual Studio\17\Community\VC\Auxiliary\Build\vcvarsall.bat" x64 2>nul || call vcvarsall.bat x64 2>nul || echo [WARN] vcvarsall not found — hoping MSVC is in PATH
+set SRCDIR=%~dp0..
 set OUTDIR=%SRCDIR%build\Debug
 set INCLUDES=/I "%SRCDIR%aurora\include"
 

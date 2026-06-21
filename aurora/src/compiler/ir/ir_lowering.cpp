@@ -56,11 +56,11 @@ static llvm::Value* lower_value(const IrValue& v, llvm::IRBuilder<>& builder,
     if (v.is_const) {
         if (v.type_idx >= 0 && (size_t)v.type_idx < pool.size()) {
             if (pool[v.type_idx].kind == IrTypeKind::Float64)
-                return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat(v.f64));
+                return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat(v.f64()));
             if (pool[v.type_idx].kind == IrTypeKind::Float32)
-                return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat((float)v.f64));
+                return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat((float)v.f64()));
         }
-        return llvm::ConstantInt::get(llvm::Type::getInt64Ty(builder.getContext()), v.i64);
+        return llvm::ConstantInt::get(llvm::Type::getInt64Ty(builder.getContext()), v.i64());
     }
     auto it = ssa_map.find(v.name);
     return (it != ssa_map.end()) ? it->second : nullptr;
@@ -151,8 +151,17 @@ static llvm::Value* lower_instruction(const IrInstruction& inst, llvm::IRBuilder
         }
 
         else if constexpr (std::is_same_v<T, IrCall>) {
+            if (i.callee.empty()) return nullptr;
             llvm::Function* callee = cur_fn->getParent()->getFunction(i.callee);
-            if (!callee) return nullptr;
+            if (!callee) {
+                /* Declare the function if not found — forward declaration */
+                auto* ret_ty = lower_type(i.ret_type_idx, pool, builder.getContext());
+                std::vector<llvm::Type*> param_tys;
+                for (size_t ai = 0; ai < i.args.size(); ai++)
+                    param_tys.push_back(llvm::Type::getInt64Ty(builder.getContext()));
+                auto* fn_ty = llvm::FunctionType::get(ret_ty, param_tys, false);
+                callee = llvm::Function::Create(fn_ty, llvm::Function::ExternalLinkage, i.callee, cur_fn->getParent());
+            }
             std::vector<llvm::Value*> llvm_args;
             for (const auto& a : i.args) {
                 auto* v = lower_value(a, builder, pool, ssa_map);
@@ -195,6 +204,7 @@ static llvm::Value* lower_instruction(const IrInstruction& inst, llvm::IRBuilder
                 lower_type(i.type_idx, pool, builder.getContext()),
                 (unsigned)i.incoming.size(), i.result_name);
             for (const auto& [val_name, block_name] : i.incoming) {
+                if (val_name.empty() || block_name.empty()) continue;
                 auto* val = lower_value(ir_ssa(val_name, i.type_idx), builder, pool, ssa_map);
                 llvm::BasicBlock* bb = nullptr;
                 for (auto& b : *cur_fn) {

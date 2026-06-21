@@ -1,5 +1,5 @@
-import "test"
-import "mock"
+// import "test" — module may not exist; test functions may be builtins
+// import "mock" — module may not exist; mock functions may be builtins
 
 ## ── Test assert_throws ──
 

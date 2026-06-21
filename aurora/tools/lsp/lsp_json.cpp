@@ -21,7 +21,7 @@ JsonValue JsonValue::get(int index) const {
 
 std::string JsonValue::as_string(const std::string& def) const {
     if (type == StringVal) return str;
-    if (type == Number) return std::to_string((long long)num);
+    if (type == Number) return std::to_string(num);
     return def;
 }
 
@@ -99,7 +99,9 @@ JsonValue JsonParser::parse_number() {
         if (pos < s.size() && (s[pos] == '+' || s[pos] == '-')) pos++;
         while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') pos++;
     }
+    errno = 0;
     v.num = std::strtod(s.substr(start, pos - start).c_str(), nullptr);
+    if (errno == ERANGE) v.num = 0;
     return v;
 }
 
@@ -140,12 +142,15 @@ JsonValue JsonParser::parse_array() {
 
 JsonValue JsonParser::parse_bool_or_null() {
     JsonValue v;
+    v.type = JsonValue::Null;
     if (s.substr(pos, 4) == "true") {
         v.type = JsonValue::Bool; v.boolean = true; pos += 4;
     } else if (s.substr(pos, 5) == "false") {
         v.type = JsonValue::Bool; v.boolean = false; pos += 5;
     } else if (s.substr(pos, 4) == "null") {
-        pos += 4;
+        v.type = JsonValue::Null; pos += 4;
+    } else {
+        /* unrecognized token — return null as error sentinel */
     }
     return v;
 }
@@ -205,7 +210,18 @@ std::string JsonParser::stringify(const JsonValue& v) {
 void JsonBuilder::comma() { if (!first_) ss_ << ","; first_ = false; }
 
 void JsonBuilder::add(const std::string& key, const std::string& val) {
-    comma(); ss_ << "\"" << key << "\":\"" << val << "\"";
+    std::string escaped;
+    for (char c : val) {
+        switch (c) {
+            case '"': escaped += "\\\""; break;
+            case '\\': escaped += "\\\\"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default: escaped += c;
+        }
+    }
+    comma(); ss_ << "\"" << key << "\":\"" << escaped << "\"";
 }
 
 void JsonBuilder::add_int(const std::string& key, int val) {

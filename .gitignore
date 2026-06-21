@@ -32,8 +32,6 @@ quickjs/build/
 *.pdb
 *.ilk
 *.dll
-!build/Release/*.dll
-!build/Release/*.lib
 !build/Release/*.exp
 
 # ── Exes (keep only specific build outputs) ──

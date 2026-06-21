@@ -35,9 +35,9 @@ extern "C" {
 /* ── Function pointer loading ── */
 #ifdef _WIN32
 static void* gl_load(const char* name) {
-    HMODULE gl = LoadLibraryA("opengl32.dll");
+    HMODULE gl = GetModuleHandleA("opengl32.dll");
     /* Try GetProcAddress first (handles forwarded exports on modern Windows) */
-    void* ptr = (void*)GetProcAddress(gl, name);
+    void* ptr = gl ? (void*)GetProcAddress(gl, name) : nullptr;
     if (!ptr) {
         /* Fallback to wglGetProcAddress for extension functions */
         using WGLGPA = void*(APIENTRY*)(const char*);
@@ -211,7 +211,10 @@ char* aurora_gl_get_program_info_log(GLuint program) {
 
 GLuint aurora_gl_compile_program(const char* vert_src, const char* frag_src) {
     gl_ensure_loaded();
-    if (!glCreateShader_fn || !glCreateProgram_fn) return 0;
+    if (!glCreateShader_fn || !glCreateProgram_fn || !glShaderSource_fn ||
+        !glCompileShader_fn || !glGetShaderiv_fn || !glDeleteShader_fn ||
+        !glAttachShader_fn || !glLinkProgram_fn || !glGetProgramiv_fn ||
+        !glDeleteProgram_fn) return 0;
 
     GLuint vs = glCreateShader_fn(0x8B31);
     if (!vs) return 0;

@@ -178,10 +178,13 @@ AuroraTensor* layernorm_forward(Layer* l, AuroraTensor* input, int training) {
         l->dw = nullptr; l->db = nullptr;
     }
     AuroraTensor* out = l_tensor(l, input->ndim, input->shape);
+    if (!out) return nullptr;
     if (l->cache) aurora_tensor_free(l->cache);
     l->cache = aurora_tensor_new(1, &nr);
+    if (!l->cache) { aurora_tensor_free(out); return nullptr; }
     if (l->running_mean) aurora_tensor_free(l->running_mean);
     l->running_mean = aurora_tensor_new(1, &nr);
+    if (!l->running_mean) { aurora_tensor_free(out); return nullptr; }
     if (l->dtype == TENSOR_F32) {
         for (int64_t r = 0; r < nr; r++) {
             float mn = 0.0f, vr = 0.0f;
@@ -221,20 +224,20 @@ AuroraTensor* layernorm_backward(Layer* l, AuroraTensor* dout, AuroraTensor* inp
     memset(l->db->data, 0, (size_t)l->db->total_size * sizeof(double));
     int64_t nf = input->shape[1], nr = input->shape[0];
     AuroraTensor* dx = aurora_tensor_new(input->ndim, input->shape);
+    if (!dx) return nullptr;
     for (int64_t r = 0; r < nr; r++) {
         double mn = l->cache ? l->cache->data[r] : 0.0;
-        double vr = l->running_mean ? l->running_mean->data[r] : 1.0;
-        double den = 1.0 / sqrt(vr + LN_EPS);
+        double inv_std = l->running_mean ? l->running_mean->data[r] : 1.0;
         for (int64_t j = 0; j < nf; j++) {
             double x = input->data[r * nf + j];
             double d = dout->data[r * nf + j];
-            double xnorm = (x - mn) * den;
+            double xnorm = (x - mn) * inv_std;
             /* gamma grad */
             l->dw->data[j] += d * xnorm;
             /* beta grad */
             l->db->data[j] += d;
             /* dx: sum across features of gradient contributions */
-            dx->data[r * nf + j] = d * l->w->data[j] * den;
+            dx->data[r * nf + j] = d * l->w->data[j] * inv_std;
             double sum_d = 0.0, sum_dx = 0.0;
             for (int64_t k = 0; k < nf; k++) {
                 double xk = input->data[r * nf + k];
@@ -242,7 +245,8 @@ AuroraTensor* layernorm_backward(Layer* l, AuroraTensor* dout, AuroraTensor* inp
                 sum_d += dk * l->w->data[k];
                 sum_dx += dk * l->w->data[k] * (xk - mn);
             }
-            dx->data[r * nf + j] -= (sum_d / (double)nf + (x - mn) * sum_dx / ((double)nf * (vr + LN_EPS)));
+            double variance = 1.0 / (inv_std * inv_std);
+            dx->data[r * nf + j] -= (sum_d / (double)nf + (x - mn) * sum_dx / ((double)nf * variance));
         }
     }
     for (int64_t j = 0; j < nf; j++) { l->dw->data[j] /= (double)nr; l->db->data[j] /= (double)nr; }
@@ -256,6 +260,7 @@ AuroraTensor* embedding_forward(Layer* l, AuroraTensor* input, int training) {
     int64_t batch = input->shape[0], seq = input->shape[1], d = l->w->shape[1];
     int64_t os[2] = { batch * seq, d };
     AuroraTensor* out = aurora_tensor_new(2, os);
+    if (!out) return nullptr;
     for (int64_t b = 0; b < batch; b++)
         for (int64_t s = 0; s < seq; s++) {
             int64_t tok = (int64_t)input->data[b * seq + s];
@@ -286,6 +291,7 @@ AuroraTensor* pos_encoding_forward(Layer* l, AuroraTensor* input, int training) 
     int64_t seq = input->shape[0] > 0 ? input->shape[0] : 1;
     int64_t d = input->shape[1];
     AuroraTensor* out = aurora_tensor_new(input->ndim, input->shape);
+    if (!out) return nullptr;
     memcpy(out->data, input->data, (size_t)input->total_size * sizeof(double));
     for (int64_t p = 0; p < seq; p++) {
         for (int64_t i = 0; i < d; i++) {
@@ -301,6 +307,7 @@ AuroraTensor* pos_encoding_backward(Layer* l, AuroraTensor* dout, AuroraTensor* 
     (void)l; (void)input;
     if (!dout) return nullptr;
     AuroraTensor* dx = aurora_tensor_new(dout->ndim, dout->shape);
+    if (!dx) return nullptr;
     memcpy(dx->data, dout->data, (size_t)dout->total_size * sizeof(double));
     return dx;
 }
@@ -328,6 +335,7 @@ AuroraTensor* rope_forward(Layer* l, AuroraTensor* input, int training) {
     int64_t dim = input->shape[1];
     int64_t total = input->total_size;
     AuroraTensor* out = aurora_tensor_new(input->ndim, input->shape);
+    if (!out) return nullptr;
     /* Handle batch: treat as flat [total, dim] or [batch * seq, dim] */
     if (input->ndim == 2) {
         apply_rope_to_tensor(input->data, seq, dim, out->data);
@@ -348,6 +356,7 @@ AuroraTensor* rope_backward(Layer* l, AuroraTensor* dout, AuroraTensor* input) {
     if (!dout) return nullptr;
     /* RoPE is orthogonal rotation; gradient is rotated by same angle */
     AuroraTensor* dx = aurora_tensor_new(dout->ndim, dout->shape);
+    if (!dx) return nullptr;
     int64_t seq = dout->shape[0];
     int64_t dim = dout->shape[1];
     if (dout->ndim == 2) {
@@ -526,6 +535,7 @@ AuroraTensor* unembed_forward(Layer* l, AuroraTensor* input, int training) {
     int64_t n = input->shape[0], emb = input->shape[1], voc = l->w->shape[0];
     int64_t os[2] = { n, voc };
     AuroraTensor* out = aurora_tensor_new(2, os);
+    if (!out) return nullptr;
     for (int64_t ri = 0; ri < n; ri++)
         for (int64_t ci = 0; ci < voc; ci++) {
             double sum = 0.0;
@@ -611,8 +621,10 @@ AuroraTensor* conv2d_forward(Layer* l, AuroraTensor* input, int training) {
     int64_t col_h = batch * oh * ow, col_w = kh * kw * c;
     int64_t col_shape[2] = { col_h, col_w };
     AuroraTensor* col = aurora_tensor_new(2, col_shape);
+    if (!col) return nullptr;
     im2col(input->data, batch, h, w, c, kh, kw, sh, sw, col->data, oh, ow);
     AuroraTensor* out = aurora_tensor_matmul(col, l->w);
+    if (!out) { aurora_tensor_free(col); return nullptr; }
     for (int64_t i = 0; i < out->total_size; i++)
         out->data[i] += l->b->data[i % l->b->total_size];
     int64_t os[4] = { batch, oh, ow, filters };
@@ -656,8 +668,10 @@ AuroraTensor* conv2d_backward(Layer* l, AuroraTensor* dout, AuroraTensor* input)
             wt->data[j * col_w + i] = l->w->data[i * filters + j];
     AuroraTensor* dx_col = aurora_tensor_matmul(dout, wt);
     aurora_tensor_free(wt);
+    if (!dx_col) { aurora_tensor_free(col); return nullptr; }
     int64_t in_shape[4] = { batch, h, w, c };
     AuroraTensor* dx = aurora_tensor_new(4, in_shape);
+    if (!dx) { aurora_tensor_free(dx_col); aurora_tensor_free(col); return nullptr; }
     col2im(dx_col->data, batch, h, w, c, kh, kw, sh, sw, dx->data, oh, ow);
     aurora_tensor_free(dx_col);
     aurora_tensor_free(col);

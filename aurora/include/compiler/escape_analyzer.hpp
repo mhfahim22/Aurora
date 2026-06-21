@@ -34,7 +34,7 @@ struct EscapeInfo {
     EscapeStatus status          { EscapeStatus::Unknown };
     bool        is_global        { false };
     bool        is_closure_param { false };
-    int         ref_count        { 0 };  /* number of references */
+    size_t      ref_count        { 0 };  /* number of references */
 
     /* Where the variable escapes */
     struct EscapePoint {

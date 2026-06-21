@@ -31,8 +31,8 @@ extern "C" {
 
 #ifdef _WIN32
 static void* gl_load(const char* name) {
-    HMODULE gl = LoadLibraryA("opengl32.dll");
-    void* ptr = (void*)GetProcAddress(gl, name);
+    HMODULE gl = GetModuleHandleA("opengl32.dll");
+    void* ptr = gl ? (void*)GetProcAddress(gl, name) : nullptr;
     if (!ptr) {
         using WGLGPA = void*(APIENTRY*)(const char*);
         static WGLGPA wgl = nullptr;

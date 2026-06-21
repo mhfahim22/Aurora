@@ -28,22 +28,7 @@
 
 /* Forward-declare arena allocator from memory.cpp */
 extern "C" void* aurora_alloc(size_t size);
-
-/* ── Panic handler ── */
-static void aurora_panic(const char* msg) {
-#ifdef _WIN32
-    HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-    DWORD w;
-    WriteFile(hErr, "PANIC: ", 7, &w, nullptr);
-    int len = 0; while (msg[len]) len++;
-    WriteFile(hErr, msg, len, &w, nullptr);
-    WriteFile(hErr, "\n", 1, &w, nullptr);
-    ExitProcess(1);
-#else
-    fprintf(stderr, "PANIC: %s\n", msg);
-    _exit(1);
-#endif
-}
+extern "C" void aurora_panic(const char* msg);
 
 // ── Value & Array types ───────────────────────────────────────
 struct AuroraValue {

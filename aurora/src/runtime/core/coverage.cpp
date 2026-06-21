@@ -14,8 +14,9 @@ static CoverageRecord g_records[MAX_COVERAGE_POINTS];
 static int g_record_count = 0;
 
 extern "C" void aurora_coverage_trace(const char* file, int line) {
+    if (!file) return;
     for (int i = 0; i < g_record_count; i++) {
-        if (g_records[i].line == line && g_records[i].file == file) {
+        if (g_records[i].line == line && strcmp(g_records[i].file, file) == 0) {
             g_records[i].count++;
             return;
         }

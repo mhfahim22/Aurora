@@ -37,7 +37,12 @@ struct IrValue {
     std::string name;
     int32_t type_idx{-1};
     bool is_const{false};
-    union { int64_t i64; double f64; };
+    std::variant<int64_t, double> data{int64_t{0}};
+
+    int64_t i64() const { return std::get<int64_t>(data); }
+    double  f64() const { return std::get<double>(data); }
+    void set_i64(int64_t v) { data = v; }
+    void set_f64(double v)  { data = v; }
 };
 
 /* ── Binary operators ── */
@@ -89,7 +94,7 @@ struct IrFunction {
     std::string name;
     std::vector<IrParam> params;
     int32_t ret_type_idx{-1};
-    std::deque<IrBasicBlock> blocks;
+    mutable std::deque<IrBasicBlock> blocks;
     std::vector<std::string> block_order;
 };
 
@@ -118,6 +123,7 @@ struct IrModule {
     std::string name;
     std::vector<IrType> type_pool;
     std::deque<IrFunction> functions;
+    std::vector<IrFunction> declarations; /* external function declarations (no body) */
     std::vector<IrGlobal> globals;
     std::vector<std::string> string_pool;
 

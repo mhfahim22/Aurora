@@ -352,7 +352,10 @@ static InteropType json_parse_type(const std::string& json) {
     if (!orig_str.empty()) t.original_name = json_unwrap_string(orig_str);
 
     std::string arr_size_str = json_extract(j, "array_size");
-    if (!arr_size_str.empty()) t.array_size = std::stoll(arr_size_str);
+    if (!arr_size_str.empty()) {
+        try { t.array_size = std::stoll(arr_size_str); }
+        catch (...) { t.array_size = 0; }
+    }
 
     std::string elem_str = json_extract(j, "element_type");
     if (!elem_str.empty()) t.element_type = json_unwrap_string(elem_str);

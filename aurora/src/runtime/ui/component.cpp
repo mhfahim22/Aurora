@@ -115,6 +115,7 @@ static int route_count = 0;
 void aurora_ui_route_register(const char* path, void* handler) {
     if (!path || route_count >= 64) return;
     strncpy(routes[route_count].path, path, sizeof(routes[route_count].path) - 1);
+    routes[route_count].path[sizeof(routes[route_count].path) - 1] = '\0';
     routes[route_count].handler = handler;
     route_count++;
 }
@@ -127,7 +128,9 @@ static int style_rule_count = 0;
 void aurora_style_apply(const char* target, const char* rules) {
     if (!target || !rules || style_rule_count >= 128) return;
     strncpy(style_rules[style_rule_count].key, target, sizeof(style_rules[style_rule_count].key) - 1);
+    style_rules[style_rule_count].key[sizeof(style_rules[style_rule_count].key) - 1] = '\0';
     strncpy(style_rules[style_rule_count].val, rules, sizeof(style_rules[style_rule_count].val) - 1);
+    style_rules[style_rule_count].val[sizeof(style_rules[style_rule_count].val) - 1] = '\0';
     style_rule_count++;
 }
 

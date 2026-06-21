@@ -1,4 +1,4 @@
-## OpenGL 3.3 Core Profile — Function Bindings
+## OpenGL 1.x Compatibility Profile (includes deprecated immediate-mode functions)
 ## Usage: import "opengl"
 ## Requires: opengl32.dll (always present on Windows)
 ##

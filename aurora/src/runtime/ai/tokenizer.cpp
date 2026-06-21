@@ -535,7 +535,8 @@ int64_t bpe_load_json(const char* tokenizer_json_path) {
     BPETokenizer* tok = (BPETokenizer*)calloc(1, sizeof(BPETokenizer));
     if (!tok) { aurora_json_free(root); return 0; }
 
-    tok->vocab_size = vocab_size + 2; /* +2 for BOS/EOS */
+    int64_t total_vocab = vocab_size + 2 + num_merges;
+    tok->vocab_size = total_vocab;
     tok->vocab = (char**)calloc((size_t)tok->vocab_size, sizeof(char*));
 
     if (vocab_json->type == JSON_OBJECT) {
@@ -548,13 +549,7 @@ int64_t bpe_load_json(const char* tokenizer_json_path) {
         }
     }
 
-    /* BOS/EOS */
-    tok->bos_id = vocab_size;
-    tok->eos_id = vocab_size + 1;
-    tok->vocab[tok->bos_id] = AURORA_STRDUP("<s>");
-    tok->vocab[tok->eos_id] = AURORA_STRDUP("</s>");
-
-    /* Parse merges */
+    /* Parse merges first to assign IDs */
     tok->num_merges = num_merges;
     tok->merges = (BPEMerge*)calloc((size_t)(num_merges > 0 ? num_merges : 1), sizeof(BPEMerge));
     tok->merge_rank = (int64_t*)malloc((size_t)(num_merges > 0 ? num_merges : 1) * sizeof(int64_t));
@@ -595,9 +590,21 @@ int64_t bpe_load_json(const char* tokenizer_json_path) {
                 tok->merges[mi].second = second_id;
                 tok->merges[mi].token = merged;
                 tok->merge_rank[mi] = mi;
+                tok->vocab[next_id] = AURORA_STRDUP(merged);
                 next_id++;
             }
         }
+    }
+
+    /* BOS/EOS */
+    if (next_id + 2 <= total_vocab) {
+        tok->bos_id = next_id;
+        tok->eos_id = next_id + 1;
+        tok->vocab[tok->bos_id] = AURORA_STRDUP("<s>");
+        tok->vocab[tok->eos_id] = AURORA_STRDUP("</s>");
+    } else {
+        tok->bos_id = 0;
+        tok->eos_id = 1;
     }
 
     aurora_json_free(root);

@@ -61,14 +61,21 @@ ASTNode::Ptr Parser::parse_class() {
         idx++;
     }
 
-    /* implements Interface */
+    /* implements Interface1, Interface2, ... */
     if (idx < cnt && toks[idx].is_keyword("implements")) {
         idx++;
-        if (idx >= cnt || !toks[idx].is_identifier())
-            throw std::runtime_error(
-                "Line " + std::to_string(ln) + ": expected interface name after 'implements'");
-        stmt->right = make_node(NodeType::Var, toks[idx].value, ln);
-        idx++;
+        ASTNode* itail = nullptr;
+        while (idx < cnt && (toks[idx].is_identifier() || toks[idx].is_operator(','))) {
+            if (toks[idx].is_operator(',')) { idx++; continue; }
+            if (!toks[idx].is_identifier())
+                throw std::runtime_error(
+                    "Line " + std::to_string(ln) + ": expected interface name after 'implements'");
+            auto iface = make_node(NodeType::Var, toks[idx].value, ln);
+            idx++;
+            ASTNode* raw = iface.get();
+            if (!stmt->args) { stmt->args = std::move(iface); itail = raw; }
+            else             { itail->next = std::move(iface); itail = raw; }
+        }
     }
 
     if (idx < cnt && toks[idx].is_operator(':')) idx++;

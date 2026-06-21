@@ -3,6 +3,9 @@ import "string"
 import "database"
 import "collections"
 
+extern function map_keys(m: pointer) -> pointer
+extern function map_copy(dst: pointer, src: pointer)
+
 function model_new(table_name, db)
     m = map()
     map_set(m, "_db", db)
@@ -49,6 +52,12 @@ function model_save_all(m)
         i = i + 1
     end
     return model_save(m, fields)
+end
+
+function model_escape(v)
+    s = str(v)
+    s = replace(s, "'", "''")
+    return strcat("'", strcat(s, "'"))
 end
 
 function values_placeholder(n)
@@ -122,7 +131,7 @@ function model_update(m, fields)
     end
     sql = strcat(sql, " WHERE id = ")
     my_id = map_get(m, "_id")
-    sql = strcat(sql, str(my_id))
+    sql = strcat(sql, model_escape(my_id))
     return db_execute(db, sql)
 end
 
@@ -130,7 +139,7 @@ function model_find(db, table_name, id_val)
     sql = "SELECT * FROM "
     sql = strcat(sql, table_name)
     sql = strcat(sql, " WHERE id = ")
-    sql = strcat(sql, str(id_val))
+    sql = strcat(sql, model_escape(id_val))
     rows = db_query(db, sql)
     n = list_len(rows)
     if n > 0
@@ -151,9 +160,9 @@ function model_find_by(db, table_name, field, value)
     sql = strcat(sql, table_name)
     sql = strcat(sql, " WHERE ")
     sql = strcat(sql, field)
-    sql = strcat(sql, " = '")
-    sql = strcat(sql, str(value))
-    sql = strcat(sql, "' LIMIT 1")
+    sql = strcat(sql, " = ")
+    sql = strcat(sql, model_escape(value))
+    sql = strcat(sql, " LIMIT 1")
     rows = db_query(db, sql)
     n = list_len(rows)
     if n > 0
@@ -215,7 +224,7 @@ function model_exists(db, table_name, id_val)
     sql = "SELECT 1 FROM "
     sql = strcat(sql, table_name)
     sql = strcat(sql, " WHERE id = ")
-    sql = strcat(sql, str(id_val))
+    sql = strcat(sql, model_escape(id_val))
     sql = strcat(sql, " LIMIT 1")
     rows = db_query(db, sql)
     return list_len(rows) > 0
@@ -229,7 +238,7 @@ function model_delete(m)
     sql = "DELETE FROM "
     sql = strcat(sql, map_get(m, "_table"))
     sql = strcat(sql, " WHERE id = ")
-    sql = strcat(sql, str(my_id))
+    sql = strcat(sql, model_escape(my_id))
     return db_execute(map_get(m, "_db"), sql)
 end
 
@@ -244,7 +253,7 @@ function model_has_many(m, child_table, foreign_key)
     sql = strcat(sql, " WHERE ")
     sql = strcat(sql, foreign_key)
     sql = strcat(sql, " = ")
-    sql = strcat(sql, str(my_id))
+    sql = strcat(sql, model_escape(my_id))
     return db_query(db, sql)
 end
 

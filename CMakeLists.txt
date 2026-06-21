@@ -11,7 +11,7 @@ list(GET AURORA_VERSION_LIST 1 AURORA_VERSION_MINOR)
 list(GET AURORA_VERSION_LIST 2 AURORA_VERSION_PATCH)
 configure_file(
     "${CMAKE_SOURCE_DIR}/aurora/include/runtime/version.h.in"
-    "${CMAKE_SOURCE_DIR}/aurora/include/runtime/version.h"
+    "${CMAKE_BINARY_DIR}/include/aurora/runtime/version.h"
     @ONLY
 )
 
@@ -123,6 +123,7 @@ endif()
 llvm_map_components_to_libnames(LLVM_LIBS ${AURORA_LLVM_COMPONENTS})
 target_link_libraries(aurorac PRIVATE ${LLVM_LIBS})
 
+target_include_directories(aurorac PRIVATE "${CMAKE_BINARY_DIR}/include")
 
 if(UNIX)
     target_link_options(aurorac PRIVATE -rdynamic)
@@ -144,7 +145,6 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/core/reflection.cpp
     aurora/src/runtime/core/ffi.cpp
     aurora/src/runtime/core/ffi_abi.cpp
-    aurora/src/runtime/core/ffi_call_win64.asm
     aurora/src/runtime/interop/type_ir.cpp
     aurora/src/runtime/interop/type_mapping.cpp
     aurora/src/runtime/interop/type_mapping_langs.cpp
@@ -201,8 +201,13 @@ add_library(aurora_runtime STATIC
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
 )
-set_source_files_properties(aurora/src/runtime/backend/miniz.c PROPERTIES LANGUAGE CXX COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
-set_source_files_properties(aurora/src/runtime/backend/miniz_tdef.c PROPERTIES LANGUAGE CXX COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
+
+if(WIN32)
+    target_sources(aurora_runtime PRIVATE aurora/src/runtime/core/ffi_call_win64.asm)
+endif()
+
+set_source_files_properties(aurora/src/runtime/backend/miniz.c PROPERTIES COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
+set_source_files_properties(aurora/src/runtime/backend/miniz_tdef.c PROPERTIES COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
 if(APPLE)
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
     target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
@@ -215,7 +220,8 @@ else()
 endif()
 
 target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include
-    ${CMAKE_SOURCE_DIR}/aurora/src/runtime/backend)
+    ${CMAKE_SOURCE_DIR}/aurora/src/runtime/backend
+    "${CMAKE_BINARY_DIR}/include")
 
 # ── OpenGL / 3D Graphics support (optional) ──
 if(WIN32)
@@ -237,7 +243,7 @@ endif()
 
 # ── LTO (Link-Time Optimization) for runtime library ──
 # Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
-# Disabled temporarily for function pointer / test development
+# TODO(#<issue>): Re-enable after function pointer / test development is complete
 # set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 
@@ -337,7 +343,6 @@ endif()
 # ═══════════════════════════════════════════════════════════════
 # Optional: RCCL support (AMD GPU distributed)
 # ═══════════════════════════════════════════════════════════════
-find_package(hip QUIET)
 if(hip_FOUND)
     find_path(RCCL_INCLUDE_DIR rccl/rccl.h
         PATHS /opt/rocm/include /opt/rocm/rccl/include)
@@ -431,7 +436,7 @@ set_target_properties(voss PROPERTIES OUTPUT_NAME "voss")
 # into a shared library (.so / .dylib) for the current platform.
 # Usage: add_npm_bridge(<name> <pkg> <c_file>)
 function(add_npm_bridge name pkg c_file)
-    set(qjs_dir "${CMAKE_SOURCE_DIR}/quickjs")
+    set(qjs_dir "${CMAKE_SOURCE_DIR}/deps/quickjs")
     set(qjs_sources
         "${qjs_dir}/quickjs.c"
         "${qjs_dir}/cutils.c"
@@ -549,7 +554,7 @@ if(Clang_FOUND)
         aurora/tools/bindgen/bindgen.cpp
     )
     target_include_directories(aurora_bindgen PRIVATE ${CLANG_INCLUDE_DIRS})
-    target_link_libraries(aurora_bindgen PRIVATE libclang)
+    target_link_libraries(aurora_bindgen PRIVATE ${CLANG_LIBRARIES})
 else()
     message(STATUS "Clang not found — skipping aurora-bindgen")
 endif()
@@ -563,7 +568,7 @@ if(Clang_FOUND)
         aurora/tools/cppwrap/cppwrap.cpp
     )
     target_include_directories(aurora_cppwrap PRIVATE ${CLANG_INCLUDE_DIRS})
-    target_link_libraries(aurora_cppwrap PRIVATE libclang)
+    target_link_libraries(aurora_cppwrap PRIVATE ${CLANG_LIBRARIES})
 endif()
 
 # ═══════════════════════════════════════════════════════════════
@@ -758,4 +763,16 @@ if(WIN32)
     target_link_libraries(bench_compiler PRIVATE kernel32)
 endif()
 target_include_directories(bench_compiler PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ── Install targets ──
+install(TARGETS aurorac RUNTIME DESTINATION bin)
+install(TARGETS aurora_runtime ARCHIVE DESTINATION lib)
+install(TARGETS voss RUNTIME DESTINATION bin)
+install(TARGETS aurora_lsp RUNTIME DESTINATION bin)
+if(TARGET aurora_bindgen)
+    install(TARGETS aurora_bindgen RUNTIME DESTINATION bin)
+endif()
+if(TARGET aurora_cppwrap)
+    install(TARGETS aurora_cppwrap RUNTIME DESTINATION bin)
+endif()
 

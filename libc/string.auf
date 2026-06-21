@@ -22,6 +22,7 @@
 
 function str_is_empty(s)
     return strlen(s) == 0
+end
 
 function str_repeat(s, n)
     result = s
@@ -29,6 +30,9 @@ function str_repeat(s, n)
     loop
         if i >= n
             break
+        end
         result = strcat(result, s)
         i = i + 1
+    end
     return result
+end

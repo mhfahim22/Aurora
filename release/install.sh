@@ -40,14 +40,14 @@ case "$ARCH" in
 esac
 
 if [ "$PLATFORM" = "macos" ] && [ "$ARCH" = "x86_64" ]; then
-    ASSET="Aurora-$Version-macos-x86_64.tar.gz"
+    ASSET="Aurora-$VERSION-macos-x86_64.tar.gz"
 elif [ "$PLATFORM" = "macos" ] && [ "$ARCH" = "aarch64" ]; then
-    ASSET="Aurora-$Version-macos-aarch64.tar.gz"
+    ASSET="Aurora-$VERSION-macos-aarch64.tar.gz"
 else
-    ASSET="Aurora-$Version-$PLATFORM-$ARCH.tar.gz"
+    ASSET="Aurora-$VERSION-$PLATFORM-$ARCH.tar.gz"
 fi
 
-URL="https://github.com/$REPO/releases/download/v$Version/$ASSET"
+URL="https://github.com/$REPO/releases/download/v$VERSION/$ASSET"
 TEMP_DIR=$(mktemp -d)
 
 echo "==> Downloading $ASSET ..."

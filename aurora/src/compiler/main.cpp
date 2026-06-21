@@ -46,8 +46,7 @@ namespace fs = std::filesystem;
 static std::string read_file(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) {
-        std::cerr << "aurora: cannot open file: " << path << "\n";
-        std::exit(1);
+        throw std::runtime_error("aurora: cannot open file: " + path);
     }
     std::ostringstream ss;
     ss << f.rdbuf();
@@ -172,6 +171,14 @@ static std::string resolve_via_voss(const std::string& name, const std::string& 
         voss_exe = (fs::path(exe_dir) / "voss").string();
         if (!fs::exists(voss_exe)) {
             voss_exe = "voss.exe";
+            if (!fs::exists(voss_exe)) {
+                voss_exe = "voss";
+                if (!fs::exists(voss_exe)) {
+                    std::cerr << "[voss] ERROR: voss executable not found\n";
+                    std::cerr << "[voss]   install voss or check PATH\n";
+                    return "";
+                }
+            }
         }
     }
     std::cerr << "[voss] using: " << voss_exe << "\n";
@@ -188,8 +195,15 @@ static std::string resolve_via_voss(const std::string& name, const std::string& 
         }
     }
 
+    /* Sanitize package name: allow only alphanumeric, underscore, hyphen, dot */
+    auto safe_pkg = pkg_name;
+    for (auto& ch : safe_pkg) {
+        if (!std::isalnum((unsigned char)ch) && ch != '_' && ch != '-' && ch != '.')
+            ch = '_';
+    }
+
     /* Build command: voss bridge <eco> <pkg> */
-    std::string cmd = "\"" + voss_exe + "\" bridge " + eco_cmd + " \"" + pkg_name + "\"";
+    std::string cmd = "\"" + voss_exe + "\" bridge " + eco_cmd + " \"" + safe_pkg + "\"";
     std::cerr << "[voss] running: " << cmd << "\n";
 
 #ifdef _WIN32
@@ -328,9 +342,17 @@ static std::string auto_bindgen(const std::string& header_path, const std::strin
 
     std::cerr << "[auto-bindgen] " << hdr.filename().string() << " → " << out_path.filename().string() << "\n" << std::flush;
 
+    /* Sanitize: ensure header_path doesn't contain shell metacharacters */
+    auto sanitized_path = header_path;
+    for (auto& ch : sanitized_path) {
+        if (ch == '|' || ch == '&' || ch == ';' || ch == '$' || ch == '`' ||
+            ch == '(' || ch == ')' || ch == '<' || ch == '>' || ch == '\'' || ch == '"')
+            ch = '_';
+    }
+
 #ifdef _WIN32
     /* Build command line args */
-    std::string args = std::string("\"") + bindgen_exe + "\" \"" + header_path
+    std::string args = std::string("\"") + bindgen_exe + "\" \"" + sanitized_path
                      + "\" -o \"" + out_path.string() + "\"";
 
     STARTUPINFOA si = {};
@@ -348,8 +370,8 @@ static std::string auto_bindgen(const std::string& header_path, const std::strin
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
 #else
-    std::string cmd = "\"" + bindgen_exe + "\" \"" + header_path
-                    + "\" -o \"" + out_path.string() + "\"";
+    std::string cmd = bindgen_exe + " " + sanitized_path
+                    + " -o " + out_path.string();
     int exit_code = std::system(cmd.c_str());
 #endif
 
@@ -392,9 +414,11 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
                 found = resolve_via_voss(path, exe_dir);
             }
             if (found.empty()) {
-                std::cerr << "aurora: cannot find import: " << path << "\n";
-                std::exit(1);
+                throw std::runtime_error("aurora: cannot find import: " + path);
             }
+            /* TODO: support namespace/module scoping for imports —
+               e.g., import com.example.foo should resolve within a
+               module com.example { ... } scope, not the global scope. */
             std::string src = read_file(found);
             Lexer lexer;
             auto lines = lexer.lex(src);
@@ -684,6 +708,10 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
 #endif
 
     std::cout << "aurora: linking " << exe_path << "\n";
+    /* NOTE: path inputs (obj_path, exe_path, rt_lib, lib_paths, link_libs)
+       should be sanitized to prevent command injection. In the current design
+       these come from trusted sources (compiler internals, not user input),
+       but a production system should validate or escape all path arguments. */
     int ret = std::system(cmd.c_str());
     if (ret != 0) {
         std::cerr << "aurora: link failed (exit " << ret << ")\n";
@@ -1014,7 +1042,11 @@ int main(int argc, char** argv) {
             /* Optimize Aurora IR */
             try {
                 ir_optimize(ir_mod);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "STAGE4b: Aurora IR optimization warning: " << e.what() << "\n" << std::flush;
+            } catch (...) {
+                std::cerr << "STAGE4b: Aurora IR optimization warning (unknown exception)\n" << std::flush;
+            }
             std::cerr << "STAGE4b: Aurora IR optimized\n" << std::flush;
 
             /* Lower to LLVM IR */
@@ -1044,7 +1076,11 @@ int main(int argc, char** argv) {
             std::cerr << "STAGE5: BeforeOpt: " << module->size() << " functions\n" << std::flush;
             try {
                 run_aurora_optimizer(module.get());
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "STAGE5: Aurora optimizer warning: " << e.what() << "\n" << std::flush;
+            } catch (...) {
+                std::cerr << "STAGE5: Aurora optimizer warning (unknown exception)\n" << std::flush;
+            }
             std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
         }
 
@@ -1154,7 +1190,9 @@ int main(int argc, char** argv) {
             auto sep = source_path.find_last_of("/\\");
             std::string fname = (sep == std::string::npos) ? source_path : source_path.substr(sep + 1);
             fname = fname.substr(0, fname.rfind('.')) + ".ll";
-            std::string out_path = "output/ir/" + fname;
+            std::string out_dir = "output/ir/";
+            fs::create_directories(out_dir);
+            std::string out_path = out_dir + fname;
             std::ofstream ofs(out_path);
             ofs << ir_str;
             ofs.close();

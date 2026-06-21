@@ -200,6 +200,11 @@ struct ASTNode {
     /* Lambda capture variables */
     std::vector<std::string> captures;
 
+    /* NOTE: raw pointer usage (ASTNode*) in this codebase follows an
+       owner/observer convention: unique_ptr owns, raw pointer observes.
+       The raw pointer patterns (left, right, body, orelse, next, args) are
+       intentional — they point to nodes owned by unique_ptrs elsewhere in
+       the tree, avoiding circular ownership. */
     explicit ASTNode(NodeType t, std::string v = "", int ln = 0)
         : type(t), value(std::move(v)), src_line(ln) {}
 

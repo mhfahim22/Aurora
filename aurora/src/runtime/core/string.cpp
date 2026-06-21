@@ -18,8 +18,7 @@ int64_t aurora_strlen(const char* str) {
     /* Called from LLVM with AuroraStr* — use header len
        WARNING: MUST receive an AuroraStr*, not a raw C string.
        Casts str to AuroraStr* and reads the len field. */
-    AuroraStr* s = (AuroraStr*)str;
-    return (int64_t)s->len;
+    return (int64_t)reinterpret_cast<const AuroraStr*>(str)->len;
 }
 
 /* Helper: extract raw C string from AuroraStr* (passed as const char*) */

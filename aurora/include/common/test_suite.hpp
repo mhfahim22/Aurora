@@ -68,11 +68,7 @@ public:
             if (passed) passed_tests_++;
             else failed_tests_++;
 
-            TestResult result;
-            result.name = test.name;
-            result.passed = passed;
-            result.message = message;
-            result.time_ms = time_ms;
+            TestResult result{test.name, passed, message, time_ms};
             results_.push_back(result);
 
             std::cout << "║  " << (passed ? "✓" : "✗") << " " << test.name;

@@ -1,3 +1,4 @@
+// TODO: Requires language features that may not be fully implemented
 /* Phase 4 — Backend Framework Integration Test */
 /* Tests enhanced runtime: auth tokens, sanitize, lock/unlock, audit, CORS, health */
 

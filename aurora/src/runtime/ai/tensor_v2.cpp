@@ -33,12 +33,15 @@ AuroraTensorV2* tensor_v2_new(int64_t ndim, int64_t* shape, int dtype) {
     int64_t total = compute_size(ndim, shape);
     size_t elem_size = (dtype == TENSOR_F32) ? sizeof(float) : sizeof(double);
     AuroraTensorV2* t = (AuroraTensorV2*)calloc(1, sizeof(AuroraTensorV2));
+    if (!t) return nullptr;
     t->ndim = ndim;
     t->shape = (int64_t*)malloc((size_t)ndim * sizeof(int64_t));
+    if (!t->shape) { free(t); return nullptr; }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int64_t));
     t->total_size = total;
     t->dtype = dtype;
     t->data = calloc((size_t)total, elem_size);
+    if (!t->data) { free(t->shape); free(t); return nullptr; }
     t->data_f64 = (double*)t->data;
     t->data_f32 = (float*)t->data;
     return t;

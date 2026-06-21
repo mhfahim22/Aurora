@@ -43,7 +43,21 @@ MappedType CMapper::map_to_ir(const std::string& native_type, const InteropTypeR
     std::string t = native_type;
 
     while (!t.empty() && t.front() == ' ') t.erase(0, 1);
-    while (!t.empty() && (t.back() == ' ' || t.back() == '*')) t.pop_back();
+
+    /* Check for pointer types before stripping trailing markers */
+    if (t.find('*') != std::string::npos) {
+        std::string base = t;
+        while (!base.empty() && (base.back() == ' ' || base.back() == '*')) base.pop_back();
+        auto* ir = reg.get_type(base);
+        if (ir) {
+            result.ir_type = InteropType::make_pointer(ir->name);
+            return result;
+        }
+        result.ir_type = InteropType::make_primitive(InteropTypeKind::Pointer, "pointer");
+        return result;
+    }
+
+    while (!t.empty() && t.back() == ' ') t.pop_back();
 
     auto* ir = reg.get_type(t);
     if (ir) {
@@ -53,11 +67,6 @@ MappedType CMapper::map_to_ir(const std::string& native_type, const InteropTypeR
             result.is_trivially_castable = true;
             result.cost = InteropCost::ZeroCost;
         }
-        return result;
-    }
-
-    if (t.find('*') != std::string::npos) {
-        result.ir_type = InteropType::make_primitive(InteropTypeKind::Pointer, "pointer");
         return result;
     }
 

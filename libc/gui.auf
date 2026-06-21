@@ -1,8 +1,8 @@
 ## Native GUI bindings
-## Usage: import "gui.au"
+## Usage: import "gui"
 ##
 ## Example:
-##   import "gui.au"
+##   import "gui"
 ##   function main():
 ##     win = gui_window_new("Hello", 400, 300)
 ##     btn = gui_button_new(win, "Click Me", 10, 10, 100, 30)

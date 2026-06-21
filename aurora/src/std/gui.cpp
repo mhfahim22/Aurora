@@ -347,7 +347,7 @@ void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) {
    X11 Backend (Linux)
    ════════════════════════════════════════════════════════════ */
 
-#else
+#elif defined(__linux__)
 
 /* ── Platform data for X11 widgets ── */
 struct X11WidgetData {
@@ -615,5 +615,38 @@ void aurora_gui_layout_vertical(AuroraWidget parent, int margin) {
         }
     }
 }
+
+/* ════════════════════════════════════════════════════════════
+   macOS Backend (Cocoa) — stub
+   ════════════════════════════════════════════════════════════ */
+
+#elif defined(__APPLE__)
+
+AuroraWidget aurora_gui_window_new(const char* title, int width, int height) { (void)title; (void)width; (void)height; return nullptr; }
+void aurora_gui_window_set_title(AuroraWidget win, const char* title) { (void)win; (void)title; }
+void aurora_gui_window_resize(AuroraWidget win, int w, int h) { (void)win; (void)w; (void)h; }
+void aurora_gui_window_show(AuroraWidget win) { (void)win; }
+void aurora_gui_window_hide(AuroraWidget win) { (void)win; }
+void aurora_gui_window_destroy(AuroraWidget win) { (void)win; }
+AuroraWidget aurora_gui_button_new(AuroraWidget parent, const char* text, int x, int y, int w, int h) { (void)parent; (void)text; (void)x; (void)y; (void)w; (void)h; return nullptr; }
+void aurora_gui_button_set_text(AuroraWidget btn, const char* text) { (void)btn; (void)text; }
+const char* aurora_gui_button_get_text(AuroraWidget btn) { (void)btn; return ""; }
+AuroraWidget aurora_gui_label_new(AuroraWidget parent, const char* text, int x, int y, int w, int h) { (void)parent; (void)text; (void)x; (void)y; (void)w; (void)h; return nullptr; }
+void aurora_gui_label_set_text(AuroraWidget lbl, const char* text) { (void)lbl; (void)text; }
+const char* aurora_gui_label_get_text(AuroraWidget lbl) { (void)lbl; return ""; }
+AuroraWidget aurora_gui_textbox_new(AuroraWidget parent, int x, int y, int w, int h) { (void)parent; (void)x; (void)y; (void)w; (void)h; return nullptr; }
+void aurora_gui_textbox_set_text(AuroraWidget tb, const char* text) { (void)tb; (void)text; }
+const char* aurora_gui_textbox_get_text(AuroraWidget tb) { (void)tb; return ""; }
+AuroraWidget aurora_gui_listbox_new(AuroraWidget parent, int x, int y, int w, int h) { (void)parent; (void)x; (void)y; (void)w; (void)h; return nullptr; }
+void aurora_gui_listbox_add_item(AuroraWidget lb, const char* item) { (void)lb; (void)item; }
+void aurora_gui_listbox_clear(AuroraWidget lb) { (void)lb; }
+int aurora_gui_listbox_get_selected(AuroraWidget lb) { (void)lb; return -1; }
+const char* aurora_gui_listbox_get_item(AuroraWidget lb, int idx) { (void)lb; (void)idx; return nullptr; }
+int aurora_gui_listbox_count(AuroraWidget lb) { (void)lb; return 0; }
+void aurora_gui_run() { }
+void aurora_gui_quit() { }
+void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) { (void)widget; (void)cb; }
+void aurora_gui_layout_horizontal(AuroraWidget parent, int margin) { (void)parent; (void)margin; }
+void aurora_gui_layout_vertical(AuroraWidget parent, int margin) { (void)parent; (void)margin; }
 
 #endif

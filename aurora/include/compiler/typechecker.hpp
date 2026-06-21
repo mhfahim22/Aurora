@@ -107,7 +107,7 @@ public:
     bool is_inside_class() const { return !current_class_name_.empty(); }
 
 private:
-    std::vector<std::unordered_map<std::string, AuroraType>> scopes_;
+    std::vector<std::unordered_map<std::string, AuroraType>> scopes_; /* TODO: add variable shadowing diagnostic (future) */
     std::unordered_map<std::string, FunctionTypeInfo> functions_;
 
     /* User-defined type registry (struct/class/enum/interface name -> TypeInfo) */

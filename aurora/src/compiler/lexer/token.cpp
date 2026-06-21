@@ -45,7 +45,9 @@ std::string token_debug_string(const Token& t) {
 }
 
 bool token_is_compound_assign(const std::string& op) {
-    return op == "+=" || op == "-=" || op == "*=" || op == "/=";
+    return op == "+=" || op == "-=" || op == "*=" || op == "/=" ||
+           op == "%=" || op == "&=" || op == "|=" || op == "^=" ||
+           op == "<<=" || op == ">>=";
 }
 
 bool token_is_two_char_op(const std::string& op) {

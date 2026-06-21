@@ -33,6 +33,7 @@ static std::ofstream g_src_os;
 static std::ofstream g_au_os;
 static std::vector<std::string> g_header_paths;
 static std::vector<const char*> g_clang_args;
+static std::vector<std::string> g_clang_args_storage;
 
 /* Track wrapped classes to avoid duplicates */
 static std::set<std::string> g_wrapped_classes;
@@ -700,15 +701,20 @@ int main(int argc, char* argv[]) {
         } else if (strcmp(argv[i], "--with-exceptions") == 0) {
             g_with_exceptions = true;
         } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
-            g_clang_args.push_back(strdup(("-I" + std::string(argv[++i])).c_str()));
+            g_clang_args_storage.push_back("-I" + std::string(argv[++i]));
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strncmp(argv[i], "-I", 2) == 0) {
-            g_clang_args.push_back(strdup(argv[i]));
+            g_clang_args_storage.push_back(argv[i]);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
-            g_clang_args.push_back(strdup(("-D" + std::string(argv[++i])).c_str()));
+            g_clang_args_storage.push_back("-D" + std::string(argv[++i]));
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strncmp(argv[i], "-D", 2) == 0) {
-            g_clang_args.push_back(strdup(argv[i]));
+            g_clang_args_storage.push_back(argv[i]);
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "-std") == 0 && i + 1 < argc) {
-            g_clang_args.push_back(strdup(("-std=" + std::string(argv[++i])).c_str()));
+            g_clang_args_storage.push_back("-std=" + std::string(argv[++i]));
+            g_clang_args.push_back(g_clang_args_storage.back().c_str());
         } else if (strcmp(argv[i], "--verbose") == 0) {
             g_verbose = true;
         } else if (argv[i][0] != '-') {

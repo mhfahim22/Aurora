@@ -282,7 +282,7 @@ function query_insert(db, table_name, cols, vals)
         i = i + 1
     end
     sql = strcat(sql, ")")
-    return db_execute(db, sql)
+    return db_execute(db, sql, vals)
 end
 
 ## ── UPDATE ──
@@ -311,7 +311,7 @@ function query_update(db, table_name, cols, vals, condition)
         sql = strcat(sql, " WHERE ")
         sql = strcat(sql, condition)
     end
-    return db_execute(db, sql)
+    return db_execute(db, sql, vals)
 end
 
 ## ── DELETE ──

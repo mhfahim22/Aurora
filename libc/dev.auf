@@ -7,6 +7,6 @@
 
 extern function aurora_dev_server(port: int, src_dir: cstring)
 
-function dev_server(port, src_dir):
+function dev_server(port, src_dir)
     aurora_dev_server(port, src_dir)
 end

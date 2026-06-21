@@ -125,6 +125,9 @@ inline const char* ownership_type_name(OwnershipType s) {
 }
 
 /* ── Memory Metadata ── */
+/* NOTE: decl_line in this struct duplicates ASTNode::src_line when MemoryMetadata
+   is embedded in an ASTNode. When stored in MemoryAnalysisResult::variables there
+   is no associated ASTNode, so decl_line is kept for profiler diagnostics. */
 struct MemoryMetadata {
     AllocStrategy  alloc_strategy  { AllocStrategy::Unknown };
     AllocStrategy  forced_strategy { AllocStrategy::Unknown };

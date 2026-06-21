@@ -120,7 +120,7 @@ std::vector<SemanticToken> LspServer::get_semantic_tokens(DocumentState& doc) {
                         st.tokenType = ST_Type;
 
                     /* Check if followed by '(' → function call */
-                    st.tokenModifiers = 0;
+                    /* Don't reset modifiers — merge them; currently no identifier-specific modifiers set */
                     break;
                 }
                 case TokenType::Number:

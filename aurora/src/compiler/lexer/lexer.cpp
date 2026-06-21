@@ -5,14 +5,18 @@
 #include <cstring>
 #include <string>
 
-static std::string ascii_lower(std::string s) {
-    for (char& ch : s)
+static std::string ascii_lower(const std::string& s) {
+    std::string result = s;
+    for (char& ch : result)
         ch = (char)std::tolower((unsigned char)ch);
-    return s;
+    return result;
 }
 
 void Lexer::strip_cr(std::string& line) {
-    for (char& c : line) if (c == '\r') c = ' ';
+    std::string out;
+    out.reserve(line.size());
+    for (char c : line) if (c != '\r') out += c;
+    line = std::move(out);
 }
 
 int Lexer::get_indent(const std::string& line) {
@@ -67,6 +71,12 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
         if (p[0]=='.' && p[1]=='.' && p[2]=='=') {
             t.type  = TokenType::Operator;
             t.value = "..=";
+            p += 3; col += 3;
+            goto push_token;
+        }
+        if (p[0]=='<' && p[1]=='=' && p[2]=='>') {
+            t.type  = TokenType::Operator;
+            t.value = "<=>";
             p += 3; col += 3;
             goto push_token;
         }
@@ -189,6 +199,10 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
     /* multi-line bracket state: << acts like ( across lines, closed by >> */
     int ml_line = -1;
     int ml_tok  = -1;
+    /* TODO: lex() currently mutates tokens of previously lexed lines (ml_line)
+       by pushing tokens into them. This is fragile. A better approach would
+       use multi-token lookahead or a proper token stream that supports
+       insertion. */
 
     while (std::getline(ss, line)) {
         if (ml_line >= 0) {
@@ -218,8 +232,10 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
 
         for (int i = 0; i < (int)lexed.tokens.size(); ++i) {
             if (lexed.tokens[i].value == "<<") {
-                /* Only treat << as multi-line bracket if it is at the start of a line
-                   or immediately after '=' (assignment). Otherwise it's a shift operator. */
+                /* ── heuristic: treat << as multi-line bracket only at line start or after =
+                   This is a best-effort heuristic. It may mis-classify << as a bracket
+                   when it is actually a shift-left operator (e.g., in expressions).
+                   A proper fix would require lookahead or contextual tokenization. */
                 bool is_ml_bracket = (i == 0);
                 if (i > 0) {
                     is_ml_bracket = lexed.tokens[i-1].is_operator('=');

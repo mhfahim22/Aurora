@@ -68,12 +68,15 @@ static int64_t tensor_linear_index(AuroraTensor* t, int64_t* indices) {
 AuroraTensor* aurora_tensor_new(int64_t ndim, int64_t* shape) {
     if (ndim <= 0 || !shape) return nullptr;
     AuroraTensor* t = (AuroraTensor*)calloc(1, sizeof(AuroraTensor));
+    if (!t) return nullptr;
     t->ndim = ndim;
     t->shape = (int64_t*)malloc((size_t)ndim * sizeof(int64_t));
+    if (!t->shape) { free(t); return nullptr; }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int64_t));
     t->total_size = tensor_compute_size(ndim, shape);
     t->dtype = TENSOR_F64;
     t->data_ptr = calloc((size_t)t->total_size, sizeof(double));
+    if (!t->data_ptr) { free(t->shape); free(t); return nullptr; }
     return t;
 }
 
@@ -81,12 +84,15 @@ AuroraTensor* aurora_tensor_new(int64_t ndim, int64_t* shape) {
 AuroraTensor* aurora_tensor_new_f32(int64_t ndim, int64_t* shape) {
     if (ndim <= 0 || !shape) return nullptr;
     AuroraTensor* t = (AuroraTensor*)calloc(1, sizeof(AuroraTensor));
+    if (!t) return nullptr;
     t->ndim = ndim;
     t->shape = (int64_t*)malloc((size_t)ndim * sizeof(int64_t));
+    if (!t->shape) { free(t); return nullptr; }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int64_t));
     t->total_size = tensor_compute_size(ndim, shape);
     t->dtype = TENSOR_F32;
     t->data_ptr = calloc((size_t)t->total_size, sizeof(float));
+    if (!t->data_ptr) { free(t->shape); free(t); return nullptr; }
     return t;
 }
 
@@ -94,12 +100,15 @@ AuroraTensor* aurora_tensor_new_f32(int64_t ndim, int64_t* shape) {
 AuroraTensor* aurora_tensor_new_f16(int64_t ndim, int64_t* shape) {
     if (ndim <= 0 || !shape) return nullptr;
     AuroraTensor* t = (AuroraTensor*)calloc(1, sizeof(AuroraTensor));
+    if (!t) return nullptr;
     t->ndim = ndim;
     t->shape = (int64_t*)malloc((size_t)ndim * sizeof(int64_t));
+    if (!t->shape) { free(t); return nullptr; }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int64_t));
     t->total_size = tensor_compute_size(ndim, shape);
     t->dtype = TENSOR_F16;
     t->data_ptr = calloc((size_t)t->total_size, sizeof(uint16_t));
+    if (!t->data_ptr) { free(t->shape); free(t); return nullptr; }
     return t;
 }
 
@@ -107,12 +116,15 @@ AuroraTensor* aurora_tensor_new_f16(int64_t ndim, int64_t* shape) {
 AuroraTensor* aurora_tensor_new_bf16(int64_t ndim, int64_t* shape) {
     if (ndim <= 0 || !shape) return nullptr;
     AuroraTensor* t = (AuroraTensor*)calloc(1, sizeof(AuroraTensor));
+    if (!t) return nullptr;
     t->ndim = ndim;
     t->shape = (int64_t*)malloc((size_t)ndim * sizeof(int64_t));
+    if (!t->shape) { free(t); return nullptr; }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int64_t));
     t->total_size = tensor_compute_size(ndim, shape);
     t->dtype = TENSOR_BF16;
     t->data_ptr = calloc((size_t)t->total_size, sizeof(uint16_t));
+    if (!t->data_ptr) { free(t->shape); free(t); return nullptr; }
     return t;
 }
 
@@ -269,6 +281,7 @@ AuroraTensor* aurora_tensor_clone(AuroraTensor* t) {
         case TENSOR_BF16: r = aurora_tensor_new_bf16(t->ndim, t->shape); elem_size = sizeof(uint16_t); break;
         default: r = aurora_tensor_new(t->ndim, t->shape); elem_size = sizeof(double); break;
     }
+    if (!r || !r->data_ptr || !t->data_ptr) { if (r) aurora_tensor_free(r); return nullptr; }
     memcpy(r->data_ptr, t->data_ptr, (size_t)t->total_size * elem_size);
     return r;
 }
@@ -639,28 +652,41 @@ AuroraTensor* aurora_tensor_concatenate(AuroraTensor* a, AuroraTensor* b, int64_
         shape[i] = a->shape[i] + (i == axis ? b->shape[i] : 0);
     AuroraTensor* r = (dt == TENSOR_F32) ?
         aurora_tensor_new_f32(a->ndim, shape) : aurora_tensor_new(a->ndim, shape);
+    if (!r) return nullptr;
 
     if (a->ndim == 1) {
-        for (int64_t i = 0; i < a->total_size; i++)
-            r->data[i] = tensor_read_f64(a, i);
-        for (int64_t i = 0; i < b->total_size; i++)
-            r->data[a->total_size + i] = tensor_read_f64(b, i);
+        for (int64_t i = 0; i < a->total_size; i++) {
+            double v = tensor_read_f64(a, i);
+            if (r->dtype == TENSOR_F32) r->data_f32[i] = (float)v; else r->data[i] = v;
+        }
+        for (int64_t i = 0; i < b->total_size; i++) {
+            double v = tensor_read_f64(b, i);
+            if (r->dtype == TENSOR_F32) r->data_f32[a->total_size + i] = (float)v; else r->data[a->total_size + i] = v;
+        }
     } else if (a->ndim == 2 && axis == 0) {
         int64_t cols = a->shape[1];
         for (int64_t i = 0; i < a->shape[0]; i++)
-            for (int64_t j = 0; j < cols; j++)
-                r->data[i * cols + j] = tensor_read_f64(a, i * cols + j);
+            for (int64_t j = 0; j < cols; j++) {
+                double v = tensor_read_f64(a, i * cols + j);
+                if (r->dtype == TENSOR_F32) r->data_f32[i * cols + j] = (float)v; else r->data[i * cols + j] = v;
+            }
         for (int64_t i = 0; i < b->shape[0]; i++)
-            for (int64_t j = 0; j < cols; j++)
-                r->data[(a->shape[0] + i) * cols + j] = tensor_read_f64(b, i * cols + j);
+            for (int64_t j = 0; j < cols; j++) {
+                double v = tensor_read_f64(b, i * cols + j);
+                if (r->dtype == TENSOR_F32) r->data_f32[(a->shape[0] + i) * cols + j] = (float)v; else r->data[(a->shape[0] + i) * cols + j] = v;
+            }
     } else if (a->ndim == 2 && axis == 1) {
         int64_t rows = a->shape[0];
         int64_t a_cols = a->shape[1], b_cols = b->shape[1];
         for (int64_t i = 0; i < rows; i++) {
-            for (int64_t j = 0; j < a_cols; j++)
-                r->data[i * (a_cols + b_cols) + j] = tensor_read_f64(a, i * a_cols + j);
-            for (int64_t j = 0; j < b_cols; j++)
-                r->data[i * (a_cols + b_cols) + a_cols + j] = tensor_read_f64(b, i * b_cols + j);
+            for (int64_t j = 0; j < a_cols; j++) {
+                double v = tensor_read_f64(a, i * a_cols + j);
+                if (r->dtype == TENSOR_F32) r->data_f32[i * (a_cols + b_cols) + j] = (float)v; else r->data[i * (a_cols + b_cols) + j] = v;
+            }
+            for (int64_t j = 0; j < b_cols; j++) {
+                double v = tensor_read_f64(b, i * b_cols + j);
+                if (r->dtype == TENSOR_F32) r->data_f32[i * (a_cols + b_cols) + a_cols + j] = (float)v; else r->data[i * (a_cols + b_cols) + a_cols + j] = v;
+            }
         }
     }
     return r;
@@ -669,29 +695,33 @@ AuroraTensor* aurora_tensor_concatenate(AuroraTensor* a, AuroraTensor* b, int64_
 AuroraTensor* aurora_tensor_slice(AuroraTensor* t, int64_t start, int64_t end, int64_t axis) {
     if (!t || axis < 0 || axis >= t->ndim || start < 0 || end > t->shape[axis] || start >= end)
         return nullptr;
+    int64_t shape[4];
+    AuroraTensor* r;
     if (t->ndim == 1) {
-        int64_t shape[1] = { end - start };
-        AuroraTensor* r = aurora_tensor_new(1, shape);
+        shape[0] = end - start;
+        r = aurora_tensor_new(1, shape);
+        if (!r) return nullptr;
         for (int64_t i = start; i < end; i++) r->data[i - start] = tensor_read_f64(t, i);
-        return r;
     } else if (t->ndim == 2 && axis == 0) {
         int64_t cols = t->shape[1];
-        int64_t shape[2] = { end - start, cols };
-        AuroraTensor* r = aurora_tensor_new(2, shape);
+        shape[0] = end - start; shape[1] = cols;
+        r = aurora_tensor_new(2, shape);
+        if (!r) return nullptr;
         for (int64_t i = start; i < end; i++)
             for (int64_t j = 0; j < cols; j++)
                 r->data[(i - start) * cols + j] = tensor_read_f64(t, i * cols + j);
-        return r;
     } else if (t->ndim == 2 && axis == 1) {
         int64_t rows = t->shape[0];
-        int64_t shape[2] = { rows, end - start };
-        AuroraTensor* r = aurora_tensor_new(2, shape);
+        shape[0] = rows; shape[1] = end - start;
+        r = aurora_tensor_new(2, shape);
+        if (!r) return nullptr;
         for (int64_t i = 0; i < rows; i++)
             for (int64_t j = start; j < end; j++)
                 r->data[i * (end - start) + (j - start)] = tensor_read_f64(t, i * t->shape[1] + j);
-        return r;
+    } else {
+        return nullptr;
     }
-    return nullptr;
+    return r;
 }
 
 /* ── Activation functions (in-place, dtype-aware, autograd-aware) ── */
@@ -835,6 +865,7 @@ void aurora_tensor_set_requires_grad(AuroraTensor* t, int flag) {
     t->requires_grad = flag;
     if (flag && !t->grad) {
         t->grad = (double*)calloc((size_t)t->total_size, sizeof(double));
+        if (!t->grad) t->requires_grad = 0;
     } else if (!flag && t->grad) {
         free(t->grad);
         t->grad = nullptr;
@@ -865,6 +896,7 @@ static AuroraTensor* link_grad(AuroraTensor* result, void (*backward)(AuroraTens
     }
     if (result->requires_grad) {
         result->grad = (double*)calloc((size_t)result->total_size, sizeof(double));
+        if (!result->grad) result->requires_grad = 0;
     }
     return result;
 }
@@ -1086,12 +1118,15 @@ AuroraTensor* aurora_tensor_quantize_i8(AuroraTensor* t) {
 
     /* Allocate quantized tensor — we reuse total_size for element count */
     AuroraTensor* q = (AuroraTensor*)calloc(1, sizeof(AuroraTensor));
+    if (!q) { if (src != t) aurora_tensor_free(src); return nullptr; }
     q->ndim = t->ndim;
     q->shape = (int64_t*)malloc((size_t)t->ndim * sizeof(int64_t));
+    if (!q->shape) { free(q); if (src != t) aurora_tensor_free(src); return nullptr; }
     memcpy(q->shape, t->shape, (size_t)t->ndim * sizeof(int64_t));
     q->total_size = n;
     q->dtype = 10; /* TENSOR_QINT8 marker */
     q->data_ptr = malloc((size_t)n * sizeof(int8_t));
+    if (!q->data_ptr) { free(q->shape); free(q); if (src != t) aurora_tensor_free(src); return nullptr; }
 
     int8_t* qdata = (int8_t*)q->data_ptr;
     for (int64_t i = 0; i < n; i++) {

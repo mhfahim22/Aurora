@@ -93,7 +93,7 @@ void aurora_print_float(double val) {
 }
 
 void aurora_print_str(const char* str) {
-    AuroraStr* s = (AuroraStr*)str;
+    auto* s = reinterpret_cast<const AuroraStr*>(str);
 #ifdef _WIN32
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD written;

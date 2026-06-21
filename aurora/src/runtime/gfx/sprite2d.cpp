@@ -48,8 +48,8 @@ extern "C" {
 /* Matches gl_helper.cpp's known-working gl_load() exactly. */
 #ifdef _WIN32
 static void* gl_sprite_load(const char* name) {
-    HMODULE gl = LoadLibraryA("opengl32.dll");
-    void* ptr = (void*)GetProcAddress(gl, name);
+    HMODULE gl = GetModuleHandleA("opengl32.dll");
+    void* ptr = gl ? (void*)GetProcAddress(gl, name) : nullptr;
     if (!ptr) {
         using WGLGPA = void*(__stdcall*)(const char*);
         static WGLGPA wgl = nullptr;
@@ -250,15 +250,6 @@ static void ensure_gl_loaded() {
 #define GL_COMPILE_STATUS         0x8B81
 #define GL_LINK_STATUS            0x8B82
 #define GL_INFO_LOG_LENGTH        0x8B84
-#define GL_ARRAY_BUFFER           0x8892
-#define GL_ELEMENT_ARRAY_BUFFER   0x8893
-#define GL_STATIC_DRAW            0x88E4
-#define GL_DYNAMIC_DRAW           0x88E8
-#define GL_WRITE_ONLY             0x88B9
-#define GL_TEXTURE0               0x84C0
-#define GL_FALSE                  0
-#define GL_TRIANGLES              0x0004
-#define GL_FLOAT                  0x1406
 
 /* ── Sprite vertex ── */
 struct SpriteVertex {
@@ -381,6 +372,10 @@ void aurora_sprite2d_init(int max_sprites) {
     g_texture_ids = (GLuint*)calloc((size_t)g_max_sprites, sizeof(GLuint));
     if (!g_vertex_data || !g_texture_ids) {
         fprintf(stderr, "[sprite2d] allocation failed\n");
+        free(g_vertex_data);
+        free(g_texture_ids);
+        g_vertex_data = nullptr;
+        g_texture_ids = nullptr;
         return;
     }
 
@@ -388,6 +383,10 @@ void aurora_sprite2d_init(int max_sprites) {
     GLuint* indices = (GLuint*)malloc((size_t)g_max_sprites * 6 * sizeof(GLuint));
     if (!indices) {
         fprintf(stderr, "[sprite2d] index allocation failed\n");
+        free(g_vertex_data);
+        free(g_texture_ids);
+        g_vertex_data = nullptr;
+        g_texture_ids = nullptr;
         return;
     }
     for (int i = 0; i < g_max_sprites; i++) {
