@@ -49,8 +49,17 @@ try {
     Write-Host "Running installer..." -ForegroundColor Cyan
     Start-Process -FilePath $ExePath -Wait
     Remove-Item $ExePath -Force -ErrorAction SilentlyContinue
+
+    # Add Aurora to PATH if not already present
+    $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($UserPath -notlike "*$InstallDir*") {
+        $NewPath = "$InstallDir;$UserPath"
+        [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
+        Write-Host "  Added $InstallDir to PATH" -ForegroundColor Green
+    }
     # Refresh PATH from registry for current session
     $env:Path = [Environment]::GetEnvironmentVariable('Path','User')
+    
     Write-Host ""
     Write-Host "Aurora $Version installed successfully!" -ForegroundColor Green
     Write-Host "  Location: (choose during setup)"

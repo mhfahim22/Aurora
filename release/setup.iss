@@ -95,26 +95,13 @@ Name: "{commondesktop}\Aurora REPL"; Filename: "{app}\aurorac.exe"; Parameters: 
 ; Filename: "{app}\aurorac.exe"; Parameters: "--repl"; Description: "Launch Aurora REPL"; Flags: postinstall nowait skipifsilent unchecked
 
 [Registry]
-; Add Aurora to PATH (HKCU so it doesn't require admin)
-Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
+; Note: PATH is managed by install.ps1 to avoid Inno Setup type-mismatch errors
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_PATH"; ValueData: "{app}\libc"
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_LIB"; ValueData: "{app}\libc"
 
 [Code]
 const
   WM_WININICHANGE = $001A;
-
-function NeedsAddPath(Param: string): boolean;
-var
-  OrigPath: string;
-begin
-  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OrigPath) then
-  begin
-    Result := True;
-    exit;
-  end;
-  Result := Pos(LowerCase(Param), LowerCase(OrigPath)) = 0;
-end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
