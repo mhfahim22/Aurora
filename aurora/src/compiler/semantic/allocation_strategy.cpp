@@ -544,34 +544,34 @@ int AllocationStrategyEngine::count_unknown() const {
    ════════════════════════════════════════════════════════════ */
 
 void AllocationStrategyEngine::print_allocation_report() const {
-    std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║      Aurora Allocation Strategy Report                   ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cout << "\n";
+    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cout << "║      Aurora Allocation Strategy Report                   ║\n";
+    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
     if (decisions_.empty()) {
-        std::cerr << "║  No allocation decisions made.                          ║\n";
+        std::cout << "║  No allocation decisions made.                          ║\n";
     } else {
-        std::cerr << "║  Variable          │ Strategy     │ Confidence │ Reason ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Variable          │ Strategy     │ Confidence │ Reason ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
         for (const auto& [name, decision] : decisions_) {
             std::string strategy_name = alloc_strategy_name(decision.strategy);
-            fprintf(stderr, "║  %-18s│ %-13s│ %3d%%      │ %-24s║\n",
+            printf("║  %-18s│ %-13s│ %3d%%      │ %-24s║\n",
                    name.c_str(), strategy_name.c_str(),
                    decision.confidence, decision.reason.substr(0, 24).c_str());
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    Stack:  " << count_stack() << "  Arena: " << count_arena()
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Statistics:                                             ║\n";
+        std::cout << "║    Stack:  " << count_stack() << "  Arena: " << count_arena()
                   << "  RAII: " << count_raii() << "                      ║\n";
-        std::cerr << "║    ARC:    " << count_arc() << "  GC:    " << count_gc()
+        std::cout << "║    ARC:    " << count_arc() << "  GC:    " << count_gc()
                   << "  Unknown: " << count_unknown() << "                  ║\n";
-        std::cerr << "║                                                          ║\n";
-        std::cerr << "║  Mode: " << (rules_.gc_enabled ? "Normal" : "@performance") << "                                        ║\n";
+        std::cout << "║                                                          ║\n";
+        std::cout << "║  Mode: " << (rules_.gc_enabled ? "Normal" : "@performance") << "                                        ║\n";
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cerr << "\n";
+    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
 }

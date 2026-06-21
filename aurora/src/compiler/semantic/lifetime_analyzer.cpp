@@ -672,42 +672,42 @@ int LifetimeAnalyzer::count_regions() const {
    ════════════════════════════════════════════════════════════ */
 
 void LifetimeAnalyzer::print_lifetime_report() const {
-    std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║          Aurora Lifetime Analysis Report                 ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cout << "\n";
+    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cout << "║          Aurora Lifetime Analysis Report                 ║\n";
+    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
     if (lifetime_info_.empty()) {
-        std::cerr << "║  No variables analyzed.                                 ║\n";
+        std::cout << "║  No variables analyzed.                                 ║\n";
     } else {
-        std::cerr << "║  Variable          │ Lifetime Scope   │ Region ID       ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Variable          │ Lifetime Scope   │ Region ID       ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
         for (const auto& [name, info] : lifetime_info_) {
             std::string scope_name = lifetime_scope_name(info.scope);
-            fprintf(stderr, "║  %-18s│ %-17s│ %d               ║\n",
+            printf("║  %-18s│ %-17s│ %d               ║\n",
                    name.c_str(), scope_name.c_str(), info.region_id);
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    Function:      " << count_function_lifetime() << "                                ║\n";
-        std::cerr << "║    Block:         " << count_block_lifetime() << "                                ║\n";
-        std::cerr << "║    Loop:          " << count_loop_lifetime() << "                                ║\n";
-        std::cerr << "║    Temporary:     " << count_temporary() << "                                ║\n";
-        std::cerr << "║    Global:        " << count_global_lifetime() << "                                ║\n";
-        std::cerr << "║    Regions:       " << count_regions() << "                                ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Statistics:                                             ║\n";
+        std::cout << "║    Function:      " << count_function_lifetime() << "                                ║\n";
+        std::cout << "║    Block:         " << count_block_lifetime() << "                                ║\n";
+        std::cout << "║    Loop:          " << count_loop_lifetime() << "                                ║\n";
+        std::cout << "║    Temporary:     " << count_temporary() << "                                ║\n";
+        std::cout << "║    Global:        " << count_global_lifetime() << "                                ║\n";
+        std::cout << "║    Regions:       " << count_regions() << "                                ║\n";
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Region Details:                                         ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Region Details:                                         ║\n";
         for (const auto& r : regions_) {
-            fprintf(stderr, "║    R%d (%s): %zu vars, est %d bytes, lines %d-%d   ║\n",
+            printf("║    R%d (%s): %zu vars, est %d bytes, lines %d-%d   ║\n",
                    r.region_id, lifetime_scope_name(r.scope_type),
                    r.var_names.size(), r.total_size_est,
                    r.start_line, r.end_line);
         }
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cerr << "\n";
+    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
 }

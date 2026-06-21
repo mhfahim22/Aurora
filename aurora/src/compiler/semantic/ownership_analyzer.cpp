@@ -790,58 +790,58 @@ int OwnershipAnalyzer::count_aliases() const {
    ════════════════════════════════════════════════════════════ */
 
 void OwnershipAnalyzer::print_ownership_report() const {
-    std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║        Aurora Ownership Analysis Report                  ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cout << "\n";
+    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cout << "║        Aurora Ownership Analysis Report                  ║\n";
+    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
     if (ownership_info_.empty()) {
-        std::cerr << "║  No variables analyzed.                                 ║\n";
+        std::cout << "║  No variables analyzed.                                 ║\n";
     } else {
-        std::cerr << "║  Variable          │ Ownership Type   │ Owner Count     ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Variable          │ Ownership Type   │ Owner Count     ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
         for (const auto& [name, info] : ownership_info_) {
             std::string type_name = ownership_type_name(info.type);
             /* Strip function prefix for display (use last :: for safety) */
             auto pos = name.rfind("::");
             std::string display = (pos != std::string::npos) ? name.substr(pos + 2) : name;
-            fprintf(stderr, "║  %-18s│ %-17s│ %d               ║\n",
+            printf("║  %-18s│ %-17s│ %d               ║\n",
                    display.c_str(), type_name.c_str(), info.owner_count);
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    Single:       " << count_single() << "                                ║\n";
-        std::cerr << "║    Shared:       " << count_shared() << "                                ║\n";
-        std::cerr << "║    Weak:         " << count_weak() << "                                ║\n";
-        std::cerr << "║    Borrowed:     " << count_borrowed() << "                                ║\n";
-        std::cerr << "║    With Aliases: " << count_aliases() << "                                ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  Statistics:                                             ║\n";
+        std::cout << "║    Single:       " << count_single() << "                                ║\n";
+        std::cout << "║    Shared:       " << count_shared() << "                                ║\n";
+        std::cout << "║    Weak:         " << count_weak() << "                                ║\n";
+        std::cout << "║    Borrowed:     " << count_borrowed() << "                                ║\n";
+        std::cout << "║    With Aliases: " << count_aliases() << "                                ║\n";
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cerr << "\n";
+    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
 }
 
 void OwnershipAnalyzer::print_alias_graph() const {
-    std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║           Aurora Alias Graph                             ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cout << "\n";
+    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cout << "║           Aurora Alias Graph                             ║\n";
+    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
     if (alias_edges_.empty()) {
-        std::cerr << "║  No alias relationships.                                ║\n";
+        std::cout << "║  No alias relationships.                                ║\n";
     } else {
-        std::cerr << "║  From              → To                │ Type            ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cout << "║  From              → To                │ Type            ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
 
         for (const auto& edge : alias_edges_) {
             std::string type_str = edge.is_strong ? "Strong" : "Weak";
-            fprintf(stderr, "║  %-18s→ %-18s│ %-16s║\n",
+            printf("║  %-18s→ %-18s│ %-16s║\n",
                    edge.from.c_str(), edge.to.c_str(), type_str.c_str());
         }
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cerr << "\n";
+    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
 }
