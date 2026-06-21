@@ -140,132 +140,132 @@ void AllocationProfiler::print_allocation_report() const {
 }
 
 void AllocationProfiler::print_percentage_report() const {
-    std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      Aurora Allocation Distribution Report               ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "\n";
+    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cerr << "║      Aurora Allocation Distribution Report               ║\n";
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
     if (stats_.total_count == 0) {
-        std::cout << "║  No allocations to report.                              ║\n";
+        std::cerr << "║  No allocations to report.                              ║\n";
     } else {
         /* Visual bar chart */
-        std::cout << "║                                                          ║\n";
+        std::cerr << "║                                                          ║\n";
 
         /* Stack bar */
         int stack_bar = (int)(stats_.stack_percent / 5);
-        printf("║  Stack : %5.1f%% ", stats_.stack_percent);
-        for (int i = 0; i < stack_bar; i++) std::cout << "█";
-        for (int i = stack_bar; i < 20; i++) std::cout << " ";
-        printf("║\n");
+        fprintf(stderr, "║  Stack : %5.1f%% ", stats_.stack_percent);
+        for (int i = 0; i < stack_bar; i++) std::cerr << "█";
+        for (int i = stack_bar; i < 20; i++) std::cerr << " ";
+        fprintf(stderr, "║\n");
 
         /* Arena bar */
         int arena_bar = (int)(stats_.arena_percent / 5);
-        printf("║  Arena : %5.1f%% ", stats_.arena_percent);
-        for (int i = 0; i < arena_bar; i++) std::cout << "█";
-        for (int i = arena_bar; i < 20; i++) std::cout << " ";
-        printf("║\n");
+        fprintf(stderr, "║  Arena : %5.1f%% ", stats_.arena_percent);
+        for (int i = 0; i < arena_bar; i++) std::cerr << "█";
+        for (int i = arena_bar; i < 20; i++) std::cerr << " ";
+        fprintf(stderr, "║\n");
 
         /* RAII bar */
         int raii_bar = (int)(stats_.raii_percent / 5);
-        printf("║  RAII  : %5.1f%% ", stats_.raii_percent);
-        for (int i = 0; i < raii_bar; i++) std::cout << "█";
-        for (int i = raii_bar; i < 20; i++) std::cout << " ";
-        printf("║\n");
+        fprintf(stderr, "║  RAII  : %5.1f%% ", stats_.raii_percent);
+        for (int i = 0; i < raii_bar; i++) std::cerr << "█";
+        for (int i = raii_bar; i < 20; i++) std::cerr << " ";
+        fprintf(stderr, "║\n");
 
         /* ARC bar */
         int arc_bar = (int)(stats_.arc_percent / 5);
-        printf("║  ARC   : %5.1f%% ", stats_.arc_percent);
-        for (int i = 0; i < arc_bar; i++) std::cout << "█";
-        for (int i = arc_bar; i < 20; i++) std::cout << " ";
-        printf("║\n");
+        fprintf(stderr, "║  ARC   : %5.1f%% ", stats_.arc_percent);
+        for (int i = 0; i < arc_bar; i++) std::cerr << "█";
+        for (int i = arc_bar; i < 20; i++) std::cerr << " ";
+        fprintf(stderr, "║\n");
 
         /* GC bar */
         int gc_bar = (int)(stats_.gc_percent / 5);
-        printf("║  GC    : %5.1f%% ", stats_.gc_percent);
-        for (int i = 0; i < gc_bar; i++) std::cout << "█";
-        for (int i = gc_bar; i < 20; i++) std::cout << " ";
-        printf("║\n");
+        fprintf(stderr, "║  GC    : %5.1f%% ", stats_.gc_percent);
+        for (int i = 0; i < gc_bar; i++) std::cerr << "█";
+        for (int i = gc_bar; i < 20; i++) std::cerr << " ";
+        fprintf(stderr, "║\n");
 
-        std::cout << "║                                                          ║\n";
+        std::cerr << "║                                                          ║\n";
 
         /* Summary */
-        printf("║  Total: %d allocations (%s)               ║\n",
+        fprintf(stderr, "║  Total: %d allocations (%s)               ║\n",
                stats_.total_count, format_size(stats_.total_size).c_str());
     }
 
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cout << "\n";
+    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "\n";
 }
 
 void AllocationProfiler::print_detailed_report() const {
-    std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      Aurora Detailed Allocation Report                  ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "\n";
+    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cerr << "║      Aurora Detailed Allocation Report                  ║\n";
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
     if (allocations_.empty()) {
-        std::cout << "║  No allocations to report.                              ║\n";
+        std::cerr << "║  No allocations to report.                              ║\n";
     } else {
-        std::cout << "║  Variable          │ Strategy │ Size    │ Function       ║\n";
-        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cerr << "║  Variable          │ Strategy │ Size    │ Function       ║\n";
+        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
         for (const auto& alloc : allocations_) {
             std::string strategy_name = alloc_strategy_name(alloc.strategy);
-            printf("║  %-18s│ %-9s│ %7s │ %-15s║\n",
+            fprintf(stderr, "║  %-18s│ %-9s│ %7s │ %-15s║\n",
                    alloc.var_name.c_str(),
                    strategy_name.c_str(),
                    format_size(alloc.size_estimate).c_str(),
                    alloc.func_name.substr(0, 15).c_str());
         }
 
-        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cout << "║  Summary:                                                ║\n";
-        printf("║    Stack: %3d (%5.1f%%)  Arena: %3d (%5.1f%%)             ║\n",
+        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cerr << "║  Summary:                                                ║\n";
+        fprintf(stderr, "║    Stack: %3d (%5.1f%%)  Arena: %3d (%5.1f%%)             ║\n",
                stats_.stack_count, stats_.stack_percent,
                stats_.arena_count, stats_.arena_percent);
-        printf("║    RAII:  %3d (%5.1f%%)  ARC:   %3d (%5.1f%%)             ║\n",
+        fprintf(stderr, "║    RAII:  %3d (%5.1f%%)  ARC:   %3d (%5.1f%%)             ║\n",
                stats_.raii_count, stats_.raii_percent,
                stats_.arc_count, stats_.arc_percent);
-        printf("║    GC:    %3d (%5.1f%%)  Other: %3d                     ║\n",
+        fprintf(stderr, "║    GC:    %3d (%5.1f%%)  Other: %3d                     ║\n",
                stats_.gc_count, stats_.gc_percent,
                stats_.unknown_count);
     }
 
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cout << "\n";
+    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "\n";
 }
 
 void AllocationProfiler::print_performance_report() const {
-    std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      Aurora Performance Metrics Report                  ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "\n";
+    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cerr << "║      Aurora Performance Metrics Report                  ║\n";
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
-    std::cout << "║                                                          ║\n";
-    std::cout << "║  Estimated Memory Usage:                                 ║\n";
-    printf("║    Stack:  %8s                                 ║\n",
+    std::cerr << "║                                                          ║\n";
+    std::cerr << "║  Estimated Memory Usage:                                 ║\n";
+    fprintf(stderr, "║    Stack:  %8s                                 ║\n",
            format_size(metrics_.estimated_stack_usage).c_str());
-    printf("║    Arena:  %8s                                 ║\n",
+    fprintf(stderr, "║    Arena:  %8s                                 ║\n",
            format_size(metrics_.estimated_arena_usage).c_str());
-    printf("║    Heap:   %8s                                 ║\n",
+    fprintf(stderr, "║    Heap:   %8s                                 ║\n",
            format_size(metrics_.estimated_heap_usage).c_str());
 
-    std::cout << "║                                                          ║\n";
-    std::cout << "║  Estimated Overhead:                                     ║\n";
-    printf("║    Refcount Ops:   %5d                                ║\n",
+    std::cerr << "║                                                          ║\n";
+    std::cerr << "║  Estimated Overhead:                                     ║\n";
+    fprintf(stderr, "║    Refcount Ops:   %5d                                ║\n",
            metrics_.estimated_refcount_ops);
-    printf("║    Destructors:    %5d                                ║\n",
+    fprintf(stderr, "║    Destructors:    %5d                                ║\n",
            metrics_.estimated_destructor_calls);
 
-    std::cout << "║                                                          ║\n";
-    std::cout << "║  Optimizations:                                          ║\n";
-    printf("║    GC Disabled:         %s                              ║\n",
+    std::cerr << "║                                                          ║\n";
+    std::cerr << "║  Optimizations:                                          ║\n";
+    fprintf(stderr, "║    GC Disabled:         %s                              ║\n",
            metrics_.gc_disabled ? "Yes" : "No");
-    printf("║    All Stack Possible:  %s                              ║\n",
+    fprintf(stderr, "║    All Stack Possible:  %s                              ║\n",
            metrics_.all_stack_possible ? "Yes" : "No");
 
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cout << "\n";
+    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "\n";
 }
 
 /* ════════════════════════════════════════════════════════════
