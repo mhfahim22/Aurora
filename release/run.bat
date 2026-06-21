@@ -1,2 +1,2 @@
 @echo off
-aurorac %*
+"%~dp0aurorac.exe" %*
