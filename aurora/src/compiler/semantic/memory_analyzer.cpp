@@ -612,36 +612,36 @@ void MemoryAnalyzer::apply_escape_results() {
    ════════════════════════════════════════════════════════════ */
 
 void MemoryAnalyzer::print_escape_report() const {
-    std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║           Aurora Escape Analysis Report                  ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "\n";
+    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cerr << "║           Aurora Escape Analysis Report                  ║\n";
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
     const auto& all_info = escape_analyzer_.get_all_escape_info();
 
     if (all_info.empty()) {
-        std::cout << "║  No variables analyzed.                                 ║\n";
+        std::cerr << "║  No variables analyzed.                                 ║\n";
     } else {
-        std::cout << "║  Variable          │ Escape Status     │ Count          ║\n";
-        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cerr << "║  Variable          │ Escape Status     │ Count          ║\n";
+        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
         for (const auto& [name, info] : all_info) {
             std::string status_name = escape_status_name(info.status);
-            printf("║  %-18s│ %-18s│                ║\n",
+            fprintf(stderr, "║  %-18s│ %-18s│                ║\n",
                    name.c_str(), status_name.c_str());
         }
 
-        std::cout << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cout << "║  Statistics:                                             ║\n";
-        std::cout << "║    NoEscape:       " << escape_analyzer_.count_no_escape() << "                                ║\n";
-        std::cout << "║    ArgEscape:      " << escape_analyzer_.count_arg_escape() << "                                ║\n";
-        std::cout << "║    ReturnEscape:   " << escape_analyzer_.count_return_escape() << "                                ║\n";
-        std::cout << "║    GlobalEscape:   " << escape_analyzer_.count_global_escape() << "                                ║\n";
-        std::cout << "║    ClosureEscape:  " << escape_analyzer_.count_closure_escape() << "                                ║\n";
+        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        std::cerr << "║  Statistics:                                             ║\n";
+        std::cerr << "║    NoEscape:       " << escape_analyzer_.count_no_escape() << "                                ║\n";
+        std::cerr << "║    ArgEscape:      " << escape_analyzer_.count_arg_escape() << "                                ║\n";
+        std::cerr << "║    ReturnEscape:   " << escape_analyzer_.count_return_escape() << "                                ║\n";
+        std::cerr << "║    GlobalEscape:   " << escape_analyzer_.count_global_escape() << "                                ║\n";
+        std::cerr << "║    ClosureEscape:  " << escape_analyzer_.count_closure_escape() << "                                ║\n";
     }
 
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cout << "\n";
+    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "\n";
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -957,10 +957,10 @@ void MemoryAnalyzer::apply_to_ast(ASTNode* root) {
    ════════════════════════════════════════════════════════════ */
 
 void MemoryAnalyzer::print_allocation_report() const {
-    std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      Aurora Allocation Strategy Report                   ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "\n";
+    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
+    std::cerr << "║      Aurora Allocation Strategy Report                   ║\n";
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
     /* Count strategies */
     int stack_count = 0, arena_count = 0, raii_count = 0;
@@ -979,27 +979,27 @@ void MemoryAnalyzer::print_allocation_report() const {
         }
     }
 
-    std::cout << "║  Allocation Distribution:                                ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "║  Allocation Distribution:                                ║\n";
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
 
     int total = stack_count + arena_count + raii_count + arc_count + gc_count;
     if (total > 0) {
-        printf("║  Stack: %3d (%3d%%)  Arena: %3d (%3d%%)  RAII: %3d (%3d%%)    ║\n",
+        fprintf(stderr, "║  Stack: %3d (%3d%%)  Arena: %3d (%3d%%)  RAII: %3d (%3d%%)    ║\n",
                stack_count, (stack_count * 100 / total),
                arena_count, (arena_count * 100 / total),
                raii_count, (raii_count * 100 / total));
-        printf("║  ARC:   %3d (%3d%%)  GC:    %3d (%3d%%)                      ║\n",
+        fprintf(stderr, "║  ARC:   %3d (%3d%%)  GC:    %3d (%3d%%)                      ║\n",
                arc_count, (arc_count * 100 / total),
                gc_count, (gc_count * 100 / total));
     } else {
-        std::cout << "║  No allocation decisions made.                          ║\n";
+        std::cerr << "║  No allocation decisions made.                          ║\n";
     }
 
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
-    std::cout << "║  Mode: " << (results_.empty() ? "Normal" :
+    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "║  Mode: " << (results_.empty() ? "Normal" :
         (results_.begin()->second.is_performance_mode ? "@performance" : "Normal")) << "                                        ║\n";
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
-    std::cout << "\n";
+    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "\n";
 }
 
 /* ════════════════════════════════════════════════════════════
