@@ -107,6 +107,6 @@ Root: HKCU; Subkey: "Software\Classes\.aura"; ValueType: string; ValueName: ""; 
 Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile"; ValueType: string; ValueName: ""; ValueData: "Aurora Source File"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell"; ValueType: string; ValueName: ""; ValueData: "run"
 Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell\run"; ValueType: string; ValueName: ""; ValueData: "Run with Aurora"
-Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\run.bat"" ""%1"" --run"
+Root: HKCU; Subkey: "Software\Classes\AuroraSourceFile\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\run.bat"" ""%1"""
 
 ; [Code] section intentionally empty — PATH is managed by install.ps1

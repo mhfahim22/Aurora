@@ -1,2 +1,2 @@
 @echo off
-"%~dp0aurorac.exe" %*
+"%~dp0aurorac.exe" %* --run
