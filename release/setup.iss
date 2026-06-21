@@ -99,14 +99,4 @@ Name: "{commondesktop}\Aurora REPL"; Filename: "{app}\aurorac.exe"; Parameters: 
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_PATH"; ValueData: "{app}\libc"
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "AURORA_LIB"; ValueData: "{app}\libc"
 
-[Code]
-const
-  WM_WININICHANGE = $001A;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssPostInstall then
-  begin
-    SendBroadcastMessage(WM_WININICHANGE, 0, 'Environment');
-  end;
-end;
+; [Code] section intentionally empty — PATH is managed by install.ps1
