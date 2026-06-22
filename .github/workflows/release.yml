@@ -21,20 +21,18 @@ jobs:
     - name: Setup LLVM
       run: |
         choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
-        # Locate the actual LLVM cmake directory
-        $llvmCmakeDir = & "llvm-config" --cmakedir 2>$null
-        if (-not $?) {
-          # fallback: search for LLVMConfig.cmake
-          $candidate = Get-ChildItem -Path "$env:ProgramFiles\LLVM\lib\cmake" -Recurse -Filter "LLVMConfig.cmake" -ErrorAction SilentlyContinue `
+        # LLVM is installed to C:\Program Files\LLVM by the choco installer
+        $llvmDir = "C:\Program Files\LLVM"
+        $llvmCmakeDir = "$llvmDir\lib\cmake\llvm"
+        # Verify
+        if (-not (Test-Path "$llvmCmakeDir\LLVMConfig.cmake")) {
+          # fallback: search for LLVMConfig.cmake anywhere under Program Files
+          $candidate = Get-ChildItem -Path "$env:ProgramFiles" -Recurse -Filter "LLVMConfig.cmake" -ErrorAction SilentlyContinue `
             | Select-Object -First 1 -ExpandProperty DirectoryName
-          if ($candidate) { $llvmCmakeDir = $candidate }
-        }
-        if (-not $llvmCmakeDir) {
-          $llvmCmakeDir = "$env:ProgramFiles\LLVM\lib\cmake\llvm"
+          if ($candidate) { $llvmCmakeDir = $candidate; $llvmDir = (Split-Path (Split-Path $llvmCmakeDir)) }
         }
         echo "LLVM_DIR=$llvmCmakeDir" >> $env:GITHUB_ENV
-        $llvmBin = Join-Path (Split-Path (Split-Path $llvmCmakeDir)) "bin"
-        echo "$llvmBin" >> $env:GITHUB_PATH
+        echo "$llvmDir\bin" >> $env:GITHUB_PATH
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -97,11 +95,13 @@ jobs:
 
     - name: Remove conflicting LLVM cmake files
       run: |
-        sudo rm -rf /usr/lib/llvm-16/lib/cmake/clang 2>/dev/null || true
-        sudo rm -rf /usr/lib/cmake/clang-16 2>/dev/null || true
-        sudo rm -rf /usr/lib/llvm-18/lib/cmake/clang 2>/dev/null || true
-        sudo rm -rf /usr/lib/cmake/clang-18 2>/dev/null || true
-        sudo rm -rf /usr/lib/llvm-19/lib/cmake/clang 2>/dev/null || true
+        # Remove all non-LLVM19 clang cmake files to prevent find_package from
+        # picking up broken ClangTargets from older LLVM versions on the runner
+        for ver in 14 15 16 17 18; do
+          sudo rm -rf "/usr/lib/llvm-$ver/lib/cmake/clang" 2>/dev/null || true
+          sudo rm -rf "/usr/lib/cmake/clang-$ver" 2>/dev/null || true
+        done
+        sudo rm -rf "/usr/lib/llvm-19/lib/cmake/clang" 2>/dev/null || true
 
     - name: Configure CMake
       run: |

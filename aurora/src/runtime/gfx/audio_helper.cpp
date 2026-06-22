@@ -1,5 +1,6 @@
 /* ── Audio helper: wraps Win32 PlaySound for Aurora FFI ── */
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdlib.h>
@@ -53,3 +54,4 @@ void aurora_audio_shutdown() {
 }
 
 } /* extern "C" */
+#endif /* _WIN32 */

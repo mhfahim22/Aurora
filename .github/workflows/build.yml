@@ -183,10 +183,15 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y cmake g++ libcurl4-openssl-dev
 
-    - name: Remove conflicting LLVM 18 cmake files
+    - name: Remove conflicting LLVM cmake files
       run: |
-        sudo rm -rf /usr/lib/llvm-18/lib/cmake/clang 2>/dev/null || true
-        sudo rm -rf /usr/lib/cmake/clang-18 2>/dev/null || true
+        # Remove all non-LLVM19 clang cmake files to prevent find_package from
+        # picking up broken ClangTargets from older LLVM versions on the runner
+        for ver in 14 15 16 17 18; do
+          sudo rm -rf "/usr/lib/llvm-$ver/lib/cmake/clang" 2>/dev/null || true
+          sudo rm -rf "/usr/lib/cmake/clang-$ver" 2>/dev/null || true
+        done
+        sudo rm -rf "/usr/lib/llvm-19/lib/cmake/clang" 2>/dev/null || true
 
     - name: Configure CMake
       run: |
