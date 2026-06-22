@@ -1085,7 +1085,9 @@ int main(int argc, char** argv) {
         }
 
         /* ── Stage 6: LLVM optimization + native CPU ── */
+        std::cerr << "STAGE6: init\n" << std::flush;
         std::string cpu = llvm::sys::getHostCPUName().str();
+        std::cerr << "STAGE6: cpu=" << cpu << "\n" << std::flush;
         {
             llvm::StringMap<bool, llvm::MallocAllocator> host_features;
             std::string features_str;
@@ -1096,12 +1098,16 @@ int main(int argc, char** argv) {
                     features_str += f.first();
                 }
             }
+            std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
             module->setTargetTriple(llvm::sys::getProcessTriple());
+            std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;
 
+            std::cerr << "STAGE6: creating managers\n" << std::flush;
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
             llvm::CGSCCAnalysisManager CGAM;
             llvm::ModuleAnalysisManager MAM;
+            std::cerr << "STAGE6: creating passbuilder\n" << std::flush;
             llvm::PassBuilder PB;
 
             PB.registerModuleAnalyses(MAM);
@@ -1119,7 +1125,9 @@ int main(int argc, char** argv) {
                 : llvm::OptimizationLevel::O2;
             else ol = llvm::OptimizationLevel::O3;
 
+            std::cerr << "STAGE6: opt_level=" << opt_level << " ol_type=" << (opt_level == 0 ? "O0" : "O1+") << "\n" << std::flush;
             if (opt_level > 0) {
+                std::cerr << "STAGE6: building pipeline\n" << std::flush;
                 llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(ol);
                 MPM.run(*module, MAM);
 

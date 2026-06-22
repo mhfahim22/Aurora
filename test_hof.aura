@@ -1,5 +1,25 @@
+lambda double_fn(x)
+    return x * 2
+
 function apply_twice(x, fn)
     return fn(fn(x))
 
-output("apply_twice(3, lambda(x) x * 2) = " + apply_twice(3, lambda(x) x * 2))
-output("done")
+output("double_fn(21) = " + double_fn(21))
+outputN()
+
+f = lambda(x) x + 1
+output("inline lambda: " + f(10))
+outputN()
+
+output("apply_twice(inline) = " + apply_twice(3, lambda(x) x * 2))
+outputN()
+
+arr_test = []
+arr_test = push(arr_test, 10)
+output("HOF+arr: " + apply_twice(7, double_fn))
+outputN()
+output("HOF+arr arr[0] = " + arr_test[0])
+outputN()
+
+output("ALL TESTS PASSED")
+outputN()

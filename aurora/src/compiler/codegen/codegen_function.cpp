@@ -47,11 +47,13 @@ void Codegen::gen_function(const ASTNode* node) {
     auto* saved_fn  = cur_fn_;
     auto* saved_bb  = builder_->GetInsertBlock();
     auto  saved_cache  = std::move(literal_aurora_cache_);
+    auto  saved_scopes = std::move(scopes_);
 
     cur_fn_ = fn;
     builder_->SetInsertPoint(entry_bb);
 
-    /* Keep existing scopes (module-level vars etc.) accessible */
+    /* Create fresh scope stack so module-level vars aren't 
+       accidentally cleaned up by gen_return's emit_all_scope_cleanup. */
     push_scope();
 
     /* Coverage: trace function entry */
@@ -75,6 +77,7 @@ void Codegen::gen_function(const ASTNode* node) {
 
     /* Restore caller context */
     literal_aurora_cache_ = std::move(saved_cache);
+    scopes_ = std::move(saved_scopes);
     cur_fn_ = saved_fn;
     if (saved_bb) builder_->SetInsertPoint(saved_bb);
 }

@@ -74,7 +74,11 @@ void AllocationStrategyEngine::analyse(const ASTNode* root) {
                 wv(n->next.get(), wv);
                 wv(n->args.get(), wv);
             };
-            walk_vars(node, walk_vars);
+            walk_vars(node->left.get(), walk_vars);
+            walk_vars(node->right.get(), walk_vars);
+            walk_vars(node->body.get(), walk_vars);
+            walk_vars(node->orelse.get(), walk_vars);
+            walk_vars(node->args.get(), walk_vars);
         }
 
         self(node->left.get(), self);

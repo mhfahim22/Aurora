@@ -189,7 +189,11 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
 
 llvm::Value* Codegen::gen_var(const ASTNode* node) {
     VarRecord* rec = lookup_var(node->value);
-    if (!rec || !rec->alloca_ptr) return i64(0);
+    if (!rec || !rec->alloca_ptr) {
+        llvm::Function* fn = module_->getFunction(node->value);
+        if (fn) return builder_->CreatePtrToInt(fn, i64_ty(), node->value + "_fnptr");
+        return i64(0);
+    }
 
     /* Weak var — must lock before use */
     if (rec->state == OwnershipState::Weak) {
@@ -265,6 +269,8 @@ bool Codegen::expr_is_string_type(const ASTNode* node) {
             }
             return true;
         }
+        case NodeType::Index:
+            return false;
         default:
             return true; /* default to string (safe for re-box) */
     }

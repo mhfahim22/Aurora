@@ -197,9 +197,16 @@ llvm::Module* LLVMCodegen::module() { return module_.get(); }
 /* ════════════════════════════════════════════════════════════
    JIT Execution (for REPL) — uses OrcJIT for in-process execution
    ════════════════════════════════════════════════════════════ */
+#include <llvm/Support/Error.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
+
+static void log_error(llvm::Error err) {
+    llvm::handleAllErrors(std::move(err), [](const llvm::ErrorInfoBase& E) {
+        std::cerr << "JIT error: " << E.message() << "\n" << std::flush;
+    });
+}
 
 int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
                      std::unique_ptr<llvm::Module> module) {
@@ -211,7 +218,10 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
     InitializeNativeTargetAsmParser();
 
     auto jit_or_err = LLJITBuilder().create();
-    if (!jit_or_err) return -1;
+    if (!jit_or_err) {
+        log_error(jit_or_err.takeError());
+        return -1;
+    }
     auto& jit = *jit_or_err;
 
     /* Add current process symbols */
@@ -224,13 +234,22 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
     module->setDataLayout(jit->getDataLayout());
 
     auto TSM = ThreadSafeModule(std::move(module), std::move(ctx));
-    if (auto err = jit->addIRModule(std::move(TSM))) return -1;
+    if (auto err = jit->addIRModule(std::move(TSM))) {
+        log_error(std::move(err));
+        return -1;
+    }
 
     auto sym = jit->lookup("main");
-    if (!sym) return -1;
+    if (!sym) {
+        log_error(sym.takeError());
+        return -1;
+    }
 
     auto* main_fn = (int(*)())(sym->getValue());
-    if (!main_fn) return -1;
+    if (!main_fn) {
+        std::cerr << "JIT error: main symbol is null\n" << std::flush;
+        return -1;
+    }
 
     return main_fn();
 }
