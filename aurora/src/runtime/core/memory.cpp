@@ -697,8 +697,33 @@ static void gc_collect_impl(void) {
         if (current_sp >= stack_limit && current_sp < stack_base) {
             gc_scan_and_mark_range(current_sp, stack_base, *gc_objects);
         }
+#elif defined(__linux__)
+        /* Linux — use pthread_getattr_np to get stack bounds */
+        pthread_attr_t attr;
+        void* stack_addr = nullptr;
+        size_t stack_size = 0;
+        if (pthread_getattr_np(pthread_self(), &attr) == 0) {
+            if (pthread_attr_getstack(&attr, &stack_addr, &stack_size) == 0) {
+                void* stack_end = static_cast<char*>(stack_addr) + stack_size;
+                void* sp = __builtin_frame_address(0);
+                if (sp >= stack_addr && sp < stack_end) {
+                    gc_scan_and_mark_range(sp, stack_end, *gc_objects);
+                }
+            }
+            pthread_attr_destroy(&attr);
+        }
+#elif defined(__APPLE__)
+        /* macOS — use pthread_get_stackaddr_np / pthread_get_stacksize_np */
+        void* stack_addr = pthread_get_stackaddr_np(pthread_self());
+        size_t stack_size = pthread_get_stacksize_np(pthread_self());
+        void* stack_base = static_cast<char*>(stack_addr);
+        void* stack_end = static_cast<char*>(stack_addr) + stack_size;
+        void* sp = __builtin_frame_address(0);
+        if (sp >= stack_base && sp < stack_end) {
+            gc_scan_and_mark_range(sp, stack_end, *gc_objects);
+        }
 #else
-        /* Unix — use pthread_getattr_np to get stack bounds */
+        /* Generic fallback — try pthread_getattr_np if available */
         pthread_attr_t attr;
         void* stack_addr = nullptr;
         size_t stack_size = 0;
