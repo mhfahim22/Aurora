@@ -19,9 +19,14 @@ jobs:
 
     - name: Setup LLVM
       run: |
-        choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade
-        echo "LLVM_HOME=C:\Program Files\LLVM" >> $env:GITHUB_ENV
-        echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+        choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
+        $llvmDir = if (Test-Path "C:\Program Files\LLVM") { "C:\Program Files\LLVM" } else {
+          $p = & "C:\ProgramData\chocolatey\bin\llvm-config.exe" --prefix 2>$null
+          if (-not $?) { $p = "$env:ProgramFiles\LLVM" }
+          $p
+        }
+        echo "LLVM_HOME=$llvmDir" >> $env:GITHUB_ENV
+        echo "$llvmDir\bin" >> $env:GITHUB_PATH
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -30,7 +35,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_HOME\lib\cmake\llvm"
 
     - name: Build Core + Bridge Targets
       run: |
@@ -110,7 +115,7 @@ jobs:
         cmake -B build_asan -DCMAKE_BUILD_TYPE=Debug `
           -DCMAKE_CXX_FLAGS_DEBUG="/fsanitize=address /Od /Zi /D_ITERATOR_DEBUG_LEVEL=0" `
           -DCMAKE_EXE_LINKER_FLAGS_DEBUG="/DEBUG" `
-          -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
+          -DLLVM_DIR="$env:LLVM_HOME\lib\cmake\llvm"
         cmake --build build_asan --config Debug `
           --target test_ffi_memory_safety `
           --target bench_npm_bridge -j2
