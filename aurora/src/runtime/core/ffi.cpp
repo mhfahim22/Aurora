@@ -768,6 +768,7 @@ extern "C" int aurora_py_ensure_initialized(void) {
 #endif
         return 1;
     }
+    typedef void (*PyInitFn)(void);
 #ifdef _WIN32
     /* Try versioned DLLs in descending order, then stable forwarder as fallback */
     const char* candidates[] = {
@@ -794,12 +795,7 @@ extern "C" int aurora_py_ensure_initialized(void) {
 #endif
         return 0;
     }
-    typedef void (*PyInitFn)(void);
-#ifdef _WIN32
     PyInitFn Py_Initialize = (PyInitFn)GetProcAddress(s_python_dll, "Py_Initialize");
-#else
-    PyInitFn Py_Initialize = (PyInitFn)dlsym(s_python_dll, "Py_Initialize");
-#endif
     if (!Py_Initialize) {
         fprintf(stderr, "[python] ERROR: Py_Initialize not found\n");
 #ifdef _WIN32

@@ -20,9 +20,15 @@ jobs:
 
     - name: Setup LLVM
       run: |
-        choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade
-        echo "LLVM_HOME=C:\Program Files\LLVM" >> $env:GITHUB_ENV
-        echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+        choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
+        # Locate the actual LLVM installation directory
+        $llvmDir = if (Test-Path "C:\Program Files\LLVM") { "C:\Program Files\LLVM" } else {
+          $p = & "C:\ProgramData\chocolatey\bin\llvm-config.exe" --prefix 2>$null
+          if (-not $?) { $p = "$env:ProgramFiles\LLVM" }
+          $p
+        }
+        echo "LLVM_HOME=$llvmDir" >> $env:GITHUB_ENV
+        echo "$llvmDir\bin" >> $env:GITHUB_PATH
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -31,7 +37,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_HOME\lib\cmake\llvm"
 
     - name: Build Core Targets
       run: |
@@ -83,10 +89,11 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y cmake g++ libcurl4-openssl-dev
 
-    - name: Remove conflicting LLVM 18 cmake files
+    - name: Remove conflicting LLVM cmake files
       run: |
         sudo rm -rf /usr/lib/llvm-18/lib/cmake/clang 2>/dev/null || true
         sudo rm -rf /usr/lib/cmake/clang-18 2>/dev/null || true
+        sudo rm -rf /usr/lib/llvm-19/lib/cmake/clang 2>/dev/null || true
 
     - name: Configure CMake
       run: |
