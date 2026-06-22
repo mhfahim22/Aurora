@@ -1,0 +1,11 @@
+output("start")
+
+function apply_twice(x, fn)
+    return fn(fn(x))
+
+lambda double_it(x)
+    return x * 2
+
+result = apply_twice(7, double_it)
+output("result = " + result)
+output("done")

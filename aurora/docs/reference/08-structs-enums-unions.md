@@ -16,6 +16,12 @@ struct Point
 struct Point
     x: int = 0
     y: int = 0
+
+# Brace syntax:
+struct Point {
+    x: int = 0
+    y: int = 0
+}
 ```
 
 ### Construction
@@ -54,6 +60,9 @@ enum Color
     Green
     Blue
 
+# Brace syntax:
+enum Color { Red, Green, Blue }
+
 # Access variants
 c = Color.Red
 d = Color.Green
@@ -87,6 +96,15 @@ extern struct Point {
     x: i32
     y: i32
 }
+```
+
+## Tuple
+
+Tuples are fixed-size, heterogeneous collections created with parentheses:
+
+```aura
+t = (1, "hello", true)    # tuple literal
+output(t[0])               # 1 (index access)
 ```
 
 ## Struct vs Class

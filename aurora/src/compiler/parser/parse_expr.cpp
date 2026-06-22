@@ -270,6 +270,44 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
         return make_node(NodeType::Pointer, var, src_ln);
     }
 
+    /* ── Inline lambda: lambda(params) body_expr ── */
+    if (t.is_keyword("lambda")) {
+        int src_ln = t.line;
+        idx++;
+
+        static int ilambda_counter = 0;
+        std::string lname = "__ilambda_" + std::to_string(++ilambda_counter);
+
+        auto stmt = make_node(NodeType::Lambda, lname, src_ln);
+
+        /* Parse parameters: (params) */
+        if (idx < cnt && toks[idx].is_operator('(')) {
+            idx++;
+            ASTNode* ptail = nullptr;
+            while (idx < cnt && !toks[idx].is_operator(')')) {
+                if (toks[idx].is_operator(',')) { idx++; continue; }
+                if (idx >= cnt) break;
+                auto p = make_node(NodeType::Var, toks[idx++].value);
+                ASTNode* raw = p.get();
+                if (!stmt->args) { stmt->args = std::move(p); ptail = raw; }
+                else             { ptail->next = std::move(p); ptail = raw; }
+            }
+            if (idx < cnt) idx++;
+            else throw std::runtime_error("Line " + std::to_string(src_ln) + ": missing ')' in lambda parameters");
+        }
+
+        /* Parse body expression */
+        auto body_expr = parse_expr(toks, idx);
+
+        /* Wrap in Return node */
+        auto ret = make_node(NodeType::Return, "");
+        ret->src_line = src_ln;
+        ret->left = std::move(body_expr);
+
+        stmt->body = std::move(ret);
+        return stmt;
+    }
+
     /* identifier: call / index / attribute / plain var */
     if (t.is(TokenType::Identifier) || t.is(TokenType::Keyword)) {
         std::string name = t.value;

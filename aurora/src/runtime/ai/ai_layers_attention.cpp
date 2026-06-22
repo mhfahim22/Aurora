@@ -121,7 +121,6 @@ AuroraTensor* mha_forward(Layer* l, AuroraTensor* input, int training) {
                 : aurora_tensor_new(input->ndim, input->shape);
             if (!out) { aurora_tensor_free(qkv); return nullptr; }
             double scale = 1.0 / sqrt((double)d_h);
-            double scale = 1.0 / sqrt((double)d_h);
             for (int64_t ri = 0; ri < new_n; ri++) {
                 double* k_ptr = (qkv->dtype == TENSOR_F32)
                     ? (double*)(qkv->data_f32 + ri * 3 * d_h * h + d_h * h)

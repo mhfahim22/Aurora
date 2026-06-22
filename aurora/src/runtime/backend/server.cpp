@@ -778,7 +778,7 @@ static int has_header_value(const char* raw, const char* header_name, const char
     /* Search for expected_val as a token in comma-separated list */
     size_t ev_len = strlen(expected_val);
     int ret = 0;
-    const char* p = hdr;
+    p = hdr;
     while (*p) {
         while (*p == ' ' || *p == ',') p++;
         if (strncmp(p, expected_val, ev_len) == 0) {

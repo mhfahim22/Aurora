@@ -1106,24 +1106,25 @@ void Codegen::gen_async(const ASTNode* node) {
 
     if (is_async_function) {
         func_name = node->body->value;
-        ASTNode* params = node->body->args.get();
 
-        /* Generate wrapper body: pass arguments through arg struct pointer */
-        /* For simplicity, the wrapper receives void* and casts to first arg type */
+        /* Generate wrapper body: generate the actual function body,
+           then return null (the task machinery ignores the return value) */
+        if (node->body->body)
+            gen_block(node->body->body.get());
         if (!entry_bb->getTerminator())
             builder_->CreateRet(llvm::ConstantPointerNull::get(i8ptr_ty()));
 
-        /* Create the callable async function: i8* name(i8* arg) -> task handle */
-        auto* fn_ty = llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false);
+        /* Create the callable async function: i8* name() -> task handle.
+           Takes zero args so user can call simple_async() directly. */
+        auto* fn_ty = llvm::FunctionType::get(i8ptr_ty(), {}, false);
         async_callee = llvm::Function::Create(
             fn_ty, llvm::Function::ExternalLinkage, func_name, module_.get());
         auto* callee_bb = llvm::BasicBlock::Create(ctx_, "entry", async_callee);
         llvm::IRBuilder<> cb(callee_bb);
 
-        /* In the callable: create task from wrapper, spawn, return task handle */
-        llvm::Value* arg_ptr = &(*async_callee->arg_begin());
+        /* In the callable: create task from wrapper (with null arg), spawn, return task */
         auto* task = cb.CreateCall(fn_task_create_,
-            { wrapper, arg_ptr }, "task");
+            { wrapper, llvm::ConstantPointerNull::get(i8ptr_ty()) }, "task");
         cb.CreateCall(fn_spawn_, { task });
         cb.CreateRet(task);
     }

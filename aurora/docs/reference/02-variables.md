@@ -36,7 +36,7 @@ mutable y = 10            # explicitly mutable
 y = 20                    # allowed — y is mutable
 ```
 
-> **Note:** All variables are immutable by default. Use `mutable` only when you need reassignment.
+> **Note:** All variables are immutable by default. Use `mutable` only when you need reassignment. `constant` is explicit but redundant.
 
 ## Field & Index Assignment
 
@@ -67,40 +67,64 @@ Controls allocation strategy per variable. See [Memory Model](09-memory.md) for 
 
 ## Ownership Keywords
 
-See [Memory Model](09-memory.md) for detailed semantics.
+| Keyword     | Description                                       |
+|-------------|---------------------------------------------------|
+| `move`      | Transfer ownership; source becomes invalid         |
+| `copy`      | Explicit deep copy                                 |
+| `shared`    | Create reference-counted handle                    |
+| `weak`      | Non-owning weak reference                          |
+| `borrow`    | Temporary immutable reference                      |
+| `reference` | Create a typed reference                           |
+| `pointer`   | Create a raw pointer                               |
+| `drop`      | Explicit destructor call                           |
+| `free`      | Free memory (low-level)                            |
+| `delete`    | Manual deallocation (unsafe)                       |
+
+### Statement Forms
 
 ```aura
-source = [1, 2, 3]
-dest = move source         # transfer ownership (source invalid)
-
-y = copy(x)                # explicit deep copy
-shared a = original        # shared reference-counted handle
-weak w = original          # non-owning weak reference
-borrow z = x               # temporary immutable reference
-reference r = a            # typed reference
-pointer p = x              # raw pointer
-drop x                     # explicit destructor
-free ptr                   # free memory (low-level)
-delete ptr                 # manual deallocation (unsafe)
+move x                     # transfer ownership
+copy y                     # explicit copy
+shared a                   # make shared/ref-counted
+weak w                     # create weak reference
+borrow r                   # borrow reference
+reference r                # typed reference
+pointer p                  # raw pointer
+drop x                     # call destructor
+free ptr                   # free memory
+delete ptr                 # unsafe deallocation
 ```
 
-Statement and expression forms:
+### Expression / Function-call Forms
 
 ```aura
-move x                     # statement form
-y = move(x)                # expression form
-
-copy x                     # statement
-y = copy(x)                # expression
-
-reference x                # statement
-r = reference(a)           # expression
-
-pointer x                  # statement
-p = pointer(x)             # expression
+dest = move(source)        # transfer ownership
+y = copy(x)                # deep copy
+shared a = original        # shared reference
+weak w = original          # weak reference
+borrow z = x               # borrow
+r = reference(a)           # typed reference
+p = pointer(x)             # raw pointer
 ```
 
 > **Tip:** Use `move` to transfer ownership of large data structures without copying. Use `borrow` for temporary read-only access.
+
+### Assignment Form (shared / weak)
+
+```aura
+shared y = x               # y gets a shared (ref-counted) reference to x
+weak w = x                 # w gets a weak (non-owning) reference to x
+```
+
+## `inline` / `noinline` / `constexpr` (statement forms)
+
+```aura
+inline fn(x) -> x * 2      # force inline
+noinline fn(x) -> x * 2    # prevent inline
+constexpr val = compile_fn()  # evaluate at compile time
+```
+
+These can also appear as `@` attributes: `@inline`, `@noinline`, `@constexpr`.
 
 ---
 

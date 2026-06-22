@@ -2,18 +2,31 @@
 
 ## Function Definition
 
+`function` and `fn` are interchangeable keywords for defining functions.
+
 ```aura
 function add(a, b)
     return a + b
 
+fn add(a, b)                     # fn works exactly like function
+    return a + b
+
 function greet(name):
     output("Hello, " + name)    # colon optional
+```
 
-# Inline body (single expression)
+### Inline body (single expression)
+
+```aura
 function add(a, b) return a + b
 function double(x) x * 2
+function add(a, b) { return a + b }    # brace inline
+function double(x) { x * 2 }           # brace with bare expression
+```
 
-# Brace block
+### Brace block
+
+```aura
 function fib(n) {
     if n <= 1 return n
     return fib(n - 1) + fib(n - 2)
@@ -52,6 +65,10 @@ result = square(5)               # 25
 
 doubled = map(array, lambda(x) x * 2)
 
+# Named lambda
+lambda myLambda(a, b):
+    return a + b
+
 # Multi-line body
 lambda(a, b):
     return a + b
@@ -75,6 +92,16 @@ extern function set_handler(cb: callback(int, int))
 return expr                       # return value
 return                            # return void (0)
 yield expr                        # yield value (generators)
+```
+
+## Return Type Annotation
+
+```aura
+function add(a: int, b: int) -> int
+    return a + b
+
+function greet(name: string) -> string
+    return "Hello, " + name
 ```
 
 ## Function Attributes

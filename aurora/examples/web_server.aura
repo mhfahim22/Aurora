@@ -18,57 +18,12 @@ server app
     route "/hello/:name"
         response("Hello, " + request.params.name + "!")
 
-    route_group "/api"
-        route "/time"
-            response.json({"timestamp": stamp(), "date": now()})
+    route "/time"
+        response("Time: " + stamp())
 
-        route "/echo"
-            data = request.body
-            response.json({"received": data, "length": len(data)})
-        end
-
-    route_group "/admin"
-        middleware require_auth
-            token = request.headers["Authorization"]
-            if not token
-                response.status(401).json({"error": "unauthorized"})
-                return
-            if not verify(token, "secret-key")
-                response.status(403).json({"error": "invalid token"})
-                return
-            next()
-
-        route "/users"
-            data = query("SELECT * FROM users")
-            response.json(data)
-
-        route "/stats"
-            if cache_has("page_stats")
-                stats = cache_get("page_stats")
-            else
-                stats = {"visits": 42, "users": 10}
-                cache_set("page_stats", stats, 60)
-            response.json(stats)
-        end
-
-    route_group "/auth"
-        rate_limit(10, 60)
-
-        route "/login"
-            body = request.body
-            user = query("SELECT * FROM users WHERE name = '" + body.user + "'")
-            if user and verify_password(body.password, user.password_hash)
-                token = sign({"user_id": user.id, "role": user.role}, "secret-key")
-                session_set("user_id", user.id)
-                response.json({"token": token, "user": user.name})
-            else
-                response.status(401).json({"error": "invalid credentials"})
-        end
-
-    route "/health"
-        health("database", db.ping())
-        health("cache", cache.ping())
-        response.json({"status": "ok"})
+    route "/echo"
+        data = request.body
+        response("Echo: " + data)
 
 app.start(3000)
 output("Server running on port 3000")

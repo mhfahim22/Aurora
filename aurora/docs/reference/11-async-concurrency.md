@@ -9,12 +9,18 @@ async function fetch_data(url)
 
 async function simple_async():
     output("Async body")
+```
 
+## Async Block
+
+```aura
 async:
     output("Async block")           # async block (standalone)
 ```
 
 ## Await / Wait
+
+`await` and `wait` are synonyms:
 
 ```aura
 data = await fetch_data("https://example.com")
@@ -83,6 +89,23 @@ signal my_signal                    # declare signal
 emit my_signal(42)                  # emit signal with args
 ```
 
+## Event
+
+```aura
+event onData:
+    output("data received")         # declare event with handler body
+```
+
+## Callback
+
+```aura
+callback my_cb(x):
+    output(x)
+
+# For FFI:
+extern function set_handler(cb: callback(int, int))
+```
+
 ## Thread
 
 ```aura
@@ -95,6 +118,7 @@ thread expr                         # spawn OS thread
 |-----------------------|------------------------------|
 | `spawn(expr)`         | Spawn async task             |
 | `await(expr)`         | Wait for async result        |
+| `wait(expr)`          | Same as await                |
 | `chan(size)`          | Create channel               |
 | `send(ch, val)`       | Send to channel              |
 | `recv(ch)`            | Receive from channel         |

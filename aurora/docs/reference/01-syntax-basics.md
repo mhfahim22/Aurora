@@ -1,8 +1,28 @@
 # Syntax Basics
 
+## Case Insensitivity
+
+All Aurora keywords are **case-insensitive**:
+
+```aura
+true   True   TRUE    # all valid
+false  False  FALSE   # all valid
+null   Null   NULL    # all valid
+output  OUTPUT  OutPut  # all valid
+```
+
+Function names, variable names, and identifiers **are case-sensitive**:
+
+```aura
+myVar = 42
+myvar = 10            # different variable!
+output(myVar)         # 42
+output(myvar)         # 10
+```
+
 ## Whitespace & Block Structure
 
-Blocks are defined by indentation (4 spaces per level). No braces, no `end` keyword required.
+Aurora uses indentation to define blocks (like Python). **4 spaces** per level is the standard.
 
 ```aura
 function greet(name)
@@ -10,8 +30,28 @@ function greet(name)
     return 0                    # ← still in function body
 
 output("done")                  # ← back to top-level (dedented)
+```
 
-# Brace blocks also work (alternative syntax):
+### Three Block Styles
+
+Every control flow / declaration construct supports **all three** styles:
+
+| Style | Example | Notes |
+|-------|---------|-------|
+| Indented (no colon) | `if cond\n    body` | Clean, Python-like |
+| Colon + Indented | `if cond:\n    body` | More explicit |
+| Brace `{ }` | `if cond { body }` | C/JS-like, inline friendly |
+
+```aura
+# Style 1: Indented (bare)
+if true
+    output("bare indent")
+
+# Style 2: Colon + Indented
+if true:
+    output("colon indent")
+
+# Style 3: Brace block
 if true {
     output("brace block")
 }
@@ -27,7 +67,7 @@ if condition
 
 Tokens: `Indent` (increased), `Dedent` (decreased), `Newline` (end of line).
 
-> **Tip:** Configure your editor to use 4 spaces per indent. Aurora does not support tabs for indentation.
+> **Tip:** Configure your editor to use 4 spaces per indent. Tabs are converted to 4 spaces internally, but 4 spaces is the convention.
 
 ## Comments
 
@@ -56,6 +96,7 @@ true        # boolean true
 false       # boolean false
 null        # null value
 [1, 2, 3]   # array literal
+(1, "hi")   # tuple literal
 ```
 
 ### String Escape Sequences
@@ -83,7 +124,7 @@ ALL_CAPS   # screaming snake case (convention for constants)
 
 ## Multi-line Bracket
 
-`<< ... >>` acts as parentheses spanning multiple lines:
+`<< ... >>` acts as parentheses or array brackets spanning multiple lines:
 
 ```aura
 x = <<
@@ -106,12 +147,37 @@ Not supported. The compiler will hint: "Aurora uses indentation for blocks, not 
 
 > **Migration tip:** If you're coming from C/Java/JS, omit all semicolons. Use indentation to define block structure.
 
-## `end` Keyword
+## `pass` Keyword (No-op)
 
-`end` is a no-op (pass statement), not a block terminator. Occasionally used in library code for familiarity:
+`pass` does nothing. Use it as a placeholder:
+
+```aura
+if condition
+    pass         # placeholder — does nothing
+```
+
+## `end` Keyword (No-op / Familiarity)
+
+`end` is a no-op (treated as `pass`), not a block terminator. Occasionally used in library code for familiarity:
 
 ```aura
 end     # does nothing — acts as a placeholder
+```
+
+## `self` and `super`
+
+`self` refers to the current class instance (implicitly available inside methods).
+`super` refers to the parent class (for calling overridden methods).
+
+```aura
+class Animal
+    function speak()
+        output("generic")
+
+class Dog extends Animal
+    function speak()
+        super.speak()           # call parent method
+        output("woof")
 ```
 
 ---

@@ -1,0 +1,5 @@
+function apply_twice(x, fn)
+    return fn(fn(x))
+
+output("apply_twice(3, lambda(x) x * 2) = " + apply_twice(3, lambda(x) x * 2))
+output("done")

@@ -44,6 +44,16 @@ Attributes modify the behavior of functions, variables, and FFI declarations.
 @gc big_data = load_large()
 ```
 
+### Allocation on functions
+
+```aura
+@stack function process()
+    # function runs with stack allocation
+
+@arena function batch_job()
+    # temporary allocations use arena
+```
+
 ### When to Use Each
 
 | Attribute | Use When                                          |
@@ -68,6 +78,16 @@ extern function fast_add(a: i32, b: i32) -> i32
 
 @cost(alloc)
 extern function malloc(size: i64) -> pointer
+```
+
+## Statement Forms (without `@`)
+
+`inline`, `noinline`, and `constexpr` can be used without `@` as statement prefixes:
+
+```aura
+inline fn(x) -> x * 2         # force inline
+noinline fn(x) -> x * 2       # prevent inlining
+constexpr val = compile_fn()  # compile-time constant
 ```
 
 ## Inline Attribute Forms

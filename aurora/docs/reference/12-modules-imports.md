@@ -14,9 +14,14 @@ from "utils" import helper        # selective import
 ## Module / Package / Namespace
 
 ```aura
-module com.example.myapp          # module declaration
+module com.example.myapp          # module declaration (dotted path)
 package myapp                     # package declaration
+package com.example.app           # package with dotted path
+```
 
+### Namespace
+
+```aura
 namespace Graphics:               # namespace with block
     function render()
         output("rendering")
@@ -25,6 +30,12 @@ namespace Graphics:               # namespace with block
 namespace mylib
     function helper()
         pass
+
+# Brace block:
+namespace mylib {
+    function helper()
+        pass
+}
 ```
 
 ## Alias
@@ -39,6 +50,13 @@ alias MyInt = int                 # type alias
 ```aura
 global :: varName                 # access global scope
 outer :: varName                  # access outer scope
+```
+
+## `from` / `import` Selective
+
+```aura
+from "path/to/utils" import helper, format
+from libc import string, math
 ```
 
 ## Module Resolution Order

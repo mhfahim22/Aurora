@@ -1,6 +1,6 @@
 # Control Flow
 
-All control flow constructs accept both colon (`:`) and no-colon before the body, and support indented blocks or brace blocks.
+All control flow constructs support **three block styles**: indented (no colon), colon + indented, and brace `{ }`.
 
 ---
 
@@ -22,6 +22,17 @@ else:
     fallback()
 ```
 
+### Brace blocks
+```aura
+if condition {
+    body()
+} elseif other_condition {
+    other_body()
+} else {
+    fallback()
+}
+```
+
 ### Inline (single expression)
 ```aura
 if n <= 1 return n               # inline after condition
@@ -33,6 +44,16 @@ if n <= 1 { return n }           # brace block inline
 function process(x)
     if x < 0 return -1           # early return, no else needed
     return x * 2
+```
+
+### Conditions use logical operators
+```aura
+if x > 0 and x < 10              # keyword
+if x > 0 && x < 10              # symbolic
+if not flag                      # keyword NOT
+if !flag                         # symbolic NOT
+if x > 0 or cleanup()            # short-circuit OR
+if 0 < x < 10                    # chained comparison
 ```
 
 ---
@@ -53,6 +74,9 @@ while condition {                # brace block
 # Common pattern: read until empty
 while (line = read_line())
     output(line)
+
+while line = read_line():
+    output(line)                 # colon with assignment
 ```
 
 ---
@@ -169,11 +193,28 @@ match value:
     default:
         output("other")
 
-# Arrow syntax (concise)
+# Brace blocks
+match value {
+    case 1 {
+        output("one")
+    }
+    default {
+        output("other")
+    }
+}
+
+# Arrow syntax (concise one-liners)
 match x
     0 -> output("zero")
     1 -> output("one")
     _ -> output("other")
+
+# Switch alias (exact same as match)
+switch x
+    case 1:
+        output("one")
+    case 2:
+        output("two")
 ```
 
 ### Pattern Types
@@ -185,17 +226,8 @@ match value
     case _                       # wildcard (ignore)
     case [a, b, c]               # array destructuring
     case Point(0, 0)             # struct/constructor pattern
+    case 1, 2, 3                 # multiple values (OR pattern)
     default                      # fallback (same as case _)
-```
-
-### Switch Alias
-
-```aura
-switch x
-    case 1:
-        output("one")
-    case 2:
-        output("two")
 ```
 
 ---

@@ -4,15 +4,15 @@
 
 | Function         | Description                     |
 |------------------|---------------------------------|
-| `output(expr)`   | Print value                     |
+| `output(expr)`   | Print value (paren form)        |
 | `output expr`    | Print value (no parens)         |
 | `outputln(expr)` | Print with newline              |
 | `outputN()`      | Print newline only              |
 | `outputf(fmt..)` | Formatted output                |
 | `input()`        | Read input                      |
 | `ask(prompt)`    | Prompt and read input           |
-| `debug expr`     | Debug print                     |
-| `log expr`       | Log message                     |
+| `debug expr`     | Debug print (statement form)    |
+| `log expr`       | Log message (statement form)    |
 
 ```aura
 output("hello")                   # prints: hello
@@ -20,6 +20,8 @@ output x                          # no-paren form
 outputln("line")                  # with newline
 outputN()                         # just newline
 outputf("Sum: %d\n", total)       # formatted
+debug "value: " + x               # debug with source location
+log "request received"            # log with timestamp
 ```
 
 > **`debug` vs `log`:** `debug` prints with source location info; `log` adds a timestamp prefix.
@@ -49,7 +51,7 @@ outputf("Sum: %d\n", total)       # formatted
 | `abs(x)`           | Absolute value           |
 | `sqrt(x)`          | Square root              |
 | `floor(x)`         | Round down               |
-| `ceil(x)`          | Round up                 |
+| `ceil(x)`          | Round up                |
 | `round(x)`         | Round nearest            |
 | `pow(x, y)`        | Power                    |
 | `clamp(x, lo, hi)` | Clamp value              |
@@ -145,8 +147,10 @@ outputf("Sum: %d\n", total)       # formatted
 
 | Function     | Description              |
 |--------------|--------------------------|
+| `time`       | Current timestamp (keyword/statement) |
 | `now()`      | Current time             |
 | `sleep(ms)`  | Sleep milliseconds       |
+| `sleep expr` | Sleep (statement form)   |
 | `stamp()`    | Timestamp                |
 
 ## OS / Environment
@@ -183,14 +187,16 @@ outputf("Sum: %d\n", total)       # formatted
 | `profile(fn)`| Profile execution        |
 | `trace(fn)`  | Trace execution          |
 
-## Other Built-in Keywords
+## Other Built-in Keywords (Statement Forms)
 
 | Keyword      | Description              |
 |--------------|--------------------------|
 | `time`       | Current timestamp        |
 | `random`     | Random number            |
 | `sleep expr` | Sleep (statement form)   |
-| `pass`       | No-op                    |
+| `pass`       | No-op placeholder        |
+| `end`        | No-op (familiarity)      |
+| `ensure expr`| Defer/cleanup            |
 
 ---
 

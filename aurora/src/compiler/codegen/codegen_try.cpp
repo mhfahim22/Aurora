@@ -183,14 +183,14 @@ void Codegen::gen_try(const ASTNode* node) {
             if (live[i].ty->isPointerTy())
                 v = builder_->CreateIntToPtr(v, live[i].ty);
             builder_->CreateStore(v, slot);
-            declare_var(live[i].name, slot, OwnershipState::Owned);
+            declare_var(live[i].name, slot, OwnershipState::Borrowed);
         }
 
         /* Expose catch variable (or __exception__) in catch bodies */
         if (is_catch && arg_ex) {
             auto* ex_slot = create_entry_alloca(catch_var_name, i64T);
             builder_->CreateStore(arg_ex, ex_slot);
-            declare_var(catch_var_name, ex_slot, OwnershipState::Owned);
+            declare_var(catch_var_name, ex_slot, OwnershipState::Borrowed);
         }
 
         /* Generate the body */

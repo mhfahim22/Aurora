@@ -1,20 +1,30 @@
 import "stdio"
 
-# ── PyPI Bridge Example ──
-# Shows how to call Python libraries from Aurora using auto-generated bridge DLLs.
-# Bridge function naming: <package>_<func>() — e.g. markdown_import, markdown_call1
-#
-# Prerequisites:
-#   pip install markdown requests numpy
-#   voss bridge pypi markdown
-#   voss bridge pypi requests
-#   voss bridge pypi numpy
+extern function markdown_import() -> pointer
+extern function markdown_str(s: cstring) -> pointer
+extern function markdown_int(n: i64) -> pointer
+extern function markdown_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern function markdown_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+extern function markdown_getattr(mod: pointer, name: cstring) -> pointer
+extern function markdown_to_cstr(v: pointer) -> cstring
+extern function markdown_dict() -> pointer
+extern function markdown_dict_set(d: pointer, k: cstring, v: pointer) -> void
+extern function markdown_free(v: pointer) -> void
+
+extern function requests_import() -> pointer
+extern function requests_str(s: cstring) -> pointer
+extern function requests_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern function requests_to_cstr(v: pointer) -> cstring
+extern function requests_free(v: pointer) -> void
+
+extern function numpy_import() -> pointer
+extern function numpy_getattr(mod: pointer, name: cstring) -> pointer
+extern function numpy_to_cstr(v: pointer) -> cstring
+extern function numpy_free(v: pointer) -> void
 
 function main():
     printf("=== PyPI Bridge Demo ===\n\n")
 
-    # ── 1. Import a Python module ──
-    # PyPI bridges export _import() which calls Python's import().
     printf("--- 1. Import markdown ---\n")
     md = markdown_import()
     if md == 0:
@@ -23,8 +33,6 @@ function main():
         return 1
     printf("OK: markdown module loaded\n")
 
-    # ── 2. Call a function via _call1(mod, "fn", arg_json) ──
-    # Arguments are passed as JSON strings. Use _str() / _int() / _float() helpers.
     printf("--- 2. markdown.markdown(text) ---\n")
     text = markdown_str("# Hello **Aurora**")
     html = markdown_call1(md, "markdown", text)
@@ -36,60 +44,21 @@ function main():
         printf("FAILED: markdown_call1\n")
     markdown_free(text)
 
-    # ── 3. Access module attributes via _getattr(mod, "name") ──
     printf("--- 3. markdown.__version__ ---\n")
     ver = markdown_getattr(md, "__version__")
     if ver != 0:
         printf("markdown version: %s\n", markdown_to_cstr(ver))
         markdown_free(ver)
 
-    # ── 4. Call with multiple args via _call2/_call3/... ──
-    printf("--- 4. Multiple arguments ---\n")
-    a = markdown_int(42)
-    b = markdown_str("hello")
-    out = markdown_call2(md, "some_func", a, b) if false else 0
-    # Fallback: just demo arg creation and cleanup
-    printf("Created: int=%s str=%s\n", markdown_to_cstr(a), markdown_to_cstr(b))
-    markdown_free(a)
-    markdown_free(b)
-
-    # ── 5. Use _dict and _dict_set for kwargs ──
-    printf("--- 5. dict helpers ---\n")
+    printf("--- 4. dict helpers ---\n")
     d = markdown_dict()
     markdown_dict_set(d, "key1", markdown_str("value1"))
     markdown_dict_set(d, "key2", markdown_int(99))
     printf("dict=%s\n", markdown_to_cstr(d))
     markdown_free(d)
 
-    # ── 6. Import and use requests ──
-    printf("--- 6. requests example ---\n")
-    req = requests_import()
-    if req == 0:
-        printf("SKIP: requests not installed (pip install requests)\n")
-    else:
-        printf("OK: requests module loaded\n")
-        url = requests_str("\"https://httpbin.org/get\"")
-        resp = requests_call1(req, "get", url)
-        if resp != 0:
-            printf("Response: %s\n", requests_to_cstr(resp))
-            requests_free(resp)
-        requests_free(url)
-        requests_free(req)
-
-    # ── 7. numpy: compiled C extension bridge (/MD CRT) ──
-    printf("--- 7. numpy example ---\n")
-    np = numpy_import()
-    if np == 0:
-        printf("SKIP: numpy not installed (pip install numpy)\n")
-    else:
-        printf("OK: numpy loaded\n")
-        ver = numpy_getattr(np, "__version__")
-        if ver != 0:
-            printf("numpy version: %s\n", numpy_to_cstr(ver))
-            numpy_free(ver)
-        numpy_free(np)
-
-    # ── 8. Cleanup ──
     markdown_free(md)
     printf("\n=== PyPI Bridge Demo Complete ===\n")
     return 0
+
+main()

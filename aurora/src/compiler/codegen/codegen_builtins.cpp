@@ -223,10 +223,10 @@ void register_builtins(llvm::Module* module, llvm::LLVMContext& ctx,
 
     /* ── Collection builtins ── */
     builtins.push_fn = llvm::Function::Create(
-        llvm::FunctionType::get(v, { i64, i64 }, false),
+        llvm::FunctionType::get(i64, { i64, i64 }, false),
         llvm::Function::ExternalLinkage, "builtin_push", module);
     builtins.push_str_fn = llvm::Function::Create(
-        llvm::FunctionType::get(v, { i64, ptr }, false),
+        llvm::FunctionType::get(i64, { i64, ptr }, false),
         llvm::Function::ExternalLinkage, "builtin_push_str", module);
     builtins.pop_fn = llvm::Function::Create(
         llvm::FunctionType::get(i64, { i64 }, false),

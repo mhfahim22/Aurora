@@ -1,97 +1,15 @@
-# Game Demo - Space Shooter
-# Demonstrates the game engine: scenes, entities, physics, input, collision, audio
+# Game Demo - Simple Example
+# Demonstrates basic game loop pattern
 
-scene Game
-    player = null
-    score = 0
+function step(dt)
+    output("Step: dt=" + dt)
 
-    function init()
-        entity player
-            sprite = "@"
-            x = 400
-            y = 550
-            speed = 300
-            health = 100
+function draw_frame()
+    output("Rendering frame")
 
-        for i in 3
-            entity enemy
-                sprite = "*"
-                x = 100 + i * 200
-                y = 50
-                speed = 50 + rand(0, 50)
-                hp = 1
-
-        for i in 5
-            entity star
-                sprite = "."
-                x = rand(0, 800)
-                y = rand(0, 600)
-                speed = 20 + rand(0, 30)
-
-    function update(dt)
-        poll_input()
-
-        if input.key_down("left") and player.x > 0
-            player.x -= player.speed * dt
-        if input.key_down("right") and player.x < 800
-            player.x += player.speed * dt
-        if input.key_down("up") and player.y > 0
-            player.y -= player.speed * dt
-        if input.key_down("down") and player.y < 600
-            player.y += player.speed * dt
-
-        if input.key_pressed("space")
-            entity bullet
-                sprite = "|"
-                x = player.x
-                y = player.y - 20
-                vy = -400
-                damage = 25
-
-        for entity in self.entities
-            if not entity.hp
-                entity.y += entity.speed * dt
-                if entity.y > 650
-                    entity.y = -20
-                    entity.x = rand(0, 800)
-
-            if entity.vy
-                entity.y += entity.vy * dt
-                if entity.y < -20
-                    scene.remove(entity)
-
-            if entity.sprite == "*"
-                for other in self.entities
-                    if other.vy
-                        if abs(entity.x - other.x) < 20 and abs(entity.y - other.y) < 20
-                            entity.hp -= 1
-                            scene.remove(other)
-                            if entity.hp <= 0
-                                scene.remove(entity)
-                                self.score += 100
-                                audio_play_tone(440, 50)
-
-        if player.health <= 0
-            output("Game Over! Score: " + self.score)
-            scene.load("menu")
-
-    function render()
-        output("Score: " + self.score + "  Health: " + player.health)
-
-scene Menu
-    function init()
-        output("=== SPACE SHOOTER ===")
-        output("Press ENTER to start")
-        output("Use arrow keys to move")
-        output("Press SPACE to shoot")
-
-    function update(dt)
-        poll_input()
-        if input.key_pressed("enter")
-            scene.load("game")
-
-Game.init()
-while true
-    Game.update(16)
-    Game.render()
-    sleep(16)
+output("=== Game Loop ===")
+for i in 3
+    step(i * 16)
+    draw_frame()
+    sleep(100)
+output("Game demo complete")

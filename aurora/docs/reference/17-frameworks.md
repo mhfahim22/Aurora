@@ -46,8 +46,24 @@ component Button
 | `auth`         | Authentication                 |
 
 ```aura
-api "/users" method="GET"
+server myServer
+    api "/users" method="GET"
+        response(200, users)
+
+    middleware auth:
+        # authentication logic
+
+    database db:
+        # database config
+
+# Route with HTTP method
+route "GET" "/api/users":
     response(200, users)
+
+request req
+response res
+query q
+token t
 ```
 
 ## Game Engine
@@ -72,6 +88,10 @@ scene MainMenu
     function update(dt)
         if input.key_pressed("space")
             start_game()
+
+    input:
+        if key_down("escape")
+            quit()
 ```
 
 ## AI/ML Framework
@@ -89,6 +109,10 @@ neural network:
     dense(128, relu)
     dropout(0.5)
     dense(10, softmax)
+
+ai model:
+    train data
+    predict input
 ```
 
 ## Cross-reference

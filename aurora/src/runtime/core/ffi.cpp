@@ -532,7 +532,18 @@ static std::vector<CallbackSlot> callback_slots;
 /* Cleanup callback executable memory on shutdown */
 namespace {
     struct CallbackCleanup {
-        ~CallbackCleanup() { aurora_callback_cleanup(); }
+        ~CallbackCleanup() {
+            for (auto& slot : callback_slots) {
+                if (slot.trampoline) {
+                    #ifdef _WIN32
+                    VirtualFree(slot.trampoline, 0, MEM_RELEASE);
+                    #else
+                    free(slot.trampoline);
+                    #endif
+                }
+            }
+            callback_slots.clear();
+        }
     };
     static CallbackCleanup g_callback_cleanup;
 }

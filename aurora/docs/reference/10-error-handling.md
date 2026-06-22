@@ -17,7 +17,25 @@ try:
 catch err:
     outputf("Error: %d\n", err)
 
-# Catch without variable (ignore error value)
+# Brace blocks:
+try {
+    throw "error"
+} catch err {
+    output(err)
+} finally {
+    cleanup()
+}
+
+# Catch with parentheses:
+try:
+    throw 42
+catch(err):
+    outputf("Error: %d\n", err)
+```
+
+### Catch without variable (ignore error value)
+
+```aura
 try:
     body()
 catch:
@@ -36,17 +54,28 @@ result = try(might_fail(5))     # returns value or propagates error
 throw "something went wrong"
 throw 42                        # throw any value (int, string, object...)
 throw Error("timeout")          # custom error pattern
+throw                           # re-throw current error (inside catch)
 ```
 
-## Ensure (Defer)
+## Ensure / Finally
 
-`ensure` runs cleanup on scope exit (like `defer` in Go or `finally` without catch):
+`ensure` and `finally` are **aliases** — they run cleanup on scope exit (like `defer` in Go):
 
 ```aura
+try:
+    body()
 ensure:
     cleanup()
 
-# Or inline:
+try:
+    body()
+finally:
+    cleanup()                   # same as ensure
+```
+
+### Inline ensure
+
+```aura
 ensure cleanup()
 
 # Practical: ensure file is closed

@@ -1,14 +1,8 @@
 # ── Aurora ML Training Demo ──
 # Shows: model creation, metrics, and predict API
-# Note: training requires tensor data (not Aurora arrays)
-# Tensor construction from Aurora is a future feature
 
 output("=== Aurora ML Training Demo ===")
 
 m = model_create("dense")
 output("Model created:")
-output(model_info(m))
-output("Params:")
-output(model_size(m))
-
 output("Done")

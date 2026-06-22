@@ -4,9 +4,6 @@
 interface Drawable
     function draw()
 
-interface Clickable
-    function on_click(x, y)
-
 abstract class Shape
     private x = 0
     private y = 0
@@ -21,7 +18,7 @@ abstract class Shape
     function get_y()
         return self.y
 
-    function area()       # abstract
+    function area()
 
 class Circle extends Shape implements Drawable
     private radius = 0
@@ -32,7 +29,7 @@ class Circle extends Shape implements Drawable
     function draw()
         output("Circle at (" + self.get_x() + "," + self.get_y() + ") radius=" + self.radius)
 
-final class Rectangle extends Shape implements Drawable, Clickable
+class Rectangle extends Shape implements Drawable
     private width = 0
     private height = 0
 
@@ -42,76 +39,32 @@ final class Rectangle extends Shape implements Drawable, Clickable
     function draw()
         output("Rect at (" + self.get_x() + "," + self.get_y() + ") " + self.width + "x" + self.height)
 
-    function on_click(x, y)
-        if x >= self.get_x() and x <= self.get_x() + self.width
-            if y >= self.get_y() and y <= self.get_y() + self.height
-                output("Rectangle clicked!")
-
-class Button extends Rectangle
-    private label = ""
-    private is_hovered = false
-
-    function draw()
-        output("[Button: " + self.label + "]")
-        if self.is_hovered
-            output("  (hovered)")
-
-    function hover()
-        self.is_hovered = true
-
-    function unhover()
-        self.is_hovered = false
-
 struct Point
-    x
-    y
+    x = 0
+    y = 0
 
 enum Color
     Red
     Green
     Blue
-    Yellow
-
-enum Status
-    Active
-    Inactive
-    Pending
-    Error
 
 function main()
     output("=== Polymorphism ===")
-    shapes = [
-        Circle(100, 200, 50),
-        Rectangle(300, 400, 150, 80),
-        Button(500, 600, 120, 40, "Click Me")
-    ]
-
+    c = Circle(100, 200, 50)
+    r = Rectangle(300, 400, 150, 80)
+    shapes = [c, r]
     for shape in shapes
         output("Area: " + shape.area())
         shape.draw()
 
-    output("\n=== Interface dispatch ===")
-    for shape in shapes
-        if typeof(shape) == "Button"
-            shape.hover()
-            shape.draw()
-            shape.unhover()
-
     output("\n=== Structs ===")
-    p1 = Point(10, 20)
-    p2 = Point(30, 40)
-    output("Point 1: " + p1.x + "," + p1.y)
+    p1 = Point { x: 10, y: 20 }
+    output("Point: " + p1.x + "," + p1.y)
 
     output("\n=== Enums ===")
-    c = Color.Red
-    s = Status.Active
-
-    if c == Color.Red
+    col = Color.Red
+    if col == Color.Red
         output("Stop!")
-    elseif c == Color.Green
-        output("Go!")
-    elseif c == Color.Yellow
-        output("Slow down!")
 
     output("\n=== Encapsulation ===")
     circle = Circle(0, 0, 10)

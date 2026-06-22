@@ -33,10 +33,8 @@ llvm::Value* codegen_builtin_section3(
         llvm::Value* arr = gen_expr(node->args.get());
         llvm::Value* val = gen_expr(node->args->next.get());
         if (val->getType()->isPointerTy())
-            builder.CreateCall(builtins.push_str_fn, { arr, val });
-        else
-            builder.CreateCall(builtins.push_fn, { arr, val });
-        return llvm::ConstantInt::get(i64, 0);
+            return builder.CreateCall(builtins.push_str_fn, { arr, val }, "push");
+        return builder.CreateCall(builtins.push_fn, { arr, val }, "push");
     }
     if (name == "pop" && node->args) {
         llvm::Value* arr = gen_expr(node->args.get());

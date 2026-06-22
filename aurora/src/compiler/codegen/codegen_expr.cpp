@@ -113,6 +113,71 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
             }
             return i64(0);
         }
+        case NodeType::Lambda: {
+            /* Inline lambda expression — create LLVM function, return i8* fn ptr */
+            if (!node->captures.empty()) {
+                std::cerr << "[codegen] warning: inline lambda with captures not yet supported, returning 0\n";
+                return i64(0);
+            }
+
+            /* Build param types (all i8*) */
+            std::vector<llvm::Type*> param_types;
+            const ASTNode* p = node->args.get();
+            while (p) {
+                param_types.push_back(i8ptr_ty());
+                p = p->next.get();
+            }
+
+            auto* fn_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+            auto* fn = llvm::Function::Create(
+                fn_type, llvm::Function::InternalLinkage,
+                node->value.empty() ? "_lambda_expr" : node->value, module_.get());
+
+            /* Name params */
+            int ai = 0;
+            for (auto& arg : fn->args()) {
+                std::string pname = "_p" + std::to_string(ai++);
+                const ASTNode* pp = node->args.get();
+                for (int i = 0; i < ai - 1 && pp; i++) pp = pp->next.get();
+                if (pp) pname = pp->value;
+                arg.setName(pname);
+            }
+
+            auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", fn);
+            auto* saved_fn = cur_fn_;
+            auto* saved_bb = builder_->GetInsertBlock();
+            auto saved_scopes = std::move(scopes_);
+            auto saved_cache = std::move(literal_aurora_cache_);
+            scopes_.clear();
+
+            cur_fn_ = fn;
+            builder_->SetInsertPoint(entry_bb);
+            push_scope();
+
+            /* Allocate and store params */
+            ai = 0;
+            p = node->args.get();
+            while (p) {
+                auto* slot = create_entry_alloca(p->value, i64_ty());
+                llvm::Value* val = fn->getArg(ai++);
+                if (val->getType() != i64_ty())
+                    val = builder_->CreatePtrToInt(val, i64_ty(), p->value + "_unbox");
+                builder_->CreateStore(val, slot);
+                declare_var(p->value, slot, OwnershipState::Owned);
+                p = p->next.get();
+            }
+
+            gen_block(node->body.get());
+            pop_scope_and_drop();
+            safe_ret(llvm::ConstantPointerNull::get(i8ptr_ty()));
+
+            literal_aurora_cache_ = std::move(saved_cache);
+            cur_fn_ = saved_fn;
+            scopes_ = std::move(saved_scopes);
+            if (saved_bb) builder_->SetInsertPoint(saved_bb);
+
+            return builder_->CreateBitCast(fn, i8ptr_ty(), "lambda_ptr");
+        }
         default: {
             std::cerr << "[codegen] warning: unhandled expression node type "
                       << (int)node->type << " at line " << node->src_line
@@ -1151,7 +1216,9 @@ llvm::Value* Codegen::gen_closure_call(const ASTNode* node, VarRecord* rec) {
 
 /* ── Call a non-capturing lambda stored as a function pointer variable ── */
 llvm::Value* Codegen::gen_fnptr_call(const ASTNode* node, VarRecord* rec) {
-    llvm::Value* fn_ptr = builder_->CreateLoad(i8ptr_ty(), rec->alloca_ptr, node->value + "_fn");
+    /* Function parameters are stored as i64 in allocas; load i64 then cast to ptr */
+    llvm::Value* fn_int = builder_->CreateLoad(i64_ty(), rec->alloca_ptr, node->value + "_fn_int");
+    llvm::Value* fn_ptr = builder_->CreateIntToPtr(fn_int, i8ptr_ty(), node->value + "_fn");
 
     std::vector<llvm::Value*> args;
     const ASTNode* arg = node->args.get();

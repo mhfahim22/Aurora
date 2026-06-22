@@ -37,8 +37,6 @@ private:
     int cur_;
     std::string pending_cost_ {}; /* @cost(zero|alloc|indirection) set by previous line */
 
-    ASTNode::Ptr parse_block(int parent_indent);
-    ASTNode::Ptr parse_brace_block(int brace_depth = 1);
     ASTNode::Ptr parse_stmt();
 
     ASTNode::Ptr parse_class();
@@ -62,6 +60,10 @@ private:
                                        const std::vector<Token>& toks,
                                        int& idx, int cnt);
 
+public:
+    /* Exposed for static helper functions in parse_stmt.cpp / parse_extern.cpp */
+    ASTNode::Ptr parse_block(int parent_indent);
+    ASTNode::Ptr parse_brace_block(int brace_depth = 1);
     void require_token_end(const std::vector<Token>& toks, int idx, const char* context) const;
 
     bool skip_blanks();

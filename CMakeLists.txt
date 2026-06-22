@@ -1,6 +1,6 @@
 # aurora_restructured/CMakeLists.txt (updated)
 cmake_minimum_required(VERSION 3.20)
-project(Aurora LANGUAGES CXX ASM_MASM)
+project(Aurora LANGUAGES C CXX ASM_MASM)
 
 # ── Read VERSION file and generate version.h ──
 file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" AURORA_VERSION_STR)

@@ -577,13 +577,15 @@ int64_t builtin_http_post(const void* url_a, const void* body_a, const void* ct_
    Collection Built-ins
    ════════════════════════════════════════════════════════════ */
 
-void builtin_push(int64_t arr_ptr, int64_t val) {
+int64_t builtin_push(int64_t arr_ptr, int64_t val) {
     aurora_array_push_int(arr_ptr, val);
+    return arr_ptr;
 }
 
-void builtin_push_str(int64_t arr_ptr, const void* str_a) {
+int64_t builtin_push_str(int64_t arr_ptr, const void* str_a) {
     const char* str = aurora_str_ptr(str_a);
     aurora_array_push_str(arr_ptr, str ? str : "");
+    return arr_ptr;
 }
 
 int64_t builtin_pop(int64_t arr_ptr) {

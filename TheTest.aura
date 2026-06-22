@@ -1,0 +1,95 @@
+function fib(n, memo)
+    if n <= 1
+        return n
+    if memo[n] != null
+        return memo[n]
+    result = fib(n - 1, memo) + fib(n - 2, memo)
+    memo[n] = result
+    return result
+
+memo = []
+for i in 56
+    memo = push(memo, null)
+
+result = fib(55, memo)
+output("fib(55) = " + result)
+
+class Circle
+    radius = 0
+    function area()
+        return self.radius * self.radius
+
+class Rectangle
+    width = 0
+    height = 0
+    function area()
+        return self.width * self.height
+
+class Square extends Rectangle
+    function init(side)
+        self.width = side
+        self.height = side
+
+c = Circle()
+c.radius = 5
+
+r = Rectangle()
+r.width = 4
+r.height = 6
+
+s = Square()
+s.init(3)
+
+output("Circle area: " + c.area())
+output("Rectangle area: " + r.area())
+output("Square area: " + s.area())
+
+function stress_arena()
+    i = 0
+    while i < 500
+        @arena batch = []
+        j = 0
+        while j < 500
+            batch = push(batch, i * j)
+            j = j + 1
+        sum = 0
+        for x in batch
+            sum = sum + x
+        i = i + 1
+    output("arena stress done")
+
+function stress_arc()
+    @arc arr = [1, 2, 3, 4, 5]
+    copies = []
+    for i in 100
+        copies = push(copies, arr)
+    output("arc stress done, len=" + len(copies))
+
+stress_arena()
+stress_arc()
+
+/* ----- Test 6: Named lambdas (statement-level) ----- */
+lambda double_fn(x)
+    return x * 2
+
+output("double_fn(21) = " + double_fn(21))
+
+/* ----- Test inline lambda parsing (lambda as expression) ----- */
+f = lambda(x) x + 1
+output("inline lambda: " + f(10))
+
+/* ----- Test HOF with inline lambda ----- */
+function apply_twice(x, fn)
+    return fn(fn(x))
+
+output("apply_twice(inline) = " + apply_twice(3, lambda(x) x * 2))
+
+/* ----- Test HOF + named lambda + arrays ----- */
+arr_test = []
+arr_test = push(arr_test, 10)
+output("HOF+arr: " + apply_twice(7, double_fn))
+output("HOF+arr arr[0] = " + arr_test[0])
+
+/* ----- Test inline lambda used as callback arg to builtin HOF ----- */
+
+output("ALL TESTS PASSED")

@@ -1,0 +1,21 @@
+function apply_twice(x, fn)
+    return fn(fn(x))
+
+output("apply_twice(3, lambda(x) x * 2) = " + apply_twice(3, lambda(x) x * 2))
+
+/* Test with named lambda + array (was causing LLVM opt crash) */
+lambda double_it(x)
+    return x * 2
+
+arr = []
+arr = push(arr, 10)
+arr = push(arr, 20)
+arr = push(arr, 30)
+
+output("arr[0] = " + arr[0])
+output("arr[1] = " + arr[1])
+
+result = apply_twice(7, double_it)
+output("apply_twice(7, double_it) = " + result)
+
+output("done")

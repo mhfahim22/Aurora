@@ -21,7 +21,16 @@ extern "stdcall" "kernel32" function Sleep(ms: u32)
 # C calling convention
 extern "c" function add(p0: i32, p1: i32) -> i32
 
-# FFI cost annotation
+# Win64 calling convention
+extern "win64" function win_api(param: i64) -> i32
+
+# System V AMD64 ABI (Linux/macOS)
+extern "sysv64" function posix_api(param: i64) -> i32
+```
+
+### FFI cost annotation
+
+```aura
 @cost(zero)
 extern function fast_add(a: i32, b: i32) -> i32
 
@@ -39,6 +48,8 @@ extern function query_database(query: cstring) -> i32
 | (default)  | Platform default (Win64)   |
 | `cdecl`    | C declaration (x86 only)   |
 | `stdcall`  | Standard call (Win32)      |
+| `win64`    | Windows x64 convention     |
+| `sysv64`   | System V AMD64 ABI         |
 
 > **Note:** On x86-64, Windows uses a single calling convention. `cdecl` and `stdcall` only differ on x86 (32-bit).
 
