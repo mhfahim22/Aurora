@@ -12,6 +12,7 @@
 #else
 #include <dlfcn.h>
 #include <pthread.h>
+#include <sys/mman.h>
 #endif
 
 #ifdef _WIN32

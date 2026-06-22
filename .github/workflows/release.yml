@@ -27,7 +27,7 @@ jobs:
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
       with:
-        vs-version: '[17,18)'
+        vs-version: '17.0'
 
     - name: Configure CMake
       run: |
