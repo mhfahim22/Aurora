@@ -3,7 +3,7 @@
 ; Download: https://jrsoftware.org/isdl.php
 
 #define MyAppName "Aurora"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "Aurora Language"
 #define MyAppURL "https://github.com/mhfahim22/Aurora"
 #define MyAppExeName "aurorac.exe"
@@ -49,8 +49,8 @@ AppDescription=Aurora Programming Language — Polyglot with LLVM-native compila
 Source: "..\build\Release\aurorac.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\Release\voss.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\Release\aurora_lsp.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\Release\aurora_bindgen.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\Release\aurora_cppwrap.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Source: "..\build\Release\aurora_bindgen.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Source: "..\build\Release\aurora_cppwrap.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; ── Runtime DLLs (required for library imports) ──
 ; NOTE: glfw3.dll is an external dependency — it must be present in build\Release\ before compiling this installer
