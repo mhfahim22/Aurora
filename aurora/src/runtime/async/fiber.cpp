@@ -67,7 +67,7 @@ void aurora_fiber_resume(AuroraFiber* fiber) {
 
         /* Use setjmp to establish a yield return point */
         /* TODO: setjmp/longjmp with C++ objects is UB — migrate to std::coroutine or exceptions */
-        if (std::setjmp(ctx->yield_point) == 0) {
+        if (setjmp(ctx->yield_point) == 0) {
             /* Call the function directly (simulated fiber) */
             void* result = fiber->func(fiber->arg);
             fiber->result = result;

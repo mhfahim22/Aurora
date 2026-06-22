@@ -21,14 +21,20 @@ jobs:
     - name: Setup LLVM
       run: |
         choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
-        # Locate the actual LLVM installation directory
-        $llvmDir = if (Test-Path "C:\Program Files\LLVM") { "C:\Program Files\LLVM" } else {
-          $p = & "C:\ProgramData\chocolatey\bin\llvm-config.exe" --prefix 2>$null
-          if (-not $?) { $p = "$env:ProgramFiles\LLVM" }
-          $p
+        # Locate the actual LLVM cmake directory
+        $llvmCmakeDir = & "llvm-config" --cmakedir 2>$null
+        if (-not $?) {
+          # fallback: search for LLVMConfig.cmake
+          $candidate = Get-ChildItem -Path "$env:ProgramFiles\LLVM\lib\cmake" -Recurse -Filter "LLVMConfig.cmake" -ErrorAction SilentlyContinue `
+            | Select-Object -First 1 -ExpandProperty DirectoryName
+          if ($candidate) { $llvmCmakeDir = $candidate }
         }
-        echo "LLVM_HOME=$llvmDir" >> $env:GITHUB_ENV
-        echo "$llvmDir\bin" >> $env:GITHUB_PATH
+        if (-not $llvmCmakeDir) {
+          $llvmCmakeDir = "$env:ProgramFiles\LLVM\lib\cmake\llvm"
+        }
+        echo "LLVM_DIR=$llvmCmakeDir" >> $env:GITHUB_ENV
+        $llvmBin = Join-Path (Split-Path (Split-Path $llvmCmakeDir)) "bin"
+        echo "$llvmBin" >> $env:GITHUB_PATH
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -37,7 +43,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_HOME\lib\cmake\llvm"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_DIR"
 
     - name: Build Core Targets
       run: |
@@ -91,6 +97,8 @@ jobs:
 
     - name: Remove conflicting LLVM cmake files
       run: |
+        sudo rm -rf /usr/lib/llvm-16/lib/cmake/clang 2>/dev/null || true
+        sudo rm -rf /usr/lib/cmake/clang-16 2>/dev/null || true
         sudo rm -rf /usr/lib/llvm-18/lib/cmake/clang 2>/dev/null || true
         sudo rm -rf /usr/lib/cmake/clang-18 2>/dev/null || true
         sudo rm -rf /usr/lib/llvm-19/lib/cmake/clang 2>/dev/null || true

@@ -82,7 +82,12 @@ void map_set(void* map, const char* key, long long val) {
         m->cap *= 2;
         m->entries = (MapEntry*)aurora_safe_realloc(m->entries, m->cap * sizeof(MapEntry));
     }
+#ifdef _WIN32
     strncpy_s(m->entries[m->len].key, sizeof(m->entries[m->len].key), key, _TRUNCATE);
+#else
+    strncpy(m->entries[m->len].key, key, sizeof(m->entries[m->len].key) - 1);
+    m->entries[m->len].key[sizeof(m->entries[m->len].key) - 1] = '\0';
+#endif
     m->entries[m->len].val = val;
     m->len++;
 }
