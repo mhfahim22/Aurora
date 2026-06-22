@@ -1,0 +1,189 @@
+name: Aurora Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup LLVM
+      run: |
+        choco install llvm --version=19.1.0 -y --no-progress
+        echo "LLVM_HOME=C:\Program Files\LLVM" >> $env:GITHUB_ENV
+        echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+
+    - name: Setup Visual Studio
+      uses: microsoft/setup-msbuild@v2
+      with:
+        vs-version: '[17,18)'
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="C:\Program Files\LLVM\lib\cmake\llvm"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j4
+        cmake --build build --config Release --target aurora_bindgen -j4 2>$null; if (-not $?) { Write-Host "bindgen skipped" }
+        cmake --build build --config Release --target aurora_cppwrap -j4 2>$null; if (-not $?) { Write-Host "cppwrap skipped" }
+
+    - name: Package Windows Installer
+      run: |
+        # Package ZIP first
+        & "release\package_release.ps1"
+        # Then compile Inno Setup installer
+        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+          choco install innosetup -y --no-progress
+        }
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "release\setup.iss"
+        Get-ChildItem -Path release -Filter "Aurora-*-setup.exe" | ForEach-Object {
+          Write-Host "  ✅ $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)"
+        }
+
+    - name: Upload Windows Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: |
+          release/Aurora-*-windows-x64-setup.exe
+          release/Aurora-*-windows-x64.zip
+        if-no-files-found: warn
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      run: |
+        wget -q https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 19
+        sudo apt-get install -y liblld-19-dev
+        echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y cmake g++ libcurl4-openssl-dev
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc)
+
+    - name: Package Linux Tarball
+      run: |
+        VERSION=$(cat VERSION | tr -d '\n')
+        mkdir -p dist/Aurora-$VERSION
+        cp build/Release/aurorac dist/Aurora-$VERSION/
+        cp build/Release/voss dist/Aurora-$VERSION/
+        cp build/Release/aurora_lsp dist/Aurora-$VERSION/
+        cp -r libc dist/Aurora-$VERSION/
+        cp build/Release/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
+        cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
+        cd dist && tar -czf Aurora-$VERSION-linux-x86_64.tar.gz Aurora-$VERSION
+        echo "PACKAGE=Aurora-$VERSION-linux-x86_64.tar.gz" >> $GITHUB_ENV
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-tarball
+        path: dist/Aurora-*-linux-x86_64.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      run: |
+        brew update
+        brew install llvm@19
+        echo "LLVM_DIR=$(brew --prefix llvm@19)/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "$(brew --prefix llvm@19)/bin" >> $GITHUB_PATH
+
+    - name: Install Dependencies
+      run: |
+        brew install cmake
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(sysctl -n hw.ncpu)
+
+    - name: Package macOS Tarball
+      run: |
+        VERSION=$(cat VERSION | tr -d '\n')
+        mkdir -p dist/Aurora-$VERSION
+        cp build/Release/aurorac dist/Aurora-$VERSION/
+        cp build/Release/voss dist/Aurora-$VERSION/
+        cp build/Release/aurora_lsp dist/Aurora-$VERSION/
+        cp -r libc dist/Aurora-$VERSION/
+        cp build/Release/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
+        cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
+        cd dist && tar -czf Aurora-$VERSION-macos-x86_64.tar.gz Aurora-$VERSION
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-tarball
+        path: dist/Aurora-*-macos-x86_64.tar.gz
+
+  create-release:
+    needs: [build-windows, build-ubuntu, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: List Artifacts
+      run: find artifacts -type f -ls
+
+    - name: Create Release and Upload Assets
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -e
+        TAG="${GITHUB_REF_NAME}"
+        VERSION="${TAG#v}"
+        echo "Creating release for $TAG (version $VERSION)"
+
+        cd artifacts
+        ASSETS=()
+        for f in $(find . -type f | sort); do
+          ASSETS+=("$f")
+        done
+
+        gh release create "$TAG" \
+          --title "Aurora $TAG" \
+          --notes "See [CHANGELOG](CHANGELOG.md) for details." \
+          "${ASSETS[@]}"
