@@ -1,0 +1,47 @@
+## Aurora Standard Library — Math
+## Usage:  import "math"
+
+extern function aurora_math_pi() -> f64
+extern function aurora_math_sin(x: f64) -> f64
+extern function aurora_math_cos(x: f64) -> f64
+extern function aurora_math_tan(x: f64) -> f64
+extern function aurora_math_sqrt(x: f64) -> f64
+extern function aurora_math_pow(x: f64, y: f64) -> f64
+extern function aurora_math_exp(x: f64) -> f64
+extern function aurora_math_log(x: f64) -> f64
+extern function aurora_math_log10(x: f64) -> f64
+extern function aurora_math_e() -> f64
+
+function pi():
+    return aurora_math_pi()
+end
+function sin(x):
+    return aurora_math_sin(x)
+end
+function cos(x):
+    return aurora_math_cos(x)
+end
+function tan(x):
+    return aurora_math_tan(x)
+end
+function sqrt(x):
+    return aurora_math_sqrt(x)
+end
+function pow(x, y):
+    return aurora_math_pow(x, y)
+end
+function exp(x):
+    return aurora_math_exp(x)
+end
+function ln(x):
+    return aurora_math_log(x)
+end
+function log(x):
+    return ln(x)
+end
+function log10(x):
+    return aurora_math_log10(x)
+end
+function e_val():
+    return aurora_math_e()
+end

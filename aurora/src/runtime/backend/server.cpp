@@ -20,7 +20,6 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include "miniz.h"
 #pragma comment(lib, "ws2_32.lib")
 #else
 #include <sys/socket.h>
@@ -31,6 +30,8 @@
 #define MSG_NOSIGNAL 0
 #endif
 #endif
+
+#include "miniz.h"
 
 extern "C" {
 

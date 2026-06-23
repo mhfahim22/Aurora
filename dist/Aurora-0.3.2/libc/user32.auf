@@ -1,0 +1,108 @@
+/* ════════════════════════════════════════════════════════════
+   User32 Windows API bindings
+   Library: user32
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Message Box ── */
+extern "stdcall" "user32" function MessageBoxA(hWnd: pointer, text: cstring, caption: cstring, type: u32) -> i32
+extern "stdcall" "user32" function MessageBoxW(hWnd: pointer, text: pointer, caption: pointer, type: u32) -> i32
+
+/* ── Window Management ── */
+extern "stdcall" "user32" function CreateWindowExA(ex_style: u32, class_name: cstring, win_name: cstring, style: u32, x: i32, y: i32, w: i32, h: i32, parent: pointer, menu: pointer, inst: pointer, param: pointer) -> pointer
+extern "stdcall" "user32" function CreateWindowExW(ex_style: u32, class_name: pointer, win_name: pointer, style: u32, x: i32, y: i32, w: i32, h: i32, parent: pointer, menu: pointer, inst: pointer, param: pointer) -> pointer
+extern "stdcall" "user32" function DestroyWindow(hWnd: pointer) -> i32
+extern "stdcall" "user32" function ShowWindow(hWnd: pointer, cmd: i32) -> i32
+extern "stdcall" "user32" function UpdateWindow(hWnd: pointer) -> i32
+extern "stdcall" "user32" function SetWindowTextA(hWnd: pointer, text: cstring) -> i32
+extern "stdcall" "user32" function SetWindowTextW(hWnd: pointer, text: pointer) -> i32
+extern "stdcall" "user32" function GetWindowTextA(hWnd: pointer, buf: cstring, max: i32) -> i32
+extern "stdcall" "user32" function GetWindowTextW(hWnd: pointer, buf: pointer, max: i32) -> i32
+extern "stdcall" "user32" function GetWindowTextLengthA(hWnd: pointer) -> i32
+extern "stdcall" "user32" function GetWindowTextLengthW(hWnd: pointer) -> i32
+extern "stdcall" "user32" function MoveWindow(hWnd: pointer, x: i32, y: i32, w: i32, h: i32, repaint: i32) -> i32
+extern "stdcall" "user32" function SetWindowPos(hWnd: pointer, after: pointer, x: i32, y: i32, w: i32, h: i32, flags: u32) -> i32
+extern "stdcall" "user32" function GetClientRect(hWnd: pointer, rect: pointer) -> i32
+extern "stdcall" "user32" function GetWindowRect(hWnd: pointer, rect: pointer) -> i32
+extern "stdcall" "user32" function AdjustWindowRectEx(rect: pointer, style: u32, menu: i32, ex_style: u32) -> i32
+extern "stdcall" "user32" function IsWindowVisible(hWnd: pointer) -> i32
+extern "stdcall" "user32" function EnableWindow(hWnd: pointer, enable: i32) -> i32
+extern "stdcall" "user32" function SetFocus(hWnd: pointer) -> pointer
+extern "stdcall" "user32" function GetForegroundWindow() -> pointer
+extern "stdcall" "user32" function GetDesktopWindow() -> pointer
+extern "stdcall" "user32" function FindWindowA(class_name: cstring, win_name: cstring) -> pointer
+extern "stdcall" "user32" function FindWindowW(class_name: pointer, win_name: pointer) -> pointer
+extern "stdcall" "user32" function FindWindowExA(parent: pointer, after: pointer, class_name: cstring, win_name: cstring) -> pointer
+extern "stdcall" "user32" function FindWindowExW(parent: pointer, after: pointer, class_name: pointer, win_name: pointer) -> pointer
+
+/* ── Window Class Registration ── */
+extern "stdcall" "user32" function RegisterClassExA(cls: pointer) -> i32
+extern "stdcall" "user32" function RegisterClassExW(cls: pointer) -> i32
+extern "stdcall" "user32" function UnregisterClassA(name: cstring, inst: pointer) -> i32
+extern "stdcall" "user32" function UnregisterClassW(name: pointer, inst: pointer) -> i32
+extern "stdcall" "user32" function GetClassInfoExA(inst: pointer, name: cstring, cls: pointer) -> i32
+extern "stdcall" "user32" function GetClassInfoExW(inst: pointer, name: pointer, cls: pointer) -> i32
+
+/* ── Message Loop ── */
+extern "stdcall" "user32" function GetMessageA(msg: pointer, hWnd: pointer, min: u32, max: u32) -> i32
+extern "stdcall" "user32" function GetMessageW(msg: pointer, hWnd: pointer, min: u32, max: u32) -> i32
+extern "stdcall" "user32" function PeekMessageA(msg: pointer, hWnd: pointer, min: u32, max: u32, remove: u32) -> i32
+extern "stdcall" "user32" function PeekMessageW(msg: pointer, hWnd: pointer, min: u32, max: u32, remove: u32) -> i32
+extern "stdcall" "user32" function TranslateMessage(msg: pointer) -> i32
+extern "stdcall" "user32" function DispatchMessageA(msg: pointer) -> pointer
+extern "stdcall" "user32" function DispatchMessageW(msg: pointer) -> pointer
+extern "stdcall" "user32" function PostMessageA(hWnd: pointer, msg: u32, wParam: u64, lParam: i64) -> i32
+extern "stdcall" "user32" function PostMessageW(hWnd: pointer, msg: u32, wParam: u64, lParam: i64) -> i32
+extern "stdcall" "user32" function PostQuitMessage(code: i32)
+extern "stdcall" "user32" function SendMessageA(hWnd: pointer, msg: u32, wParam: u64, lParam: i64) -> i64
+extern "stdcall" "user32" function SendMessageW(hWnd: pointer, msg: u32, wParam: u64, lParam: i64) -> i64
+
+/* ── Drawing / Device Context ── */
+extern "stdcall" "user32" function GetDC(hWnd: pointer) -> pointer
+extern "stdcall" "user32" function GetWindowDC(hWnd: pointer) -> pointer
+extern "stdcall" "user32" function ReleaseDC(hWnd: pointer, dc: pointer) -> i32
+extern "stdcall" "user32" function BeginPaint(hWnd: pointer, paint: pointer) -> pointer
+extern "stdcall" "user32" function EndPaint(hWnd: pointer, paint: pointer) -> i32
+extern "stdcall" "user32" function InvalidateRect(hWnd: pointer, rect: pointer, erase: i32) -> i32
+extern "stdcall" "user32" function ValidateRect(hWnd: pointer, rect: pointer) -> i32
+extern "stdcall" "user32" function GetUpdateRect(hWnd: pointer, rect: pointer, erase: i32) -> i32
+extern "stdcall" "user32" function RedrawWindow(hWnd: pointer, rect: pointer, region: pointer, flags: u32) -> i32
+extern "stdcall" "user32" function ScreenToClient(hWnd: pointer, point: pointer) -> i32
+extern "stdcall" "user32" function ClientToScreen(hWnd: pointer, point: pointer) -> i32
+
+/* ── Resources ── */
+extern "stdcall" "user32" function LoadCursorA(inst: pointer, name: cstring) -> pointer
+extern "stdcall" "user32" function LoadCursorW(inst: pointer, name: pointer) -> pointer
+extern "stdcall" "user32" function LoadIconA(inst: pointer, name: cstring) -> pointer
+extern "stdcall" "user32" function LoadIconW(inst: pointer, name: pointer) -> pointer
+extern "stdcall" "user32" function LoadImageA(inst: pointer, name: cstring, type: u32, cx: i32, cy: i32, flags: u32) -> pointer
+extern "stdcall" "user32" function LoadImageW(inst: pointer, name: pointer, type: u32, cx: i32, cy: i32, flags: u32) -> pointer
+extern "stdcall" "user32" function SetCursor(cursor: pointer) -> pointer
+extern "stdcall" "user32" function ShowCursor(show: i32) -> i32
+
+/* ── Timer ── */
+extern "stdcall" "user32" function SetTimer(hWnd: pointer, id: u64, ms: u32, proc: pointer) -> u64
+extern "stdcall" "user32" function KillTimer(hWnd: pointer, id: u64) -> i32
+
+/* ── Caret / Keyboard ── */
+extern "stdcall" "user32" function CreateCaret(hWnd: pointer, bitmap: pointer, w: i32, h: i32) -> i32
+extern "stdcall" "user32" function ShowCaret(hWnd: pointer) -> i32
+extern "stdcall" "user32" function HideCaret(hWnd: pointer) -> i32
+extern "stdcall" "user32" function SetCaretPos(x: i32, y: i32) -> i32
+extern "stdcall" "user32" function GetCaretPos(point: pointer) -> i32
+extern "stdcall" "user32" function GetKeyState(key: i32) -> i16
+extern "stdcall" "user32" function GetAsyncKeyState(key: i32) -> i16
+extern "stdcall" "user32" function IsKeyDown(key: i32) -> i32
+
+/* ── Clipboard ── */
+extern "stdcall" "user32" function OpenClipboard(hWnd: pointer) -> i32
+extern "stdcall" "user32" function CloseClipboard() -> i32
+extern "stdcall" "user32" function EmptyClipboard() -> i32
+extern "stdcall" "user32" function SetClipboardData(format: u32, data: pointer) -> pointer
+extern "stdcall" "user32" function GetClipboardData(format: u32) -> pointer
+extern "stdcall" "user32" function IsClipboardFormatAvailable(format: u32) -> i32
+
+/* ── Dialog ── */
+extern "stdcall" "user32" function DialogBoxParamA(inst: pointer, template_name: cstring, parent: pointer, proc: pointer, param: i64) -> i64
+extern "stdcall" "user32" function DialogBoxParamW(inst: pointer, template_name: pointer, parent: pointer, proc: pointer, param: i64) -> i64
+extern "stdcall" "user32" function EndDialog(hDlg: pointer, result: i64) -> i32
+extern "stdcall" "user32" function MessageBoxTimeoutA(hWnd: pointer, text: cstring, caption: cstring, type: u32, lang: i16, ms: u32) -> i32
