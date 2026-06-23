@@ -95,15 +95,19 @@ jobs:
 
     - name: Package Windows Installer
       run: |
-        # Package ZIP first
         & "release\package_release.ps1"
-        # Then compile Inno Setup installer
-        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
-          choco install innosetup -y --no-progress
+        # Inno Setup installer (optional — may not be available on runner)
+        $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) {
+          choco install innosetup -y --no-progress 2>$null
         }
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "release\setup.iss"
-        Get-ChildItem -Path release -Filter "Aurora-*-setup.exe" | ForEach-Object {
-          Write-Host "  ✅ $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)"
+        if (Test-Path $iscc) {
+          & $iscc "release\setup.iss"
+          Get-ChildItem -Path release -Filter "Aurora-*-setup.exe" | ForEach-Object {
+            Write-Host "  ✅ $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)"
+          }
+        } else {
+          Write-Host "  ⚠️ Inno Setup not available — installer skipped"
         }
 
     - name: Upload Windows Artifacts
