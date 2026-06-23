@@ -42,8 +42,8 @@ std::vector<LspCodeAction> LspServer::get_code_actions(DocumentState& doc, const
         }
 
         LspTextEdit edit;
-        edit.range.start = {(int)doc.lines.size(), 0};
-        edit.range.end = {(int)doc.lines.size(), 0};
+        edit.range.start = {(uint32_t)doc.lines.size(), 0};
+        edit.range.end = {(uint32_t)doc.lines.size(), 0};
         edit.newText = "\n" + file_indent + "end function";
         action.edits.push_back(edit);
         actions.push_back(action);
@@ -73,8 +73,8 @@ std::vector<LspCodeAction> LspServer::get_code_actions(DocumentState& doc, const
             });
             if (decl_line >= 0) {
                 LspTextEdit edit;
-                edit.range.start = {decl_line, 0};
-                edit.range.end = {decl_line + 1, 0};
+                edit.range.start = {(uint32_t)decl_line, 0};
+                edit.range.end = {(uint32_t)(decl_line + 1), 0};
                 edit.newText = "";
                 action.edits.push_back(edit);
             }
