@@ -417,7 +417,11 @@ llvm::Value* Codegen::gen_unary(const ASTNode* node) {
     if (node->value == "-") {
         if (val->getType()->isDoubleTy())
             return builder_->CreateFNeg(val, "neg");
+#if LLVM_VERSION_MAJOR >= 18
+        return builder_->CreateNSWNeg(val, "neg");
+#else
         return builder_->CreateNeg(val, "neg", false, true);
+#endif
     }
     if (node->value == "not") {
         if (val->getType()->isIntegerTy(1))
