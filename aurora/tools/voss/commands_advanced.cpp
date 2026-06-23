@@ -675,7 +675,8 @@ int cmd_lifecycle() {
 #ifdef _WIN32
                 localtime_s(&local, &ev.timestamp);
 #else
-                localtime_r(&ev.timestamp, &local);
+                time_t ts = static_cast<time_t>(ev.timestamp);
+                localtime_r(&ts, &local);
 #endif
                 strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &local);
                 std::cout << "    [" << buf << "] " << ev.event << " " << ev.version << "\n";
@@ -703,7 +704,8 @@ int cmd_lifecycle_package(const std::string& pkg) {
 #ifdef _WIN32
         localtime_s(&local, &ev.timestamp);
 #else
-        localtime_r(&ev.timestamp, &local);
+        time_t ts = static_cast<time_t>(ev.timestamp);
+        localtime_r(&ts, &local);
 #endif
         strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &local);
         std::cout << "  [" << buf << "] " << ev.event << " " << ev.version << "\n";

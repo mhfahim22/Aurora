@@ -427,6 +427,10 @@ target_include_directories(voss PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 if(WIN32)
     target_link_libraries(voss PRIVATE winhttp.lib)
 endif()
+if(UNIX)
+    find_package(CURL REQUIRED)
+    target_link_libraries(voss PRIVATE CURL::libcurl)
+endif()
 
 set_target_properties(voss PROPERTIES OUTPUT_NAME "voss")
 

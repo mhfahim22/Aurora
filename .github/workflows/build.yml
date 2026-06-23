@@ -56,6 +56,32 @@ jobs:
       with:
         vs-version: '17.0'
 
+    - name: Set up DIA SDK
+      shell: pwsh
+      run: |
+        # LLVM pre-built libraries depend on diaguids.lib from the DIA SDK.
+        # LLVM's cmake config references it at a fixed path that may not match
+        # the runner's VS installation.  Locate the actual DIA SDK and make
+        # the library available where the linker expects it.
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath 2>$null
+        if (-not $vsPath) {
+          Write-Host "::warning::vswhere could not locate a VS installation"
+          return
+        }
+        $srcLib = "$vsPath\DIA SDK\lib\amd64\diaguids.lib"
+        if (-not (Test-Path $srcLib)) {
+          Write-Host "::warning::DIA SDK not found at $srcLib"
+          return
+        }
+        $dstDir = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\DIA SDK\lib\amd64"
+        if (-not (Test-Path "$dstDir\diaguids.lib")) {
+          New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
+          Copy-Item $srcLib $dstDir\ -Force
+          Write-Host "Copied $srcLib -> $dstDir\"
+        } else {
+          Write-Host "DIA SDK already present at $dstDir"
+        }
+
     - name: Configure CMake
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_DIR"
