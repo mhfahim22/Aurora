@@ -4,7 +4,7 @@
 #include <cstring>
 #include <cstdlib>
 
-#ifdef __APPLE__
+#ifndef _WIN32
 #include <execinfo.h>
 #endif
 

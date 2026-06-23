@@ -1100,6 +1100,8 @@ static int64_t file_mtime(const char* path) {
     if (stat(path, &st) != 0) return 0;
 #ifdef _WIN32
     return (int64_t)st.st_mtime * 1000;
+#elif defined(__APPLE__)
+    return (int64_t)st.st_mtimespec.tv_sec * 1000 + st.st_mtimespec.tv_nsec / 1000000;
 #else
     return (int64_t)st.st_mtim.tv_sec * 1000 + st.st_mtim.tv_nsec / 1000000;
 #endif
@@ -1938,7 +1940,7 @@ static unsigned char* gzip_compress(const unsigned char* input, size_t input_len
     size_t deflate_len = tdefl_compress_mem_to_mem(
         deflate_buf.data(), max_out,
         input, input_len,
-        TDEFL_DEFAULT_MAX_PROBES);
+        128); /* TDEFL_DEFAULT_MAX_PROBES */
     if (deflate_len == 0) {
         fprintf(stderr, "[gzip] tdefl_compress_mem_to_mem failed\n");
         return nullptr;

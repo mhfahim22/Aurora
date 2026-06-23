@@ -18,15 +18,22 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup LLVM
+      shell: pwsh
       run: |
         choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
-        $llvmDir = if (Test-Path "C:\Program Files\LLVM") { "C:\Program Files\LLVM" } else {
-          $p = & "C:\ProgramData\chocolatey\bin\llvm-config.exe" --prefix 2>$null
-          if (-not $?) { $p = "$env:ProgramFiles\LLVM" }
-          $p
+        # Search for LLVMConfig.cmake anywhere under Program Files or chocolatey
+        $searchPaths = @("$env:ProgramFiles", "${env:ProgramFiles(x86)}", "$env:ProgramData")
+        $cmakeDir = $null
+        foreach ($p in $searchPaths) {
+          $candidate = Get-ChildItem -Path $p -Recurse -Filter "LLVMConfig.cmake" -ErrorAction SilentlyContinue `
+            | Select-Object -First 1 -ExpandProperty DirectoryName
+          if ($candidate) { $cmakeDir = $candidate; break }
         }
-        echo "LLVM_HOME=$llvmDir" >> $env:GITHUB_ENV
+        if (-not $cmakeDir) { throw "LLVMConfig.cmake not found" }
+        $llvmDir = Split-Path (Split-Path $cmakeDir) -Parent
+        echo "LLVM_DIR=$cmakeDir" >> $env:GITHUB_ENV
         echo "$llvmDir\bin" >> $env:GITHUB_PATH
+        Write-Host "Found LLVM cmake at: $cmakeDir"
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -35,7 +42,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_HOME\lib\cmake\llvm"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_DIR"
 
     - name: Build Core + Bridge Targets
       run: |
@@ -115,7 +122,7 @@ jobs:
         cmake -B build_asan -DCMAKE_BUILD_TYPE=Debug `
           -DCMAKE_CXX_FLAGS_DEBUG="/fsanitize=address /Od /Zi /D_ITERATOR_DEBUG_LEVEL=0" `
           -DCMAKE_EXE_LINKER_FLAGS_DEBUG="/DEBUG" `
-          -DLLVM_DIR="$env:LLVM_HOME\lib\cmake\llvm"
+          -DLLVM_DIR="$env:LLVM_DIR"
         cmake --build build_asan --config Debug `
           --target test_ffi_memory_safety `
           --target bench_npm_bridge -j2
@@ -185,13 +192,29 @@ jobs:
 
     - name: Remove conflicting LLVM cmake files
       run: |
-        # Remove all non-LLVM19 clang cmake files to prevent find_package from
+        # Remove ALL non-LLVM19 clang cmake files to prevent find_package from
         # picking up broken ClangTargets from older LLVM versions on the runner
-        for ver in 14 15 16 17 18; do
-          sudo rm -rf "/usr/lib/llvm-$ver/lib/cmake/clang" 2>/dev/null || true
-          sudo rm -rf "/usr/lib/cmake/clang-$ver" 2>/dev/null || true
+        # First check what's installed
+        for llvmdir in /usr/lib/llvm-*; do
+          [ -d "$llvmdir" ] || continue
+          ver="${llvmdir#/usr/lib/llvm-}"
+          if [ "$ver" != "19" ]; then
+            sudo rm -rf "$llvmdir/lib/cmake/clang" 2>/dev/null || true
+          fi
         done
-        sudo rm -rf "/usr/lib/llvm-19/lib/cmake/clang" 2>/dev/null || true
+        for cmakedir in /usr/lib/cmake/clang-*; do
+          [ -d "$cmakedir" ] || continue
+          ver="${cmakedir#/usr/lib/cmake/clang-}"
+          if [ "$ver" != "19" ]; then
+            sudo rm -rf "$cmakedir" 2>/dev/null || true
+          fi
+        done
+        sudo rm -rf /usr/lib/llvm-19/lib/cmake/clang 2>/dev/null || true
+        # Verify LLVM 19 cmake exists
+        if [ ! -f "/usr/lib/llvm-19/lib/cmake/llvm/LLVMConfig.cmake" ]; then
+          echo "WARNING: LLVM 19 cmake not found at expected path"
+          ls /usr/lib/llvm-*/lib/cmake/llvm/ 2>/dev/null || true
+        fi
 
     - name: Configure CMake
       run: |
