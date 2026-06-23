@@ -42,7 +42,12 @@ llvm::Value* codegen_builtin_section2(
         llvm::Value* val = gen_expr(node->args.get());
         if (val->getType()->isDoubleTy())
             return builder.CreateCall(builtins.abs_fn, { val }, "abs_ret");
-        llvm::Value* neg = builder.CreateNeg(val, "neg", false, true);
+        llvm::Value* neg;
+#if LLVM_VERSION_MAJOR >= 18
+        neg = builder.CreateNSWNeg(val, "neg");
+#else
+        neg = builder.CreateNeg(val, "neg", false, true);
+#endif
         llvm::Value* cmp = builder.CreateICmpSGT(val, llvm::ConstantInt::get(i64, 0), "abs_cmp");
         return builder.CreateSelect(cmp, val, neg, "abs_sel");
     }

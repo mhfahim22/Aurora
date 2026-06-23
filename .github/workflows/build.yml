@@ -18,14 +18,38 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup LLVM
-      uses: KyleMayes/install-llvm-action@v2
-      with:
-        version: "19.1"
-
-    - name: Set LLVM_DIR
       shell: pwsh
       run: |
-        echo "LLVM_DIR=$env:LLVM_PATH\lib\cmake\llvm" >> $env:GITHUB_ENV
+        # Chocolatey-installed LLVM is tools-only (no LLVMConfig.cmake).
+        # Download the full tarball distribution from GitHub Releases.
+        $llvmVersion = "19.1.0"
+        $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvmVersion/clang+llvm-$llvmVersion-x86_64-pc-windows-msvc.tar.xz"
+        $archive = "$env:TEMP\llvm.tar.xz"
+        Write-Host "Downloading LLVM $llvmVersion full tarball..."
+        Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
+        Write-Host "Extracting (step 1: xz)..."
+        $tarFile = "$env:TEMP\llvm.tar"
+        7z x $archive "-o$env:TEMP" -y -bt 2>&1 | Out-Null
+        if (-not (Test-Path $tarFile)) {
+          # Try alternate name
+          $tarFile = "$env:TEMP\clang+llvm-$llvmVersion-x86_64-pc-windows-msvc.tar"
+        }
+        Write-Host "Extracting (step 2: tar)..."
+        $extractDir = "$env:TEMP\llvm-full"
+        Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+        7z x $tarFile "-o$extractDir" -y -bt 2>&1 | Out-Null
+        Remove-Item $tarFile -ErrorAction SilentlyContinue
+        Remove-Item $archive -ErrorAction SilentlyContinue
+        $llvmDir = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1 -ExpandProperty FullName
+        $llvmCmakeDir = "$llvmDir\lib\cmake\llvm"
+        if (-not (Test-Path "$llvmCmakeDir\LLVMConfig.cmake")) {
+          Get-ChildItem -Path "$llvmDir\lib\cmake" -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object FullName
+          throw "LLVMConfig.cmake not found at $llvmCmakeDir"
+        }
+        echo "LLVM_DIR=$llvmCmakeDir" >> $env:GITHUB_ENV
+        echo "$llvmDir\bin" >> $env:GITHUB_PATH
+        Write-Host "LLVM cmake OK at: $llvmCmakeDir"
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
