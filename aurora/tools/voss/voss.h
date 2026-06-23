@@ -350,6 +350,7 @@ int cmd_help();
 int cmd_init(const std::string& name);
 int cmd_sign(const std::string& spec);
 int cmd_add(const std::string& pkg, const std::string& version = "");
+int cmd_verify();
 int cmd_verify(const std::string& spec);
 bool verify_package_signature(const std::string& name, const std::string& version);
 int cmd_install(const std::string& pkg, const std::string& ecosystem_hint = "");
