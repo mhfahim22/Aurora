@@ -272,9 +272,9 @@ jobs:
 
     - name: Run C++ Tests (non-bridge)
       run: |
-        build/Release/test_unified_type_system
-        build/Release/test_fuzz_parser 1000
-        build/Release/bench_compiler
+        build/test_unified_type_system
+        build/test_fuzz_parser 1000
+        build/bench_compiler
 
     - name: Verify Documentation Files
       run: |
@@ -294,7 +294,7 @@ jobs:
 
     - name: Verify Build Output
       run: |
-        files="build/Release/aurorac build/Release/libaurora_runtime.a build/Release/voss build/Release/aurora_lsp"
+        files="build/aurorac build/libaurora_runtime.a build/voss build/aurora_lsp"
         for f in $files; do
           if [ -f "$f" ]; then
             echo "  ✅ $f"
@@ -378,9 +378,9 @@ CEOF
     - name: Run Compiler Tests
       run: |
         echo "--- test_fuzz_parser ---"
-        build/Release/test_fuzz_parser 1000
+        build/test_fuzz_parser 1000
         echo "--- bench_compiler ---"
-        build/Release/bench_compiler
+        build/bench_compiler
 
     - name: Verify Documentation Files
       run: |
@@ -400,10 +400,14 @@ CEOF
 
     - name: Verify Build Output
       run: |
-        echo "  ✅ build/Release/aurorac"
-        echo "  ✅ build/Release/libaurora_runtime.a"
-        echo "  ✅ build/Release/voss"
-        echo "  ✅ build/Release/aurora_lsp"
+        for f in build/aurorac build/libaurora_runtime.a build/voss build/aurora_lsp; do
+          if [ -f "$f" ]; then
+            echo "  ✅ $f"
+          else
+            echo "  ❌ $f"
+            exit 1
+          fi
+        done
 
     - name: Cross-platform npm bridge build test
       run: |

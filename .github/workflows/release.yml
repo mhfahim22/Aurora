@@ -174,11 +174,11 @@ jobs:
       run: |
         VERSION=$(cat VERSION | tr -d '\n')
         mkdir -p dist/Aurora-$VERSION
-        cp build/Release/aurorac dist/Aurora-$VERSION/
-        cp build/Release/voss dist/Aurora-$VERSION/
-        cp build/Release/aurora_lsp dist/Aurora-$VERSION/
+        cp build/aurorac dist/Aurora-$VERSION/
+        cp build/voss dist/Aurora-$VERSION/
+        cp build/aurora_lsp dist/Aurora-$VERSION/
         cp -r libc dist/Aurora-$VERSION/
-        cp build/Release/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
+        cp build/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
         cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
         cd dist && tar -czf Aurora-$VERSION-linux-x86_64.tar.gz Aurora-$VERSION
         echo "PACKAGE=Aurora-$VERSION-linux-x86_64.tar.gz" >> $GITHUB_ENV
@@ -224,11 +224,11 @@ jobs:
       run: |
         VERSION=$(cat VERSION | tr -d '\n')
         mkdir -p dist/Aurora-$VERSION
-        cp build/Release/aurorac dist/Aurora-$VERSION/
-        cp build/Release/voss dist/Aurora-$VERSION/
-        cp build/Release/aurora_lsp dist/Aurora-$VERSION/
+        cp build/aurorac dist/Aurora-$VERSION/
+        cp build/voss dist/Aurora-$VERSION/
+        cp build/aurora_lsp dist/Aurora-$VERSION/
         cp -r libc dist/Aurora-$VERSION/
-        cp build/Release/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
+        cp build/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
         cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
         cd dist && tar -czf Aurora-$VERSION-macos-x86_64.tar.gz Aurora-$VERSION
 

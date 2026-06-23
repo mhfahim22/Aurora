@@ -13,8 +13,8 @@
 
 static void add_diag(std::vector<LspDiagnostic>& diags, int line, int col_start, int col_end, int severity, const std::string& msg, const std::string& source) {
     LspDiagnostic d;
-    d.range.start = {line, col_start};
-    d.range.end = {line, col_end};
+    d.range.start = {(uint32_t)line, (uint32_t)col_start};
+    d.range.end = {(uint32_t)line, (uint32_t)col_end};
     d.severity = severity;
     d.message = msg;
     d.source = source;
@@ -403,8 +403,8 @@ std::vector<LspSymbol> LspServer::get_symbols(DocumentState& doc) {
         LspSymbol sym;
         sym.name = n->value;
         sym.kind = kind;
-        sym.range.start = {n->src_line - 1, 0};
-        sym.range.end = {n->src_line - 1, (int)n->value.size()};
+        sym.range.start = {(uint32_t)(n->src_line - 1), 0};
+        sym.range.end = {(uint32_t)(n->src_line - 1), (uint32_t)n->value.size()};
         sym.selectionRange = sym.range;
         symbols.push_back(sym);
     });
@@ -528,8 +528,8 @@ std::vector<LspLocation> LspServer::get_all_references(DocumentState& doc, int l
             if (n->src_line > 0) {
                 LspLocation loc;
                 loc.uri = doc.uri;
-                loc.range.start = {n->src_line - 1, 0};
-                loc.range.end = {n->src_line - 1, (int)n->value.size()};
+                loc.range.start = {(uint32_t)(n->src_line - 1), 0};
+                loc.range.end = {(uint32_t)(n->src_line - 1), (uint32_t)n->value.size()};
                 refs.push_back(loc);
             }
         }
@@ -542,8 +542,8 @@ std::vector<LspLocation> LspServer::get_all_references(DocumentState& doc, int l
                 if (t.type == TokenType::Identifier && t.value == word) {
                     LspLocation loc;
                     loc.uri = uri;
-                    loc.range.start = {ll.line_no - 1, t.col};
-                    loc.range.end = {ll.line_no - 1, t.col + (int)t.value.size()};
+                    loc.range.start = {(uint32_t)(ll.line_no - 1), (uint32_t)t.col};
+                    loc.range.end = {(uint32_t)(ll.line_no - 1), (uint32_t)(t.col + (int)t.value.size())};
                     /* Deduplicate */
                     bool dup = false;
                     for (auto& r : refs) {
