@@ -33,11 +33,25 @@ static bool llvm_initialized = false;
 
 static void ensure_llvm_init() {
     if (llvm_initialized) return;
+#if defined(__x86_64__) || defined(_M_X64) || defined(i386) || defined(__i386__) || defined(_M_IX86)
     LLVMInitializeX86TargetInfo();
     LLVMInitializeX86Target();
     LLVMInitializeX86TargetMC();
     LLVMInitializeX86AsmPrinter();
     LLVMInitializeX86AsmParser();
+#elif defined(__aarch64__) || defined(__ARM64__) || defined(_M_ARM64)
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64AsmPrinter();
+    LLVMInitializeAArch64AsmParser();
+#else
+    LLVMInitializeAllTargetInfos();
+    LLVMInitializeAllTargets();
+    LLVMInitializeAllTargetMCs();
+    LLVMInitializeAllAsmPrinters();
+    LLVMInitializeAllAsmParsers();
+#endif
     llvm_initialized = true;
 }
 

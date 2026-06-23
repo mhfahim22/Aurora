@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
 
     /* Analysis */
     if (cmd == "tree") return cmd_tree();
-    if (cmd == "verify") return cmd_verify();
+    if (cmd == "verify") return cmd_verify("");
     if (cmd == "audit") {
         if (argc > off && (strcmp(argv[off], "--fix") == 0 || strcmp(argv[off], "-f") == 0)) return cmd_audit_fix();
         return cmd_audit();
