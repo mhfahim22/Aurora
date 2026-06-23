@@ -87,8 +87,18 @@ bool LLVMCodegen::emit_object_file(const std::string& obj_path) {
 
     llvm::TargetOptions options;
     std::string cpu = llvm::sys::getHostCPUName().str();
-    llvm::StringMap<bool, llvm::MallocAllocator> host_features;
     std::string features_str;
+#if LLVM_VERSION_MAJOR >= 19
+    auto host_features = llvm::sys::getHostCPUFeatures();
+    if (!host_features.empty()) {
+        for (const auto& f : host_features) {
+            if (!features_str.empty()) features_str += ",";
+            features_str += f.second ? "+" : "-";
+            features_str += f.first();
+        }
+    }
+#else
+    llvm::StringMap<bool, llvm::MallocAllocator> host_features;
     if (llvm::sys::getHostCPUFeatures(host_features)) {
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
@@ -96,6 +106,7 @@ bool LLVMCodegen::emit_object_file(const std::string& obj_path) {
             features_str += f.first();
         }
     }
+#endif
 
     auto* target_machine = target->createTargetMachine(
         module_->getTargetTriple(), cpu, features_str, options, llvm::Reloc::Model());
