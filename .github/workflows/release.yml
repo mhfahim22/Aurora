@@ -90,8 +90,8 @@ jobs:
     - name: Build Core Targets
       run: |
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j4
-        cmake --build build --config Release --target aurora_bindgen -j4 2>$null; if (-not $?) { Write-Host "bindgen skipped" }
-        cmake --build build --config Release --target aurora_cppwrap -j4 2>$null; if (-not $?) { Write-Host "cppwrap skipped" }
+        cmake --build build --config Release --target aurora_bindgen -j4 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "bindgen skipped" }; $LASTEXITCODE=0
+        cmake --build build --config Release --target aurora_cppwrap -j4 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "cppwrap skipped" }; $LASTEXITCODE=0
 
     - name: Package Windows Installer
       run: |

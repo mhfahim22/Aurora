@@ -48,8 +48,8 @@ std::vector<LspTextEdit> LspServer::get_formatting_edits(DocumentState& doc) {
 
         if (actual_indent != target_indent) {
             LspTextEdit edit;
-            edit.range.start = {line_num, 0};
-            edit.range.end = {line_num, actual_indent};
+            edit.range.start = {(uint32_t)line_num, 0};
+            edit.range.end = {(uint32_t)line_num, (uint32_t)actual_indent};
             edit.newText = std::string(target_indent, ' ');
             edits.push_back(edit);
         }
