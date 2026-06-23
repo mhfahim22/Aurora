@@ -490,8 +490,18 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
 
     /* Detect native CPU and features */
     std::string cpu = llvm::sys::getHostCPUName().str();
-    llvm::StringMap<bool, llvm::MallocAllocator> host_features;
     std::string features_str;
+#if LLVM_VERSION_MAJOR >= 19
+    auto host_features = llvm::sys::getHostCPUFeatures();
+    if (!host_features.empty()) {
+        for (const auto& f : host_features) {
+            if (!features_str.empty()) features_str += ",";
+            features_str += f.second ? "+" : "-";
+            features_str += f.first();
+        }
+    }
+#else
+    llvm::StringMap<bool, llvm::MallocAllocator> host_features;
     if (llvm::sys::getHostCPUFeatures(host_features)) {
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
@@ -499,6 +509,7 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
             features_str += f.first();
         }
     }
+#endif
 
     auto* target_machine = target->createTargetMachine(
         target_triple, cpu, features_str, options, llvm::Reloc::PIC_);
@@ -1089,8 +1100,18 @@ int main(int argc, char** argv) {
         std::string cpu = llvm::sys::getHostCPUName().str();
         std::cerr << "STAGE6: cpu=" << cpu << "\n" << std::flush;
         {
-            llvm::StringMap<bool, llvm::MallocAllocator> host_features;
             std::string features_str;
+#if LLVM_VERSION_MAJOR >= 19
+            auto host_features = llvm::sys::getHostCPUFeatures();
+            if (!host_features.empty()) {
+                for (const auto& f : host_features) {
+                    if (!features_str.empty()) features_str += ",";
+                    features_str += f.second ? "+" : "-";
+                    features_str += f.first();
+                }
+            }
+#else
+            llvm::StringMap<bool, llvm::MallocAllocator> host_features;
             if (llvm::sys::getHostCPUFeatures(host_features)) {
                 for (const auto& f : host_features) {
                     if (!features_str.empty()) features_str += ",";
@@ -1098,6 +1119,7 @@ int main(int argc, char** argv) {
                     features_str += f.first();
                 }
             }
+#endif
             std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
             module->setTargetTriple(llvm::sys::getProcessTriple());
             std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;

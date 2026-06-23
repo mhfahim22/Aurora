@@ -1,6 +1,6 @@
 # aurora_restructured/CMakeLists.txt (updated)
 cmake_minimum_required(VERSION 3.20)
-project(Aurora LANGUAGES C CXX ASM_MASM)
+project(Aurora LANGUAGES C CXX OBJCXX ASM_MASM)
 
 # ── Read VERSION file and generate version.h ──
 file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" AURORA_VERSION_STR)
@@ -211,7 +211,7 @@ set_source_files_properties(aurora/src/runtime/backend/miniz_tdef.c PROPERTIES C
 if(APPLE)
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
     target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
-    set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX)
+    set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE OBJCXX)
 else()
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp)
     if(WIN32)

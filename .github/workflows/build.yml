@@ -21,13 +21,23 @@ jobs:
       shell: pwsh
       run: |
         choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
-        # Search for LLVMConfig.cmake anywhere under Program Files or chocolatey
-        $searchPaths = @("$env:ProgramFiles", "${env:ProgramFiles(x86)}", "$env:ProgramData")
+        # Search for LLVMConfig.cmake in known locations only
+        $searchPaths = @(
+          "$env:ProgramFiles\LLVM\lib\cmake\llvm",
+          "${env:ProgramFiles(x86)}\LLVM\lib\cmake\llvm",
+          "$env:ProgramFiles\LLVM\lib\cmake\llvm-19",
+          "${env:ProgramFiles(x86)}\LLVM\lib\cmake\llvm-19",
+          "$env:ProgramData\chocolatey\lib\llvm\tools\lib\cmake\llvm",
+          "$env:ProgramData\chocolatey\lib\llvm\tools\lib\cmake\llvm-19"
+        )
         $cmakeDir = $null
         foreach ($p in $searchPaths) {
-          $candidate = Get-ChildItem -Path $p -Recurse -Filter "LLVMConfig.cmake" -ErrorAction SilentlyContinue `
+          if (Test-Path "$p\LLVMConfig.cmake") { $cmakeDir = $p; break }
+        }
+        if (-not $cmakeDir) {
+          # Last resort: search only lib\cmake subdirs (max depth 5)
+          $cmakeDir = Get-ChildItem -Path "$env:ProgramFiles" -Filter "LLVMConfig.cmake" -Recurse -Depth 5 -ErrorAction SilentlyContinue `
             | Select-Object -First 1 -ExpandProperty DirectoryName
-          if ($candidate) { $cmakeDir = $candidate; break }
         }
         if (-not $cmakeDir) { throw "LLVMConfig.cmake not found" }
         $llvmDir = Split-Path (Split-Path $cmakeDir) -Parent
@@ -314,6 +324,7 @@ CEOF
       run: |
         brew update
         brew install llvm@19
+        brew link --overwrite llvm@19 2>/dev/null || true
         echo "LLVM_DIR=$(brew --prefix llvm@19)/lib/cmake/llvm" >> $GITHUB_ENV
         echo "$(brew --prefix llvm@19)/bin" >> $GITHUB_PATH
 
