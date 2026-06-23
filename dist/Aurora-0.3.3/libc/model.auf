@@ -1,0 +1,376 @@
+## Aurora Model Layer (lightweight ORM)
+import "string"
+import "database"
+import "collections"
+
+extern function map_keys(m: pointer) -> pointer
+extern function map_copy(dst: pointer, src: pointer)
+
+function model_new(table_name, db)
+    m = map()
+    map_set(m, "_db", db)
+    map_set(m, "_table", table_name)
+    map_set(m, "_saved", false)
+    map_set(m, "_id", -1)
+    return m
+end
+
+function model_set_field(m, field, value)
+    map_set(m, field, value)
+end
+
+function model_get_field(m, field)
+    return map_get(m, field)
+end
+
+function model_has_field(m, field)
+    return map_has(m, field)
+end
+
+function model_save(m, fields)
+    my_id = map_get(m, "_id")
+    if my_id >= 0
+        return model_update(m, fields)
+    else
+        return model_insert(m, fields)
+    end
+end
+
+function model_save_all(m)
+    fields = []
+    all_keys = map_keys(m)
+    n = list_len(all_keys)
+    i = 0
+    loop
+        if i >= n
+            break
+        end
+        key = list_get(all_keys, i)
+        if not starts(str(key), "_")
+            list_push(fields, key)
+        end
+        i = i + 1
+    end
+    return model_save(m, fields)
+end
+
+function model_escape(v)
+    s = str(v)
+    s = replace(s, "'", "''")
+    return strcat("'", strcat(s, "'"))
+end
+
+function values_placeholder(n)
+    sql = "("
+    i = 0
+    loop
+        if i >= n
+            break
+        end
+        if i > 0
+            sql = strcat(sql, ", ")
+        end
+        sql = strcat(sql, "?")
+        i = i + 1
+    end
+    sql = strcat(sql, ")")
+    return sql
+end
+
+function model_insert(m, fields)
+    db = map_get(m, "_db")
+    sql = "INSERT INTO "
+    sql = strcat(sql, map_get(m, "_table"))
+    sql = strcat(sql, " (")
+    i = 0
+    n = list_len(fields)
+    loop
+        if i >= n
+            break
+        end
+        if i > 0
+            sql = strcat(sql, ", ")
+        end
+        sql = strcat(sql, list_get(fields, i))
+        i = i + 1
+    end
+    sql = strcat(sql, ") VALUES ")
+    sql = strcat(sql, values_placeholder(n))
+    rc = db_execute(db, sql)
+    if rc >= 0
+        map_set(m, "_saved", true)
+    end
+    return rc
+end
+
+function model_update(m, fields)
+    db = map_get(m, "_db")
+    sql = "UPDATE "
+    sql = strcat(sql, map_get(m, "_table"))
+    sql = strcat(sql, " SET ")
+    first = true
+    i = 0
+    n = list_len(fields)
+    loop
+        if i >= n
+            break
+        end
+        col = list_get(fields, i)
+        if col == "id"
+            i = i + 1
+            continue
+        end
+        if first
+            first = false
+        else
+            sql = strcat(sql, ", ")
+        end
+        sql = strcat(sql, col)
+        sql = strcat(sql, " = ?")
+        i = i + 1
+    end
+    sql = strcat(sql, " WHERE id = ")
+    my_id = map_get(m, "_id")
+    sql = strcat(sql, model_escape(my_id))
+    return db_execute(db, sql)
+end
+
+function model_find(db, table_name, id_val)
+    sql = "SELECT * FROM "
+    sql = strcat(sql, table_name)
+    sql = strcat(sql, " WHERE id = ")
+    sql = strcat(sql, model_escape(id_val))
+    rows = db_query(db, sql)
+    n = list_len(rows)
+    if n > 0
+        row = list_get(rows, 0)
+        m = model_new(table_name, db)
+        map_set(m, "_saved", true)
+        if map_has(row, "id")
+            map_set(m, "_id", map_get(row, "id"))
+        end
+        map_copy(m, row)
+        return m
+    end
+    return model_new(table_name, db)
+end
+
+function model_find_by(db, table_name, field, value)
+    sql = "SELECT * FROM "
+    sql = strcat(sql, table_name)
+    sql = strcat(sql, " WHERE ")
+    sql = strcat(sql, field)
+    sql = strcat(sql, " = ")
+    sql = strcat(sql, model_escape(value))
+    sql = strcat(sql, " LIMIT 1")
+    rows = db_query(db, sql)
+    n = list_len(rows)
+    if n > 0
+        row = list_get(rows, 0)
+        m = model_new(table_name, db)
+        map_set(m, "_saved", true)
+        if map_has(row, "id")
+            map_set(m, "_id", map_get(row, "id"))
+        end
+        map_copy(m, row)
+        return m
+    end
+    return model_new(table_name, db)
+end
+
+function model_first(db, table_name, condition)
+    sql = "SELECT * FROM "
+    sql = strcat(sql, table_name)
+    if condition != ""
+        sql = strcat(sql, " WHERE ")
+        sql = strcat(sql, condition)
+    end
+    sql = strcat(sql, " LIMIT 1")
+    rows = db_query(db, sql)
+    n = list_len(rows)
+    if n > 0
+        row = list_get(rows, 0)
+        m = model_new(table_name, db)
+        map_set(m, "_saved", true)
+        if map_has(row, "id")
+            map_set(m, "_id", map_get(row, "id"))
+        end
+        map_copy(m, row)
+        return m
+    end
+    return model_new(table_name, db)
+end
+
+function model_all(db, table_name)
+    sql = "SELECT * FROM "
+    sql = strcat(sql, table_name)
+    return db_query(db, sql)
+end
+
+function model_count(db, table_name)
+    sql = "SELECT COUNT(*) AS cnt FROM "
+    sql = strcat(sql, table_name)
+    rows = db_query(db, sql)
+    if list_len(rows) > 0
+        row = list_get(rows, 0)
+        if map_has(row, "cnt")
+            return map_get(row, "cnt")
+        end
+    end
+    return 0
+end
+
+function model_exists(db, table_name, id_val)
+    sql = "SELECT 1 FROM "
+    sql = strcat(sql, table_name)
+    sql = strcat(sql, " WHERE id = ")
+    sql = strcat(sql, model_escape(id_val))
+    sql = strcat(sql, " LIMIT 1")
+    rows = db_query(db, sql)
+    return list_len(rows) > 0
+end
+
+function model_delete(m)
+    my_id = map_get(m, "_id")
+    if my_id < 0
+        return -1
+    end
+    sql = "DELETE FROM "
+    sql = strcat(sql, map_get(m, "_table"))
+    sql = strcat(sql, " WHERE id = ")
+    sql = strcat(sql, model_escape(my_id))
+    return db_execute(map_get(m, "_db"), sql)
+end
+
+function model_has_many(m, child_table, foreign_key)
+    my_id = map_get(m, "_id")
+    if my_id < 0
+        return []
+    end
+    db = map_get(m, "_db")
+    sql = "SELECT * FROM "
+    sql = strcat(sql, child_table)
+    sql = strcat(sql, " WHERE ")
+    sql = strcat(sql, foreign_key)
+    sql = strcat(sql, " = ")
+    sql = strcat(sql, model_escape(my_id))
+    return db_query(db, sql)
+end
+
+function model_has_one(m, child_table, foreign_key)
+    rows = model_has_many(m, child_table, foreign_key)
+    if list_len(rows) > 0
+        return list_get(rows, 0)
+    end
+    return 0
+end
+
+function model_belongs_to(m, parent_table, foreign_key)
+    fk_val = 0
+    if map_has(m, foreign_key)
+        fk_val = map_get(m, foreign_key)
+    end
+    db = map_get(m, "_db")
+    return model_find(db, parent_table, fk_val)
+end
+
+function model_validate(m, rules)
+    errors = []
+    rule_keys = map_keys(rules)
+    n = list_len(rule_keys)
+    i = 0
+    loop
+        if i >= n
+            break
+        end
+        field = list_get(rule_keys, i)
+        rule_str = map_get(rules, str(field))
+        val = ""
+        if map_has(m, field)
+            val = str(map_get(m, field))
+        end
+        if rule_str == "required"
+            if val == "" or val == "0"
+                msg = strcat(str(field), " is required")
+                list_push(errors, msg)
+            end
+        elseif rule_str == "numeric"
+            if val != "" and val != "0"
+                try:
+                    nv = int(val)
+                catch:
+                    msg = strcat(str(field), " must be numeric")
+                    list_push(errors, msg)
+                end
+            end
+        elseif starts(rule_str, "min:")
+            min_val = int(substr(rule_str, 4, strlen(rule_str) - 4))
+            nv = 0
+            if val != ""
+                nv = int(val)
+            end
+            if nv < min_val
+                msg = strcat(str(field), " must be >= ")
+                msg = strcat(msg, str(min_val))
+                list_push(errors, msg)
+            end
+        elseif starts(rule_str, "max:")
+            max_val = int(substr(rule_str, 4, strlen(rule_str) - 4))
+            nv = 0
+            if val != ""
+                nv = int(val)
+            end
+            if nv > max_val
+                msg = strcat(str(field), " must be <= ")
+                msg = strcat(msg, str(max_val))
+                list_push(errors, msg)
+            end
+        elseif starts(rule_str, "min_len:")
+            min_len = int(substr(rule_str, 8, strlen(rule_str) - 8))
+            if strlen(val) < min_len
+                msg = strcat(str(field), " too short (min ")
+                msg = strcat(msg, str(min_len))
+                msg = strcat(msg, ")")
+                list_push(errors, msg)
+            end
+        elseif starts(rule_str, "max_len:")
+            max_len = int(substr(rule_str, 8, strlen(rule_str) - 8))
+            if strlen(val) > max_len
+                msg = strcat(str(field), " too long (max ")
+                msg = strcat(msg, str(max_len))
+                msg = strcat(msg, ")")
+                list_push(errors, msg)
+            end
+        end
+        i = i + 1
+    end
+    return errors
+end
+
+function model_to_string(m)
+    s = "{"
+    keys = map_keys(m)
+    n = list_len(keys)
+    i = 0
+    first = true
+    loop
+        if i >= n
+            break
+        end
+        key = list_get(keys, i)
+        key_name = str(key)
+        if not starts(key_name, "_")
+            if first
+                first = false
+            else
+                s = strcat(s, ", ")
+            end
+            s = strcat(s, key_name)
+            s = strcat(s, ": ")
+            s = strcat(s, str(map_get(m, key)))
+        end
+        i = i + 1
+    end
+    s = strcat(s, "}")
+    return s
+end

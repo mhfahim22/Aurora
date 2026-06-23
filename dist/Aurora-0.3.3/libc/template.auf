@@ -1,0 +1,214 @@
+## Aurora Template Engine — {{var}}, {%if%}, {%for%}, {%extends%}
+import "string"
+import "collections"
+
+function find_from(s, sub, start)
+    n = strlen(s)
+    sub_len = strlen(sub)
+    i = start
+    loop
+        if i > n - sub_len
+            break
+        end
+        if substr(s, i, sub_len) == sub
+            return i
+        end
+        i = i + 1
+    end
+    return -1
+end
+
+function trim(s)
+    n = strlen(s)
+    i = 0
+    loop
+        if i >= n
+            break
+        end
+        c = substr(s, i, 1)
+        if c != " " and c != "\t" and c != "\n" and c != "\r"
+            break
+        end
+        i = i + 1
+    end
+    if i >= n
+        return ""
+    end
+    j = n - 1
+    loop
+        if j < i
+            break
+        end
+        c = substr(s, j, 1)
+        if c != " " and c != "\t" and c != "\n" and c != "\r"
+            break
+        end
+        j = j - 1
+    end
+    return substr(s, i, j - i + 1)
+end
+
+function escape_html(s)
+    s = replace(s, "&", "&amp;")
+    s = replace(s, "<", "&lt;")
+    s = replace(s, ">", "&gt;")
+    s = replace(s, "\"", "&quot;")
+    s = replace(s, "'", "&#39;")
+    return s
+end
+
+function ctx_get(ctx, name)
+    if map_has(ctx, name)
+        return str(map_get(ctx, name))
+    end
+    return ""
+end
+
+function render_tags(tpl, ctx)
+    result = ""
+    i = 0
+    n = strlen(tpl)
+    loop
+        if i >= n
+            break
+        end
+        var_start = find_from(tpl, "{{", i)
+        tag_start = find_from(tpl, "{%", i)
+        nxt = -1
+        if var_start >= 0
+            nxt = var_start
+        end
+        if tag_start >= 0 and (nxt < 0 or tag_start < nxt)
+            nxt = tag_start
+        end
+        if nxt < 0
+            result = strcat(result, substr(tpl, i, n - i))
+            break
+        end
+        if nxt > i
+            result = strcat(result, substr(tpl, i, nxt - i))
+        end
+        if var_start >= 0 and (nxt < 0 or var_start <= nxt)
+            close = find_from(tpl, "}}", var_start + 2)
+            if close < 0
+                result = strcat(result, substr(tpl, i, n - i))
+                break
+            end
+            raw = substr(tpl, var_start + 2, close - var_start - 2)
+            varname = trim(raw)
+            if starts(raw, "{")
+                r2 = trim(substr(raw, 1, strlen(raw) - 1))
+                result = strcat(result, ctx_get(ctx, r2))
+            else
+                result = strcat(result, escape_html(ctx_get(ctx, varname)))
+            end
+            i = close + 2
+            continue
+        end
+        if tag_start >= 0
+            close = find_from(tpl, "%}", tag_start + 2)
+            if close < 0
+                result = strcat(result, substr(tpl, i, n - i))
+                break
+            end
+            tag_content = substr(tpl, tag_start + 2, close - tag_start - 2)
+            tag_content = trim(tag_content)
+            if starts(tag_content, "if ")
+                cond_part = substr(tag_content, 3, strlen(tag_content) - 3)
+                endif_pos = find_from(tpl, "{% endif %}", close + 2)
+                if endif_pos < 0
+                    result = strcat(result, substr(tpl, i, n - i))
+                    break
+                end
+                else_pos = find_from(tpl, "{% else %}", close + 2)
+                bstart = close + 2
+                bend = endif_pos
+                ebody = ""
+                if else_pos >= 0 and else_pos < endif_pos
+                    bend = else_pos
+                    ebody = substr(tpl, else_pos + 10, endif_pos - else_pos - 10)
+                end
+                body = substr(tpl, bstart, bend - bstart)
+                cval = cond_part
+                if map_has(ctx, cond_part)
+                    cval = ctx_get(ctx, cond_part)
+                end
+                if cval == "true" or cval == "1" or cval != ""
+                    result = strcat(result, render_tags(body, ctx))
+                else
+                    result = strcat(result, render_tags(ebody, ctx))
+                end
+                i = endif_pos + 11
+                continue
+            elseif starts(tag_content, "for ")
+                rest = trim(substr(tag_content, 4, strlen(tag_content) - 4))
+                inpos = find_from(rest, " in ", 0)
+                if inpos >= 0
+                    item_var = trim(substr(rest, 0, inpos))
+                    list_expr = trim(substr(rest, inpos + 4, strlen(rest) - inpos - 4))
+                    endfor_pos = find_from(tpl, "{% endfor %}", close + 2)
+                    if endfor_pos < 0
+                        result = strcat(result, substr(tpl, i, n - i))
+                        break
+                    end
+                    loop_body = substr(tpl, close + 2, endfor_pos - close - 2)
+                    list_val = 0
+                    if map_has(ctx, list_expr)
+                        list_val = map_get(ctx, list_expr)
+                    end
+                    llen = list_len(list_val)
+                    j = 0
+                    loop
+                        if j >= llen
+                            break
+                        end
+                        item_val = list_get(list_val, j)
+                        item_ctx = map()
+                        map_copy(item_ctx, ctx)
+                        map_set(item_ctx, item_var, item_val)
+                        result = strcat(result, render_tags(loop_body, item_ctx))
+                        j = j + 1
+                    end
+                    i = endfor_pos + 12
+                    continue
+                end
+                result = strcat(result, substr(tpl, i, n - i))
+                break
+            elseif starts(tag_content, "extends ")
+                pname = trim(substr(tag_content, 8, strlen(tag_content) - 8))
+                pname = trim(pname)
+                parent_content = read(pname)
+                if parent_content == ""
+                    result = strcat(result, "<!-- missing: ")
+                    result = strcat(result, pname)
+                    result = strcat(result, " -->")
+                    i = close + 2
+                    continue
+                end
+                result = strcat(result, render_tags(parent_content, ctx))
+                i = close + 2
+                continue
+            else
+                result = strcat(result, "<!-- ?")
+                result = strcat(result, tag_content)
+                result = strcat(result, "-->")
+                i = close + 2
+                continue
+            end
+        end
+        i = i + 1
+    end
+    return result
+end
+
+function template_render(tpl, ctx)
+    return render_tags(tpl, ctx)
+end
+
+function template_render_file(path, ctx)
+    content = read(path)
+    if content == ""
+        return ""
+    end
+    return template_render(content, ctx)
+end

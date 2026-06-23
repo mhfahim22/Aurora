@@ -1,0 +1,32 @@
+extern function printf(fmt: cstring, ...) -> i32
+extern function fprintf(stream: pointer, fmt: cstring, ...) -> i32
+extern function dprintf(fd: i32, fmt: cstring, ...) -> i32
+extern function sprintf(buf: cstring, fmt: cstring, ...) -> i32
+extern function snprintf(buf: cstring, size: i64, fmt: cstring, ...) -> i32
+extern function scanf(fmt: cstring, ...) -> i32
+extern function fscanf(stream: pointer, fmt: cstring, ...) -> i32
+extern function sscanf(buf: cstring, fmt: cstring, ...) -> i32
+
+extern function fopen(path: cstring, mode: cstring) -> pointer
+extern function fclose(stream: pointer) -> i32
+extern function fread(ptr: pointer, size: i64, count: i64, stream: pointer) -> i64
+extern function fwrite(ptr: pointer, size: i64, count: i64, stream: pointer) -> i64
+extern function fgets(str: cstring, count: i32, stream: pointer) -> cstring
+extern function fputs(str: cstring, stream: pointer) -> i32
+extern function fflush(stream: pointer) -> i32
+extern function fseek(stream: pointer, offset: i64, whence: i32) -> i32
+extern function ftell(stream: pointer) -> i64
+extern function rewind(stream: pointer)
+extern function feof(stream: pointer) -> i32
+extern function ferror(stream: pointer) -> i32
+extern function remove(path: cstring) -> i32
+extern function rename(old: cstring, new_name: cstring) -> i32
+extern function tmpfile() -> pointer
+extern function tmpnam(buf: cstring) -> cstring
+extern function setbuf(stream: pointer, buf: pointer)
+extern function setvbuf(stream: pointer, buf: pointer, mode: i32, size: i64) -> i32
+
+extern function perror(str: cstring)
+extern function puts(str: cstring) -> i32
+extern function putchar(c: i32) -> i32
+extern function getchar() -> i32

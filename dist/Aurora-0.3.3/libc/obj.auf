@@ -1,0 +1,22 @@
+## OBJ Model Loader Module
+## Usage: import "obj"
+##
+## Loads Wavefront .obj files and returns interleaved vertex data.
+
+extern function aurora_obj_load(path: cstring) -> pointer
+extern function aurora_obj_vertex_count(obj: pointer) -> i32
+extern function aurora_obj_vertex_data(obj: pointer) -> pointer
+extern function aurora_obj_free(obj: pointer)
+
+function obj_load(path):
+    return aurora_obj_load(path)
+end
+function obj_vertex_count(obj):
+    return aurora_obj_vertex_count(obj)
+end
+function obj_vertex_data(obj):
+    return aurora_obj_vertex_data(obj)
+end
+function obj_free(obj):
+    aurora_obj_free(obj)
+end

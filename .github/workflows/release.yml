@@ -21,30 +21,29 @@ jobs:
     - name: Setup LLVM
       shell: pwsh
       run: |
-        choco install llvm --version=19.1.0 -y --no-progress --allow-downgrade --force
-        # Search for LLVMConfig.cmake in known locations only
-        $searchPaths = @(
-          "$env:ProgramFiles\LLVM\lib\cmake\llvm",
-          "${env:ProgramFiles(x86)}\LLVM\lib\cmake\llvm",
-          "$env:ProgramFiles\LLVM\lib\cmake\llvm-19",
-          "${env:ProgramFiles(x86)}\LLVM\lib\cmake\llvm-19",
-          "$env:ProgramData\chocolatey\lib\llvm\tools\lib\cmake\llvm",
-          "$env:ProgramData\chocolatey\lib\llvm\tools\lib\cmake\llvm-19"
-        )
-        $cmakeDir = $null
-        foreach ($p in $searchPaths) {
-          if (Test-Path "$p\LLVMConfig.cmake") { $cmakeDir = $p; break }
+        # Chocolatey-installed LLVM is tools-only (no LLVMConfig.cmake).
+        # Use the full tarball distribution which includes cmake config, headers, and libs.
+        $llvmVersion = "19.1.0"
+        $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvmVersion/clang+llvm-$llvmVersion-x86_64-pc-windows-msvc.tar.xz"
+        $archive = "$env:TEMP\llvm.tar.xz"
+        Write-Host "Downloading LLVM $llvmVersion full tarball..."
+        Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
+        Write-Host "Extracting..."
+        # Use 7z (built-in on Windows runner) to extract tar.xz
+        $extractDir = "$env:TEMP\llvm-full"
+        Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+        7z x $archive "-o$extractDir" -y | Out-Null
+        $llvmDir = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1 -ExpandProperty FullName
+        $llvmCmakeDir = "$llvmDir\lib\cmake\llvm"
+        if (-not (Test-Path "$llvmCmakeDir\LLVMConfig.cmake")) {
+          Write-Host "Full directory listing:"
+          Get-ChildItem -Path $llvmDir -Recurse -Depth 3 -ErrorAction SilentlyContinue | Select-Object -First 50 FullName
+          throw "LLVMConfig.cmake not found at $llvmCmakeDir"
         }
-        if (-not $cmakeDir) {
-          # Last resort: search only lib\cmake subdirs (max depth 5)
-          $cmakeDir = Get-ChildItem -Path "$env:ProgramFiles" -Filter "LLVMConfig.cmake" -Recurse -Depth 5 -ErrorAction SilentlyContinue `
-            | Select-Object -First 1 -ExpandProperty DirectoryName
-        }
-        if (-not $cmakeDir) { throw "LLVMConfig.cmake not found" }
-        $llvmDir = Split-Path (Split-Path $cmakeDir) -Parent
-        echo "LLVM_DIR=$cmakeDir" >> $env:GITHUB_ENV
+        echo "LLVM_DIR=$llvmCmakeDir" >> $env:GITHUB_ENV
         echo "$llvmDir\bin" >> $env:GITHUB_PATH
-        Write-Host "Found LLVM cmake at: $cmakeDir"
+        Write-Host "LLVM tarball setup OK at: $llvmDir"
 
     - name: Setup Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -168,11 +167,10 @@ jobs:
 
     - name: Install LLVM
       run: |
-        brew update
-        brew install llvm@19
-        brew link --overwrite llvm@19 2>/dev/null || true
-        echo "LLVM_DIR=$(brew --prefix llvm@19)/lib/cmake/llvm" >> $GITHUB_ENV
-        echo "$(brew --prefix llvm@19)/bin" >> $GITHUB_PATH
+        # macOS 26 runner has llvm@20 pre-installed and compatible with Xcode 26.5
+        # llvm@19 is incompatible (AlignedCharArrayUnion errors with new libc++)
+        echo "LLVM_DIR=$(brew --prefix llvm@20)/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
     - name: Install Dependencies
       run: |
