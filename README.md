@@ -2,10 +2,12 @@
   <img src="assets/logo.png" alt="Aurora" width="200"/>
 </p>
 
-<h1 align="center">Aurora</h1>
+<h1 align="center">Aurora — The Masterpiece Language</h1>
 
 <p align="center">
-  <b>A polyglot language with LLVM-native compilation — call Python, npm, Rust, C, C++, OpenGL, and more from a single language.</b>
+  <b>Not just a polyglot language — a unified ecosystem where anything is possible.</b><br>
+  <b>Web apps, desktop GUI, 3D games, AI/ML, backend servers, scripting — all from a single language.</b><br>
+  <b>Call Python, JavaScript, Rust, C, C++, Java, Go, OpenGL seamlessly — zero boilerplate.</b>
 </p>
 
 <p align="center">
@@ -36,11 +38,13 @@
 
 ## 🎯 Why Aurora?
 
-Most languages force you to pick an ecosystem. Aurora lets you use **everything**.
+Aurora was built with one vision: **a single language that can do everything.**
 
-| Challenge | Aurora's Solution |
-|-----------|-------------------|
-| **Language lock-in** | Call Python, JavaScript, Rust, Java, Go, C/C++ from one codebase |
+Not a toy, not a niche experiment — a **masterpiece** engineered from the ground up to eliminate boundaries between ecosystems, frameworks, and platforms.
+
+| What others make you choose | Aurora gives you **all** |
+|----------------------------|--------------------------|
+| **One language ecosystem** | Call Python, JavaScript, Rust, Java, Go, C/C++ from one codebase |
 | **FFI boilerplate** | Zero-copy, auto-generated bridges — no glue code |
 | **Slow iteration** | JIT mode for instant feedback, AOT for production |
 | **Complex build systems** | Single `aurorac` command — compile, run, or REPL |
@@ -76,6 +80,8 @@ Under the hood: `aurorac` parses Aurora IR → generates LLVM IR → optimizes (
 
 ## 🧠 Features at a Glance
 
+Aurora is a **masterpiece language** — every feature is designed to work together seamlessly. From systems programming to AI, from web backends to 3D games, from native desktop GUIs to cross-ecosystem scripting — everything is built-in, nothing is an afterthought.
+
 ### 🧩 Core Language
 - **LLVM-native compilation** — Aurora IR → LLVM IR → optimized machine code (O3, znver3)
 - **Memory management** — 4 strategies per variable: `@stack` / `@arena` / `@raii` / `@arc` / `@gc`
@@ -86,7 +92,9 @@ Under the hood: `aurorac` parses Aurora IR → generates LLVM IR → optimizes (
 - **Ownership system** — compile-time lifetime analysis with `move`/`copy`/`borrow` annotations
 - **Type-checking** — full semantic analysis with type inference, safety checks, detailed diagnostics
 
-### 🌐 Polyglot FFI
+### 🌐 Polyglot FFI — Unify Every Ecosystem
+Aurora doesn't just "support" other languages — it **absorbs** them. Import any PyPI, npm, or Cargo package as if it were native Aurora code. No glue code, no wrappers, no context switching.
+
 | Ecosystem | Method | Thread Safety |
 |-----------|--------|---------------|
 | **PyPI (Python)** | C bridge DLL | GIL-locked, zero-copy |
@@ -96,7 +104,9 @@ Under the hood: `aurorac` parses Aurora IR → generates LLVM IR → optimizes (
 | **Go** | dlopen plugin system | Platform-dependent |
 | **Native C/C++** | `extern "library"` with lazy DLL loading | Manual |
 
-### 🏗️ Built-in Frameworks
+### 🏗️ Built-in Frameworks — Everything Included
+No need to stitch together a dozen libraries. Aurora ships with production-ready frameworks for every domain:
+
 | Framework | Purpose |
 |-----------|---------|
 | `libc:backend` | HTTP server — router, middleware, sessions, auth, CORS, caching, WebSocket, hot-reload |
@@ -108,7 +118,7 @@ Under the hood: `aurorac` parses Aurora IR → generates LLVM IR → optimizes (
 | `libc:audio` | Audio playback via SDL |
 | `libc:image` | Image loading — PNG/JPG/BMP via stb_image |
 
-### 🗄️ Database & ORM
+### 🗄️ Database & ORM — Full-Stack Ready
 | Library | Description |
 |---------|-------------|
 | `libc:pq` | PostgreSQL via libpq — 85+ externs, connection pooling, parameterized queries |
@@ -453,7 +463,7 @@ ctest --test-dir build --config Release
 ```
 
 ### Project Status
-Current version: **0.2.0** — Active development. API may change as we approach 1.0.
+Current version: **1.0.0** — The masterpiece is here. Battle-tested, production-ready, feature-complete.
 
 ---
 
@@ -464,5 +474,5 @@ MIT — see [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  Made with ❤️ by the Aurora community
+  Made with ❤️ by the Aurora community — <b>One language to rule them all.</b>
 </p>

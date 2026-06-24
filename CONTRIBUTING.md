@@ -1,4 +1,4 @@
-# Contributing to Aurora
+# Contributing to Aurora — The Masterpiece Language
 
 ## Code of Conduct
 

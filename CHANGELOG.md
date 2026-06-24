@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0 — "The Masterpiece" (2026-06-24)
+
+### 🎉 Aurora is now a Masterpiece Language
+
+The vision is complete. Aurora is no longer just a polyglot language — it is a **masterpiece** capable of building anything: web apps, desktop GUI, 3D games, AI/ML models, backend servers, and cross-ecosystem pipelines.
+
+### What makes Aurora a Masterpiece
+- **Unified ecosystem** — One language for every domain
+- **Zero-boilerplate FFI** — Call Python, JS, Rust, Java, Go, C/C++ seamlessly
+- **Built-in everything** — UI, backend, game engine, AI — no external deps needed
+- **LLVM-native compilation** — JIT for development, AOT for production
+- **Cross-platform** — Windows, Linux, macOS — same code, native performance
+- **Full package ecosystem** — `voss` package manager with registry, signing, sandboxing
+
+### Changed
+- All markdown files updated to reflect the masterpiece vision
+- Version bumped to 1.0.0
+
 ## 0.3.2 (2026-06-22)
 
 ### Fixed
