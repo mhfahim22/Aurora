@@ -85,8 +85,9 @@ static std::string generate_random_script() {
 static int compile_and_check(const std::string& src) {
     /* Generate unique temp file path */
     char tmpfile[1024];
+    char tmpdir[1024];
 #ifdef _WIN32
-    char tmpdir[1024] = "";
+    tmpdir[0] = 0;
     DWORD len = GetTempPathA(sizeof(tmpdir), tmpdir);
     if (len == 0 || len >= sizeof(tmpdir)) strcpy(tmpdir, ".");
 #else
