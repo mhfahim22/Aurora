@@ -53,10 +53,10 @@ Source: "..\build\Release\aurora_lsp.exe"; DestDir: "{app}"; Flags: ignoreversio
 ; Source: "..\build\Release\aurora_cppwrap.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; ── Runtime DLLs (required for library imports) ──
-; NOTE: glfw3.dll is an external dependency — it must be present in build\Release\ before compiling this installer
-Source: "..\build\Release\glfw3.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\Release\cpp_interop_test.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\build\Release\mysql_native.dll"; DestDir: "{app}"; Flags: ignoreversion
+; NOTE: These are external dependencies — uncomment if present in build\Release\ before compiling
+; Source: "..\build\Release\glfw3.dll"; DestDir: "{app}"; Flags: ignoreversion
+; Source: "..\build\Release\cpp_interop_test.dll"; DestDir: "{app}"; Flags: ignoreversion
+; Source: "..\build\Release\mysql_native.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 ; ── Static libraries (for AOT compilation) ──
 Source: "..\build\Release\aurora_runtime.lib"; DestDir: "{app}\lib"; Flags: ignoreversion
