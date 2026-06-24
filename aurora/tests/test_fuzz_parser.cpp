@@ -103,7 +103,11 @@ static int compile_and_check(const std::string& src) {
     fclose(f);
 
     /* Run aurorac on it */
+#ifdef _WIN32
     std::string cmd = "\"" + g_aurorac_path + "\" \"" + tmpfile + "\" --emit-obj 2>nul";
+#else
+    std::string cmd = "\"" + g_aurorac_path + "\" \"" + tmpfile + "\" --emit-obj 2>/dev/null";
+#endif
     int rc = system(cmd.c_str());
 
     remove(tmpfile);

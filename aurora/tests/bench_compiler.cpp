@@ -68,7 +68,11 @@ static BenchResult run_bench(const char* name, int iterations,
 
     for (int i = 0; i < iterations; i++) {
         std::string tmp = make_temp_file(source);
+#ifdef _WIN32
         std::string cmd = "\"" + g_aurorac_path + "\" \"" + tmp + "\" --emit-obj 2>nul";
+#else
+        std::string cmd = "\"" + g_aurorac_path + "\" \"" + tmp + "\" --emit-obj 2>/dev/null";
+#endif
         system(cmd.c_str());
         remove(tmp.c_str());
     }

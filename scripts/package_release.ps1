@@ -17,7 +17,7 @@ $BuildDir = "$Root\build\Release"
 $OutDir = "$Root\dist"
 
 if (-not $Version) {
-    $Version = if (Test-Path "$Root\VERSION") { (Get-Content "$Root\VERSION" -Raw).Trim() } else { "0.2.0" }
+    $Version = if (Test-Path "$Root\VERSION") { (Get-Content "$Root\VERSION" -Raw).Trim() } else { "1.0.0" }
 }
 
 Write-Host "Packaging Aurora v$Version" -ForegroundColor Cyan

@@ -2,7 +2,7 @@
 
 ## Versioning
 
-Current version: **0.2.0** (pre-1.0 development)
+Current version: **1.0.0** — The Masterpiece Language
 
 Version format: `MAJOR.MINOR.PATCH` (semver after 1.0)
 

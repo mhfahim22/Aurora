@@ -55,11 +55,6 @@ jobs:
         echo "$llvmDir\bin" >> $env:GITHUB_PATH
         Write-Host "LLVM cmake OK at: $llvmCmakeDir"
 
-    - name: Setup Visual Studio
-      uses: microsoft/setup-msbuild@v2
-      with:
-        vs-version: '17.0'
-
     - name: Set up DIA SDK
       shell: pwsh
       run: |
@@ -138,16 +133,20 @@ jobs:
 
     - name: Install LLVM
       run: |
-        wget -q https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 19
-        sudo apt-get install -y liblld-19-dev
+        wget -q https://apt.llvm.org/llvm.sh || true
+        if [ -f llvm.sh ]; then
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19 || sudo apt-get install -y llvm-19-dev lld-19 libclang-19-dev
+        else
+          sudo apt-get install -y llvm-19-dev lld-19 libclang-19-dev
+        fi
+        sudo apt-get install -y liblld-19-dev 2>/dev/null || true
         echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
 
     - name: Install Dependencies
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y cmake g++ libcurl4-openssl-dev libgl1-mesa-dev
+        sudo apt-get install -y cmake g++ libcurl4-openssl-dev libgl1-mesa-dev liblld-19-dev 2>/dev/null || true
 
     - name: Remove conflicting LLVM cmake files
       run: |
@@ -212,21 +211,23 @@ jobs:
 
     - name: Install LLVM
       run: |
-        # macOS 26 runner has llvm@20 pre-installed, but install explicitly to ensure
-        # cmake config files are available
-        brew install llvm@20 2>/dev/null || true
-        LLVM_PREFIX=$(brew --prefix llvm@20)
+        brew install llvm@19
+        LLVM_PREFIX=$(brew --prefix llvm@19)
         echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
         echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
-        echo "LLVM prefix: $LLVM_PREFIX"
+        echo "CC=$LLVM_PREFIX/bin/clang" >> $GITHUB_ENV
+        echo "CXX=$LLVM_PREFIX/bin/clang++" >> $GITHUB_ENV
 
     - name: Install Dependencies
       run: |
-        brew install cmake
+        brew install cmake curl
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+        cmake -B build -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_DIR="$LLVM_DIR" \
+          -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
+          -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++"
 
     - name: Build Core Targets
       run: |
@@ -235,6 +236,7 @@ jobs:
     - name: Package macOS Tarball
       run: |
         VERSION=$(cat VERSION | tr -d '\n')
+        ARCH=$(uname -m)
         mkdir -p dist/Aurora-$VERSION
         cp build/aurorac dist/Aurora-$VERSION/
         cp build/voss dist/Aurora-$VERSION/
@@ -242,13 +244,14 @@ jobs:
         cp -r libc dist/Aurora-$VERSION/
         cp build/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
         cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
-        cd dist && tar -czf Aurora-$VERSION-macos-x86_64.tar.gz Aurora-$VERSION
+        cd dist && tar -czf Aurora-$VERSION-macos-$ARCH.tar.gz Aurora-$VERSION
+        echo "PACKAGE=Aurora-$VERSION-macos-$ARCH.tar.gz" >> $GITHUB_ENV
 
     - name: Upload macOS Artifact
       uses: actions/upload-artifact@v4
       with:
         name: macos-tarball
-        path: dist/Aurora-*-macos-x86_64.tar.gz
+        path: dist/Aurora-*-macos-*.tar.gz
 
   create-release:
     needs: [build-windows, build-ubuntu, build-macos]
@@ -267,7 +270,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -e
-        TAG="v1.0.0"
+        TAG="v$(cat VERSION | tr -d '\n')"
         REPO="${{ github.repository }}"
         echo "Updating release $TAG from commit $GITHUB_SHA"
 

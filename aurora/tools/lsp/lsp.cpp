@@ -247,7 +247,7 @@ std::string LspServer::handle_initialize(const std::string& params) {
     result.add_raw("capabilities", caps);
     JsonBuilder info;
     info.add("name", "aurora-lsp");
-    info.add("version", "0.2.0");
+    info.add("version", "1.0.0");
     result.add_raw("serverInfo", info.str());
     return make_response(current_msg_id_, result.str());
 }
