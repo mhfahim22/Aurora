@@ -3,7 +3,7 @@
 ; Download: https://jrsoftware.org/isdl.php
 
 #define MyAppName "Aurora"
-#define MyAppVersion "0.3.0"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "Aurora Language"
 #define MyAppURL "https://github.com/mhfahim22/Aurora"
 #define MyAppExeName "aurorac.exe"
