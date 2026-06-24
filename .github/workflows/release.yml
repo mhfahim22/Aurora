@@ -1,0 +1,289 @@
+name: Aurora Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup LLVM
+      shell: pwsh
+      run: |
+        # Chocolatey-installed LLVM is tools-only (no LLVMConfig.cmake).
+        # Download the full tarball distribution from GitHub Releases.
+        $llvmVersion = "19.1.0"
+        $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvmVersion/clang+llvm-$llvmVersion-x86_64-pc-windows-msvc.tar.xz"
+        $archive = "$env:TEMP\llvm.tar.xz"
+        Write-Host "Downloading LLVM $llvmVersion full tarball..."
+        Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing
+        Write-Host "Extracting (step 1: xz)..."
+        $tarFile = "$env:TEMP\llvm.tar"
+        7z x $archive "-o$env:TEMP" -y -bt 2>&1 | Out-Null
+        if (-not (Test-Path $tarFile)) {
+          # Try alternate name
+          $tarFile = "$env:TEMP\clang+llvm-$llvmVersion-x86_64-pc-windows-msvc.tar"
+        }
+        Write-Host "Extracting (step 2: tar)..."
+        $extractDir = "$env:TEMP\llvm-full"
+        Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+        7z x $tarFile "-o$extractDir" -y -bt 2>&1 | Out-Null
+        Remove-Item $tarFile -ErrorAction SilentlyContinue
+        Remove-Item $archive -ErrorAction SilentlyContinue
+        $llvmDir = Get-ChildItem -Path $extractDir -Directory | Select-Object -First 1 -ExpandProperty FullName
+        $llvmCmakeDir = "$llvmDir\lib\cmake\llvm"
+        if (-not (Test-Path "$llvmCmakeDir\LLVMConfig.cmake")) {
+          Get-ChildItem -Path "$llvmDir\lib\cmake" -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object FullName
+          throw "LLVMConfig.cmake not found at $llvmCmakeDir"
+        }
+        echo "LLVM_DIR=$llvmCmakeDir" >> $env:GITHUB_ENV
+        echo "$llvmDir\bin" >> $env:GITHUB_PATH
+        Write-Host "LLVM cmake OK at: $llvmCmakeDir"
+
+    - name: Setup Visual Studio
+      uses: microsoft/setup-msbuild@v2
+      with:
+        vs-version: '17.0'
+
+    - name: Set up DIA SDK
+      shell: pwsh
+      run: |
+        # LLVM pre-built libraries depend on diaguids.lib from the DIA SDK.
+        # LLVM's cmake config references it at a fixed path that may not match
+        # the runner's VS installation.  Locate the actual DIA SDK and make
+        # the library available where the linker expects it.
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath 2>$null
+        if (-not $vsPath) {
+          Write-Host "::warning::vswhere could not locate a VS installation"
+          return
+        }
+        $srcLib = "$vsPath\DIA SDK\lib\amd64\diaguids.lib"
+        if (-not (Test-Path $srcLib)) {
+          Write-Host "::warning::DIA SDK not found at $srcLib"
+          return
+        }
+        $dstDir = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\DIA SDK\lib\amd64"
+        if (-not (Test-Path "$dstDir\diaguids.lib")) {
+          New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
+          Copy-Item $srcLib $dstDir\ -Force
+          Write-Host "Copied $srcLib -> $dstDir\"
+        } else {
+          Write-Host "DIA SDK already present at $dstDir"
+        }
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$env:LLVM_DIR"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j4
+        cmake --build build --config Release --target aurora_bindgen -j4 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "bindgen skipped" }; $LASTEXITCODE=0
+        cmake --build build --config Release --target aurora_cppwrap -j4 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "cppwrap skipped" }; $LASTEXITCODE=0
+
+    - name: Package Windows Installer
+      run: |
+        & "release\package_release.ps1"
+        # Inno Setup installer (optional — may not be available on runner)
+        $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) {
+          choco install innosetup -y --no-progress 2>$null
+        }
+        if (Test-Path $iscc) {
+          try {
+            & $iscc "release\setup.iss"
+            if ($LASTEXITCODE -ne 0) { throw "ISCC exit code $LASTEXITCODE" }
+            Get-ChildItem -Path release -Filter "Aurora-*-setup.exe" | ForEach-Object {
+              Write-Host "  ✅ $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)"
+            }
+          } catch {
+            Write-Host "  ⚠️ Inno Setup installer failed: $_ — ZIP artifact available"
+          }
+        } else {
+          Write-Host "  ⚠️ Inno Setup not available — installer skipped"
+        }
+
+    - name: Upload Windows Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: |
+          release/Aurora-*-windows-x64-setup.exe
+          release/Aurora-*-windows-x64.zip
+        if-no-files-found: warn
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      run: |
+        wget -q https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 19
+        sudo apt-get install -y liblld-19-dev
+        echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y cmake g++ libcurl4-openssl-dev libgl1-mesa-dev
+
+    - name: Remove conflicting LLVM cmake files
+      run: |
+        # Remove ALL non-LLVM19 clang cmake files to prevent find_package from
+        # picking up broken ClangTargets from older LLVM versions on the runner
+        for llvmdir in /usr/lib/llvm-*; do
+          [ -d "$llvmdir" ] || continue
+          ver="${llvmdir#/usr/lib/llvm-}"
+          if [ "$ver" != "19" ]; then
+            sudo rm -rf "$llvmdir/lib/cmake/clang" 2>/dev/null || true
+          fi
+        done
+        for cmakedir in /usr/lib/cmake/clang-*; do
+          [ -d "$cmakedir" ] || continue
+          ver="${cmakedir#/usr/lib/cmake/clang-}"
+          if [ "$ver" != "19" ]; then
+            sudo rm -rf "$cmakedir" 2>/dev/null || true
+          fi
+        done
+        sudo rm -rf /usr/lib/llvm-19/lib/cmake/clang 2>/dev/null || true
+        # Verify LLVM 19 cmake exists
+        if [ ! -f "/usr/lib/llvm-19/lib/cmake/llvm/LLVMConfig.cmake" ]; then
+          echo "WARNING: LLVM 19 cmake not found at expected path"
+          ls /usr/lib/llvm-*/lib/cmake/llvm/ 2>/dev/null || true
+        fi
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc)
+
+    - name: Package Linux Tarball
+      run: |
+        VERSION=$(cat VERSION | tr -d '\n')
+        mkdir -p dist/Aurora-$VERSION
+        cp build/aurorac dist/Aurora-$VERSION/
+        cp build/voss dist/Aurora-$VERSION/
+        cp build/aurora_lsp dist/Aurora-$VERSION/
+        cp -r libc dist/Aurora-$VERSION/
+        cp build/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
+        cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
+        cd dist && tar -czf Aurora-$VERSION-linux-x86_64.tar.gz Aurora-$VERSION
+        echo "PACKAGE=Aurora-$VERSION-linux-x86_64.tar.gz" >> $GITHUB_ENV
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-tarball
+        path: dist/Aurora-*-linux-x86_64.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      run: |
+        # macOS 26 runner has llvm@20 pre-installed, but install explicitly to ensure
+        # cmake config files are available
+        brew install llvm@20 2>/dev/null || true
+        LLVM_PREFIX=$(brew --prefix llvm@20)
+        echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+        echo "LLVM prefix: $LLVM_PREFIX"
+
+    - name: Install Dependencies
+      run: |
+        brew install cmake
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build Core Targets
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(sysctl -n hw.ncpu)
+
+    - name: Package macOS Tarball
+      run: |
+        VERSION=$(cat VERSION | tr -d '\n')
+        mkdir -p dist/Aurora-$VERSION
+        cp build/aurorac dist/Aurora-$VERSION/
+        cp build/voss dist/Aurora-$VERSION/
+        cp build/aurora_lsp dist/Aurora-$VERSION/
+        cp -r libc dist/Aurora-$VERSION/
+        cp build/libaurora_runtime.a dist/Aurora-$VERSION/ 2>/dev/null || true
+        cp README.md LICENSE dist/Aurora-$VERSION/ 2>/dev/null || true
+        cd dist && tar -czf Aurora-$VERSION-macos-x86_64.tar.gz Aurora-$VERSION
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-tarball
+        path: dist/Aurora-*-macos-x86_64.tar.gz
+
+  create-release:
+    needs: [build-windows, build-ubuntu, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: List Artifacts
+      run: find artifacts -type f -ls
+
+    - name: Create Release and Upload Assets
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -e
+        TAG="v1.0.0"
+        REPO="${{ github.repository }}"
+        echo "Updating release $TAG from commit $GITHUB_SHA"
+
+        # Delete old release+tag, then recreate
+        gh release delete "$TAG" --yes --repo "$REPO" 2>/dev/null || true
+        git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+        cd artifacts
+        ASSETS=()
+        for f in $(find . -type f | sort); do
+          ASSETS+=("$f")
+        done
+
+        gh release create "$TAG" \
+          --title "Aurora $TAG" \
+          --notes "Latest build — updated from commit ${{ github.sha }}" \
+          --target "$GITHUB_SHA" \
+          --repo "$REPO" \
+          "${ASSETS[@]}"

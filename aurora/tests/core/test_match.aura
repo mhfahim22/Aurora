@@ -1,0 +1,56 @@
+# ── Test 1: Integer literal matching (existing behavior) ──
+function get_val()
+    return 2
+
+x = get_val()
+match x
+    case 1
+        output(10)
+    case 2
+        output(20)
+    case 3
+        output(30)
+    default
+        output(99)
+
+# ── Test 2: Array destructuring ──
+arr = [1, 2, 3]
+match arr
+    case [1, 2, 3]
+        output(100)
+    case [a, b]
+        output(a + b)
+    default
+        output(0)
+
+# ── Test 3: Variable binding pattern ──
+y = 42
+match y
+    case z
+        output(z)
+    default
+        output(0)
+
+# ── Test 4: Wildcard pattern ──
+w = 77
+match w
+    case _
+        output(200)
+    default
+        output(0)
+
+# ── Test 5: Struct pattern matching ──
+extern struct Point { x: i32, y: i32 }
+
+p = Point { x: 3, y: 4 }
+match p
+    case Point(0, 0)
+        output(1)
+    case Point(x, 0)
+        output(x)
+    case Point(0, y)
+        output(y)
+    case Point(x, y)
+        output(x + y)
+    default
+        output(0)

@@ -1,0 +1,21 @@
+lambda my_throw():
+    throw "test"
+end
+
+function call_it(f)
+    f()
+end
+
+function main()
+    did_catch = false
+    try:
+        call_it(my_throw)
+    catch e:
+        did_catch = true
+    end
+    if did_catch
+        output("caught")
+    else
+        output("NOT caught")
+    end
+end

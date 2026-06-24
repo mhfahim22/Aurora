@@ -1,0 +1,7 @@
+#ifndef MINIZ_EXPORT_H
+#define MINIZ_EXPORT_H
+
+#define MINIZ_EXPORT
+#define MINIZ_EXPORT_TEMPLATE
+
+#endif

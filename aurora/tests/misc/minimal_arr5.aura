@@ -1,0 +1,12 @@
+arr = [1, 2.5, "hello", 42]
+output(arr)
+output(arr[0])
+output(arr[2])
+arr[0] = 99
+output(arr[0])
+
+nums = [10, 20, 30, 40, 50]
+total = 0
+for k in 5
+    total = total + nums[k]
+output(total)

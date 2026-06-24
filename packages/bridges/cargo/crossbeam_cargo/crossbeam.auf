@@ -1,0 +1,80 @@
+/* ════════════════════════════════════════════════════════════
+   Cargo Bridge — Auto-generated Aurora FFI Bindings
+   Package: crossbeam@0.8.4
+   ════════════════════════════════════════════════════════════ */
+
+/* Module init */
+@cost(zero)
+extern "cargo_crossbeam" function crossbeam_import() -> pointer
+
+/* FFI entry points */
+@cost(zero)
+extern "cargo_crossbeam" function crossbeam_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+@cost(zero)
+extern "cargo_crossbeam" function crossbeam_free(handle: pointer)
+@cost(zero)
+extern "cargo_crossbeam" function crossbeam_free_cstr(handle: pointer)
+
+/* Value conversion helpers */
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_str(s: cstring) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_int(v: i64) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_float(v: f64) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call_kw(mod: pointer, fn: cstring, args: pointer, kwargs: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_getattr(obj: pointer, name: cstring) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call2(mod: pointer, fn: cstring, arg1: pointer, arg2: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call3(mod: pointer, fn: cstring, arg1: pointer, arg2: pointer, arg3: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call4(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call5(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call6(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer, a6: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_list(items: pointer, count: i32) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_tuple(items: pointer, count: i32) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_tuple2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_tuple3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_tuple4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_list2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_list3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_list4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_to_cstr(obj: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_dict() -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_dict_set(d: pointer, key: cstring, val: pointer) -> i32
+
+/* Type instance API — construct, call method, destroy */
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_construct(type_name: cstring, ctor: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "cargo_crossbeam" function crossbeam_call_method(handle: pointer, type_name: cstring, method: cstring, args: pointer) -> pointer
+@cost(zero)
+extern "cargo_crossbeam" function crossbeam_free_type(handle: pointer, type_name: cstring)
+@cost(zero)
+extern "cargo_crossbeam" function crossbeam_last_error() -> cstring
+
+/* Usage:
+     import "crossbeam"
+     let mod = crossbeam_import()
+     let args = crossbeam_tuple2(a, b)
+     let result = crossbeam_call(mod, "fn_name", args)
+     crossbeam_free(result)
+*/

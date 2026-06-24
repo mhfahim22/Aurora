@@ -1,0 +1,10 @@
+class Person
+    name = "unknown"
+    age = 0
+
+function make_greeting(p)
+    return "hello " + p.name
+
+p = Person("Alice", 30)
+output(make_greeting(p))
+output("DONE")

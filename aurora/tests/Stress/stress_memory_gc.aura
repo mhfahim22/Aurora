@@ -1,0 +1,44 @@
+# Phase 8: GC stress test (simplified — no annotation)
+
+function cycle_chain(n)
+    if n <= 0
+        return 0
+    a = [n]
+    b = [n-1]
+    c = [n-2]
+    result = a[0] + b[0] + c[0]
+    return result + cycle_chain(n - 3)
+
+function many_objects(n)
+    total = 0
+    for i in n
+        data = [i, i+1, i+2]
+        data2 = [data[0], data[1]]
+        data3 = [data2[0], i]
+        total = total + data3[0] + data3[1]
+    return total
+
+function nested_cycles(n)
+    total = 0
+    for i in n
+        a = [i]
+        for j in 3
+            b = [a[0], j]
+            a = [b[0], b[1]]
+        total = total + a[0]
+    return total
+
+function interleaved(n)
+    total = 0
+    for i in n
+        x = [i, i+1]
+        y = [x[0]]
+        z = [y[0], x[1]]
+        total = total + z[0] + z[1]
+    return total
+
+output(cycle_chain(100))
+output(many_objects(500))
+output(nested_cycles(300))
+output(interleaved(500))
+output("GC_OK")

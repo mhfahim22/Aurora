@@ -1,0 +1,18 @@
+lambda throwing_fn():
+    throw "error"
+end
+
+function main()
+    output("start")
+    did_catch = false
+    try:
+        throwing_fn()
+    catch e:
+        did_catch = true
+    end
+    if did_catch
+        output("caught")
+    else
+        output("NOT caught")
+    end
+end

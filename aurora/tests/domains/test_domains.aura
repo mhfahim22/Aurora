@@ -1,0 +1,27 @@
+# ══════════════════════════════════
+# Aurora Language — Domain Feature Tests
+# ══════════════════════════════════
+
+# ── Game Engine ──
+output("--- Game Engine ---")
+scene main:
+    entity player:
+        output("entity created")
+    physics step:
+        output("physics running")
+
+# ── Backend ──
+output("--- Backend ---")
+server my_server = 8080:
+    api "/":
+        output("api ready")
+    route "/api/hello":
+        output("route registered")
+
+# ── Utility ──
+output("--- Utility ---")
+sleep 100
+time
+random
+
+output("--- DOMAIN DONE ---")

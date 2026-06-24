@@ -1,0 +1,64 @@
+import "stdio"
+
+extern function markdown_import() -> pointer
+extern function markdown_str(s: cstring) -> pointer
+extern function markdown_int(n: i64) -> pointer
+extern function markdown_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern function markdown_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+extern function markdown_getattr(mod: pointer, name: cstring) -> pointer
+extern function markdown_to_cstr(v: pointer) -> cstring
+extern function markdown_dict() -> pointer
+extern function markdown_dict_set(d: pointer, k: cstring, v: pointer) -> void
+extern function markdown_free(v: pointer) -> void
+
+extern function requests_import() -> pointer
+extern function requests_str(s: cstring) -> pointer
+extern function requests_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern function requests_to_cstr(v: pointer) -> cstring
+extern function requests_free(v: pointer) -> void
+
+extern function numpy_import() -> pointer
+extern function numpy_getattr(mod: pointer, name: cstring) -> pointer
+extern function numpy_to_cstr(v: pointer) -> cstring
+extern function numpy_free(v: pointer) -> void
+
+function main():
+    printf("=== PyPI Bridge Demo ===\n\n")
+
+    printf("--- 1. Import markdown ---\n")
+    md = markdown_import()
+    if md == 0:
+        printf("FAILED: markdown_import() — is markdown installed?\n")
+        printf("Run: pip install markdown\n")
+        return 1
+    printf("OK: markdown module loaded\n")
+
+    printf("--- 2. markdown.markdown(text) ---\n")
+    text = markdown_str("# Hello **Aurora**")
+    html = markdown_call1(md, "markdown", text)
+    if html != 0:
+        printf("Input:  '# Hello **Aurora**'\n")
+        printf("Output: %s\n", markdown_to_cstr(html))
+        markdown_free(html)
+    else:
+        printf("FAILED: markdown_call1\n")
+    markdown_free(text)
+
+    printf("--- 3. markdown.__version__ ---\n")
+    ver = markdown_getattr(md, "__version__")
+    if ver != 0:
+        printf("markdown version: %s\n", markdown_to_cstr(ver))
+        markdown_free(ver)
+
+    printf("--- 4. dict helpers ---\n")
+    d = markdown_dict()
+    markdown_dict_set(d, "key1", markdown_str("value1"))
+    markdown_dict_set(d, "key2", markdown_int(99))
+    printf("dict=%s\n", markdown_to_cstr(d))
+    markdown_free(d)
+
+    markdown_free(md)
+    printf("\n=== PyPI Bridge Demo Complete ===\n")
+    return 0
+
+main()

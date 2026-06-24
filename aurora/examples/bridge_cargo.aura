@@ -1,0 +1,47 @@
+import "stdio"
+
+extern function hello_rust_import() -> pointer
+extern function hello_rust_str(s: cstring) -> pointer
+extern function hello_rust_int(n: i64) -> pointer
+extern function hello_rust_float(f: f64) -> pointer
+extern function hello_rust_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern function hello_rust_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+extern function hello_rust_getattr(mod: pointer, name: cstring) -> pointer
+extern function hello_rust_to_cstr(v: pointer) -> cstring
+extern function hello_rust_dict() -> pointer
+extern function hello_rust_dict_set(d: pointer, k: cstring, v: pointer) -> void
+extern function hello_rust_last_error() -> cstring
+extern function hello_rust_free(v: pointer) -> void
+
+function main():
+    printf("=== Cargo Bridge Demo ===\n\n")
+
+    printf("--- 1. Import hello_rust ---\n")
+    mod = hello_rust_import()
+    if mod == 0:
+        printf("FAILED: hello_rust_import()\n")
+        printf("Run: voss bridge cargo hello_rust\n")
+        return 1
+    printf("OK: hello_rust module loaded at %p\n", mod)
+
+    printf("--- 2. Value helpers ---\n")
+    s = hello_rust_str("\"hello\"")
+    i = hello_rust_int(42)
+    f = hello_rust_float(3.14)
+    printf("str=%s int=%s float=%s\n", hello_rust_to_cstr(s), hello_rust_to_cstr(i), hello_rust_to_cstr(f))
+    hello_rust_free(s)
+    hello_rust_free(i)
+    hello_rust_free(f)
+
+    printf("--- 3. Dict ---\n")
+    d = hello_rust_dict()
+    hello_rust_dict_set(d, "key1", hello_rust_str("\"val1\""))
+    hello_rust_dict_set(d, "count", hello_rust_int(100))
+    printf("dict=%s\n", hello_rust_to_cstr(d))
+    hello_rust_free(d)
+
+    hello_rust_free(mod)
+    printf("\n=== Cargo Bridge Demo Complete ===\n")
+    return 0
+
+main()

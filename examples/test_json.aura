@@ -1,0 +1,5 @@
+outputln("Testing json()...")
+server app
+    route "GET" "/"
+        json("test")
+outputln("Server registered.")

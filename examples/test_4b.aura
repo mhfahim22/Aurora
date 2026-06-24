@@ -1,0 +1,14 @@
+outputln("Test 4 routes (different)...")
+server app
+    route "GET" "/todos"
+        json(aurora_todo_list())
+    route "POST" "/todos"
+        body = request("body")
+        json(aurora_todo_create(body))
+    route "GET" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+    route "DELETE" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_delete(id))
+outputln("Server registered.")

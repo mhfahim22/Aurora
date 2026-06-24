@@ -1,0 +1,247 @@
+# Flappy Bird — 2D GPU Game Example
+# Sprite batching, physics, collision, input — GPU-accelerated
+
+import "glfw"
+import "opengl"
+import "sprite2d"
+import "stdlib"
+
+# ── Constants ──
+SW = 800
+SH = 600
+
+GRAVITY     = 980.0
+FLAP_SPEED  = -350.0
+PIPE_SPEED  = 200.0
+PIPE_GAP    = 180.0
+PIPE_WIDTH  = 70.0
+BIRD_SIZE   = 30.0
+GROUND_H    = 80.0
+MAX_PIPES   = 8
+PIPE_INTERVAL = 1.5
+
+SW_F = 800.0
+SH_F = 600.0
+
+# ── Game state ──
+bird_x   = 200.0
+bird_y   = 300.0
+bird_vy  = 0.0
+
+pipe_xs = []
+pipe_gaps = []
+pipe_active = []
+num_pipes = 0
+pipe_timer = 0.0
+
+score = 0
+game_over = 0
+
+function init_pipes():
+    i = 0
+    while i < MAX_PIPES:
+        pipe_xs[i] = 0.0
+        pipe_gaps[i] = 0.0
+        pipe_active[i] = 0
+        i = i + 1
+    end
+    num_pipes = 0
+end
+
+function add_pipe(x, gap_y):
+    if num_pipes >= MAX_PIPES:
+        return
+    end
+    pipe_xs[num_pipes] = x
+    pipe_gaps[num_pipes] = gap_y
+    pipe_active[num_pipes] = 1
+    num_pipes = num_pipes + 1
+end
+
+function remove_pipe(idx):
+    i = idx
+    while i < num_pipes - 1:
+        pipe_xs[i] = pipe_xs[i + 1]
+        pipe_gaps[i] = pipe_gaps[i + 1]
+        pipe_active[i] = pipe_active[i + 1]
+        i = i + 1
+    end
+    num_pipes = num_pipes - 1
+end
+
+function reset_game():
+    bird_y = 300.0
+    bird_vy = 0.0
+    init_pipes()
+    pipe_timer = 0.0
+    score = 0
+    game_over = 0
+end
+
+function spawn_pipe():
+    gap_y = 80 + rand() % 280
+    if gap_y < 60:
+        gap_y = 60
+    end
+    if gap_y > 340:
+        gap_y = 340
+    end
+    add_pipe(SW_F + PIPE_WIDTH, gap_y * 1.0)
+end
+
+function update_pipes(dt):
+    i = 0
+    while i < num_pipes:
+        pipe_xs[i] = pipe_xs[i] - PIPE_SPEED * dt
+        if pipe_xs[i] < -PIPE_WIDTH * 2.0:
+            remove_pipe(i)
+        else:
+            i = i + 1
+        end
+    end
+    pipe_timer = pipe_timer + dt
+    if pipe_timer >= PIPE_INTERVAL:
+        pipe_timer = 0.0
+        spawn_pipe()
+    end
+end
+
+function check_collision():
+    half = BIRD_SIZE * 0.5
+    grd_y = SH_F - BIRD_SIZE - GROUND_H
+    if bird_y >= grd_y:
+        game_over = 1
+        bird_y = grd_y
+        bird_vy = 0.0
+        return
+    end
+    if bird_y < BIRD_SIZE:
+        bird_y = BIRD_SIZE
+        bird_vy = 0.0
+        return
+    end
+    i = 0
+    while i < num_pipes:
+        px = pipe_xs[i]
+        gy = pipe_gaps[i]
+        ph = PIPE_WIDTH * 0.5
+        if bird_x + half > px - ph and bird_x - half < px + ph:
+            if bird_y - half < gy or bird_y + half > gy + PIPE_GAP:
+                game_over = 1
+                return
+            end
+        end
+        i = i + 1
+    end
+end
+
+function draw_pipes():
+    i = 0
+    while i < num_pipes:
+        px = pipe_xs[i]
+        gy = pipe_gaps[i]
+        top_h = gy
+        if top_h > 0.0:
+            sprite2d_draw_color(0, px, top_h * 0.5, PIPE_WIDTH, top_h, 0.0, 0.8, 0.0, 1.0)
+        end
+        sprite2d_draw_color(0, px, gy, PIPE_WIDTH + 10.0, 20.0, 0.0, 0.6, 0.0, 1.0)
+        bot_start = gy + PIPE_GAP
+        bot_h = SH_F - GROUND_H - bot_start
+        if bot_h > 0.0:
+            sprite2d_draw_color(0, px, bot_start + bot_h * 0.5, PIPE_WIDTH, bot_h, 0.0, 0.8, 0.0, 1.0)
+        end
+        sprite2d_draw_color(0, px, gy + PIPE_GAP, PIPE_WIDTH + 10.0, 20.0, 0.0, 0.6, 0.0, 1.0)
+        i = i + 1
+    end
+end
+
+function draw_ground():
+    sprite2d_draw_color(0, SW_F * 0.5, SH_F - GROUND_H * 0.5, SW_F, GROUND_H, 0.6, 0.4, 0.2, 1.0)
+end
+
+function draw_bird():
+    sz = BIRD_SIZE
+    sprite2d_draw_color(0, bird_x, bird_y, sz, sz, 1.0, 0.8, 0.0, 1.0)
+    sprite2d_draw_color(0, bird_x + 5.0, bird_y + 5.0, 8.0, 8.0, 1.0, 1.0, 1.0, 1.0)
+    sprite2d_draw_color(0, bird_x + 7.0, bird_y + 7.0, 4.0, 4.0, 0.0, 0.0, 0.0, 1.0)
+    sprite2d_draw_color(0, bird_x + sz * 0.5 + 3.0, bird_y, 12.0, 6.0, 1.0, 0.5, 0.0, 1.0)
+    sprite2d_draw_color(0, bird_x - 2.0, bird_y - 2.0, 10.0, sz * 0.6, 0.8, 0.6, 0.0, 1.0)
+end
+
+function draw_score():
+    sprite2d_draw_color(0, SW_F * 0.5, 30.0, 120.0, 30.0, 0.0, 0.0, 0.0, 0.6)
+end
+
+function draw_game_over():
+    sprite2d_draw_color(0, SW_F * 0.5, SH_F * 0.5, SW_F, SH_F, 0.0, 0.0, 0.0, 0.5)
+    sprite2d_draw_color(0, SW_F * 0.5, SH_F * 0.5 - 20.0, 200.0, 40.0, 1.0, 0.0, 0.0, 1.0)
+    sprite2d_draw_color(0, SW_F * 0.5, SH_F * 0.5 + 40.0, 250.0, 20.0, 1.0, 1.0, 1.0, 1.0)
+end
+
+function main():
+    if glfwInit() == 0:
+        output("ERROR: glfwInit failed")
+        return
+    end
+    glfwWindowHint(0x00022002, 3)  # GLFW_CONTEXT_VERSION_MAJOR
+    glfwWindowHint(0x00022003, 3)  # GLFW_CONTEXT_VERSION_MINOR
+    glfwWindowHint(0x00022008, 0x00032001)  # GLFW_OPENGL_PROFILE = GLFW_OPENGL_CORE_PROFILE
+    window = glfwCreateWindow(SW, SH, "Flappy Bird — Aurora 2D GPU", null, null)
+    if window == 0:
+        output("ERROR: glfwCreateWindow failed")
+        glfwTerminate()
+        return
+    end
+    glfwMakeContextCurrent(window)
+    glfwSwapInterval(1)
+    sprite2d_init(2048, SW, SH)
+    output("Flappy Bird started! SPACE or click to flap")
+    reset_game()
+    glClearColor(0.4, 0.6, 0.9, 1.0)
+    last_time = glfwGetTime()
+    while glfwWindowShouldClose(window) == 0:
+        now = glfwGetTime()
+        dt = now - last_time
+        last_time = now
+        if dt > 0.05:
+            dt = 0.05
+        end
+        glfwPollEvents()
+        if glfwGetKey(window, 256) == 1:
+            glfwSetWindowShouldClose(window, 1)
+        end
+        if game_over == 0:
+            if glfwGetKey(window, 32) == 1:
+                bird_vy = FLAP_SPEED
+            end
+            if glfwGetMouseButton(window, 0) == 1:
+                bird_vy = FLAP_SPEED
+            end
+            bird_vy = bird_vy + GRAVITY * dt
+            bird_y = bird_y + bird_vy * dt
+            update_pipes(dt)
+            check_collision()
+        else:
+            if glfwGetKey(window, 32) == 1:
+                reset_game()
+            end
+        end
+        glClear(16384)
+        sprite2d_clear()
+        draw_pipes()
+        draw_ground()
+        draw_bird()
+        draw_score()
+        if game_over:
+            draw_game_over()
+        end
+        sprite2d_flush()
+        glfwSwapBuffers(window)
+    end
+    sprite2d_shutdown()
+    glfwDestroyWindow(window)
+    glfwTerminate()
+    output("Game over!")
+end
+
+main()

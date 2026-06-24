@@ -1,0 +1,89 @@
+extern "cpp_interop_test" function bench_matmul(n: i32, iterations: i32) -> f64
+extern "cpp_interop_test" function bench_compute(iterations: i64) -> f64
+extern "cpp_interop_test" function timer_new() -> pointer
+extern "cpp_interop_test" function timer_delete(t: pointer) -> void
+extern "cpp_interop_test" function timer_elapsed_ms(t: pointer) -> f64
+extern "cpp_interop_test" function add(a: f64, b: f64) -> f64
+extern "cpp_interop_test" function sub(a: f64, b: f64) -> f64
+extern "cpp_interop_test" function mul(a: f64, b: f64) -> f64
+
+function main():
+    output("=== C++ Native Speed Benchmark ===\n")
+
+    # ── Pure Aurora computation (no FFI) ──
+    output("--- 1. Pure Aurora (interpreted-like, LLVM JIT) ---\n")
+    timer = timer_new()
+    pi = 0.0
+    sign = 1.0
+    i = 0
+    while i < 10000000
+        pi = pi + sign / (i * 2 + 1)
+        sign = 0.0 - sign
+        i = i + 1
+    pi = pi * 4.0
+    aurora_time = timer_elapsed_ms(timer)
+    output("pi(10M terms) = ")
+    output(pi)
+    output("\n")
+    output("time: ")
+    output(aurora_time)
+    output(" ms\n")
+    timer_delete(timer)
+
+    # ── Native C++ compute (FFI call into DLL) ──
+    output("\n--- 2. Native C++ via FFI (DLL) ---\n")
+    timer = timer_new()
+    r = bench_compute(500000000)
+    native_time = timer_elapsed_ms(timer)
+    output("bench_compute(500M) = ")
+    output(r)
+    output("\n")
+    output("time: ")
+    output(native_time)
+    output(" ms\n")
+    timer_delete(timer)
+
+    # ── Native C++ matmul 500x500 x 20 iterations ──
+    output("\n--- 3. Native C++ Matmul 500x500 (20x) ---\n")
+    timer = timer_new()
+    r2 = bench_matmul(500, 20)
+    matmul_time = timer_elapsed_ms(timer)
+    output("result = ")
+    output(r2)
+    output("\n")
+    output("time: ")
+    output(matmul_time)
+    output(" ms\n")
+    timer_delete(timer)
+
+    # ── C++ FFI overhead measurement ──
+    output("\n--- 4. FFI Overhead (empty call cost) ---\n")
+    timer = timer_new()
+    k = 0
+    while k < 10000000
+        r3 = add(1.0, 2.0)
+        k = k + 1
+    ffi_overhead = timer_elapsed_ms(timer)
+    ffi_per_call = ffi_overhead / 10000000.0
+    output("10M FFI calls in ")
+    output(ffi_overhead)
+    output(" ms\n")
+    output("per call: ")
+    output(ffi_per_call)
+    output(" ms (")
+    ffi_per_us = ffi_per_call * 1000.0
+    output(ffi_per_us)
+    output(" us)\n")
+    timer_delete(timer)
+
+    # ── Summary ──
+    output("\n=== Summary ===\n")
+    output("Native C++ matmul (500x500, 20x): ")
+    output(matmul_time)
+    output(" ms\n")
+    output("Aurora pi (10M Leibniz terms): ")
+    output(aurora_time)
+    output(" ms\n")
+
+    output("\n=== Benchmark complete ===\n")
+    return 0

@@ -1,0 +1,42 @@
+import MrCode
+
+output("=== Phase 6: Speculative Decoding + Enhanced Quantization ===\n")
+
+## ── Test Speculative Decoding ──
+## Build a target model
+target = model_create("sequential")
+add(target, embedding(100, 32))
+add(target, mha(4))
+add(target, dense(32, "relu"))
+add(target, unembed())
+set_loss(target, "categorical_crossentropy")
+set_optimizer(target, "adam")
+set_lr(target, 0.01)
+
+## Build a smaller draft model
+draft = model_create("sequential")
+add(draft, embedding(100, 16))
+add(draft, mha(2))
+add(draft, dense(16, "relu"))
+add(draft, unembed())
+set_loss(draft, "categorical_crossentropy")
+set_optimizer(draft, "adam")
+set_lr(draft, 0.01)
+
+output("target model: " + model_info(target))
+output("draft model: " + model_info(draft))
+
+## Test basic generation on each model
+output("target tokens: " + generate_tokens(target, 1, 10))
+output("draft tokens: " + generate_tokens(draft, 1, 10))
+
+## Test speculative decoding
+spec_result = speculative_decode_builtin(target, draft, 1, 20, 4)
+output("speculative decode: " + spec_result)
+
+output("\n--- Quantization Tests ---\n")
+output("group-wise quantized: " + str(quantize_groupwise_builtin(target, 64)) + " params")
+output("kv cache params: " + str(quantize_kv_cache_builtin(target)))
+output("standard quantize: " + str(quantize(target)) + " params")
+
+output("\n=== PHASE 6 DONE ===\n")

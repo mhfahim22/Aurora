@@ -1,0 +1,1 @@
+extern "fastcall" function test_fastcall_fn(x: int) -> int

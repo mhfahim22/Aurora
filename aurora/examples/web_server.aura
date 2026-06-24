@@ -1,0 +1,29 @@
+# Web Server Example
+# Demonstrates the backend framework: routing, middleware, sessions, caching, auth, database
+
+server app
+    middleware logger
+        output("[" + stamp() + "] " + request.method + " " + request.path)
+        next()
+
+    middleware metrics
+        start = stamp()
+        next()
+        elapsed = stamp() - start
+        output("  -> " + elapsed + "ms")
+
+    route "/"
+        response("Welcome to Aurora Web Server!")
+
+    route "/hello/:name"
+        response("Hello, " + request.params.name + "!")
+
+    route "/time"
+        response("Time: " + stamp())
+
+    route "/echo"
+        data = request.body
+        response("Echo: " + data)
+
+app.start(3000)
+output("Server running on port 3000")

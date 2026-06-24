@@ -1,0 +1,15 @@
+outputln("Testing 4 routes (mixed body+param)...")
+server app
+    route "GET" "/list"
+        json(aurora_todo_list())
+    route "POST" "/create"
+        body = request("body")
+        json(aurora_todo_create(body))
+    route "GET" "/get/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+    route "PUT" "/update/:id"
+        id = request.params.id
+        body = request("body")
+        json(aurora_todo_update(id, body, 0))
+outputln("Server registered.")

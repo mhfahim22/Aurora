@@ -1,0 +1,11 @@
+// Type IR cost annotations for kernel32
+// Auto-generated — used by Aurora compiler for zero-cost interop
+{
+  "types": {
+    "C_int":  {"ir": "i32",   "cost": "zero"},
+    "C_long": {"ir": "i64",   "cost": "zero"},
+    "C_float":{"ir": "f32",   "cost": "zero"},
+    "C_double":{"ir": "f64",  "cost": "zero"},
+    "C_str":  {"ir": "cstring","cost": "zero"}
+  }
+}

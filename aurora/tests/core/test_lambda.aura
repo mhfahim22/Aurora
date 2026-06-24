@@ -1,0 +1,8 @@
+function double(x)
+    return x * 2
+
+lambda(a, b)
+    return a + b
+
+result = double(5)
+output(result)

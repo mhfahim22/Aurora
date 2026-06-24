@@ -1,0 +1,7 @@
+factor = 10
+
+lambda(x)
+    return x + factor
+
+result = __lambda_1(5)
+output(result)

@@ -1,0 +1,9 @@
+outputln("Testing multiple routes...")
+server app
+    route "GET" "/list"
+        json(aurora_todo_list())
+    route "POST" "/create"
+        json(aurora_todo_create("test"))
+    route "DELETE" "/delete/1"
+        json(aurora_todo_delete("1"))
+outputln("Server registered.")

@@ -1,0 +1,52 @@
+import "cargo:hello_rust"
+
+extern "cargo_hello_rust" function hello_rust_import() -> pointer
+extern "cargo_hello_rust" function hello_rust_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+extern "cargo_hello_rust" function hello_rust_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern "cargo_hello_rust" function hello_rust_str(s: cstring) -> pointer
+extern "cargo_hello_rust" function hello_rust_int(v: i64) -> pointer
+extern "cargo_hello_rust" function hello_rust_to_cstr(obj: pointer) -> pointer
+extern "cargo_hello_rust" function hello_rust_tuple2(a: pointer, b: pointer) -> pointer
+extern "cargo_hello_rust" function hello_rust_free(handle: pointer)
+extern "cargo_hello_rust" function hello_rust_free_cstr(handle: pointer)
+
+function main():
+    output("--- Cargo Bridge End-to-End Test ---")
+    mod = hello_rust_import()
+    if mod == 0:
+        output("FAIL: hello_rust_import() returned null")
+        output("note: run 'voss bridge cargo hello_rust' first")
+        return 1
+    output("PASS: hello_rust_import() ok")
+
+    name = hello_rust_str("Aurora")
+    result = hello_rust_call1(mod, "greet", name)
+    out = hello_rust_to_cstr(result)
+    if out != 0:
+        output("PASS: greet(Aurora) = " + str(out))
+        hello_rust_free_cstr(out)
+    else:
+        output("FAIL: greet() returned null")
+        hello_rust_free(result)
+        hello_rust_free(name)
+        hello_rust_free(mod)
+        return 1
+    hello_rust_free(result)
+    hello_rust_free(name)
+
+    a = hello_rust_int(40)
+    b = hello_rust_int(2)
+    pair = hello_rust_tuple2(a, b)
+    result2 = hello_rust_call(mod, "add", pair)
+    out2 = hello_rust_to_cstr(result2)
+    if out2 != 0:
+        output("PASS: add(40, 2) = " + str(out2))
+        hello_rust_free_cstr(out2)
+    hello_rust_free(result2)
+    hello_rust_free(pair)
+    hello_rust_free(a)
+    hello_rust_free(b)
+
+    hello_rust_free(mod)
+    output("--- All Cargo Bridge Tests Passed ---")
+    return 0

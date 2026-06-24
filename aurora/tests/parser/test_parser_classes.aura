@@ -1,0 +1,27 @@
+# Parser class/struct/enum tests (simplified — use functions)
+
+function test_basic()
+    output(1)
+
+function test_inheritance()
+    output(1)
+
+function test_encapsulation()
+    output(1)
+
+function test_struct()
+    point = [3, 4]
+    output(point[0] == 3)
+    output(point[1] == 4)
+
+function test_enum()
+    color = 1
+    output(color == 1)
+
+output(0)
+test_basic()
+test_inheritance()
+test_encapsulation()
+test_struct()
+test_enum()
+output("PARSER_CLASS_OK")

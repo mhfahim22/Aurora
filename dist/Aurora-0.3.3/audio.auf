@@ -1,0 +1,8 @@
+## Audio Module
+## Usage: import "audio"
+##
+## Simple audio playback using Win32 PlaySound.
+
+extern function aurora_audio_init() -> i32
+extern function aurora_audio_play_file(path: cstring) -> i32
+extern function aurora_audio_shutdown()

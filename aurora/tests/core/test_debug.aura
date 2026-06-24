@@ -1,0 +1,21 @@
+class Person
+    public name = "unknown"
+    private age = 0
+    
+    function get_name()
+        return self.name
+    
+    function set_age(a)
+        self.age = a
+    
+    function get_age()
+        return self.age
+
+p = Person("Alice")
+output("name: " + p.get_name())
+
+# Test non-virtual method call
+p.set_age(42)
+output("age: " + p.get_age())
+
+output("DONE")

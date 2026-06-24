@@ -1,0 +1,11 @@
+class Person
+    public name = "unknown"
+    private age = 0
+    function get_age()
+        return self.age
+class Employee extends Person
+    function show()
+        output("Age: " + self.get_age())
+e = Employee("Bob", 30)
+e.show()
+output("DONE")

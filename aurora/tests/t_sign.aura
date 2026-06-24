@@ -1,0 +1,5 @@
+function test_token()
+    output("--- test_token ---")
+    tok = "signed_hello_world"
+    output(tok)
+test_token()

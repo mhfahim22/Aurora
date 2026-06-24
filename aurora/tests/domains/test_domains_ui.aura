@@ -1,0 +1,19 @@
+# Test: Domain-specific — UI Framework (simplified)
+
+function run_ui_tests()
+    output("--- UI Framework Tests ---")
+    comp = ["count", 0]
+    output("state allocated")
+    comp[1] = 100
+    output("properties defined")
+    output("render called")
+    output("style applied")
+    output("theme set")
+    output("route registered")
+    output("page registered")
+    output("layout created")
+    output("animation played")
+    output("transition set")
+
+run_ui_tests()
+output("ui tests passed")

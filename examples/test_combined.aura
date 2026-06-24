@@ -1,0 +1,23 @@
+outputln("Test 1: list")
+outputln("Test 2: create")
+outputln("Test 3: get")
+outputln("Test 4: update")
+outputln("Test 5: delete")
+
+server app
+    route "GET" "/todos"
+        json(aurora_todo_list())
+    route "POST" "/todos"
+        body = request("body")
+        json(aurora_todo_create(body))
+    route "GET" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+    route "PUT" "/todos/:id"
+        id = request.params.id
+        body = request("body")
+        json(aurora_todo_update(id, body, 0))
+    route "DELETE" "/todos/:id"
+        id = request.params.id
+        json(aurora_todo_delete(id))
+outputln("Server registered.")

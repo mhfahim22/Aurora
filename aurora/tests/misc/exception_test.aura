@@ -1,0 +1,54 @@
+# ── Test 1: basic throw and catch ──
+try:
+    throw 42
+catch:
+    output(__exception__)
+# expected: 42
+
+# ── Test 2: no throw — catch must NOT run ──
+x = 0
+try:
+    x = 10
+catch:
+    x = 999
+output(x)
+# expected: 10
+
+# ── Test 3: throw from inside a function ──
+function risky(n):
+    throw n
+
+try:
+    risky(77)
+catch:
+    output(__exception__)
+# expected: 77
+
+# ── Test 4: nested try — inner catches, outer not triggered ──
+try:
+    try:
+        throw 1
+    catch:
+        output(__exception__)
+    output(99)
+catch:
+    output(0)
+# expected: 1 then 99  (outer catch should NOT run)
+
+# ── Test 5: nested try — inner does NOT catch, outer does ──
+try:
+    try:
+        throw 55
+    catch:
+        throw __exception__
+    output(0)
+catch:
+    output(__exception__)
+# expected: 55
+
+# ── Test 6: bare throw (no value) ──
+try:
+    throw
+catch:
+    output(__exception__)
+# expected: 0  (default value when no expression given)

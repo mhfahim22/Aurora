@@ -1,0 +1,1 @@
+extern "c" function test_c_fn(x: int) -> int

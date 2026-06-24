@@ -1,0 +1,76 @@
+// TODO: Requires language features that may not be fully implemented
+/* Phase 3 — UI Framework Integration Test */
+
+/* ── Test 1: basic component ── */
+function test_component():
+    output("--- test_component ---")
+    component my_comp:
+        state count = 0
+        output("Component body")
+        render:
+            output("Component render")
+    output("Component test done")
+
+/* ── Test 2: component with properties ── */
+function test_properties():
+    output("--- test_properties ---")
+    component with_props:
+        properties props:
+            width = 800
+            height = 600
+        output("Properties set")
+    output("Properties test done")
+
+/* ── Test 3: nested components ── */
+function test_nested():
+    output("--- test_nested ---")
+    component parent:
+        output("Parent component")
+        component child:
+            output("Child component")
+    output("Nested test done")
+
+/* ── Test 4: style and theme ── */
+function test_style_theme():
+    output("--- test_style_theme ---")
+    style button:
+        output("Button style")
+    theme dark:
+        output("Dark theme")
+    output("Style/theme test done")
+
+/* ── Test 5: page and route ── */
+function test_page_route():
+    output("--- test_page_route ---")
+    page home:
+        output("Home page")
+    route "/about":
+        output("About route")
+    output("Page/route test done")
+
+/* ── Test 6: layout ── */
+function test_layout():
+    output("--- test_layout ---")
+    layout vertical:
+        output("Layout body")
+    output("Layout test done")
+
+/* ── Test 7: animate and transition ── */
+function test_anim_trans():
+    output("--- test_anim_trans ---")
+    animate fade:
+        output("Fade animation")
+    transition slide:
+        output("Slide transition")
+    output("Anim/trans test done")
+
+/* ── Main ── */
+output("=== Phase 3 UI Framework Test ===")
+test_component()
+test_properties()
+test_nested()
+test_style_theme()
+test_page_route()
+test_layout()
+test_anim_trans()
+output("=== All UI tests passed ===")

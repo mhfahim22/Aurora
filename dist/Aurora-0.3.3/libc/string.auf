@@ -1,0 +1,38 @@
+# ════════════════════════════════════════════════════════════
+# Aurora Standard Library — String
+# Usage:  import "string"  or  import libc:string
+#
+# String builtins:
+#   len(s), strlen(s)      → length (i64)
+#   strcat(a, b)           → concatenate a + b
+#   substr(s, i, n)        → substring from i, length n
+#   index(s, sub)          → first index of sub (-1 if none)
+#   has(s, sub)            → contains sub?
+#   starts(s, pre)         → starts with prefix?
+#   ends(s, suf)           → ends with suffix?
+#   upper(s), lower(s)     → case conversion
+#   trim(s)                → trim whitespace
+#   replace(s, old, new)   → replace all
+#   split(s, delim)        → split to array
+#   join(arr, sep)         → array to string
+#   reverse(s)             → reversed copy
+#
+# Conversion:  str(v),  int(s),  float(s),  bool(s)
+# ════════════════════════════════════════════════════════════
+
+function str_is_empty(s)
+    return strlen(s) == 0
+end
+
+function str_repeat(s, n)
+    result = s
+    i = 1
+    loop
+        if i >= n
+            break
+        end
+        result = strcat(result, s)
+        i = i + 1
+    end
+    return result
+end

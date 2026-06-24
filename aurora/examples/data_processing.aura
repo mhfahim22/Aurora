@@ -1,0 +1,35 @@
+# Data Processing Pipeline
+# Demonstrates arrays, file I/O, and basic data processing
+
+function load_data(path)
+    if not exists(path)
+        output("File not found: " + path)
+        return []
+
+    raw = read(path)
+    lines = split(raw, "\n")
+
+    data = []
+    for i in range(1, len(lines))
+        if len(lines[i]) > 0
+            push(data, lines[i])
+
+    return data
+
+function main()
+    output("=== Data Processing Pipeline ===")
+
+    write("sample.csv", "name,age,city,score\nAlice,30,NYC,95\nBob,25,LA,87")
+
+    data = load_data("sample.csv")
+    output("Loaded " + len(data) + " records")
+
+    output("\n=== Records ===")
+    for row in data
+        fields = split(row, ",")
+        output("Name: " + fields[0] + ", Age: " + fields[1])
+
+    output("\n=== Stats ===")
+    output("Count: " + len(data))
+
+main()

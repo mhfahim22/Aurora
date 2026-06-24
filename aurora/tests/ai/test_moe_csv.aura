@@ -1,0 +1,17 @@
+import MrCode
+
+output("start\n")
+m = model_create("sequential")
+output("created\n")
+l = moe(4, 8)
+output("moe created\n")
+add(m, l)
+output("moe added\n")
+l2 = dense(1, "sigmoid")
+output("dense created\n")
+add(m, l2)
+output("dense added\n")
+output("about to load csv\n")
+d = csv("test.csv")
+output("csv loaded\n")
+output(" === ALL PASSED ===\n")

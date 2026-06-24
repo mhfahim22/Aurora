@@ -1,0 +1,110 @@
+## OBJ Model Viewer Demo
+import "glfw"
+import "opengl"
+import "gl"
+import "glm"
+import "obj"
+
+vert_src = "#version 330 core\nlayout (location = 0) in vec3 aPos;\nlayout (location = 1) in vec3 aNormal;\nlayout (location = 2) in vec2 aTexCoord;\nout vec3 vNormal;\nuniform mat4 uMVP;\nuniform mat4 uModel;\nvoid main() {\n    gl_Position = uMVP * vec4(aPos, 1.0);\n    vNormal = mat3(uModel) * aNormal;\n}"
+
+frag_src = "#version 330 core\nin vec3 vNormal;\nout vec4 fragColor;\nuniform vec3 uLightDir;\nvoid main() {\n    vec3 n = normalize(vNormal);\n    float diff = max(dot(n, normalize(uLightDir)), 0.0);\n    float intensity = 0.3 + diff * 0.7;\n    fragColor = vec4(vec3(intensity), 1.0);\n}"
+
+glfwInit()
+glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
+glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+
+window = glfwCreateWindow(800, 600, "Aurora Model Viewer", null, null)
+if window == 0:
+    output("glfwCreateWindow failed")
+    glfwTerminate()
+else:
+    glfwMakeContextCurrent(window)
+    prog = gl_create_program(vert_src, frag_src)
+    if prog == 0:
+        output("Shader failed")
+        glfwDestroyWindow(window)
+        glfwTerminate()
+    else:
+        output("Prog: " + str(prog))
+
+        obj_data = obj_load("D:\\Downloads\\aurora_restructured\\examples\\3d\\cube_model.obj")
+        if obj_data == 0:
+            output("Failed to load OBJ file")
+            glDeleteProgram(prog)
+            glfwDestroyWindow(window)
+            glfwTerminate()
+        else:
+            vert_cnt = obj_vertex_count(obj_data)
+            vert_ptr = obj_vertex_data(obj_data)
+            vert_str = 32  ## 8 floats × 4 bytes = pos3 + nrm3 + tex2
+            output("Loaded " + str(vert_cnt) + " vertices")
+
+            vao = aurora_gl_gen_vertex_array()
+            glBindVertexArray(vao)
+            vbo = aurora_gl_gen_buffer()
+            glBindBuffer(GL_ARRAY_BUFFER, vbo)
+            glBufferData(GL_ARRAY_BUFFER, vert_cnt * vert_str, vert_ptr, GL_STATIC_DRAW)
+
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vert_str, 0)
+            glEnableVertexAttribArray(0)
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vert_str, 12)
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vert_str, 24)
+            glEnableVertexAttribArray(2)
+
+            obj_free(obj_data)
+
+            proj = mat4_new()
+            mat4_perspective(proj, 60.0, 800.0 / 600.0, 0.1, 100.0)
+            view = mat4_new()
+            mat4_lookat(view, 0.0, 0.0, 3.5, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+            model = mat4_new()
+            mvp = mat4_new()
+
+            glUseProgram(prog)
+            u_mvp   = glGetUniformLocation(prog, "uMVP")
+            u_model = glGetUniformLocation(prog, "uModel")
+            u_light = glGetUniformLocation(prog, "uLightDir")
+            glEnable(GL_DEPTH_TEST)
+            angle = 0.0
+
+            while glfwWindowShouldClose(window) == 0:
+                angle = angle + 0.6
+                if angle >= 360.0:
+                    angle = 0.0
+                end
+                if glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS:
+                    glfwSetWindowShouldClose(window, GLFW_TRUE)
+                end
+
+                mat4_identity(model)
+                mat4_rotate(model, angle, 0.0, 1.0, 0.0)
+
+                mat4_mul(mvp, view, model)
+                mat4_mul(mvp, proj, mvp)
+
+                glClearColor(0.05, 0.05, 0.1, 1.0)
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+                glUseProgram(prog)
+                glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp)
+                glUniformMatrix4fv(u_model, 1, GL_FALSE, model)
+                glUniform3f(u_light, 0.5, 0.8, 0.6)
+                glBindVertexArray(vao)
+                glDrawArrays(GL_TRIANGLES, 0, vert_cnt)
+
+                glfwSwapBuffers(window)
+                glfwPollEvents()
+            end
+
+            mat4_free(proj)
+            mat4_free(view)
+            mat4_free(model)
+            mat4_free(mvp)
+            glDeleteProgram(prog)
+            glfwDestroyWindow(window)
+            glfwTerminate()
+        end
+    end
+end

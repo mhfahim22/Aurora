@@ -1,0 +1,31 @@
+arr = [10, 20, 30, 40, 50]
+total = 0
+for x in arr
+    total = total + x
+outputf("Sum: %d\n", total)
+
+x = 10
+x += 5
+outputf("x += 5: %d\n", x)
+
+try
+    throw 42
+catch err
+    outputf("Caught: %d\n", err)
+
+nums = [5, 3, 1, 4, 2]
+sorted_arr = [0, 0, 0, 0, 0]
+for i in 5
+    sorted_arr[i] = nums[i]
+best = 0
+for x in sorted_arr
+    if x > best
+        best = x
+outputf("Best: %d\n", best)
+
+function stats(arr, n)
+    outputf("Sum: %d\n", sum(arr))
+    outputf("Min: %d\n", min(arr))
+
+arr2 = [100, 200, 300, 400, 500]
+stats(arr2, 5)

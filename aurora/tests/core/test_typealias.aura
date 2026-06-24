@@ -1,0 +1,11 @@
+# ── Type Alias ──
+type MyInt = int
+
+x = 42
+output(x)
+
+type MyFloat = float
+y = 3.14
+output(y)
+
+output(444)

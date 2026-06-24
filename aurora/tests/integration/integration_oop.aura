@@ -1,0 +1,90 @@
+# ════════════════════════════════════════════════════════════
+# Aurora Integration Test — OOP Features
+# Tests: class, method, new, inheritance, field access
+# ════════════════════════════════════════════════════════════
+
+# ── 1. Basic Class ──
+class Person
+    name = "unknown"
+    age = 0
+
+    function greet()
+        output("Hi, I am " + self.name)
+
+    function get_age()
+        return self.age
+
+p = Person("Alice", 30)
+p.greet()             # Hi, I am Alice
+output(p.get_age())   # 30
+
+# ── 2. Class with Methods ──
+class Counter
+    count = 0
+
+    function increment()
+        self.count = self.count + 1
+
+    function get_count()
+        return self.count
+
+c = Counter()
+c.increment()
+c.increment()
+c.increment()
+output(c.get_count())   # 3
+
+# ── 3. Inheritance ──
+class Animal
+    name = "unknown"
+
+    function speak()
+        output("...")
+
+class Dog extends Animal
+    breed = "unknown"
+
+    function bark()
+        output("Woof!")
+
+d = Dog("Rex", "Labrador")
+d.bark()              # Woof!
+d.speak()             # ...
+output(d.name)        # Rex
+
+# ── 4. Method Chaining Concept ──
+class Builder
+    value = 0
+
+    function add(x)
+        self.value = self.value + x
+        return self
+
+b = Builder()
+b.add(10)
+b.add(20)
+output(b.value)     # 30
+
+# ── 5. Field Access ──
+class Point
+    x = 0
+    y = 0
+
+pt = Point(5, 10)
+output(pt.x)        # 5
+output(pt.y)        # 10
+
+# ── 6. Field Assignment ──
+pt.x = 100
+pt.y = 200
+output(pt.x)        # 100
+output(pt.y)        # 200
+
+# ── 7. Array of Objects ──
+class Item
+    id = 0
+    name = "item"
+
+items = [Item(1, "apple"), Item(2, "banana"), Item(3, "cherry")]
+output(items[0].name)   # apple
+output(items[2].name)   # cherry

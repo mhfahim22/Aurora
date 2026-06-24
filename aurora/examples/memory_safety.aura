@@ -1,0 +1,24 @@
+# ── Memory Safety Examples ──
+
+# Stack allocation (default for scalars)
+x = 42
+
+# Arena allocation with @arena attribute
+@arena data = [1, 2, 3, 4, 5]
+
+# Reference counting with shared
+y = 100
+shared z = y
+
+# Explicit move
+source = [1, 2, 3]
+dest = move source
+
+# @performance mode for hot paths
+@performance function sum(n)
+    total = 0
+    for i in n
+        total = total + i
+    return total
+
+output(sum(100))

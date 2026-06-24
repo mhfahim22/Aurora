@@ -1,0 +1,15 @@
+## Mini FFI demo: Windows API via libc/ bindings
+##
+## Workflow:
+##   1. import kernel32 / user32 — ready-made bindings from libc/
+##   2. Use the functions directly (no C header needed)
+##   3. Build: aurorac demo\main.aura --emit-obj -l user32 -o demo\demo.exe
+
+import kernel32
+import user32
+
+function main():
+  start = GetTickCount()
+  ret = MessageBoxA(0, "Hello from Aurora and Win32!", "Aurora + Bindgen Demo", 0)
+  elapsed = GetTickCount() - start
+  outputf("MessageBox returned: %d\nElapsed: %dms\n", ret, elapsed)

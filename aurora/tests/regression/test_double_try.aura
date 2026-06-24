@@ -1,0 +1,30 @@
+lambda my_throw():
+    throw "test"
+end
+
+function try_call(fn)
+    did_throw = false
+    try:
+        fn()
+    catch e:
+        did_throw = true
+    end
+    if not did_throw
+        throw "not thrown"
+    end
+end
+
+function main()
+    output("before try_call")
+    did_catch = false
+    try:
+        try_call(my_throw)
+    catch e:
+        did_catch = true
+    end
+    if did_catch
+        output("caught in main")
+    else
+        output("NOT caught in main")
+    end
+end

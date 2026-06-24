@@ -1,0 +1,44 @@
+# Phase 8: RAII stress test (simplified — no annotation)
+
+function simple_chain(n)
+    if n <= 0
+        return 0
+    obj = [n, n+1]
+    return obj[0] + obj[1] + simple_chain(n - 1)
+
+function nested_scope(n)
+    total = 0
+    for i in n
+        a = [i]
+        for j in 2
+            b = [a[0], j]
+            a[0] = a[0] + b[1]
+        total = total + a[0]
+    return total
+
+function early_return(n)
+    if n <= 0
+        return 0
+    if n == 1
+        return 1
+    data = [n]
+    if data[0] % 2 == 0
+        return data[0] / 2
+    return data[0] * 3 + 1
+
+function bulk(n)
+    total = 0
+    arr = [0, 0, 0, 0, 0]
+    for i in n
+        arr[0] = arr[0] + 1
+        arr[1] = arr[1] + 2
+        arr[2] = arr[2] + 3
+        arr[3] = arr[3] + 4
+        arr[4] = arr[4] + 5
+    return arr[0] + arr[1] + arr[2] + arr[3] + arr[4]
+
+output(simple_chain(100))
+output(nested_scope(500))
+output(early_return(100))
+output(bulk(1000))
+output("RAII_OK")

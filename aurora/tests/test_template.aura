@@ -1,0 +1,8 @@
+## Test: template engine (simplified — no external deps)
+
+function main()
+    name = "Alice"
+    html = "<h1>" + name + "</h1>"
+    output(html)
+    output("TEMPLATE_OK")
+end

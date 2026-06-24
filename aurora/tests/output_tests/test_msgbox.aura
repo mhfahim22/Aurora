@@ -1,0 +1,3 @@
+function main():
+  output("msgbox test (non-interactive)")
+  return 0

@@ -1,0 +1,9 @@
+// NOTE: Near-duplicate of verify_encap_fail.aura; both test private field access
+class Person
+    public name = "unknown"
+    private age = 0
+
+p = Person("Alice", 30)
+output(p.name)
+output(p.age)
+output("DONE")

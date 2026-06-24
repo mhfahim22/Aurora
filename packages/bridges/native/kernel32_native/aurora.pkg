@@ -1,0 +1,5 @@
+name: kernel32-native
+version: latest
+entry: kernel32.au
+dependencies:
+  - system

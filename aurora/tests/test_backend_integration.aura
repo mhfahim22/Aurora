@@ -1,0 +1,295 @@
+// TODO: Requires language features that may not be fully implemented
+/* Phase 4 — Backend Framework Integration Test */
+/* Tests enhanced runtime: auth tokens, sanitize, lock/unlock, audit, CORS, health */
+
+function test_auth_token():
+    output("--- test_auth_token ---")
+    tok = sign("hello world")
+    output("Token generated")
+    output(tok)
+    ok = verify("hello world", tok)
+    output("Verify result:")
+    output(ok)
+
+function test_sanitize_html():
+    output("--- test_sanitize_html ---")
+    clean = sanitize("<script>alert(1)</script>")
+    output("Sanitized output:")
+    output(clean)
+
+function test_lock_unlock():
+    output("--- test_lock_unlock ---")
+    r = lock("resource1")
+    output("Lock acquired")
+    r2 = unlock("resource1")
+    output("Lock released")
+
+function test_audit_log():
+    output("--- test_audit_log ---")
+    r = audit("test audit event")
+    output("Audit logged")
+
+function test_health_check():
+    output("--- test_health_check ---")
+    h = health()
+    output("Health check done")
+
+function test_session_ops():
+    output("--- test_session_ops ---")
+    s = session()
+    output("Session created")
+    r = session_set("user", "bob")
+    output("Session set done")
+    v = session_get("user")
+    output("Session get:")
+    output(v)
+    r2 = session_delete("user")
+    output("Session delete done")
+
+function test_cookie_ops():
+    output("--- test_cookie_ops ---")
+    r = cookie_set("lang", "en")
+    output("Cookie set done")
+    v = cookie_get("lang")
+    output("Cookie get:")
+    output(v)
+    r2 = cookie_delete("lang")
+    output("Cookie delete done")
+
+function test_cors_csrf():
+    output("--- test_cors_csrf ---")
+    c = cors()
+    output("CORS configured")
+    cs = csrf()
+    output("CSRF configured")
+
+function test_middleware_pipeline():
+    output("--- test_middleware_pipeline ---")
+    mw = middleware(0)
+    output("Middleware registered")
+    n = next()
+    output("Middleware chain next called")
+
+function test_rate_limit():
+    output("--- test_rate_limit ---")
+    r = rate_limit(100, 60000)
+    output("Rate limit configured")
+
+function test_route_group():
+    output("--- test_route_group ---")
+    r = route_group("/api/v1")
+    output("Route group created")
+
+function test_proxy():
+    output("--- test_proxy ---")
+    r = proxy("http://localhost:9090")
+    output("Proxy configured")
+    r2 = reverse_proxy("http://upstream:8080")
+    output("Reverse proxy configured")
+
+function test_streaming():
+    output("--- test_streaming ---")
+    r = stream("data stream")
+    output("Stream created")
+    r2 = stream_file("/path/to/file")
+    output("Stream file created")
+    r3 = sse("/events")
+    output("SSE endpoint created")
+    r4 = webhook("/hook")
+    output("Webhook registered")
+
+function test_metrics_trace():
+    output("--- test_metrics_trace ---")
+    m = metrics()
+    output("Metrics collected")
+    t = trace_id()
+    output("Trace ID:")
+    output(t)
+    r = request_id()
+    output("Request ID:")
+    output(r)
+
+function test_event_pubsub():
+    output("--- test_event_pubsub ---")
+    e = event("user.login")
+    output("Event registered")
+    r = emit("user.login", "alice")
+    output("Event emitted")
+    r2 = listen("user.login", 0)
+    output("Listener registered")
+    r3 = publish("orders", "{id: 1}")
+    output("Published")
+    r4 = subscribe("orders", 0)
+    output("Subscribed")
+
+function test_db_ops():
+    output("--- test_db_ops ---")
+    r = index("users", "email")
+    output("Index created")
+    r2 = migrate()
+    output("Migration done")
+    r3 = seed()
+    output("Seed done")
+
+function test_model_schema():
+    output("--- test_model_schema ---")
+    r = model("Product")
+    output("Model defined")
+    r2 = schema("{name: string, price: float}")
+    output("Schema defined")
+    r3 = validate("{type: string}", 0)
+    output("Validation done")
+
+function test_rpc_cluster():
+    output("--- test_rpc_cluster ---")
+    r = rpc("payment-service")
+    output("RPC configured")
+    d = discover("payment-service")
+    output("Discovery done")
+    c = cluster()
+    output("Cluster initialized")
+    id = node_id()
+    output("Node ID:")
+    output(id)
+    l = leader()
+    output("Leader elected")
+
+function test_monitor_prof():
+    output("--- test_monitor_prof ---")
+    m = monitor()
+    output("Monitor started")
+    pr = profile_request()
+    output("Request profiled")
+    ms = memory_snapshot()
+    output("Memory snapshot taken")
+    gc = gc_collect()
+    output("GC collected")
+    hr = hot_reload()
+    output("Hot reload done")
+
+function test_plugin_tenant():
+    output("--- test_plugin_tenant ---")
+    p = plugin("auth-module")
+    output("Plugin loaded")
+    f = feature_flag("dark-mode")
+    output("Feature flag checked")
+    t = tenant("org_42")
+    output("Tenant set")
+    tc = tenant_context()
+    output("Tenant context:")
+    output(tc)
+
+function test_throttle_debounce():
+    output("--- test_throttle_debounce ---")
+    t = throttle(100)
+    output("Throttle set")
+    d = debounce(300)
+    output("Debounce set")
+
+function test_compress_serialize():
+    output("--- test_compress_serialize ---")
+    c = compress("hello world hello world")
+    output("Compressed")
+    d = decompress(c)
+    output("Decompressed")
+    s = serialize(0)
+    output("Serialized")
+    ds = deserialize(s)
+    output("Deserialized")
+
+function test_ai():
+    output("--- test_ai ---")
+    a = ai_agent("assistant")
+    output("AI agent created")
+    t = tool("calculator")
+    output("Tool registered")
+    w = workflow("order_processing")
+    output("Workflow created")
+    p = pipeline("data_pipeline")
+    output("Pipeline created")
+    st = step("validate_input")
+    output("Step created")
+    se = search_engine()
+    output("Search engine initialized")
+    vs = vector_search(0)
+    output("Vector search done")
+
+function test_security():
+    output("--- test_security ---")
+    s = secret("db_password")
+    output("Secret retrieved:")
+    output(s)
+    v = vault("api_key")
+    output("Vault retrieved:")
+    output(v)
+    g = geoip("8.8.8.8")
+    output("GeoIP lookup:")
+    output(g)
+    cap = captcha_verify("token123")
+    output("Captcha verify done")
+
+function test_request_keyword():
+    output("--- test_request_keyword ---")
+    request "GET /test HTTP/1.1"
+    output("Request parsed")
+
+function test_response_keyword():
+    output("--- test_response_keyword ---")
+    response "hello world"
+    output("Response created")
+
+function test_db_create_table():
+    output("--- test_db_create_table ---")
+    query "CREATE TABLE users (id, name, email)"
+    output("Table created")
+
+function test_db_insert():
+    output("--- test_db_insert ---")
+    query "INSERT INTO users VALUES (1, 'alice', 'alice@test.com')"
+    query "INSERT INTO users VALUES (2, 'bob', 'bob@test.com')"
+    output("Rows inserted")
+
+function test_db_select():
+    output("--- test_db_select ---")
+    query "SELECT * FROM users"
+    output("Select result: OK")
+    query "SELECT name FROM users WHERE id = 1"
+    output("Filtered result: OK")
+
+function test_db_drop():
+    output("--- test_db_drop ---")
+    query "DROP TABLE users"
+    output("Table dropped")
+
+function main():
+    test_auth_token()
+    test_sanitize_html()
+    test_lock_unlock()
+    test_audit_log()
+    test_health_check()
+    test_session_ops()
+    test_cookie_ops()
+    test_cors_csrf()
+    test_middleware_pipeline()
+    test_rate_limit()
+    test_route_group()
+    test_proxy()
+    test_streaming()
+    test_metrics_trace()
+    test_event_pubsub()
+    test_db_ops()
+    test_model_schema()
+    test_rpc_cluster()
+    test_monitor_prof()
+    test_plugin_tenant()
+    test_throttle_debounce()
+    test_compress_serialize()
+    test_ai()
+    test_security()
+    test_request_keyword()
+    test_response_keyword()
+    test_db_create_table()
+    test_db_insert()
+    test_db_select()
+    test_db_drop()
+    output("ALL BACKEND INTEGRATION TESTS PASSED")

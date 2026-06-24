@@ -1,0 +1,100 @@
+## 2D Sprite Rendering Module — GPU-accelerated sprite batcher
+## Usage: import "sprite2d"
+##
+## Provides texture management, batched sprite drawing, and
+## orthographic pixel-perfect rendering via OpenGL.
+##
+## Example:
+##   import "glfw"
+##   import "sprite2d"
+##   glfwInit()
+##   window = glfwCreateWindow(800, 600, "2D Game", null, null)
+##   glfwMakeContextCurrent(window)
+##   sprite2d_init(1024, 800, 600)
+##   tex = sprite2d_load("bird.png")
+##   while not glfwWindowShouldClose(window):
+##       sprite2d_draw(tex, 400, 300, 64, 64)
+##       sprite2d_flush()
+##       glfwSwapBuffers(window)
+##       glfwPollEvents()
+##   end
+##   sprite2d_shutdown()
+##   glfwDestroyWindow(window)
+##   glfwTerminate()
+
+extern function aurora_sprite2d_init(max_sprites: i32)
+extern function aurora_sprite2d_set_viewport(w: i32, h: i32)
+extern function aurora_sprite2d_load_texture(path: cstring) -> i32
+extern function aurora_sprite2d_create_texture(w: i32, h: i32, data: pointer) -> i32
+extern function aurora_sprite2d_draw(tex_id: i32, x: f32, y: f32, w: f32, h: f32, rot: f32, r: f32, g: f32, b: f32, a: f32, u: f32, v: f32, uw: f32, vh: f32)
+extern function aurora_sprite2d_flush()
+extern function aurora_sprite2d_clear()
+extern function aurora_sprite2d_delete_texture(id: i32)
+extern function aurora_sprite2d_shutdown()
+
+## Initialize the sprite batcher.
+## max_sprites: maximum sprites per batch (default 2048 if 0)
+## screen_w, screen_h: viewport dimensions (pixel-perfect ortho)
+function sprite2d_init(max_sprites, screen_w, screen_h):
+    aurora_sprite2d_init(max_sprites)
+    aurora_sprite2d_set_viewport(screen_w, screen_h)
+end
+
+## Resize viewport (call when window is resized)
+function sprite2d_resize(screen_w, screen_h):
+    aurora_sprite2d_set_viewport(screen_w, screen_h)
+end
+
+## Load a texture from file. Returns texture ID (0 = error).
+function sprite2d_load(path):
+    return aurora_sprite2d_load_texture(path)
+end
+
+## Create texture from raw RGBA pixel data.
+## data: pointer to 4-byte-per-pixel RGBA data (w * h * 4 bytes)
+function sprite2d_create_texture(w, h, data):
+    return aurora_sprite2d_create_texture(w, h, data)
+end
+
+## Draw a sprite (adds to batch). Must call sprite2d_flush() to render.
+## tex: texture ID from sprite2d_load() or sprite2d_create_texture()
+## x, y: center position
+## w, h: size in pixels
+## rot: rotation in radians (default 0)
+## r, g, b, a: color tint (default 1,1,1,1)
+## u, v, uw, vh: UV sub-rectangle (default 0,0,1,1 = full texture)
+function sprite2d_draw(tex, x, y, w, h):
+    aurora_sprite2d_draw(tex, x, y, w, h, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0)
+end
+
+function sprite2d_draw_color(tex, x, y, w, h, r, g, b, a):
+    aurora_sprite2d_draw(tex, x, y, w, h, 0.0, r, g, b, a, 0.0, 0.0, 1.0, 1.0)
+end
+
+function sprite2d_draw_rotated(tex, x, y, w, h, rot):
+    aurora_sprite2d_draw(tex, x, y, w, h, rot, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0)
+end
+
+function sprite2d_draw_sub(tex, x, y, w, h, u, v, uw, vh):
+    aurora_sprite2d_draw(tex, x, y, w, h, 0.0, 1.0, 1.0, 1.0, 1.0, u, v, uw, vh)
+end
+
+## Render all batched sprites to the screen.
+function sprite2d_flush():
+    aurora_sprite2d_flush()
+end
+
+## Clear the batch without rendering.
+function sprite2d_clear():
+    aurora_sprite2d_clear()
+end
+
+## Delete a texture and free GPU memory.
+function sprite2d_delete(tex):
+    aurora_sprite2d_delete_texture(tex)
+end
+
+## Shutdown sprite system and free all resources.
+function sprite2d_shutdown():
+    aurora_sprite2d_shutdown()
+end

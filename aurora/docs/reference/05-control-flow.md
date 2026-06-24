@@ -1,0 +1,235 @@
+# Control Flow
+
+All control flow constructs support **three block styles**: indented (no colon), colon + indented, and brace `{ }`.
+
+---
+
+## If / Elseif / Else
+
+### Multi-line (indented)
+```aura
+if condition
+    body()
+
+if condition:
+    body()                       # colon optional — same meaning
+
+if condition:
+    body()
+elseif other_condition:
+    other_body()
+else:
+    fallback()
+```
+
+### Brace blocks
+```aura
+if condition {
+    body()
+} elseif other_condition {
+    other_body()
+} else {
+    fallback()
+}
+```
+
+### Inline (single expression)
+```aura
+if n <= 1 return n               # inline after condition
+if n <= 1 { return n }           # brace block inline
+```
+
+### Guard Pattern
+```aura
+function process(x)
+    if x < 0 return -1           # early return, no else needed
+    return x * 2
+```
+
+### Conditions use logical operators
+```aura
+if x > 0 and x < 10              # keyword
+if x > 0 && x < 10              # symbolic
+if not flag                      # keyword NOT
+if !flag                         # symbolic NOT
+if x > 0 or cleanup()            # short-circuit OR
+if 0 < x < 10                    # chained comparison
+```
+
+---
+
+## While
+
+```aura
+while condition
+    body()
+
+while condition:
+    body()                       # colon optional
+
+while condition {                # brace block
+    body()
+}
+
+# Common pattern: read until empty
+while (line = read_line())
+    output(line)
+
+while line = read_line():
+    output(line)                 # colon with assignment
+```
+
+---
+
+## For
+
+```aura
+# Count form: iterate 0..n-1
+for i in 5
+    output(i)                    # 0, 1, 2, 3, 4
+
+# Explicit range (exclusive)
+for i in 0..10
+    output(i)
+
+# Inclusive range
+for i in 0..=10
+    output(i)
+
+# Comma range
+for i in 0, 5
+    output(i)
+
+# Array iteration
+for item in array
+    output(item)
+
+# All forms support colon
+for i in 5:
+    output(i)
+
+# All forms support brace block
+for i in 3 {
+    output(i)
+}
+```
+
+---
+
+## Loop (infinite)
+
+```aura
+loop
+    body()
+
+loop:                           # colon optional
+    body()
+
+loop {                          # brace block
+    body()
+}
+
+# Typical use: event loop
+loop
+    event = poll_event()
+    if event == EVENT_QUIT
+        break
+    handle_event(event)
+```
+
+---
+
+## Repeat / Until
+
+```aura
+repeat
+    body()
+until condition
+
+repeat:                         # colon optional
+    body()
+until condition
+
+# Practical: input validation
+repeat
+    value = ask("Enter a number: ")
+    n = int(value)
+until n > 0
+```
+
+---
+
+## Break / Continue / Skip
+
+```aura
+for i in 100
+    if i == 5
+        break                    # exit loop entirely
+    if i % 2 == 0
+        continue                 # skip to next iteration
+    skip                         # alias for continue
+    output(i)                    # only odd numbers < 5
+```
+
+---
+
+## Match / Switch
+
+`match` and `switch` are exact aliases.
+
+```aura
+match value
+    case 1
+        output("one")
+    case 2, 3
+        output("two or three")
+    case _
+        output("other")          # wildcard (catch-all)
+
+# With colons
+match value:
+    case 1:
+        output("one")
+    default:
+        output("other")
+
+# Brace blocks
+match value {
+    case 1 {
+        output("one")
+    }
+    default {
+        output("other")
+    }
+}
+
+# Arrow syntax (concise one-liners)
+match x
+    0 -> output("zero")
+    1 -> output("one")
+    _ -> output("other")
+
+# Switch alias (exact same as match)
+switch x
+    case 1:
+        output("one")
+    case 2:
+        output("two")
+```
+
+### Pattern Types
+
+```aura
+match value
+    case 42                      # literal match
+    case x                       # variable binding (captures value)
+    case _                       # wildcard (ignore)
+    case [a, b, c]               # array destructuring
+    case Point(0, 0)             # struct/constructor pattern
+    case 1, 2, 3                 # multiple values (OR pattern)
+    default                      # fallback (same as case _)
+```
+
+---
+
+**Next:** [Functions](06-functions.md)

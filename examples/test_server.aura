@@ -1,0 +1,5 @@
+outputln("Starting server test...")
+server app
+    route "GET" "/"
+        outputln("Hello from route!")
+outputln("Server registered.")

@@ -1,0 +1,10 @@
+import MrCode
+
+output("GPU INFO")
+output("gpu return code (0=none, 1=NVIDIA, 2=AMD)")
+output(gpu())
+output("gpu_mem (MB)")
+output(gpu_mem())
+output("device")
+output(device())
+output("GPU INFO DONE")

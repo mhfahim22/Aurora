@@ -1,0 +1,36 @@
+# Phase 8: Arena stress test (simplified — no annotation)
+
+function arena_churn(n)
+    total = 0
+    for i in n
+        data = [i, i*2, i*3]
+        total = total + data[0] + data[1] + data[2]
+    return total
+
+function arena_nested(n)
+    total = 0
+    for i in n
+        for j in 5
+            data = [i, j]
+            total = total + data[0] + data[1]
+    return total
+
+function arena_mixed_types(n)
+    total = 0
+    for i in n
+        a = [i, i+1]
+        c = i * 2
+        total = total + a[0] + c
+    return total
+
+function arena_deep_chain(n)
+    if n <= 0
+        return 0
+    data = [n, n-1]
+    return data[0] + data[1] + arena_deep_chain(n - 1)
+
+output(arena_churn(1000))
+output(arena_nested(500))
+output(arena_mixed_types(500))
+output(arena_deep_chain(100))
+output("ARENA_OK")

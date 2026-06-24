@@ -1,0 +1,71 @@
+{
+  "name": "aurora-language",
+  "displayName": "Aurora Language",
+  "description": "Aurora language support — syntax highlighting, LSP, semantic tokens, formatting, and more",
+  "version": "2.0.0",
+  "publisher": "aurora-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mhfahim22/Aurora.git"
+  },
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Themes",
+    "Language Packs",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:aurora",
+    "onCommand:aurora.installFont"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aurora.installFont",
+        "title": "Aurora: Install JetBrains Mono Font"
+      }
+    ],
+    "languages": [
+      {
+        "id": "aurora",
+        "aliases": ["Aurora", "aurora"],
+        "extensions": [".aura"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "aurora",
+        "scopeName": "source.aurora",
+        "path": "./syntaxes/aurora.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Aurora Twilight",
+        "uiTheme": "vs-dark",
+        "path": "./themes/aurora-color-theme.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Aurora",
+      "properties": {
+        "aurora.lsp.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the aurora_lsp executable. Leave empty to auto-detect."
+        },
+        "aurora.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Aurora Language Server for diagnostics, completions, and more."
+        }
+      }
+    }
+  }
+}

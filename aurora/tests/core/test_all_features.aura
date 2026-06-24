@@ -1,0 +1,265 @@
+# ════════════════════════════════════════════════════════════════
+# Aurora Universal Memory Safety — Comprehensive Test File
+# ════════════════════════════════════════════════════════════════
+# Tests: @performance, @stack, @arena, @raii, @arc, @gc
+# ════════════════════════════════════════════════════════════════
+
+# ── Test 1: @performance mode (GC disabled) ──
+@performance
+function physics():
+    x = 10
+    y = 20
+    z = x + y
+    output(z)
+
+# ── Test 2: @performance with function call ──
+@performance
+function renderer():
+    width = 1920
+    height = 1080
+    pixels = width * height
+    output(pixels)
+
+# ── Test 3: @stack forced allocation ──
+function test_stack():
+    @stack a = 100
+    @stack b = 200
+    result = a + b
+    output(result)
+
+# ── Test 4: @arena forced allocation ──
+function test_arena():
+    @arena x = 50
+    @arena y = 75
+    result = x + y
+    output(result)
+
+# ── Test 5: @raii forced allocation ──
+function test_raii():
+    @raii data = 42
+    output(data)
+
+# ── Test 6: @arc forced allocation ──
+function test_arc():
+    @arc shared_data = 99
+    output(shared_data)
+
+# ── Test 7: Mixed allocation strategies ──
+function test_mixed():
+    @stack local_val = 10
+    @arena bulk_val = 20
+    @raii owned_val = 30
+    @arc shared_val = 40
+    total = local_val + bulk_val + owned_val + shared_val
+    output(total)
+
+# ── Test 8: Control flow with allocations ──
+function test_control_flow():
+    @stack counter = 0
+    for i in 5:
+        counter = counter + 1
+    output(counter)
+
+    @stack flag = 1
+    if flag == 1:
+        output("yes")
+    else:
+        output("no")
+
+# ── Test 9: Multiple @performance functions ──
+@performance
+function game_update():
+    dt = 16
+    velocity = 60
+    position = velocity * dt
+    output(position)
+
+@performance
+function physics_step():
+    mass = 10
+    force = 100
+    acceleration = force / mass
+    output(acceleration)
+
+# ── Test 11: @performance with loop ──
+@performance
+function particle_system():
+    count = 100
+    for i in count:
+        x = i * 2
+    output(count)
+
+# ── Test 12: @stack with conditionals ──
+function test_stack_conditional():
+    @stack mode = 1
+    if mode == 1:
+        @stack result = 100
+        output(result)
+    else:
+        @stack result = 200
+        output(result)
+
+# ── Test 13: @arena with loops ──
+function test_arena_loop():
+    @arena total = 0
+    for i in 10:
+        total = total + i
+    output(total)
+
+# ── Test 14: @raii with function calls ──
+function process():
+    @raii data = 55
+    return data
+
+function test_raii_call():
+    val = process()
+    output(val)
+
+# ── Test 15: Combined @performance and allocation attrs ──
+@performance
+function optimized_render():
+    @stack screen_width = 800
+    @stack screen_height = 600
+    @arena texture_cache = 0
+    pixels = screen_width * screen_height
+    output(pixels)
+
+# ════════════════════════════════════════════════════════════════
+#  Normal Priority Flow Tests
+#  ──────────────────────────────────────────────────────────────
+#  Compiler auto-decides: Stack → Arena → RAII → ARC → GC
+#  No forced attributes — relies on analysis engine
+# ════════════════════════════════════════════════════════════════
+
+# ── Test N1: Auto Stack (small local, no escape, single owner) ──
+function auto_stack():
+    x = 1
+    y = 2
+    z = x + y
+    output(z)
+
+# ── Test N2: Auto Arena (bulk-like, same function scope) ──
+function auto_arena():
+    buf1 = 100
+    buf2 = 200
+    buf3 = 300
+    total = buf1 + buf2 + buf3
+    output(total)
+
+# ── Test N3: Auto RAII (single owner, scoped lifetime) ──
+function helper_raii():
+    val = 77
+    return val
+
+function auto_raii():
+    result = helper_raii()
+    output(result)
+
+# ── Test N4: Auto ARC (shared ownership via copy) ──
+function auto_arc():
+    original = 500
+    shared1 = original
+    shared2 = original
+    total = shared1 + shared2
+    output(total)
+
+# ── Test N5: Full priority chain in one function ──
+function priority_chain():
+    s = 1
+    a = 10
+    r = 20
+    arc1 = 100
+    arc2 = arc1
+    total = s + a + r + arc1 + arc2
+    output(total)
+
+# ── Test N6: @gc forced allocation ──
+function test_gc():
+    @gc data = 999
+    output(data)
+
+# ════════════════════════════════════════════════════════════════
+# Auto GC Test
+# ──────────────────────────────────────────────────────────────
+# Multiple shared refs (ref_count > 2) → engine detects cycle
+# risk → auto-chooses GC strategy in normal mode.
+# ════════════════════════════════════════════════════════════════
+
+# ── Test N7: Auto GC (multiple shared refs → cycle risk) ──
+function auto_gc():
+    root = 777
+    shared a = root
+    shared b = root
+    shared c = root
+    total = a + b + c
+    output(total)
+
+# ── Main entry point ──
+function main():
+    output("=== Aurora Memory Safety Tests ===")
+
+    output("--- Test 1: @performance physics ---")
+    physics()
+
+    output("--- Test 2: @performance renderer ---")
+    renderer()
+
+    output("--- Test 3: @stack allocation ---")
+    test_stack()
+
+    output("--- Test 4: @arena allocation ---")
+    test_arena()
+
+    output("--- Test 5: @raii allocation ---")
+    test_raii()
+
+    output("--- Test 6: @arc allocation ---")
+    test_arc()
+
+    output("--- Test 7: Mixed allocations ---")
+    test_mixed()
+
+    output("--- Test 8: Control flow ---")
+    test_control_flow()
+
+    output("--- Test 9: Multiple @performance ---")
+    game_update()
+    physics_step()
+
+    output("--- Test 10: @performance with loop ---")
+    particle_system()
+
+    output("--- Test 11: @stack conditional ---")
+    test_stack_conditional()
+
+    output("--- Test 12: @arena loop ---")
+    test_arena_loop()
+
+    output("--- Test 13: @raii call ---")
+    test_raii_call()
+
+    output("--- Test 14: Combined optimization ---")
+    optimized_render()
+
+    output("--- Test N1: Auto Stack (no attr) ---")
+    auto_stack()
+
+    output("--- Test N2: Auto Arena (no attr) ---")
+    auto_arena()
+
+    output("--- Test N3: Auto RAII (no attr) ---")
+    auto_raii()
+
+    output("--- Test N4: Auto ARC (shared copy) ---")
+    auto_arc()
+
+    output("--- Test N5: Priority chain ---")
+    priority_chain()
+
+    output("--- Test N6: @gc forced ---")
+    test_gc()
+
+    output("--- Test N7: Auto GC (3x shared refs) ---")
+    auto_gc()
+
+    output("=== All Tests Complete ===")

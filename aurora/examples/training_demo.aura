@@ -1,0 +1,8 @@
+# ── Aurora ML Training Demo ──
+# Shows: model creation, metrics, and predict API
+
+output("=== Aurora ML Training Demo ===")
+
+m = model_create("dense")
+output("Model created:")
+output("Done")

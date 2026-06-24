@@ -1,0 +1,13 @@
+[package]
+name = "chrono_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = "1"
+serde_json = "1"
+futures = "0.3"
+chrono = { version = "0.4.45", features = ["__internal_bench", "alloc", "clock", "core-error", "defmt", "now", "rkyv", "rkyv-16", "rkyv-32", "rkyv-64", "rkyv-validation", "std", "unstable-locales", "wasmbind"] }

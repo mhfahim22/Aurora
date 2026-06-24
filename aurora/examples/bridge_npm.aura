@@ -1,0 +1,42 @@
+import "stdio"
+
+extern function moment_require() -> pointer
+extern function moment_str(s: cstring) -> pointer
+extern function moment_int(n: i64) -> pointer
+extern function moment_float(f: f64) -> pointer
+extern function moment_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+extern function moment_getattr(mod: pointer, name: cstring) -> pointer
+extern function moment_to_cstr(v: pointer) -> cstring
+extern function moment_free(v: pointer) -> void
+
+function main():
+    printf("=== npm Bridge Demo ===\n\n")
+
+    printf("--- 1. moment.require() ---\n")
+    mod = moment_require()
+    if mod == 0:
+        printf("FAILED: moment_require()\n")
+        printf("Run: voss bridge npm moment\n")
+        return 1
+    printf("OK: moment module loaded\n")
+
+    printf("--- 2. Value helpers ---\n")
+    vs = moment_str("hello world")
+    vi = moment_int(42)
+    vf = moment_float(3.14)
+    printf("str=%s int=%s float=%s\n", moment_to_cstr(vs), moment_to_cstr(vi), moment_to_cstr(vf))
+    moment_free(vs)
+    moment_free(vi)
+    moment_free(vf)
+
+    printf("--- 3. moment.version ---\n")
+    ver = moment_getattr(mod, "version")
+    if ver != 0:
+        printf("moment version: %s\n", moment_to_cstr(ver))
+        moment_free(ver)
+
+    moment_free(mod)
+    printf("\n=== npm Bridge Demo Complete ===\n")
+    return 0
+
+main()

@@ -1,0 +1,33 @@
+import MrCode
+
+output("MHA forward only test\n")
+
+m = model_create("sequential")
+add(m, dense(4, "relu"))
+add(m, mha(4))
+add(m, dense(1, "linear"))
+set_loss(m, "mse")
+set_optimizer(m, "adam")
+set_lr(m, 0.001)
+set_epochs(m, 1)
+
+data = csv("test_data.csv")
+output("data ok\n")
+
+## Test forward (inference mode)
+pred = predict(m, data)
+output("predict ok, ptr=" + str(pred) + "\n")
+
+## Test training with a tiny model
+output("\n--- 1 batch test ---\n")
+m2 = model_create("sequential")
+add(m2, dense(4, "relu"))
+add(m2, mha(4))
+add(m2, dense(1, "linear"))
+set_loss(m2, "mse")
+set_optimizer(m2, "adam")
+set_lr(m2, 0.001)
+set_batch_size(m2, 32)
+set_epochs(m2, 1)
+r = train(m2, data)
+output("train result: " + str(r) + "\n")

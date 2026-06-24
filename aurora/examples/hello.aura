@@ -1,0 +1,10 @@
+# ── Hello, Aurora! ──
+output("Hello, Aurora!")
+
+# ── Variables ──
+name = "World"
+count = 42
+pi = 3.14
+output("Hello, " + name)
+output(count)
+output(pi)

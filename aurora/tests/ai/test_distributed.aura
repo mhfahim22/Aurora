@@ -1,0 +1,39 @@
+import MrCode
+
+output("=== Phase 3: Distributed Training Test ===\n")
+
+## Test basic distributed API
+output("distributed_init: " + str(distributed_init()))
+output("distributed_rank: " + str(distributed_rank()))
+output("distributed_size: " + str(distributed_size()))
+
+## Build a simple model
+m = model_create("sequential")
+add(m, dense(8, "relu"))
+add(m, dense(4, "relu"))
+add(m, dense(1, "sigmoid"))
+set_loss(m, "binary_crossentropy")
+set_optimizer(m, "adam")
+set_lr(m, 0.01)
+set_batch_size(m, 4)
+set_epochs(m, 2)
+set_validation_split(m, 0.0)
+set_verbose(m, 1)
+
+## Load data
+d = csv("test.csv")
+output("data loaded")
+
+## Train (gradient sync is no-op in single-process mode)
+train(m, d)
+output("training complete")
+
+## Test distributed barrier
+distributed_barrier()
+output("barrier passed")
+
+## Test broadcast model
+distributed_broadcast_model(m, 0)
+output("model broadcast complete")
+
+output("=== PHASE 3 DONE ===\n")

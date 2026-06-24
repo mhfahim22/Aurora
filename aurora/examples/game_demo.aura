@@ -1,0 +1,15 @@
+# Game Demo - Simple Example
+# Demonstrates basic game loop pattern
+
+function step(dt)
+    output("Step: dt=" + dt)
+
+function draw_frame()
+    output("Rendering frame")
+
+output("=== Game Loop ===")
+for i in 3
+    step(i * 16)
+    draw_frame()
+    sleep(100)
+output("Game demo complete")

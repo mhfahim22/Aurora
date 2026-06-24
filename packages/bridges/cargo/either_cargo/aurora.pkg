@@ -1,0 +1,6 @@
+name: either-cargo
+version: 1.16.0
+description: "cargo bridge: The enum `Either` with variants `Left` and `Right` is a general purpose sum type with two cases.\n"
+entry: either.au
+dependencies:
+  - rust-std

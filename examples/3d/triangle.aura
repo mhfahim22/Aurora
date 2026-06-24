@@ -1,0 +1,35 @@
+## OpenGL/GLFW Demo: Colored Triangle (compat mode)
+## Requires: glfw3.dll in PATH or project directory
+
+import "glfw"
+import "opengl"
+import "gl"
+import "glm"
+
+glfwInit()
+glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0)
+glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE)
+
+window = glfwCreateWindow(800, 600, "Aurora 3D Triangle", null, null)
+if window == null:
+    output("ERROR: glfwCreateWindow failed")
+    glfwTerminate()
+    return
+end
+
+glfwMakeContextCurrent(window)
+glfwSwapInterval(1)
+
+while glfwWindowShouldClose(window) == 0:
+    glClear(GL_COLOR_BUFFER_BIT)
+    gl_draw_colored_triangle()
+    glfwSwapBuffers(window)
+    glfwPollEvents()
+    if glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS:
+        glfwSetWindowShouldClose(window, GLFW_TRUE)
+    end
+end
+
+glfwDestroyWindow(window)
+glfwTerminate()

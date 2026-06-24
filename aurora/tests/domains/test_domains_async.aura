@@ -1,0 +1,61 @@
+# Test: Domain-specific — Async, Parallel, Signals, Lambdas
+# Covers: async, spawn, wait, parallel, thread, signal, emit,
+#         callback, event, lambda, yield, sleep, time, random
+
+function run_async_tests()
+    output("--- Async / Parallel Tests ---")
+
+    signal on_update
+    output("signal declared")
+
+    emit on_update(1)
+    output("signal emitted")
+
+    lambda(x):
+        output("lambda executed")
+    output("lambda created")
+
+    async:
+        output("async block")
+    output("async block done")
+
+    async function do_work(x, y):
+        output("async function")
+    output("async function defined")
+
+    async:
+        output("spawned block")
+    output("spawn test done")
+
+    wait 0
+    output("waited")
+
+    parallel:
+        output("parallel block")
+    output("parallel done")
+
+    thread
+    output("thread launched")
+
+    callback on_start():
+        output("callback")
+    output("callback registered")
+
+    event on_click:
+        output("event fired")
+    output("event handled")
+
+    yield 0
+    output("yielded")
+
+    sleep 10
+    output("slept")
+
+    time
+    output("time recorded")
+
+    random
+    output("random generated")
+
+run_async_tests()
+output("async tests passed")

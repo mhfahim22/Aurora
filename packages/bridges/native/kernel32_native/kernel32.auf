@@ -1,0 +1,3370 @@
+/* ════════════════════════════════════════════════════════════
+   Native DLL Bridge — Auto-generated Aurora FFI Bindings
+   Library: kernel32.dll
+   Path: C:\WINDOWS\system32\kernel32.dll
+   ════════════════════════════════════════════════════════════ */
+
+/* 1693 exported functions */
+
+@cost(zero)
+extern "native_kernel32" function AcquireSRWLockExclusive() -> pointer
+@cost(zero)
+extern "native_kernel32" function AcquireSRWLockShared() -> pointer
+@cost(zero)
+extern "native_kernel32" function ActivateActCtx() -> pointer
+@cost(zero)
+extern "native_kernel32" function ActivateActCtxWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function ActivatePackageVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddAtomA() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddAtomW() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddConsoleAliasA() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddConsoleAliasW() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddDllDirectory() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddIntegrityLabelToBoundaryDescriptor() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddLocalAlternateComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddLocalAlternateComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddRefActCtx() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddRefActCtxWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddResourceAttributeAce() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddSIDToBoundaryDescriptor() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddScopedPolicyIDAce() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddSecureMemoryCacheCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddVectoredContinueHandler() -> pointer
+@cost(zero)
+extern "native_kernel32" function AddVectoredExceptionHandler() -> pointer
+@cost(zero)
+extern "native_kernel32" function AdjustCalendarDate() -> pointer
+@cost(zero)
+extern "native_kernel32" function AllocConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function AllocConsoleWithOptions() -> pointer
+@cost(zero)
+extern "native_kernel32" function AllocateUserPhysicalPages() -> pointer
+@cost(zero)
+extern "native_kernel32" function AllocateUserPhysicalPagesNuma() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetClrCompat() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetCreateFileAccess() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetLifecycleManagement() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetMediaFoundationCodecLoading() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetProcessTerminationMethod() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetShowDeveloperDiagnostic() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetThreadInitializationType() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppPolicyGetWindowingModel() -> pointer
+@cost(zero)
+extern "native_kernel32" function AppXGetOSMaxVersionTested() -> pointer
+@cost(zero)
+extern "native_kernel32" function ApplicationRecoveryFinished() -> pointer
+@cost(zero)
+extern "native_kernel32" function ApplicationRecoveryInProgress() -> pointer
+@cost(zero)
+extern "native_kernel32" function AreFileApisANSI() -> pointer
+@cost(zero)
+extern "native_kernel32" function AreShortNamesEnabled() -> pointer
+@cost(zero)
+extern "native_kernel32" function AssignProcessToJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function AttachConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function BackupRead() -> pointer
+@cost(zero)
+extern "native_kernel32" function BackupReadEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function BackupSeek() -> pointer
+@cost(zero)
+extern "native_kernel32" function BackupWrite() -> pointer
+@cost(zero)
+extern "native_kernel32" function BackupWriteEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCheckAppcompatCache() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCheckAppcompatCacheEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCheckAppcompatCacheExWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCheckAppcompatCacheWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCheckElevation() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCleanupAppcompatCacheSupport() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseCleanupAppcompatCacheSupportWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseDestroyVDMEnvironment() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseDllReadWriteIniFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseDumpAppcompatCache() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseDumpAppcompatCacheWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseElevationPostProcessing() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseFlushAppcompatCache() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseFlushAppcompatCacheWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseFormatObjectAttributes() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseFormatTimeOut() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseFreeAppCompatDataForProcessWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseGenerateAppCompatData() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseGetNamedObjectDirectory() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseInitAppcompatCacheSupport() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseInitAppcompatCacheSupportWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseIsAppcompatInfrastructureDisabled() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseIsAppcompatInfrastructureDisabledWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseIsDosApplication() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseMarkProcessTokenForInstallers() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseQueryModuleData() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseReadAppCompatDataForProcessWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseSetLastNTError() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseThreadInitThunk() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseUpdateAppcompatCache() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseUpdateAppcompatCacheWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseUpdateVDMEntry() -> pointer
+@cost(zero)
+extern "native_kernel32" function BaseWriteErrorElevationRequiredEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function Basep8BitStringToDynamicUnicodeString() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepAllocateActivationContextActivationBlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepAnsiStringToDynamicUnicodeString() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepAppContainerEnvironmentExtension() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepAppXExtension() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepCheckAppCompat() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepCheckPplSupport() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepCheckWebBladeHashes() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepCheckWinSaferRestrictions() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepConstructSxsCreateProcessMessage() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepCopyEncryption() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepFinishPackageActivation() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepFinishPackageActivationForSxS() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepFreeActivationContextActivationBlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepFreeActivationTokenInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepFreeAppCompatData() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetAppCompatData() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetComputerNameFromNtPath() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetExeArchType() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetPackageActivationTokenForFilePath() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetPackageActivationTokenForFilePath2() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetPackageActivationTokenForSxS() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetPackageActivationTokenForSxS2() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetPackageActivationTokenForSxS3() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepGetPackagedAppInfoForFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepInitAppCompatData() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepIsProcessAllowed() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepMapModuleHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepNotifyLoadStringResource() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepPostSuccessAppXExtension() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepProcessInvalidImage() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepQueryAppCompat() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepQueryModuleChpeSettings() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepReleaseAppXContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepReleasePackagedAppInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepReleaseSxsCreateProcessUtilityStruct() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepReportFault() -> pointer
+@cost(zero)
+extern "native_kernel32" function BasepSetFileEncryptionCompression() -> pointer
+@cost(zero)
+extern "native_kernel32" function Beep() -> pointer
+@cost(zero)
+extern "native_kernel32" function BeginUpdateResourceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function BeginUpdateResourceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function BindIoCompletionCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildCommDCBA() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildCommDCBAndTimeoutsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildCommDCBAndTimeoutsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildCommDCBW() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingCancelRequest() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingFlushFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingReadFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingReadFileScatter() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingRegisterBuffers() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingRegisterFileHandles() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingWriteFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function BuildIoRingWriteFileGather() -> pointer
+@cost(zero)
+extern "native_kernel32" function CallNamedPipeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CallNamedPipeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CallbackMayRunLong() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelDeviceWakeupRequest() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelIo() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelIoEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelSynchronousIo() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelThreadpoolIo() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelTimerQueueTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CancelWaitableTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CeipIsOptedIn() -> pointer
+@cost(zero)
+extern "native_kernel32" function ChangeTimerQueueTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckAllowDecryptedRemoteDestinationPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckElevation() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckElevationEnabled() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckForReadOnlyResource() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckForReadOnlyResourceFilter() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckNameLegalDOS8Dot3A() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckNameLegalDOS8Dot3W() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckRemoteDebuggerPresent() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckTokenCapability() -> pointer
+@cost(zero)
+extern "native_kernel32" function CheckTokenMembershipEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function ClearCommBreak() -> pointer
+@cost(zero)
+extern "native_kernel32" function ClearCommError() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseConsoleHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseIoRing() -> pointer
+@cost(zero)
+extern "native_kernel32" function ClosePackageInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function ClosePrivateNamespace() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseProfileUserMapping() -> pointer
+@cost(zero)
+extern "native_kernel32" function ClosePseudoConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseState() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpool() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpoolCleanupGroup() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpoolCleanupGroupMembers() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpoolIo() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpoolTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpoolWait() -> pointer
+@cost(zero)
+extern "native_kernel32" function CloseThreadpoolWork() -> pointer
+@cost(zero)
+extern "native_kernel32" function CmdBatNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function CommConfigDialogA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CommConfigDialogW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CompareCalendarDates() -> pointer
+@cost(zero)
+extern "native_kernel32" function CompareFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function CompareStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CompareStringEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function CompareStringOrdinal() -> pointer
+@cost(zero)
+extern "native_kernel32" function CompareStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConnectNamedPipe() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConsoleMenuControl() -> pointer
+@cost(zero)
+extern "native_kernel32" function ContinueDebugEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertCalDateTimeToSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertDefaultLocale() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertFiberToThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertNLSDayOfWeekToWin32DayOfWeek() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertSystemTimeToCalDateTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertThreadToFiber() -> pointer
+@cost(zero)
+extern "native_kernel32" function ConvertThreadToFiberEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFile2() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFileExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFileExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFileTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFileTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CopyLZFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateActCtxA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateActCtxW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateActCtxWWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateBoundaryDescriptorA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateBoundaryDescriptorW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateConsoleScreenBuffer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectory2A() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectory2W() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectoryExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectoryExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectoryTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectoryTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateEnclave() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateEventA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateEventExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateEventExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateEventW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFiber() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFiberEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFile2() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFile3() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileMappingA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileMappingFromApp() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileMappingNumaA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileMappingNumaW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileMappingW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateHardLinkA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateHardLinkTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateHardLinkTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateHardLinkW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateIoCompletionPort() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateIoRing() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateJobObjectA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateJobObjectW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateJobSet() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMailslotA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMailslotW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMemoryResourceNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMutexA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMutexExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMutexExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateMutexW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateNamedPipeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateNamedPipeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreatePackageVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreatePipe() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreatePrivateNamespaceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreatePrivateNamespaceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateProcessA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateProcessAsUserA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateProcessAsUserW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateProcessInternalA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateProcessInternalW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateProcessW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreatePseudoConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateRemoteThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateRemoteThreadEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSemaphoreA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSemaphoreExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSemaphoreExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSemaphoreW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSymbolicLinkA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSymbolicLinkTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSymbolicLinkTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateSymbolicLinkW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateTapePartition() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThreadpool() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThreadpoolCleanupGroup() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThreadpoolIo() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThreadpoolTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThreadpoolWait() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateThreadpoolWork() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateTimerQueue() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateTimerQueueTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateToolhelp32Snapshot() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateUmsCompletionList() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateUmsThreadContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateWaitableTimerA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateWaitableTimerExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateWaitableTimerExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CreateWaitableTimerW() -> pointer
+@cost(zero)
+extern "native_kernel32" function CtrlRoutine() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeactivateActCtx() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeactivateActCtxWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeactivatePackageVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function DebugActiveProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function DebugActiveProcessStop() -> pointer
+@cost(zero)
+extern "native_kernel32" function DebugBreak() -> pointer
+@cost(zero)
+extern "native_kernel32" function DebugBreakProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function DebugSetProcessKillOnExit() -> pointer
+@cost(zero)
+extern "native_kernel32" function DecodePointer() -> pointer
+@cost(zero)
+extern "native_kernel32" function DecodeSystemPointer() -> pointer
+@cost(zero)
+extern "native_kernel32" function DefineDosDeviceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function DefineDosDeviceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DelayLoadFailureHook() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteAtom() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteBoundaryDescriptor() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteCriticalSection() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFiber() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFile2A() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFile2W() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFileTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFileTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteProcThreadAttributeList() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteSynchronizationBarrier() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteTimerQueue() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteTimerQueueEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteTimerQueueTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteUmsCompletionList() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteUmsThreadContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteVolumeMountPointA() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeleteVolumeMountPointW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DequeueUmsCompletionListItems() -> pointer
+@cost(zero)
+extern "native_kernel32" function DeviceIoControl() -> pointer
+@cost(zero)
+extern "native_kernel32" function DisableThreadLibraryCalls() -> pointer
+@cost(zero)
+extern "native_kernel32" function DisableThreadProfiling() -> pointer
+@cost(zero)
+extern "native_kernel32" function DisassociateCurrentThreadFromCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function DiscardVirtualMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function DisconnectNamedPipe() -> pointer
+@cost(zero)
+extern "native_kernel32" function DnsHostnameToComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function DnsHostnameToComputerNameExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DnsHostnameToComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DosDateTimeToFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function DosPathToSessionPathA() -> pointer
+@cost(zero)
+extern "native_kernel32" function DosPathToSessionPathW() -> pointer
+@cost(zero)
+extern "native_kernel32" function DuplicateConsoleHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function DuplicateEncryptionInfoFileExt() -> pointer
+@cost(zero)
+extern "native_kernel32" function DuplicateHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function DuplicatePackageVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnableProcessOptionalXStateFeatures() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnableThreadProfiling() -> pointer
+@cost(zero)
+extern "native_kernel32" function EncodePointer() -> pointer
+@cost(zero)
+extern "native_kernel32" function EncodeSystemPointer() -> pointer
+@cost(zero)
+extern "native_kernel32" function EndUpdateResourceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EndUpdateResourceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnterCriticalSection() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnterSynchronizationBarrier() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnterUmsSchedulingMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumCalendarInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumCalendarInfoExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumCalendarInfoExEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumCalendarInfoExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumCalendarInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumDateFormatsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumDateFormatsExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumDateFormatsExEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumDateFormatsExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumDateFormatsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumLanguageGroupLocalesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumLanguageGroupLocalesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceLanguagesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceLanguagesExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceLanguagesExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceLanguagesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceNamesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceNamesExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceNamesExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceNamesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceTypesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceTypesExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceTypesExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumResourceTypesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemCodePagesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemCodePagesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemFirmwareTables() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemGeoID() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemGeoNames() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemLanguageGroupsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemLanguageGroupsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemLocalesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemLocalesEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumSystemLocalesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumTimeFormatsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumTimeFormatsEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumTimeFormatsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumUILanguagesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumUILanguagesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumerateLocalComputerNamesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function EnumerateLocalComputerNamesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function EraseTape() -> pointer
+@cost(zero)
+extern "native_kernel32" function EscapeCommFunction() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExecuteUmsThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExitProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExitThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExitVDM() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExpandEnvironmentStringsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExpandEnvironmentStringsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExpungeConsoleCommandHistoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ExpungeConsoleCommandHistoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FatalAppExitA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FatalAppExitW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FatalExit() -> pointer
+@cost(zero)
+extern "native_kernel32" function FileTimeToDosDateTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function FileTimeToLocalFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function FileTimeToSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function FillConsoleOutputAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function FillConsoleOutputCharacterA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FillConsoleOutputCharacterW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindActCtxSectionGuid() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindActCtxSectionGuidWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindActCtxSectionStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindActCtxSectionStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindActCtxSectionStringWWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindAtomA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindAtomW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindClose() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindCloseChangeNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstChangeNotificationA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstChangeNotificationW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileNameTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstStreamTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstStreamW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstVolumeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstVolumeMountPointA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstVolumeMountPointW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindFirstVolumeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNLSString() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNLSStringEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextChangeNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextStreamW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextVolumeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextVolumeMountPointA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextVolumeMountPointW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindNextVolumeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindPackagesByPackageFamily() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindResourceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindResourceExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindResourceExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindResourceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindStringOrdinal() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindVolumeClose() -> pointer
+@cost(zero)
+extern "native_kernel32" function FindVolumeMountPointClose() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlsAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlsFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlsGetValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlsGetValue2() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlsSetValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlushConsoleInputBuffer() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlushFileBuffers() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlushInstructionCache() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlushProcessWriteBuffers() -> pointer
+@cost(zero)
+extern "native_kernel32" function FlushViewOfFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function FoldStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FoldStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FormatApplicationUserModelId() -> pointer
+@cost(zero)
+extern "native_kernel32" function FormatMessageA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FormatMessageW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeEnvironmentStringsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeEnvironmentStringsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeLibrary() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeLibraryAndExitThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeLibraryWhenCallbackReturns() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeMemoryJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeResource() -> pointer
+@cost(zero)
+extern "native_kernel32" function FreeUserPhysicalPages() -> pointer
+@cost(zero)
+extern "native_kernel32" function GenerateConsoleCtrlEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetACP() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetActiveProcessorCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetActiveProcessorGroupCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetAppContainerAce() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetAppContainerNamedObjectPath() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetApplicationRecoveryCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetApplicationRecoveryCallbackWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetApplicationRestartSettings() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetApplicationRestartSettingsWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetApplicationUserModelId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetAtomNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetAtomNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetBinaryType() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetBinaryTypeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetBinaryTypeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCPInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCPInfoExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCPInfoExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCachedSigningLevel() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarDateFormat() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarDateFormatEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarDaysInMonth() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarDifferenceInDays() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarInfoEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarMonthsInYear() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarSupportedDateRange() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCalendarWeekNumber() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetComPlusPackageInstallStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommConfig() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommModemStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommProperties() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommState() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommTimeouts() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommandLineA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCommandLineW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCompressedFileSizeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCompressedFileSizeTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCompressedFileSizeTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCompressedFileSizeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetComputerNameExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetComputerNameExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasExesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasExesLengthA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasExesLengthW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasExesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasesLengthA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasesLengthW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleAliasesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCP() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCharType() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCommandHistoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCommandHistoryLengthA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCommandHistoryLengthW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCommandHistoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCursorInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleCursorMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleDisplayMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleFontInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleFontSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleHardwareState() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleHistoryInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleInputExeNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleInputExeNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleInputWaitHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleKeyboardLayoutNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleKeyboardLayoutNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleNlsMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleOriginalTitleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleOriginalTitleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleOutputCP() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleProcessList() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleScreenBufferInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleScreenBufferInfoEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleSelectionInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleTitleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleTitleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetConsoleWindow() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrencyFormatA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrencyFormatEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrencyFormatW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentActCtx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentActCtxWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentApplicationUserModelId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentConsoleFont() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentConsoleFontEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentPackageFamilyName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentPackageFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentPackageId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentPackageInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentPackagePath() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentPackageVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentProcessId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentProcessorNumber() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentProcessorNumberEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentThreadId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentThreadStackLimits() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetCurrentUmsThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDateFormatA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDateFormatAWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDateFormatEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDateFormatW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDateFormatWWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDefaultCommConfigA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDefaultCommConfigW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDevicePowerState() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDiskFreeSpaceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDiskFreeSpaceExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDiskFreeSpaceExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDiskFreeSpaceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDiskSpaceInformationA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDiskSpaceInformationW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDllDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDllDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDriveTypeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDriveTypeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDurationFormat() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDurationFormatEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetDynamicTimeZoneInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEnabledXStateFeatures() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEncryptedFileVersionExt() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEnvironmentStrings() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEnvironmentStringsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEnvironmentStringsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEnvironmentVariableA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEnvironmentVariableW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetEraNameCountedString() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetErrorMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetExitCodeProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetExitCodeThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetExpandedNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetExpandedNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileAttributesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileAttributesExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileAttributesExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileAttributesTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileAttributesTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileAttributesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileBandwidthReservation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileInformationByHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileInformationByHandleEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileInformationByName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileMUIInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileMUIPath() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileSizeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFileType() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFinalPathNameByHandleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFinalPathNameByHandleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFirmwareEnvironmentVariableA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFirmwareEnvironmentVariableExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFirmwareEnvironmentVariableExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFirmwareEnvironmentVariableW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFirmwareType() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFullPathNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFullPathNameTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFullPathNameTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetFullPathNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetGeoInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetGeoInfoEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetGeoInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetHandleInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetIoRingInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLargePageMinimum() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLargestConsoleWindowSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLastError() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLocalTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLocaleInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLocaleInfoEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLocaleInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLogicalDriveStringsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLogicalDriveStringsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLogicalDrives() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLogicalProcessorInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLogicalProcessorInformationEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLongPathNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLongPathNameTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLongPathNameTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetLongPathNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetMachineTypeAttributes() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetMailslotInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetMaximumProcessorCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetMaximumProcessorGroupCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetMemoryErrorHandlingCapabilities() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetModuleFileNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetModuleFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetModuleHandleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetModuleHandleExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetModuleHandleExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetModuleHandleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNLSVersion() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNLSVersionEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeClientComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeClientComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeClientProcessId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeClientSessionId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeHandleStateA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeHandleStateW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeServerProcessId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNamedPipeServerSessionId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNativeSystemInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNextUmsListItem() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNextVDMCommand() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaAvailableMemoryNode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaAvailableMemoryNodeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaHighestNodeNumber() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaNodeNumberFromHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaNodeProcessorMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaNodeProcessorMask2() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaNodeProcessorMaskEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaProcessorNode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaProcessorNodeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaProximityNode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumaProximityNodeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumberFormatA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumberFormatEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumberFormatW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumberOfConsoleFonts() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumberOfConsoleInputEvents() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetNumberOfConsoleMouseButtons() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetOEMCP() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetOverlappedResult() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetOverlappedResultEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackageApplicationIds() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackageFamilyName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackageFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackageId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackageInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackagePath() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackagePathByFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPackagesByPackageFamily() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPhysicallyInstalledSystemMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPriorityClass() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileIntA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileIntW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileSectionA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileSectionNamesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileSectionNamesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileSectionW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileStructA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetPrivateProfileStructW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcAddress() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessAffinityMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessDEPPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessDefaultCpuSetMasks() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessDefaultCpuSets() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessGroupAffinity() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessHandleCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessHeap() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessHeaps() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessIdOfThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessIoCounters() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessMitigationPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessPreferredUILanguages() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessPriorityBoost() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessShutdownParameters() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessTimes() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessVersion() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessWorkingSetSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessWorkingSetSizeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessesInVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProcessorSystemCycleTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProductInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProfileIntA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProfileIntW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProfileSectionA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProfileSectionW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProfileStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetProfileStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetQueuedCompletionStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetQueuedCompletionStatusEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetShortPathNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetShortPathNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStagedPackagePathByFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStartupInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStartupInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStateFolder() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStdHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStringScripts() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStringTypeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStringTypeExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStringTypeExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetStringTypeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemAppDataKey() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemCpuSetInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDEPPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDefaultLCID() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDefaultLangID() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDefaultLocaleName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDefaultUILanguage() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemFileCacheSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemFirmwareTable() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemPowerStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemPreferredUILanguages() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemRegistryQuota() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemTimeAdjustment() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemTimeAsFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemTimePreciseAsFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemTimes() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemWindowsDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemWindowsDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemWow64DirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetSystemWow64DirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTapeParameters() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTapePosition() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTapeStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTempFileNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTempFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTempPath2A() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTempPath2W() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTempPathA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTempPathW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadDescription() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadEnabledXStateFeatures() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadErrorMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadGroupAffinity() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadIOPendingFlag() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadId() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadIdealProcessorEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadLocale() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadPreferredUILanguages() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadPriority() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadPriorityBoost() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadSelectedCpuSetMasks() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadSelectedCpuSets() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadSelectorEntry() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadTimes() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetThreadUILanguage() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTickCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTickCount64() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeFormatA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeFormatAWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeFormatEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeFormatW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeFormatWWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeZoneInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetTimeZoneInformationForYear() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUILanguageInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUmsCompletionListEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUmsSystemThreadInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserDefaultGeoName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserDefaultLCID() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserDefaultLangID() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserDefaultLocaleName() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserDefaultUILanguage() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserGeoID() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetUserPreferredUILanguages() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVDMCurrentDirectories() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVersion() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVersionExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVersionExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumeInformationA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumeInformationByHandleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumeInformationW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumeNameForVolumeMountPointA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumeNameForVolumeMountPointW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumePathNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumePathNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumePathNamesForVolumeNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetVolumePathNamesForVolumeNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetWindowsDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetWindowsDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetWriteWatch() -> pointer
+@cost(zero)
+extern "native_kernel32" function GetXStateFeaturesMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalAddAtomA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalAddAtomExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalAddAtomExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalAddAtomW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalCompact() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalDeleteAtom() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalFindAtomA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalFindAtomW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalFix() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalFlags() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalGetAtomNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalGetAtomNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalLock() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalMemoryStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalMemoryStatusEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalReAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalUnWire() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalUnfix() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalUnlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function GlobalWire() -> pointer
+@cost(zero)
+extern "native_kernel32" function Heap32First() -> pointer
+@cost(zero)
+extern "native_kernel32" function Heap32ListFirst() -> pointer
+@cost(zero)
+extern "native_kernel32" function Heap32ListNext() -> pointer
+@cost(zero)
+extern "native_kernel32" function Heap32Next() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapCompact() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapCreate() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapDestroy() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapLock() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapQueryInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapReAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapSetInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapSummary() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapUnlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapValidate() -> pointer
+@cost(zero)
+extern "native_kernel32" function HeapWalk() -> pointer
+@cost(zero)
+extern "native_kernel32" function IdnToAscii() -> pointer
+@cost(zero)
+extern "native_kernel32" function IdnToNameprepUnicode() -> pointer
+@cost(zero)
+extern "native_kernel32" function IdnToUnicode() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitAtomTable() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitOnceBeginInitialize() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitOnceComplete() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitOnceExecuteOnce() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitOnceInitialize() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeConditionVariable() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeContext2() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeCriticalSection() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeCriticalSectionAndSpinCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeCriticalSectionEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeEnclave() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeProcThreadAttributeList() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeSListHead() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeSRWLock() -> pointer
+@cost(zero)
+extern "native_kernel32" function InitializeSynchronizationBarrier() -> pointer
+@cost(zero)
+extern "native_kernel32" function InstallELAMCertificateInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function InterlockedFlushSList() -> pointer
+@cost(zero)
+extern "native_kernel32" function InterlockedPopEntrySList() -> pointer
+@cost(zero)
+extern "native_kernel32" function InterlockedPushEntrySList() -> pointer
+@cost(zero)
+extern "native_kernel32" function InterlockedPushListSList() -> pointer
+@cost(zero)
+extern "native_kernel32" function InterlockedPushListSListEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function InvalidateConsoleDIBits() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadCodePtr() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadHugeReadPtr() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadHugeWritePtr() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadReadPtr() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadStringPtrA() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadStringPtrW() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsBadWritePtr() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsCalendarLeapDay() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsCalendarLeapMonth() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsCalendarLeapYear() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsDBCSLeadByte() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsDBCSLeadByteEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsDebuggerPresent() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsEnclaveTypeSupported() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsIoRingOpSupported() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsNLSDefinedString() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsNativeVhdBoot() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsNormalizedString() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsProcessCritical() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsProcessInJob() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsProcessorFeaturePresent() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsSystemResumeAutomatic() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsThreadAFiber() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsThreadpoolTimerSet() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsUserCetAvailableInEnvironment() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsValidCalDateTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsValidCodePage() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsValidLanguageGroup() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsValidLocale() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsValidLocaleName() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsValidNLSVersion() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsWow64GuestMachineSupported() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsWow64Process() -> pointer
+@cost(zero)
+extern "native_kernel32" function IsWow64Process2() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EmptyWorkingSet() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EnumDeviceDrivers() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EnumPageFilesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EnumPageFilesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EnumProcessModules() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EnumProcessModulesEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32EnumProcesses() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetDeviceDriverBaseNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetDeviceDriverBaseNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetDeviceDriverFileNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetDeviceDriverFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetMappedFileNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetMappedFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetModuleBaseNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetModuleBaseNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetModuleFileNameExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetModuleFileNameExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetModuleInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetPerformanceInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetProcessImageFileNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetProcessImageFileNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetProcessMemoryInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetWsChanges() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32GetWsChangesEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32InitializeProcessForWsWatch() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32QueryWorkingSet() -> pointer
+@cost(zero)
+extern "native_kernel32" function K32QueryWorkingSetEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function LCIDToLocaleName() -> pointer
+@cost(zero)
+extern "native_kernel32" function LCMapStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function LCMapStringEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function LCMapStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZClose() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZCloseFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZCopy() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZCreateFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZDone() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZInit() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZOpenFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZOpenFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZRead() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZSeek() -> pointer
+@cost(zero)
+extern "native_kernel32" function LZStart() -> pointer
+@cost(zero)
+extern "native_kernel32" function LeaveCriticalSection() -> pointer
+@cost(zero)
+extern "native_kernel32" function LeaveCriticalSectionWhenCallbackReturns() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadAppInitDlls() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadEnclaveData() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadLibraryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadLibraryExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadLibraryExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadLibraryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadModule() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadPackagedLibrary() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadResource() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadStringBaseExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LoadStringBaseW() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalCompact() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalFileTimeToFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalFileTimeToLocalSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalFlags() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalLock() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalReAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalShrink() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalSystemTimeToLocalFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocalUnlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocaleNameToLCID() -> pointer
+@cost(zero)
+extern "native_kernel32" function LocateXStateFeature() -> pointer
+@cost(zero)
+extern "native_kernel32" function LockFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function LockFileEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function LockResource() -> pointer
+@cost(zero)
+extern "native_kernel32" function LogUnexpectedCodepath() -> pointer
+@cost(zero)
+extern "native_kernel32" function MapUserPhysicalPages() -> pointer
+@cost(zero)
+extern "native_kernel32" function MapUserPhysicalPagesScatter() -> pointer
+@cost(zero)
+extern "native_kernel32" function MapViewOfFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function MapViewOfFileEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function MapViewOfFileExNuma() -> pointer
+@cost(zero)
+extern "native_kernel32" function MapViewOfFileFromApp() -> pointer
+@cost(zero)
+extern "native_kernel32" function Module32First() -> pointer
+@cost(zero)
+extern "native_kernel32" function Module32FirstW() -> pointer
+@cost(zero)
+extern "native_kernel32" function Module32Next() -> pointer
+@cost(zero)
+extern "native_kernel32" function Module32NextW() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileWithProgressA() -> pointer
+@cost(zero)
+extern "native_kernel32" function MoveFileWithProgressW() -> pointer
+@cost(zero)
+extern "native_kernel32" function MulDiv() -> pointer
+@cost(zero)
+extern "native_kernel32" function MultiByteToWideChar() -> pointer
+@cost(zero)
+extern "native_kernel32" function NeedCurrentDirectoryForExePathA() -> pointer
+@cost(zero)
+extern "native_kernel32" function NeedCurrentDirectoryForExePathW() -> pointer
+@cost(zero)
+extern "native_kernel32" function NlsCheckPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function NlsGetCacheUpdateCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function NlsUpdateLocale() -> pointer
+@cost(zero)
+extern "native_kernel32" function NlsUpdateSystemLocale() -> pointer
+@cost(zero)
+extern "native_kernel32" function NormalizeString() -> pointer
+@cost(zero)
+extern "native_kernel32" function NotifyMountMgr() -> pointer
+@cost(zero)
+extern "native_kernel32" function NotifyUILanguageChange() -> pointer
+@cost(zero)
+extern "native_kernel32" function NtVdm64CreateProcessInternalW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OOBEComplete() -> pointer
+@cost(zero)
+extern "native_kernel32" function OfferVirtualMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenConsoleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenConsoleWStub() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenEventA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenEventW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenFileById() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenFileMappingA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenFileMappingW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenJobObjectA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenJobObjectW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenMutexA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenMutexW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenPackageInfoByFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenPrivateNamespaceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenPrivateNamespaceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenProcessToken() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenProfileUserMapping() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenSemaphoreA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenSemaphoreW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenState() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenStateExplicit() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenThreadToken() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenWaitableTimerA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OpenWaitableTimerW() -> pointer
+@cost(zero)
+extern "native_kernel32" function OutputDebugStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function OutputDebugStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function PackageFamilyNameFromFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function PackageFamilyNameFromId() -> pointer
+@cost(zero)
+extern "native_kernel32" function PackageFullNameFromId() -> pointer
+@cost(zero)
+extern "native_kernel32" function PackageIdFromFullName() -> pointer
+@cost(zero)
+extern "native_kernel32" function PackageNameAndPublisherIdFromFamilyName() -> pointer
+@cost(zero)
+extern "native_kernel32" function ParseApplicationUserModelId() -> pointer
+@cost(zero)
+extern "native_kernel32" function PeekConsoleInputA() -> pointer
+@cost(zero)
+extern "native_kernel32" function PeekConsoleInputW() -> pointer
+@cost(zero)
+extern "native_kernel32" function PeekNamedPipe() -> pointer
+@cost(zero)
+extern "native_kernel32" function PopIoRingCompletion() -> pointer
+@cost(zero)
+extern "native_kernel32" function PostQueuedCompletionStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function PowerClearRequest() -> pointer
+@cost(zero)
+extern "native_kernel32" function PowerCreateRequest() -> pointer
+@cost(zero)
+extern "native_kernel32" function PowerSetRequest() -> pointer
+@cost(zero)
+extern "native_kernel32" function PrefetchVirtualMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function PrepareTape() -> pointer
+@cost(zero)
+extern "native_kernel32" function PrivCopyFileExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function PrivMoveFileIdentityW() -> pointer
+@cost(zero)
+extern "native_kernel32" function Process32First() -> pointer
+@cost(zero)
+extern "native_kernel32" function Process32FirstW() -> pointer
+@cost(zero)
+extern "native_kernel32" function Process32Next() -> pointer
+@cost(zero)
+extern "native_kernel32" function Process32NextW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ProcessIdToSessionId() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssCaptureSnapshot() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssDuplicateSnapshot() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssFreeSnapshot() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssQuerySnapshot() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerCreate() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerGetPosition() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerRewind() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerSeek() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerSeekToBeginning() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerSetPosition() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkMarkerTell() -> pointer
+@cost(zero)
+extern "native_kernel32" function PssWalkSnapshot() -> pointer
+@cost(zero)
+extern "native_kernel32" function PulseEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function PurgeComm() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryActCtxSettingsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryActCtxSettingsWWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryActCtxW() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryActCtxWWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryDepthSList() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryDosDeviceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryDosDeviceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryFullProcessImageNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryFullProcessImageNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryIdleProcessorCycleTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryIdleProcessorCycleTimeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryInformationJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryIoRateControlInformationJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryIoRingCapabilities() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryMemoryResourceNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryPerformanceCounter() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryPerformanceFrequency() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryProcessAffinityUpdateMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryProcessCycleTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryProtectedPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryThreadCycleTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryThreadProfiling() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryThreadpoolStackInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryUmsThreadInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueryUnbiasedInterruptTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueueUserAPC() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueueUserAPC2() -> pointer
+@cost(zero)
+extern "native_kernel32" function QueueUserWorkItem() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkGetData2Worker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkGetDataWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabled2Worker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabled3Worker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabledForPackage2Worker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabledForPackage3Worker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabledForPackage4Worker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabledForPackageWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabledForProcessWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function QuirkIsEnabledWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function RaiseException() -> pointer
+@cost(zero)
+extern "native_kernel32" function RaiseFailFastException() -> pointer
+@cost(zero)
+extern "native_kernel32" function RaiseInvalid16BitExeError() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReOpenFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleInputA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleInputExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleInputExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleInputW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleOutputA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleOutputAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleOutputCharacterA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleOutputCharacterW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleOutputW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadConsoleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadDirectoryChangesExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadDirectoryChangesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadFileEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadFileScatter() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadProcessMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReadThreadProfilingData() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReclaimVirtualMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegCloseKey() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegCopyTreeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegCreateKeyExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegCreateKeyExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDeleteKeyExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDeleteKeyExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDeleteTreeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDeleteTreeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDeleteValueA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDeleteValueW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegDisablePredefinedCacheEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegEnumKeyExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegEnumKeyExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegEnumValueA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegEnumValueW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegFlushKey() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegGetKeySecurity() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegGetValueA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegGetValueW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegLoadKeyA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegLoadKeyW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegLoadMUIStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegLoadMUIStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegNotifyChangeKeyValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegOpenCurrentUser() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegOpenKeyExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegOpenKeyExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegOpenUserClassesRoot() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegQueryInfoKeyA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegQueryInfoKeyW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegQueryValueExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegQueryValueExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegRestoreKeyA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegRestoreKeyW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegSaveKeyExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegSaveKeyExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegSetKeySecurity() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegSetValueExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegSetValueExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegUnLoadKeyA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegUnLoadKeyW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterApplicationRecoveryCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterApplicationRestart() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterBadMemoryNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterConsoleIME() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterConsoleOS2() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterConsoleVDM() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterWaitForInputIdle() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterWaitForSingleObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterWaitForSingleObjectEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterWaitUntilOOBECompleted() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterWowBaseHandlers() -> pointer
+@cost(zero)
+extern "native_kernel32" function RegisterWowExec() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseActCtx() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseActCtxWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseMutex() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseMutexWhenCallbackReturns() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleasePackageVirtualizationContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleasePseudoConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseSRWLockExclusive() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseSRWLockShared() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseSemaphore() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReleaseSemaphoreWhenCallbackReturns() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDirectory2A() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDirectory2W() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDirectoryTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDirectoryTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveDllDirectory() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveLocalAlternateComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveLocalAlternateComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveSecureMemoryCacheCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveVectoredContinueHandler() -> pointer
+@cost(zero)
+extern "native_kernel32" function RemoveVectoredExceptionHandler() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReplaceFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReplaceFileA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReplaceFileW() -> pointer
+@cost(zero)
+extern "native_kernel32" function ReplacePartitionUnit() -> pointer
+@cost(zero)
+extern "native_kernel32" function RequestDeviceWakeup() -> pointer
+@cost(zero)
+extern "native_kernel32" function RequestWakeupLatency() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResetEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResetWriteWatch() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResizePseudoConsole() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResolveDelayLoadedAPI() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResolveDelayLoadsFromDll() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResolveLocaleName() -> pointer
+@cost(zero)
+extern "native_kernel32" function RestoreLastError() -> pointer
+@cost(zero)
+extern "native_kernel32" function ResumeThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlAddFunctionTable() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlCaptureContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlCaptureStackBackTrace() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlCompareMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlCopyMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlDeleteFunctionTable() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlFillMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlInstallFunctionTableCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlIsEcCode() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlLookupFunctionEntry() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlMoveMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlPcToFileHeader() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlRaiseException() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlRestoreContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlUnwind() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlUnwindEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlVirtualUnwind() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlVirtualUnwind2() -> pointer
+@cost(zero)
+extern "native_kernel32" function RtlZeroMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function ScrollConsoleScreenBufferA() -> pointer
+@cost(zero)
+extern "native_kernel32" function ScrollConsoleScreenBufferW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SearchPathA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SearchPathW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCachedSigningLevel() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCalendarInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCalendarInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetComPlusPackageInstallStatus() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCommBreak() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCommConfig() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCommMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCommState() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCommTimeouts() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetComputerNameEx2W() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetComputerNameExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetComputerNameExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleActiveScreenBuffer() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleCP() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleCtrlHandler() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleCursor() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleCursorInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleCursorMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleCursorPosition() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleDisplayMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleFont() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleHardwareState() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleHistoryInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleIcon() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleInputExeNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleInputExeNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleKeyShortcuts() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleLocalEUDC() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleMaximumWindowSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleMenuClose() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleNlsMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleNumberOfCommandsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleNumberOfCommandsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleOS2OemFormat() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleOutputCP() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsolePalette() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleScreenBufferInfoEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleScreenBufferSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleTextAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleTitleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleTitleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetConsoleWindowInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCriticalSectionSpinCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCurrentConsoleFontEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCurrentDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetCurrentDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetDefaultCommConfigA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetDefaultCommConfigW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetDefaultDllDirectories() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetDllDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetDllDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetDynamicTimeZoneInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEndOfFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEnvironmentStringsA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEnvironmentStringsW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEnvironmentVariableA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEnvironmentVariableW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetErrorMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetEventWhenCallbackReturns() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileApisToANSI() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileApisToOEM() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileAttributesA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileAttributesTransactedA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileAttributesTransactedW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileAttributesW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileBandwidthReservation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileCompletionNotificationModes() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileInformationByHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileIoOverlappedRange() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFilePointer() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFilePointerEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileShortNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileShortNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFileValidData() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFirmwareEnvironmentVariableA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFirmwareEnvironmentVariableExA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFirmwareEnvironmentVariableExW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetFirmwareEnvironmentVariableW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetHandleCount() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetHandleInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetInformationJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetIoRateControlInformationJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetIoRingCompletionEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLastConsoleEventActive() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLastError() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLocalPrimaryComputerNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLocalPrimaryComputerNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLocalTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLocaleInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetLocaleInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetMailslotInfo() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetMessageWaitingIndicator() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetNamedPipeAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetNamedPipeHandleState() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetPriorityClass() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessAffinityMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessAffinityUpdateMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessDEPPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessDefaultCpuSetMasks() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessDefaultCpuSets() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessDynamicEHContinuationTargets() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessDynamicEnforcedCetCompatibleRanges() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessMitigationPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessPreferredUILanguages() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessPriorityBoost() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessShutdownParameters() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessWorkingSetSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProcessWorkingSetSizeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetProtectedPolicy() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetSearchPathMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetStdHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetStdHandleEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetSystemFileCacheSize() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetSystemPowerState() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetSystemTimeAdjustment() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetTapeParameters() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetTapePosition() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetTermsrvAppInstallMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadAffinityMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadDescription() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadErrorMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadExecutionState() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadGroupAffinity() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadIdealProcessor() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadIdealProcessorEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadLocale() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadPreferredUILanguages() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadPriority() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadPriorityBoost() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadSelectedCpuSetMasks() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadSelectedCpuSets() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadStackGuarantee() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadToken() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadUILanguage() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolStackInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolThreadMaximum() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolThreadMinimum() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolTimerEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolWait() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetThreadpoolWaitEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetTimeZoneInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetTimerQueueTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetUmsThreadInformation() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetUnhandledExceptionFilter() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetUserGeoID() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetUserGeoName() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetVDMCurrentDirectories() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetVolumeLabelA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetVolumeLabelW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetVolumeMountPointA() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetVolumeMountPointW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetVolumeMountPointWStub() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetWaitableTimer() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetWaitableTimerEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetXStateFeaturesMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function SetupComm() -> pointer
+@cost(zero)
+extern "native_kernel32" function ShowConsoleCursor() -> pointer
+@cost(zero)
+extern "native_kernel32" function SignalObjectAndWait() -> pointer
+@cost(zero)
+extern "native_kernel32" function SizeofResource() -> pointer
+@cost(zero)
+extern "native_kernel32" function Sleep() -> pointer
+@cost(zero)
+extern "native_kernel32" function SleepConditionVariableCS() -> pointer
+@cost(zero)
+extern "native_kernel32" function SleepConditionVariableSRW() -> pointer
+@cost(zero)
+extern "native_kernel32" function SleepEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function SortCloseHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function SortGetHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function StartThreadpoolIo() -> pointer
+@cost(zero)
+extern "native_kernel32" function SubmitIoRing() -> pointer
+@cost(zero)
+extern "native_kernel32" function SubmitThreadpoolWork() -> pointer
+@cost(zero)
+extern "native_kernel32" function SuspendThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function SwitchToFiber() -> pointer
+@cost(zero)
+extern "native_kernel32" function SwitchToThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function SystemTimeToFileTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function SystemTimeToTzSpecificLocalTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function SystemTimeToTzSpecificLocalTimeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function TerminateJobObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function TerminateProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function TerminateThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvAppInstallMode() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvConvertSysRootToUserDir() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvCreateRegEntry() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvDeleteKey() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvDeleteValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvGetPreSetValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvGetWindowsDirectoryA() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvGetWindowsDirectoryW() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvOpenRegEntry() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvOpenUserClasses() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvRestoreKey() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvSetKeySecurity() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvSetValueKey() -> pointer
+@cost(zero)
+extern "native_kernel32" function TermsrvSyncUserIniFileExt() -> pointer
+@cost(zero)
+extern "native_kernel32" function Thread32First() -> pointer
+@cost(zero)
+extern "native_kernel32" function Thread32Next() -> pointer
+@cost(zero)
+extern "native_kernel32" function TlsAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function TlsFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function TlsGetValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function TlsGetValue2() -> pointer
+@cost(zero)
+extern "native_kernel32" function TlsSetValue() -> pointer
+@cost(zero)
+extern "native_kernel32" function Toolhelp32ReadProcessMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function TransactNamedPipe() -> pointer
+@cost(zero)
+extern "native_kernel32" function TransmitCommChar() -> pointer
+@cost(zero)
+extern "native_kernel32" function TryAcquireSRWLockExclusive() -> pointer
+@cost(zero)
+extern "native_kernel32" function TryAcquireSRWLockShared() -> pointer
+@cost(zero)
+extern "native_kernel32" function TryEnterCriticalSection() -> pointer
+@cost(zero)
+extern "native_kernel32" function TrySubmitThreadpoolCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function TzSpecificLocalTimeToSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function TzSpecificLocalTimeToSystemTimeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function UTRegister() -> pointer
+@cost(zero)
+extern "native_kernel32" function UTUnRegister() -> pointer
+@cost(zero)
+extern "native_kernel32" function UmsThreadYield() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnhandledExceptionFilter() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnlockFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnlockFileEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnmapViewOfFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnmapViewOfFileEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterApplicationRecoveryCallback() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterApplicationRestart() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterBadMemoryNotification() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterConsoleIME() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterWait() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterWaitEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function UnregisterWaitUntilOOBECompleted() -> pointer
+@cost(zero)
+extern "native_kernel32" function UpdateCalendarDayOfWeek() -> pointer
+@cost(zero)
+extern "native_kernel32" function UpdateProcThreadAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function UpdateResourceA() -> pointer
+@cost(zero)
+extern "native_kernel32" function UpdateResourceW() -> pointer
+@cost(zero)
+extern "native_kernel32" function VDMConsoleOperation() -> pointer
+@cost(zero)
+extern "native_kernel32" function VDMOperationStarted() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerLanguageNameA() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerLanguageNameW() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerSetConditionMask() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerifyConsoleIoHandle() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerifyScripts() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerifyVersionInfoA() -> pointer
+@cost(zero)
+extern "native_kernel32" function VerifyVersionInfoW() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualAlloc() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualAllocEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualAllocExNuma() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualFree() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualFreeEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualLock() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualProtect() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualProtectEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualQuery() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualQueryEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function VirtualUnlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function WTSGetActiveConsoleSessionId() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitCommEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForDebugEvent() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForDebugEventEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForMultipleObjects() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForMultipleObjectsEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForSingleObject() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForSingleObjectEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForThreadpoolIoCallbacks() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForThreadpoolTimerCallbacks() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForThreadpoolWaitCallbacks() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitForThreadpoolWorkCallbacks() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitNamedPipeA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WaitNamedPipeW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WakeAllConditionVariable() -> pointer
+@cost(zero)
+extern "native_kernel32" function WakeConditionVariable() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerGetFlags() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerGetFlagsWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterAdditionalProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterAppLocalDump() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterCustomMetadata() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterExcludedMemoryBlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterFileWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterMemoryBlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterMemoryBlockWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterRuntimeExceptionModule() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerRegisterRuntimeExceptionModuleWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerSetFlags() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerSetFlagsWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterAdditionalProcess() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterAppLocalDump() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterCustomMetadata() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterExcludedMemoryBlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterFileWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterMemoryBlock() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterMemoryBlockWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterRuntimeExceptionModule() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerUnregisterRuntimeExceptionModuleWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerpGetDebugger() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerpInitiateRemoteRecovery() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerpLaunchAeDebug() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerpNotifyLoadStringResourceWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WerpNotifyUseStringResourceWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function WideCharToMultiByte() -> pointer
+@cost(zero)
+extern "native_kernel32" function WinExec() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64DisableWow64FsRedirection() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64EnableWow64FsRedirection() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64GetThreadContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64GetThreadSelectorEntry() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64RevertWow64FsRedirection() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64SetThreadContext() -> pointer
+@cost(zero)
+extern "native_kernel32" function Wow64SuspendThread() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleInputA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleInputVDMA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleInputVDMW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleInputW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleOutputA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleOutputAttribute() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleOutputCharacterA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleOutputCharacterW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleOutputW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteConsoleW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteFile() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteFileEx() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteFileGather() -> pointer
+@cost(zero)
+extern "native_kernel32" function WritePrivateProfileSectionA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WritePrivateProfileSectionW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WritePrivateProfileStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WritePrivateProfileStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WritePrivateProfileStructA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WritePrivateProfileStructW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteProcessMemory() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteProfileSectionA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteProfileSectionW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteProfileStringA() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteProfileStringW() -> pointer
+@cost(zero)
+extern "native_kernel32" function WriteTapemark() -> pointer
+@cost(zero)
+extern "native_kernel32" function ZombifyActCtx() -> pointer
+@cost(zero)
+extern "native_kernel32" function ZombifyActCtxWorker() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcat() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcatA() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcatW() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcmp() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcmpA() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcmpW() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcmpi() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcmpiA() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcmpiW() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcpy() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcpyA() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcpyW() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcpyn() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcpynA() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrcpynW() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrlen() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrlenA() -> pointer
+@cost(zero)
+extern "native_kernel32" function lstrlenW() -> pointer
+@cost(zero)
+extern "native_kernel32" function timeBeginPeriod() -> pointer
+@cost(zero)
+extern "native_kernel32" function timeEndPeriod() -> pointer
+@cost(zero)
+extern "native_kernel32" function timeGetDevCaps() -> pointer
+@cost(zero)
+extern "native_kernel32" function timeGetSystemTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function timeGetTime() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_lstrcmpW() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_lstrcmpiW() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_lstrlenW() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_wcschr() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_wcscpy() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_wcsicmp() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_wcslen() -> pointer
+@cost(zero)
+extern "native_kernel32" function uaw_wcsrchr() -> pointer

@@ -1,0 +1,75 @@
+# Comprehensive OOP Example
+# Demonstrates classes, inheritance, interfaces, abstract/final, encapsulation, polymorphism, structs, enums
+
+interface Drawable
+    function draw()
+
+abstract class Shape
+    private x = 0
+    private y = 0
+
+    function move_to(new_x, new_y)
+        self.x = new_x
+        self.y = new_y
+
+    function get_x()
+        return self.x
+
+    function get_y()
+        return self.y
+
+    function area()
+
+class Circle extends Shape implements Drawable
+    private radius = 0
+
+    function area()
+        return 3.14159 * self.radius * self.radius
+
+    function draw()
+        output("Circle at (" + self.get_x() + "," + self.get_y() + ") radius=" + self.radius)
+
+class Rectangle extends Shape implements Drawable
+    private width = 0
+    private height = 0
+
+    function area()
+        return self.width * self.height
+
+    function draw()
+        output("Rect at (" + self.get_x() + "," + self.get_y() + ") " + self.width + "x" + self.height)
+
+struct Point
+    x = 0
+    y = 0
+
+enum Color
+    Red
+    Green
+    Blue
+
+function main()
+    output("=== Polymorphism ===")
+    c = Circle(100, 200, 50)
+    r = Rectangle(300, 400, 150, 80)
+    shapes = [c, r]
+    for shape in shapes
+        output("Area: " + shape.area())
+        shape.draw()
+
+    output("\n=== Structs ===")
+    p1 = Point { x: 10, y: 20 }
+    output("Point: " + p1.x + "," + p1.y)
+
+    output("\n=== Enums ===")
+    col = Color.Red
+    if col == Color.Red
+        output("Stop!")
+
+    output("\n=== Encapsulation ===")
+    circle = Circle(0, 0, 10)
+    circle.move_to(50, 50)
+    output("Circle center: " + circle.get_x() + "," + circle.get_y())
+    output("Circle area: " + circle.area())
+
+main()

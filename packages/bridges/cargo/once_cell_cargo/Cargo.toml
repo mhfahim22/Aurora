@@ -1,0 +1,13 @@
+[package]
+name = "once_cell_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = "1"
+serde_json = "1"
+futures = "0.3"
+once_cell = { version = "1.21.4", features = ["alloc", "critical-section", "parking_lot", "portable-atomic", "race", "std"] }

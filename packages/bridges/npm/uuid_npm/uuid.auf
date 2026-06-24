@@ -1,0 +1,73 @@
+/* ════════════════════════════════════════════════════════════
+   npm Bridge — Auto-generated Aurora FFI Bindings
+   Package: uuid@14.0.0
+   ════════════════════════════════════════════════════════════ */
+
+/* Module init */
+@cost(zero)
+extern "npm_uuid" function uuid_require() -> pointer
+
+/* FFI entry points */
+@cost(zero)
+extern "npm_uuid" function uuid_call(mod: pointer, fn: cstring, args: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call1(mod: pointer, fn: cstring, arg: pointer) -> pointer
+@cost(zero)
+extern "npm_uuid" function uuid_free(handle: pointer)
+@cost(zero)
+extern "npm_uuid" function uuid_free_cstr(handle: pointer)
+
+/* Value conversion helpers */
+@cost(alloc)
+extern "npm_uuid" function uuid_str(s: cstring) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_int(v: i64) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_float(v: f64) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call_kw(mod: pointer, fn: cstring, args: pointer, kwargs: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_getattr(obj: pointer, name: cstring) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call2(mod: pointer, fn: cstring, a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call3(mod: pointer, fn: cstring, a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call4(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call5(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_call6(mod: pointer, fn: cstring, a1: pointer, a2: pointer, a3: pointer, a4: pointer, a5: pointer, a6: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_tuple2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_tuple3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_tuple4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_list2(a: pointer, b: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_list3(a: pointer, b: pointer, c: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_list4(a: pointer, b: pointer, c: pointer, d: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_to_cstr(obj: pointer) -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_dict() -> pointer
+@cost(alloc)
+extern "npm_uuid" function uuid_dict_set(d: pointer, key: cstring, val: pointer) -> i32
+/* Diagnostics */
+@cost(zero)
+extern "npm_uuid" function uuid_get_perf_stats() -> cstring
+@cost(zero)
+extern "npm_uuid" function uuid_get_last_error() -> cstring
+
+/* Usage:
+     import "uuid"
+     let mod = uuid_require()
+     let name = uuid_str("world")
+     let result = uuid_call1(mod, "fn", name)
+     printf("%s
+", uuid_to_cstr(result))
+     uuid_free(result)
+*/

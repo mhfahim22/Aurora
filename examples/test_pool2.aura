@@ -1,0 +1,24 @@
+outputln("--- Direct Pool Test ---")
+
+outputln("Creating pool directly...")
+pool = aurora_db_pool_create("mock://direct", 1, 3)
+outputln("  pool = " + str(pool))
+outputln("  idle = " + str(aurora_db_pool_idle_count(pool)) + " active = " + str(aurora_db_pool_active_count(pool)))
+outputln("  total = " + str(aurora_db_pool_idle_count(pool) + aurora_db_pool_active_count(pool)))
+
+outputln("Querying directly...")
+r1 = aurora_db_pool_query(pool, "CREATE TABLE foo (id INTEGER)")
+outputln("  create = " + str(r1))
+aurora_db_pool_query_free(r1)
+
+r2 = aurora_db_pool_query(pool, "INSERT INTO foo VALUES (1)")
+outputln("  insert = " + str(r2))
+aurora_db_pool_query_free(r2)
+
+r3 = aurora_db_pool_query(pool, "SELECT * FROM foo")
+outputln("  select = " + str(r3))
+aurora_db_pool_query_free(r3)
+
+outputln("Destroying...")
+aurora_db_pool_destroy(pool)
+outputln("Done!")

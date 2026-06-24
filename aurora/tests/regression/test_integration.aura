@@ -1,0 +1,126 @@
+// import "test" — module may not exist; test functions may be builtins
+// import "mock" — module may not exist; mock functions may be builtins
+
+## ── Test assert_throws ──
+
+lambda throwing_fn():
+    throw "error"
+end
+
+lambda safe_fn():
+    return 42
+end
+
+function test_assert_throws()
+    ## Should pass: throwing_fn throws
+    assert_throws(throwing_fn)
+
+    ## Should fail: safe_fn does not throw
+    did_fail = false
+    try:
+        assert_throws(safe_fn)
+    catch e:
+        did_fail = true
+    end
+    if not did_fail
+        panic "assert_throws did not panic for non-throwing fn"
+    end
+
+    ## Test with a named lambda (no args, just throws)
+    lambda check_arg():
+        throw "expected_error"
+    end
+
+    assert_throws(check_arg)
+end
+
+## ── Test now() timestamp ──
+
+function test_now()
+    t1 = now()
+    t2 = now()
+
+    if t2 < t1
+        panic strcat("now() went backward: ", strcat(str(t2), strcat(" < ", str(t1))))
+    end
+
+    delta = t2 - t1
+    if delta < 0
+        delta = -delta
+    end
+
+    if delta > 5000
+        panic strcat("now() delta too large: ", str(delta))
+    end
+end
+
+## ── Test stamp() high-res timestamp ──
+
+function test_stamp()
+    s1 = stamp()
+    s2 = stamp()
+
+    if s2 < s1
+        panic "stamp() went backward"
+    end
+end
+
+## ── Test mock library ──
+
+function test_mock()
+    ctx = mock_new()
+    mock_expect(ctx, [1, 2], 3)
+    mock_expect(ctx, [4, 5], 9)
+
+    result1 = mock_call(ctx, [1, 2])
+    if result1 != 3
+        panic strcat("mock call 1: expected 3, got ", str(result1))
+    end
+
+    result2 = mock_call(ctx, [4, 5])
+    if result2 != 9
+        panic strcat("mock call 2: expected 9, got ", str(result2))
+    end
+
+    mock_verify(ctx)
+end
+
+## ── Test returning a lambda from a function ──
+
+function make_adder(n)
+    lambda add(x):
+        return x + n
+    end
+    return add
+end
+
+function test_return_lambda()
+    add5 = make_adder(5)
+    result = add5(10)
+    if result != 15
+        panic strcat("make_adder: expected 15, got ", str(result))
+    end
+end
+
+## ── Main test runner ──
+
+function main()
+    test_begin("Integration Tests")
+
+    test_assert_throws()
+    test_pass("assert_throws")
+
+    test_now()
+    test_pass("now()")
+
+    test_stamp()
+    test_pass("stamp()")
+
+    test_mock()
+    test_pass("mock")
+
+    test_return_lambda()
+    test_pass("return lambda")
+
+    test_report()
+end

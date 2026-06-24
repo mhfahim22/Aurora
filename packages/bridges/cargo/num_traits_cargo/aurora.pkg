@@ -1,0 +1,6 @@
+name: num_traits-cargo
+version: 0.2.19
+description: "cargo bridge: Numeric traits for generic mathematics"
+entry: num_traits.au
+dependencies:
+  - rust-std

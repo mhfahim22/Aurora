@@ -1,0 +1,9 @@
+class Person
+    name = "unknown"
+    age = 0
+    function greet()
+        output(self.name)
+
+p = Person("Alice", 30)
+p.greet()
+output("DONE")

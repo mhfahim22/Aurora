@@ -1,0 +1,6 @@
+outputln("Testing request()...")
+server app
+    route "GET" "/"
+        body = request("body")
+        json(body)
+outputln("Server registered.")

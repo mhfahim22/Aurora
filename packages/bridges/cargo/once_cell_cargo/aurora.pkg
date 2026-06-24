@@ -1,0 +1,6 @@
+name: once_cell-cargo
+version: 1.21.4
+description: "cargo bridge: Single assignment cells and lazy values."
+entry: once_cell.au
+dependencies:
+  - rust-std

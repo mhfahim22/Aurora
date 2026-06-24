@@ -1,0 +1,3 @@
+extern "stdcall" "user32" function MessageBoxA(hWnd: pointer, text: cstring, caption: cstring, type: i32) -> i32
+function main():
+  return 0

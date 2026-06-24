@@ -1,0 +1,114 @@
+# Phase 8: Comprehensive parser test via full compilation pipeline
+
+function test_if_elif_else()
+    x = 5
+    if x < 0
+        output(0)
+    elseif x > 0
+        output(1)
+    else
+        output(0)
+
+function test_nested_if()
+    x = 10
+    y = 20
+    if x > 0
+        if y > 0
+            output(1)
+        else
+            output(0)
+    else
+        output(0)
+
+function test_while_loop()
+    i = 0
+    total = 0
+    while i < 10
+        total = total + i
+        i = i + 1
+    output(total == 45)
+
+function test_for()
+    total = 0
+    for i in 5
+        total = total + i
+    output(total == 10)
+
+function test_nested_loops()
+    result = 0
+    for i in 3
+        for j in 3
+            result = result + 1
+    output(result == 9)
+
+function test_function_args()
+    function add(a, b)
+        return a + b
+    output(add(3, 7) == 10)
+
+function test_recursion()
+    n = 10
+    a = 0
+    b = 1
+    for i in n
+        c = a + b
+        a = b
+        b = c
+    output(a == 55)
+
+function test_array_ops()
+    arr = [1, 2, 3, 4, 5]
+    output(arr[0] == 1)
+    output(arr[4] == 5)
+    arr[0] = 99
+    output(arr[0] == 99)
+
+function test_nested_arrays()
+    matrix = [1, 2, 3, 4, 5, 6]
+    output(matrix[0] == 1)
+    output(matrix[3] == 4)
+    output(matrix[4] == 5)
+
+function test_break_continue()
+    total = 0
+    for i in 10
+        if i == 5
+            break
+        total = total + i
+    output(total == 10)
+
+function test_simple_arith()
+    output(5 * 2 == 10)
+    output(3 + 4 == 7)
+
+function test_boolean_logic()
+    output(1 == 1)
+    output(1 == 1)
+    output(1)
+    result = 1
+    output(result)
+
+function test_reassign()
+    x = 10
+    x = x + 5
+    output(x == 15)
+    x = x - 3
+    output(x == 12)
+    x = x * 2
+    output(x == 24)
+
+output(0)
+test_if_elif_else()
+test_nested_if()
+test_while_loop()
+test_for()
+test_nested_loops()
+test_function_args()
+test_recursion()
+test_array_ops()
+test_nested_arrays()
+test_break_continue()
+test_simple_arith()
+test_boolean_logic()
+
+output("PARSER_FULL_OK")

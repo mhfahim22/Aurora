@@ -1,0 +1,9 @@
+outputln("Test both field and param...")
+server app
+    route "GET" "/get/:id"
+        id = request.params.id
+        json(aurora_todo_get(id))
+    route "POST" "/create"
+        body = request("body")
+        json(aurora_todo_create(body))
+outputln("Server registered.")

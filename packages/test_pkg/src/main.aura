@@ -1,0 +1,5 @@
+## test_pkg - A new Aurora package
+## Version: 0.1.0
+
+function main():
+  output("Hello from test_pkg!")

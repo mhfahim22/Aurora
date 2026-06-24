@@ -1,0 +1,5 @@
+extern "stdcall" "kernel32" function GetTickCount() -> u32
+
+function main():
+  output(42)
+  return 0
