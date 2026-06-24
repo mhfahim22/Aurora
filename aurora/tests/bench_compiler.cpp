@@ -46,8 +46,9 @@ static std::string find_aurorac() {
 static std::string make_temp_file(const std::string& content) {
     static int counter = 0;
     char tmpfile[1024];
+    char tmpdir[1024];
 #ifdef _WIN32
-    char tmpdir[1024] = "";
+    tmpdir[0] = 0;
     DWORD len = GetTempPathA(sizeof(tmpdir), tmpdir);
     if (len == 0 || len >= sizeof(tmpdir)) strcpy(tmpdir, ".");
 #else
