@@ -215,6 +215,7 @@ jobs:
         brew install llvm@19
         LLVM_PREFIX=$(brew --prefix llvm@19)
         echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "LLVM_PREFIX=$LLVM_PREFIX" >> $GITHUB_ENV
         echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
         echo "CC=$LLVM_PREFIX/bin/clang" >> $GITHUB_ENV
         echo "CXX=$LLVM_PREFIX/bin/clang++" >> $GITHUB_ENV
