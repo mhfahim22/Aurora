@@ -216,8 +216,6 @@ jobs:
         echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
         echo "LLVM_PREFIX=$LLVM_PREFIX" >> $GITHUB_ENV
         echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
-        echo "CC=$LLVM_PREFIX/bin/clang" >> $GITHUB_ENV
-        echo "CXX=$LLVM_PREFIX/bin/clang++" >> $GITHUB_ENV
 
     - name: Install Dependencies
       run: |
@@ -226,9 +224,7 @@ jobs:
     - name: Configure CMake
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release \
-          -DLLVM_DIR="$LLVM_DIR" \
-          -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
-          -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++"
+          -DLLVM_DIR="$LLVM_DIR"
 
     - name: Build Core Targets
       run: |
