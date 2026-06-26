@@ -71,12 +71,14 @@ static llvm::GlobalVariable* get_or_create_vtable(
     for (auto* m : vtable_methods) {
         llvm::Function* fn = module.getFunction(m->llvm_name);
         if (!fn) {
+            /* H3-F: annotation-aware return type; params default to i8* (matching gen_class_oop) */
+            auto* vt_ret_ty = ast_kind_to_abi_type(ctx, m->return_kind,
+                llvm::Type::getInt64Ty(ctx));
             std::vector<llvm::Type*> param_types;
-            param_types.push_back(llvm::PointerType::getUnqual(ctx));
+            param_types.push_back(llvm::PointerType::getUnqual(ctx)); /* self */
             for (size_t i = 0; i < m->params.size(); i++)
-                param_types.push_back(llvm::Type::getInt64Ty(ctx));
-            auto* fn_ty = llvm::FunctionType::get(
-                llvm::Type::getInt64Ty(ctx), param_types, false);
+                param_types.push_back(llvm::PointerType::getUnqual(ctx));
+            auto* fn_ty = llvm::FunctionType::get(vt_ret_ty, param_types, false);
             fn = llvm::Function::Create(
                 fn_ty, llvm::Function::ExternalLinkage, m->llvm_name, module);
         }
@@ -399,19 +401,33 @@ static llvm::Value* oop_gen_method_call_impl(
                                  "' has no method '" + method_name + "'");
     }
 
-    /* args build করা */
+    /* args build করা (gen_expr returns uniform i64 by default; conversion happens per-branch) */
     std::vector<llvm::Value*> call_args;
-    call_args.push_back(obj_ptr); /* self */
+    call_args.push_back(obj_ptr); /* self — i8* */
 
     const ASTNode* arg = args_node;
     while (arg) {
         llvm::Value* v = gen_expr(arg);
         if (!v) v = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), 0);
-        if (v->getType()->isIntegerTy() && !v->getType()->isPointerTy())
-            v = builder.CreateIntToPtr(v, llvm::PointerType::getUnqual(ctx), "arg_cast");
         call_args.push_back(v);
         arg = arg->next.get();
     }
+
+    /* ── Helper: convert value to match a target LLVM type ── */
+    auto convert_to_type = [&](llvm::Value* val, llvm::Type* target) -> llvm::Value* {
+        if (!val || val->getType() == target) return val;
+        if (val->getType()->isIntegerTy() && target->isPointerTy())
+            return builder.CreateIntToPtr(val, target, "arg_cast");
+        if (val->getType()->isPointerTy() && target->isIntegerTy())
+            return builder.CreatePtrToInt(val, target, "arg_cast");
+        if (val->getType()->isIntegerTy() && target->isDoubleTy())
+            return builder.CreateSIToFP(val, target, "arg_itof");
+        if (val->getType()->isDoubleTy() && target->isIntegerTy())
+            return builder.CreateFPToSI(val, target, "arg_ftoi");
+        if (val->getType()->isPointerTy() && target->isPointerTy())
+            return builder.CreateBitCast(val, target, "arg_pcast");
+        return val;
+    };
 
     /* ── Virtual dispatch via vtable ── */
     const ClassInfo* cls = global_class_registry().get(class_name);
@@ -437,8 +453,7 @@ static llvm::Value* oop_gen_method_call_impl(
         llvm::Value* method_ptr = builder.CreateLoad(
             llvm::PointerType::getUnqual(ctx), method_ptr_ptr, "vtable_method");
 
-        /* Use the known function signature (i64 return, i8* self, i64 params) */
-        /* Match what oop_gen_class produces */
+        /* H3-F: use annotation-aware return type; params default to i8* */
         std::vector<llvm::Type*> fn_param_types;
         fn_param_types.push_back(llvm::PointerType::getUnqual(ctx)); /* self */
         /* Try to get the actual function to match its signature */
@@ -447,15 +462,22 @@ static llvm::Value* oop_gen_method_call_impl(
         if (existing_fn) {
             fn_ty = existing_fn->getFunctionType();
         } else {
+            auto* virt_ret_ty = ast_kind_to_abi_type(ctx, method->return_kind,
+                llvm::Type::getInt64Ty(ctx));
             for (size_t i = 0; i < method->params.size(); i++)
-                fn_param_types.push_back(llvm::Type::getInt64Ty(ctx));
-            fn_ty = llvm::FunctionType::get(
-                llvm::Type::getInt64Ty(ctx), fn_param_types, false);
+                fn_param_types.push_back(llvm::PointerType::getUnqual(ctx));
+            fn_ty = llvm::FunctionType::get(virt_ret_ty, fn_param_types, false);
         }
+
+        /* Convert args to match fn_ty param types */
+        for (size_t i = 1; i < call_args.size() && i < fn_ty->getNumParams(); i++)
+            call_args[i] = convert_to_type(call_args[i], fn_ty->getParamType(i));
 
         llvm::Value* ret = builder.CreateCall(fn_ty, method_ptr, call_args, method_name + "_virt_ret");
         if (ret->getType()->isPointerTy() && !method_annotation_returns_string(*method))
             ret = builder.CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx), "ret_unbox");
+        else if (ret->getType()->isDoubleTy())
+            ret = builder.CreateBitCast(ret, llvm::Type::getInt64Ty(ctx), "ret_fp_unbox");
         return ret;
     }
 
@@ -467,15 +489,25 @@ static llvm::Value* oop_gen_method_call_impl(
         for (int i = 0; i < (int)method->params.size(); i++)
             param_types.push_back(llvm::PointerType::getUnqual(ctx));
 
-        auto* fn_ty = llvm::FunctionType::get(
-            llvm::PointerType::getUnqual(ctx), param_types, false);
+        auto* dir_ret_ty = ast_kind_to_abi_type(ctx, method->return_kind,
+            llvm::PointerType::getUnqual(ctx));
+        auto* fn_ty = llvm::FunctionType::get(dir_ret_ty, param_types, false);
         fn = llvm::Function::Create(
             fn_ty, llvm::Function::ExternalLinkage, method->llvm_name, module);
+    }
+
+    /* Convert args to match fn's param types */
+    {
+        auto* fty = fn->getFunctionType();
+        for (size_t i = 1; i < call_args.size() && i < fty->getNumParams(); i++)
+            call_args[i] = convert_to_type(call_args[i], fty->getParamType(i));
     }
 
     llvm::Value* ret = builder.CreateCall(fn, call_args, method_name + "_ret");
     if (ret->getType()->isPointerTy() && !method_annotation_returns_string(*method))
         ret = builder.CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx), "ret_unbox");
+    else if (ret->getType()->isDoubleTy())
+        ret = builder.CreateBitCast(ret, llvm::Type::getInt64Ty(ctx), "ret_fp_unbox");
     return ret;
 }
 

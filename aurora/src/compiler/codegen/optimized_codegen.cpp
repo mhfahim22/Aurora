@@ -562,9 +562,19 @@ void OptimizedCodegen::gen_assign(const ASTNode* node) {
             ptr = create_entry_alloca(name, llvm::Type::getInt64Ty(ctx_));
     }
 
-    /* Store the RHS into the allocated slot */
-    if (ptr)
-        builder_->CreateStore(rhs, ptr);
+    /* Store the RHS into the allocated slot (convert to i64 for uniform representation) */
+    if (ptr) {
+        llvm::Value* store_val = rhs;
+        if (store_val->getType() != llvm::Type::getInt64Ty(ctx_)) {
+            if (store_val->getType()->isPointerTy())
+                store_val = builder_->CreatePtrToInt(store_val, llvm::Type::getInt64Ty(ctx_), name + "_box");
+            else if (store_val->getType()->isDoubleTy())
+                store_val = builder_->CreateBitCast(store_val, llvm::Type::getInt64Ty(ctx_), name + "_box");
+            else
+                store_val = builder_->CreatePtrToInt(store_val, llvm::Type::getInt64Ty(ctx_), name + "_conv");
+        }
+        builder_->CreateStore(store_val, ptr);
+    }
 }
 
 void OptimizedCodegen::gen_return(const ASTNode* node) {
@@ -577,8 +587,22 @@ void OptimizedCodegen::gen_return(const ASTNode* node) {
             /* Don't decrement on return - ownership is transferred */
         }
     }
-    if (!builder_->GetInsertBlock() || !builder_->GetInsertBlock()->getTerminator())
-        builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
+    if (!builder_->GetInsertBlock() || builder_->GetInsertBlock()->getTerminator()) return;
+    llvm::Function* cur_fn = builder_->GetInsertBlock()->getParent();
+    auto* rt = cur_fn ? cur_fn->getReturnType() : nullptr;
+    if (!rt) {
+        builder_->CreateRet(llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0));
+        return;
+    }
+    if (rt->isVoidTy()) {
+        builder_->CreateRetVoid();
+    } else if (rt->isPointerTy()) {
+        builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(rt)));
+    } else if (rt->isDoubleTy()) {
+        builder_->CreateRet(llvm::ConstantFP::get(rt, 0.0));
+    } else {
+        builder_->CreateRet(llvm::ConstantInt::get(rt, 0));
+    }
 }
 
 void OptimizedCodegen::gen_function(const ASTNode* node) {
@@ -587,11 +611,13 @@ void OptimizedCodegen::gen_function(const ASTNode* node) {
     const ASTNode* p = node->args.get();
     while (p) {
         param_names.push_back(p->value);
-        param_types.push_back(llvm::Type::getInt64Ty(ctx_));
+        param_types.push_back(ast_kind_to_abi_type(ctx_, p->type_annotation.kind, llvm::Type::getInt64Ty(ctx_)));
         p = p->next.get();
     }
 
-    auto* fn_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+    auto ret_kind = get_annotation_kind(node);
+    auto* ret_ty = ast_kind_to_abi_type(ctx_, ret_kind, i8ptr_ty());
+    auto* fn_type = llvm::FunctionType::get(ret_ty, param_types, false);
     auto* fn = llvm::Function::Create(
         fn_type, llvm::Function::ExternalLinkage,
         node->value, module_.get());
@@ -616,15 +642,31 @@ void OptimizedCodegen::gen_function(const ASTNode* node) {
     ai = 0;
     for (auto& arg : fn->args()) {
         auto* slot = create_entry_alloca(param_names[ai], llvm::Type::getInt64Ty(ctx_));
-        builder_->CreateStore(&arg, slot);
+        llvm::Value* arg_val = &arg;
+        if (arg_val->getType() != llvm::Type::getInt64Ty(ctx_)) {
+            if (arg_val->getType()->isPointerTy())
+                arg_val = builder_->CreatePtrToInt(arg_val, llvm::Type::getInt64Ty(ctx_), param_names[ai] + "_box");
+            else if (arg_val->getType()->isDoubleTy())
+                arg_val = builder_->CreateBitCast(arg_val, llvm::Type::getInt64Ty(ctx_), param_names[ai] + "_box");
+        }
+        builder_->CreateStore(arg_val, slot);
         ai++;
     }
 
     walk_block(node->body.get());
     pop_scope();
 
-    if (!builder_->GetInsertBlock() || !builder_->GetInsertBlock()->getTerminator())
-        builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
+    if (!builder_->GetInsertBlock() || !builder_->GetInsertBlock()->getTerminator()) {
+        if (ret_ty->isVoidTy()) {
+            builder_->CreateRetVoid();
+        } else if (ret_ty->isPointerTy()) {
+            builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(ret_ty)));
+        } else if (ret_ty->isDoubleTy()) {
+            builder_->CreateRet(llvm::ConstantFP::get(ret_ty, 0.0));
+        } else {
+            builder_->CreateRet(llvm::ConstantInt::get(ret_ty, 0));
+        }
+    }
 
     if (saved_bb) builder_->SetInsertPoint(saved_bb);
 }
@@ -722,10 +764,30 @@ llvm::Value* OptimizedCodegen::gen_call(const ASTNode* node) {
     /* Look up or declare the function */
     llvm::Function* fn = module_->getFunction(callee);
     if (!fn) {
+        auto rk = get_annotation_kind(node);
+        auto* ret_type = ast_kind_to_abi_type(ctx_, rk, i8ptr_ty());
         auto* i64 = llvm::Type::getInt64Ty(ctx_);
         std::vector<llvm::Type*> param_tys(args.size(), i64);
-        auto* fty = llvm::FunctionType::get(i8ptr_ty(), param_tys, false);
+        auto* fty = llvm::FunctionType::get(ret_type, param_tys, false);
         fn = llvm::Function::Create(fty, llvm::Function::ExternalLinkage, callee, module_.get());
+    }
+
+    /* Convert arguments from uniform i64 to function's expected param types */
+    {
+        auto* fty = fn->getFunctionType();
+        for (size_t i = 0; i < args.size() && i < fty->getNumParams(); i++) {
+            llvm::Type* param_ty = fty->getParamType(i);
+            if (args[i]->getType() != param_ty) {
+                if (args[i]->getType()->isIntegerTy() && param_ty->isPointerTy())
+                    args[i] = builder_->CreateIntToPtr(args[i], param_ty, "arg_unbox");
+                else if (args[i]->getType()->isPointerTy() && param_ty->isIntegerTy())
+                    args[i] = builder_->CreatePtrToInt(args[i], param_ty, "arg_box");
+                else if (args[i]->getType()->isIntegerTy() && param_ty->isDoubleTy())
+                    args[i] = builder_->CreateSIToFP(args[i], param_ty, "arg_itof");
+                else if (args[i]->getType()->isDoubleTy() && param_ty->isIntegerTy())
+                    args[i] = builder_->CreateFPToSI(args[i], param_ty, "arg_ftoi");
+            }
+        }
     }
 
     return builder_->CreateCall(fn, args, callee + "_call");

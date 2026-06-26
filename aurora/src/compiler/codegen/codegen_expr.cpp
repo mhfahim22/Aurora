@@ -1234,30 +1234,49 @@ llvm::Value* Codegen::gen_closure_call(const ASTNode* node, VarRecord* rec) {
     auto* env_gep = builder_->CreateStructGEP(closure_ty, closure_ptr, 1, "cenv");
     llvm::Value* env_ptr = builder_->CreateLoad(i8ptr_ty(), env_gep, "cenv");
 
+    /* H3-F: derive return type from annotation, fall back to i8* */
+    auto closure_ret_kind = get_annotation_kind(node);
+    auto* ret_ty = ast_kind_to_abi_type(ctx_, closure_ret_kind, i8ptr_ty());
+
     /* Collect args: env first, then regular args */
     std::vector<llvm::Value*> args;
+    std::vector<llvm::Type*> param_types;
     args.push_back(env_ptr);
+    param_types.push_back(i8ptr_ty());  /* env is always i8* */
     const ASTNode* arg = node->args.get();
     while (arg) {
         llvm::Value* v = gen_expr(arg);
         if (!v) v = i64(0);
-        if (v->getType()->isIntegerTy() && !v->getType()->isPointerTy())
-            v = builder_->CreateIntToPtr(v, i8ptr_ty(), "arg_closure_cast");
+        /* Closure user params use i8* ABI (matching lambda generation defaults) */
+        param_types.push_back(i8ptr_ty());
+        if (v->getType() != i8ptr_ty()) {
+            if (v->getType()->isPointerTy()) {
+                /* already a pointer — keep */
+            } else if (v->getType()->isIntegerTy()) {
+                v = builder_->CreateIntToPtr(v, i8ptr_ty(), "arg_closure_cast");
+            } else if (v->getType()->isDoubleTy()) {
+                v = builder_->CreateBitCast(v, i64_ty(), "arg_closure_fp_box");
+                v = builder_->CreateIntToPtr(v, i8ptr_ty(), "arg_closure_cast");
+            }
+        }
         args.push_back(v);
         arg = arg->next.get();
     }
 
-    /* Build function type for the call */
-    std::vector<llvm::Type*> param_types;
-    for (size_t i = 0; i < args.size(); i++)
-        param_types.push_back(i8ptr_ty());
-    auto* fn_call_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+    auto* fn_call_type = llvm::FunctionType::get(ret_ty, param_types, false);
 
     llvm::CallInst* call = builder_->CreateCall(fn_call_type, fn_ptr, args, "closure_call");
     call->setTailCallKind(llvm::CallInst::TCK_NoTail);
     llvm::Value* result = call;
-    if (result->getType()->isPointerTy())
-        result = builder_->CreatePtrToInt(result, i64_ty(), "closure_ret");
+    /* Normalize return to uniform representation */
+    if (ret_ty->isPointerTy()) {
+        if (closure_ret_kind != AstTypeKind::String)
+            result = builder_->CreatePtrToInt(result, i64_ty(), "closure_ret");
+    } else if (ret_ty->isDoubleTy()) {
+        result = builder_->CreateBitCast(result, i64_ty(), "closure_ret_fp");
+    } else if (ret_ty->isIntegerTy() && ret_ty->getIntegerBitWidth() < 64) {
+        result = builder_->CreateZExt(result, i64_ty(), "closure_ret_zext");
+    }
     return result;
 }
 
@@ -1267,26 +1286,45 @@ llvm::Value* Codegen::gen_fnptr_call(const ASTNode* node, VarRecord* rec) {
     llvm::Value* fn_int = builder_->CreateLoad(i64_ty(), rec->alloca_ptr, node->value + "_fn_int");
     llvm::Value* fn_ptr = builder_->CreateIntToPtr(fn_int, i8ptr_ty(), node->value + "_fn");
 
+    /* H3-F: derive return type from annotation, fall back to i8* */
+    auto fnptr_ret_kind = get_annotation_kind(node);
+    auto* ret_ty = ast_kind_to_abi_type(ctx_, fnptr_ret_kind, i8ptr_ty());
+
     std::vector<llvm::Value*> args;
+    std::vector<llvm::Type*> param_types;
     const ASTNode* arg = node->args.get();
     while (arg) {
         llvm::Value* v = gen_expr(arg);
         if (!v) v = i64(0);
-        if (v->getType()->isIntegerTy() && !v->getType()->isPointerTy())
-            v = builder_->CreateIntToPtr(v, i8ptr_ty(), "arg_fnptr_cast");
+        /* Fnptr params use i8* ABI (matching function pointer generation defaults) */
+        param_types.push_back(i8ptr_ty());
+        if (v->getType() != i8ptr_ty()) {
+            if (v->getType()->isPointerTy()) {
+                /* already i8* or compatible pointer — keep */
+            } else if (v->getType()->isIntegerTy()) {
+                v = builder_->CreateIntToPtr(v, i8ptr_ty(), "arg_fnptr_cast");
+            } else if (v->getType()->isDoubleTy()) {
+                v = builder_->CreateBitCast(v, i64_ty(), "arg_fnptr_fp_box");
+                v = builder_->CreateIntToPtr(v, i8ptr_ty(), "arg_fnptr_cast");
+            }
+        }
         args.push_back(v);
         arg = arg->next.get();
     }
 
-    std::vector<llvm::Type*> param_types;
-    for (size_t i = 0; i < args.size(); i++)
-        param_types.push_back(i8ptr_ty());
-    auto* fn_call_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+    auto* fn_call_type = llvm::FunctionType::get(ret_ty, param_types, false);
 
     llvm::CallInst* call = builder_->CreateCall(fn_call_type, fn_ptr, args, node->value + "_call");
     call->setTailCallKind(llvm::CallInst::TCK_NoTail);
     llvm::Value* result = call;
-    if (result->getType()->isPointerTy())
-        result = builder_->CreatePtrToInt(result, i64_ty(), node->value + "_ret");
+    /* Normalize return to uniform representation */
+    if (ret_ty->isPointerTy()) {
+        if (fnptr_ret_kind != AstTypeKind::String)
+            result = builder_->CreatePtrToInt(result, i64_ty(), node->value + "_ret");
+    } else if (ret_ty->isDoubleTy()) {
+        result = builder_->CreateBitCast(result, i64_ty(), node->value + "_ret_fp");
+    } else if (ret_ty->isIntegerTy() && ret_ty->getIntegerBitWidth() < 64) {
+        result = builder_->CreateZExt(result, i64_ty(), node->value + "_ret_zext");
+    }
     return result;
 }
