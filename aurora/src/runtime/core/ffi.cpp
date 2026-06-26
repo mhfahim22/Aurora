@@ -18,7 +18,7 @@
 #ifdef _WIN32
 #define AURORA_DL_PREFIX "lib"
 #define AURORA_DL_SUFFIX ".dll"
-#elif __APPLE__
+#elif defined(__APPLE__)
 #define AURORA_DL_PREFIX "lib"
 #define AURORA_DL_SUFFIX ".dylib"
 #else

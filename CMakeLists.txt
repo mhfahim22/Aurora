@@ -1,6 +1,7 @@
 # aurora_restructured/CMakeLists.txt (updated)
 cmake_minimum_required(VERSION 3.20)
 project(Aurora LANGUAGES C CXX ASM_MASM)
+include(CTest)
 
 # ── Read VERSION file and generate version.h ──
 file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" AURORA_VERSION_STR)
@@ -24,11 +25,17 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(MSVC)
+    # Force all configurations to use /MD (Release CRT) because LLVM was
+    # built with /MD.  Mixing /MDd (Debug CRT) with /MD LLVM libs causes
+    # LNK2038 RuntimeLibrary mismatch errors.
+    #
+    # Consequence: Debug builds lose CRT debug checks, debug heap, debug
+    # allocators, and STL iterator bounds checking.  To restore full debug
+    # capability, LLVM must be built from source with /MDd.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-    # LLVM libs are Release (/MD). Override CMake's /MDd→/MD in Debug
-    # so aurorac, aurora_runtime, and all test targets match LLVM's
-    # RuntimeLibrary metadata and avoid LNK2038.
-    add_compile_options($<$<CONFIG:Debug>:/MD>)
+    # _ITERATOR_DEBUG_LEVEL must be 0 when using /MD in Debug mode;
+    # the Debug STL headers default to _ITERATOR_DEBUG_LEVEL=2, which is
+    # incompatible with the release CRT.
     add_compile_definitions($<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)
 endif()
 
@@ -465,6 +472,7 @@ function(add_npm_bridge name pkg c_file)
     if(WIN32)
         if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
             set_property(TARGET ${name} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+            target_compile_options(${name} PRIVATE /FI"quickjs_config.h" /std:c11)
         endif()
         target_link_libraries(${name} PRIVATE bcrypt)
     else()
@@ -601,6 +609,7 @@ add_executable(test_unified_type_system
 )
 target_link_libraries(test_unified_type_system PRIVATE aurora_runtime)
 target_include_directories(test_unified_type_system PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_unified_type_system COMMAND test_unified_type_system)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 4: Cross-Language Memory Safety — Test
@@ -609,6 +618,7 @@ add_executable(test_ffi_memory_safety
     aurora/tests/test_ffi_memory_safety.cpp
 )
 target_include_directories(test_ffi_memory_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_ffi_memory_safety COMMAND test_ffi_memory_safety)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 5: Universal Package Bridge — Test
@@ -618,6 +628,7 @@ add_executable(test_universal_bridge
 )
 target_link_libraries(test_universal_bridge PRIVATE aurora_runtime)
 target_include_directories(test_universal_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_universal_bridge COMMAND test_universal_bridge)
 
 # ═══════════════════════════════════════════════════════════════
 # Native Speed Benchmark — 1B iterations across all phases
@@ -647,6 +658,7 @@ target_include_directories(test_integration_http PRIVATE ${CMAKE_SOURCE_DIR}/aur
 if(WIN32)
     target_link_libraries(test_integration_http PRIVATE winhttp.lib)
 endif()
+add_test(NAME test_integration_http COMMAND test_integration_http)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 1: Universal FFI Core — ABI tests
@@ -656,24 +668,28 @@ add_executable(test_ffi_abi
 )
 target_link_libraries(test_ffi_abi PRIVATE aurora_runtime)
 target_include_directories(test_ffi_abi PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_ffi_abi COMMAND test_ffi_abi)
 
 add_executable(test_ffi_abi_extra
     aurora/tests/test_ffi_abi_extra.cpp
 )
 target_link_libraries(test_ffi_abi_extra PRIVATE aurora_runtime)
 target_include_directories(test_ffi_abi_extra PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_ffi_abi_extra COMMAND test_ffi_abi_extra)
 
 add_executable(test_ffi_abi_edge
     aurora/tests/test_ffi_abi_edge.cpp
 )
 target_link_libraries(test_ffi_abi_edge PRIVATE aurora_runtime)
 target_include_directories(test_ffi_abi_edge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_ffi_abi_edge COMMAND test_ffi_abi_edge)
 
 add_executable(test_ffi_abi_struct
     aurora/tests/test_ffi_abi_struct.cpp
 )
 target_link_libraries(test_ffi_abi_struct PRIVATE aurora_runtime)
 target_include_directories(test_ffi_abi_struct PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_ffi_abi_struct COMMAND test_ffi_abi_struct)
 
 # ═══════════════════════════════════════════════════════════════
 # End-to-End Bridge Integration Test
@@ -683,6 +699,7 @@ add_executable(test_bridge_e2e
 )
 target_link_libraries(test_bridge_e2e PRIVATE aurora_runtime)
 target_include_directories(test_bridge_e2e PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_bridge_e2e COMMAND test_bridge_e2e)
 
 # ═══════════════════════════════════════════════════════════════
 # PyPI Bridge Thread Safety Test (Phase 1: GIL & Thread Safety)
@@ -692,6 +709,7 @@ add_executable(test_pypi_thread_safety
 )
 target_link_libraries(test_pypi_thread_safety PRIVATE aurora_runtime)
 target_include_directories(test_pypi_thread_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_pypi_thread_safety COMMAND test_pypi_thread_safety)
 
 # ═══════════════════════════════════════════════════════════════
 # TLS SChannel Integration Test (Windows native TLS)
@@ -701,6 +719,7 @@ add_executable(test_tls_schannel
     aurora/tests/test_tls_schannel.cpp
 )
 target_link_libraries(test_tls_schannel PRIVATE ws2_32.lib)
+add_test(NAME test_tls_schannel COMMAND test_tls_schannel)
 endif()
 
 # ═══════════════════════════════════════════════════════════════
@@ -722,6 +741,7 @@ if(WIN32)
     target_link_libraries(test_fuzz_parser PRIVATE kernel32)
 endif()
 target_include_directories(test_fuzz_parser PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_fuzz_parser COMMAND test_fuzz_parser 1000)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 8: Leak Detector — Test
@@ -731,6 +751,7 @@ add_executable(test_leak_detector
 )
 target_link_libraries(test_leak_detector PRIVATE aurora_runtime)
 target_include_directories(test_leak_detector PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_leak_detector COMMAND test_leak_detector)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 8: Smart Pointers — Test
@@ -740,6 +761,7 @@ add_executable(test_smart_ptr
 )
 target_link_libraries(test_smart_ptr PRIVATE aurora_runtime)
 target_include_directories(test_smart_ptr PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_smart_ptr COMMAND test_smart_ptr)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 9: Optimizer Pass Tests (const_fold, DCE, strength_reduce)
@@ -757,6 +779,33 @@ add_executable(test_optimizer
 )
 target_include_directories(test_optimizer PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include ${LLVM_INCLUDE_DIRS})
 target_link_libraries(test_optimizer PRIVATE ${LLVM_LIBS})
+add_test(NAME test_optimizer COMMAND test_optimizer)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 10: Memory Safety System — Comprehensive Integration Test
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_memory_safety
+    aurora/tests/test_memory_safety.cpp
+    aurora/src/compiler/semantic/escape_analyzer.cpp
+    aurora/src/compiler/semantic/lifetime_analyzer.cpp
+    aurora/src/compiler/semantic/ownership_analyzer.cpp
+    aurora/src/compiler/semantic/memory_analyzer.cpp
+    aurora/src/compiler/semantic/allocation_strategy.cpp
+    aurora/src/compiler/semantic/allocation_profiler.cpp
+)
+target_link_libraries(test_memory_safety PRIVATE aurora_runtime)
+target_include_directories(test_memory_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_memory_safety COMMAND test_memory_safety)
+
+# ═══════════════════════════════════════════════════════════════
+# Missing: Python Symbol Export Test (orphaned — re-added)
+# ═══════════════════════════════════════════════════════════════
+if(WIN32)
+add_executable(test_symbols
+    aurora/tests/test_symbols.cpp
+)
+add_test(NAME test_symbols COMMAND test_symbols)
+endif()
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 8: Compiler Performance Benchmarks

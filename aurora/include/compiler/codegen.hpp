@@ -13,6 +13,8 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include <string>
 #include <unordered_map>
@@ -133,8 +135,7 @@ void         oop_register_object_ptr(const std::string& var_name,
 struct VarRecord {
     llvm::Value*   alloca_ptr  { nullptr };   /* alloca instruction        */
     OwnershipState state       { OwnershipState::Owned };
-    bool           is_array    { false };
-    bool           is_string   { false };
+    AstTypeKind    type_kind   { AstTypeKind::Unknown }; /* H3 Phase D — resolved type */
     bool           is_gc_root  { false };     /* registered with GC        */
     bool           is_closure  { false };     /* lambda closure variable   */
     std::string    struct_type {};            /* extern struct name, if any */
@@ -657,7 +658,62 @@ private:
     std::unique_ptr<llvm::IRBuilder<>>      builder_;
 };
 
+/* ── H2 Phase E-3: map resolved AstTypeKind to LLVM ABI type ──
+    Returns the LLVM type suitable for function signatures (params/return)
+    based on the annotation's type kind. Falls back to `fallback` when
+    kind is Unknown — this preserves the existing ABI for untyped code.
+    Never returns null.                                                     */
+inline llvm::Type* ast_kind_to_abi_type(llvm::LLVMContext& ctx, AstTypeKind kind, llvm::Type* fallback) {
+    switch (kind) {
+        case AstTypeKind::Unknown:              return fallback;
+        case AstTypeKind::Int:
+        case AstTypeKind::Bool:                 return llvm::Type::getInt64Ty(ctx);
+        case AstTypeKind::Float:                return llvm::Type::getDoubleTy(ctx);
+        case AstTypeKind::String:               return llvm::PointerType::getUnqual(ctx);
+        case AstTypeKind::Void:                 return llvm::Type::getVoidTy(ctx);
+        default:                                return llvm::PointerType::getUnqual(ctx);
+    }
+}
+
+/* ── H2 Phase C: get type kind from AST node, preferring type_annotation ── */
+/*   Returns the resolved type kind if annotation is non-Unknown,              */
+/*   otherwise falls back to deriving from the node's syntactic type.          */
+inline AstTypeKind get_annotation_kind(const ASTNode* node) {
+    if (!node) return AstTypeKind::Unknown;
+    if (node->type_annotation.kind != AstTypeKind::Unknown)
+        return node->type_annotation.kind;
+    /* Fallback: derive from node type (literal nodes only) */
+    switch (node->type) {
+        case NodeType::Num:   return AstTypeKind::Int;
+        case NodeType::Float: return AstTypeKind::Float;
+        case NodeType::Str:   return AstTypeKind::String;
+        case NodeType::Array: {
+            if (node->value == "__tuple__") return AstTypeKind::Tuple;
+            return AstTypeKind::Array;
+        }
+        default: return AstTypeKind::Unknown;
+    }
+}
+
 /* ── Convenience free functions ── */
+
+/* Derive the LLVM data-layout string from a target triple.
+   Returns a string like "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+   Throws a user-friendly std::runtime_error if the target is not registered. */
+inline std::string llvm_target_data_layout(const std::string& triple) {
+    std::string err;
+    const auto* target = llvm::TargetRegistry::lookupTarget(triple, err);
+    if (!target) {
+        throw std::runtime_error("LLVM codegen: unknown target triple \"" + triple + "\": " + err);
+    }
+    auto* tm = target->createTargetMachine(triple, "generic", "", {}, {});
+    if (!tm) {
+        throw std::runtime_error("LLVM codegen: could not create target machine for triple \"" + triple + "\"");
+    }
+    auto dl = tm->createDataLayout().getStringRepresentation();
+    delete tm;
+    return dl;
+}
 
 /* Full pipeline: .aura source -> .obj file (single step) */
 bool compile_aura_to_object(const std::string& source_path,

@@ -69,8 +69,9 @@ LLVMCodegen::LLVMCodegen()
     , builder_(std::make_unique<llvm::IRBuilder<>>(*ctx_))
 {
     ensure_llvm_init();
-    module_->setTargetTriple("x86_64-pc-windows-msvc");
-    module_->setDataLayout("e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    auto triple = llvm::sys::getProcessTriple();
+    module_->setTargetTriple(triple);
+    module_->setDataLayout(llvm_target_data_layout(triple));
 }
 
 LLVMCodegen::LLVMCodegen(llvm::LLVMContext& ctx,

@@ -10,17 +10,19 @@
 
 /* ── function fname(params): body ── */
 void Codegen::gen_function(const ASTNode* node) {
-    /* Build param type list — use i64 for all params (values stored as i64 internally) */
+    /* Build param type list — prefer annotation, fall back to i64 */
     std::vector<std::string>    param_names;
     std::vector<llvm::Type*>    param_types;
     const ASTNode* p = node->args.get();
     while (p) {
         param_names.push_back(p->value);
-        param_types.push_back(i64_ty());
+        param_types.push_back(ast_kind_to_abi_type(ctx_, p->type_annotation.kind, i64_ty()));
         p = p->next.get();
     }
 
-    auto* fn_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+    auto ret_kind = get_annotation_kind(node);
+    auto* ret_ty  = ast_kind_to_abi_type(ctx_, ret_kind, i8ptr_ty());
+    auto* fn_type = llvm::FunctionType::get(ret_ty, param_types, false);
     auto* fn      = llvm::Function::Create(
         fn_type, llvm::Function::ExternalLinkage,
         node->value, module_.get());
@@ -72,8 +74,17 @@ void Codegen::gen_function(const ASTNode* node) {
     gen_block(node->body.get());
     pop_scope_and_drop();
 
-    /* Default return: null pointer */
-    safe_ret(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
+    /* Default return: appropriate zero for the function's return type */
+    {
+        auto* rt = fn->getReturnType();
+        if (rt->isVoidTy()) {
+            if (!current_block_terminated()) builder_->CreateRetVoid();
+        } else if (rt->isPointerTy()) {
+            safe_ret(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(rt)));
+        } else {
+            safe_ret(llvm::ConstantInt::get(rt, 0));
+        }
+    }
 
     /* Restore caller context */
     literal_aurora_cache_ = std::move(saved_cache);
@@ -103,17 +114,19 @@ void Codegen::gen_class_oop(const ASTNode* node) {
         if (stmt->type == NodeType::Function) {
             std::string llvm_name = class_name + "__" + stmt->value;
 
-            /* self pointer + declared params */
+            /* self pointer + declared params — prefer annotation, fall back to i8* */
             std::vector<llvm::Type*> param_types;
             param_types.push_back(llvm::PointerType::getUnqual(ctx_)); /* self */
             const ASTNode* param = stmt->args.get();
             while (param) {
                 if (param->value != "self")
-                    param_types.push_back(i8ptr_ty());
+                    param_types.push_back(ast_kind_to_abi_type(ctx_, param->type_annotation.kind, i8ptr_ty()));
                 param = param->next.get();
             }
 
-            auto* fn_ty = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+            auto method_ret_kind = get_annotation_kind(stmt);
+            auto* method_ret_ty  = ast_kind_to_abi_type(ctx_, method_ret_kind, i8ptr_ty());
+            auto* fn_ty = llvm::FunctionType::get(method_ret_ty, param_types, false);
             llvm::Function* fn = module_->getFunction(llvm_name);
             if (!fn)
                 fn = llvm::Function::Create(
@@ -159,35 +172,6 @@ void Codegen::gen_class_oop(const ASTNode* node) {
                 param = param->next.get();
             }
 
-            /* Determine method return type from the method body */
-            if (ClassInfo* mutable_cls = global_class_registry().get_mut(class_name)) {
-                for (auto& m : mutable_cls->methods) {
-                    if (m.name == stmt->value) {
-                        /* Walk the method body for Return nodes */
-                        const ASTNode* b = stmt->body.get();
-                        while (b) {
-                            if (b->type == NodeType::Return && b->left) {
-                                /* Check return expression type */
-                                if (b->left->type == NodeType::Attribute && b->left->left &&
-                                    b->left->left->value == "self") {
-                                    /* return self.<field> */
-                                    const ClassFieldInfo* fi = global_class_registry().find_field(class_name, b->left->value);
-                                    m.returns_string = fi ? fi->is_string : true;
-                                } else if (b->left->type == NodeType::Str) {
-                                    m.returns_string = true;
-                                } else if (b->left->type == NodeType::Num) {
-                                    m.returns_string = false;
-                                }
-                                /* Only check the first return statement */
-                                break;
-                            }
-                            b = b->next.get();
-                        }
-                        break;
-                    }
-                }
-            }
-
             /* Walk method body */
             const ASTNode* body = stmt->body.get();
             while (body) {
@@ -195,8 +179,16 @@ void Codegen::gen_class_oop(const ASTNode* node) {
                 body = body->next.get();
             }
 
-            if (!current_block_terminated())
-                builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty())));
+            if (!current_block_terminated()) {
+                auto* rt = fn->getReturnType();
+                if (rt->isVoidTy()) {
+                    builder_->CreateRetVoid();
+                } else if (rt->isPointerTy()) {
+                    builder_->CreateRet(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(rt)));
+                } else {
+                    builder_->CreateRet(llvm::ConstantInt::get(rt, 0));
+                }
+            }
 
             pop_scope_and_drop();
         }
@@ -253,7 +245,9 @@ llvm::Value* Codegen::gen_expr_in_method(const ASTNode* node,
 
         /* Helper: promote to double if either side is float */
         auto promote_to_float = [&](llvm::Value*& a, llvm::Value*& b) {
-            if (a->getType()->isDoubleTy() || b->getType()->isDoubleTy()) {
+            /* H2 Phase C: prefer annotation for float detection */
+            if (get_annotation_kind(node) == AstTypeKind::Float ||
+                a->getType()->isDoubleTy() || b->getType()->isDoubleTy()) {
                 auto* dbl = llvm::Type::getDoubleTy(ctx_);
                 if (!a->getType()->isDoubleTy()) a = builder_->CreateSIToFP(a, dbl);
                 if (!b->getType()->isDoubleTy()) b = builder_->CreateSIToFP(b, dbl);
@@ -262,7 +256,9 @@ llvm::Value* Codegen::gen_expr_in_method(const ASTNode* node,
 
         /* Arithmetic operators */
         if (op == "+") {
-            if (L->getType()->isPointerTy() || R->getType()->isPointerTy()) {
+            /* H2 Phase C: prefer annotation for string concat detection */
+            if (get_annotation_kind(node) == AstTypeKind::String ||
+                L->getType()->isPointerTy() || R->getType()->isPointerTy()) {
                 /* string concat — convert non-string to string, allocate new */
                 auto to_str = [&](llvm::Value*& V, const char* name) {
                     if (!V->getType()->isPointerTy()) {
@@ -416,12 +412,16 @@ void Codegen::gen_stmt_with_self(const ASTNode* node,
     if (node->type == NodeType::Output && node->left) {
         llvm::Value* val = gen_expr_in_method(node->left.get(), self_ptr, class_name);
         if (!val) { gen_stmt(node); return; }
-        if (val->getType()->isDoubleTy())
-            builder_->CreateCall(fn_print_float_, { val });
-        else if (val->getType()->isPointerTy())
-            builder_->CreateCall(fn_print_str_, { val });
-        else
-            builder_->CreateCall(fn_printf_, { val });
+        /* H2 Phase C: prefer annotation, fall back to LLVM type */
+        {
+            auto lk = get_annotation_kind(node->left.get());
+            if (lk == AstTypeKind::Float || val->getType()->isDoubleTy())
+                builder_->CreateCall(fn_print_float_, { val });
+            else if (lk == AstTypeKind::String || val->getType()->isPointerTy())
+                builder_->CreateCall(fn_print_str_, { val });
+            else
+                builder_->CreateCall(fn_printf_, { val });
+        }
         return;
     }
 

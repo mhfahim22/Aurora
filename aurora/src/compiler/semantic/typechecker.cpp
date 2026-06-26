@@ -19,6 +19,55 @@ static AuroraType parse_extern_type(const std::string& name) {
     return AuroraType::Unknown;
 }
 
+/* ── AuroraType → AstTypeKind conversion (H2 Phase B) ── */
+static AstTypeKind to_ast_type_kind(AuroraType t) {
+    switch (t) {
+        case AuroraType::Unknown:  return AstTypeKind::Unknown;
+        case AuroraType::Void:     return AstTypeKind::Void;
+        case AuroraType::Int:      return AstTypeKind::Int;
+        case AuroraType::Float:    return AstTypeKind::Float;
+        case AuroraType::String:   return AstTypeKind::String;
+        case AuroraType::Bool:     return AstTypeKind::Bool;
+        case AuroraType::Array:    return AstTypeKind::Array;
+        case AuroraType::Struct:   return AstTypeKind::Struct;
+        case AuroraType::Function: return AstTypeKind::Function;
+        case AuroraType::Class:    return AstTypeKind::Class;
+        case AuroraType::Enum:      return AstTypeKind::Enum;
+        case AuroraType::Interface: return AstTypeKind::Interface;
+        case AuroraType::Tuple:    return AstTypeKind::Tuple;
+        case AuroraType::Pointer:  return AstTypeKind::Pointer;
+        case AuroraType::List:     return AstTypeKind::List;
+        case AuroraType::Map:       return AstTypeKind::Map;
+        case AuroraType::Set:       return AstTypeKind::Set;
+        case AuroraType::Vector:   return AstTypeKind::Vector;
+        case AuroraType::Stack:    return AstTypeKind::Stack;
+        case AuroraType::Queue:    return AstTypeKind::Queue;
+        case AuroraType::Json:     return AstTypeKind::Json;
+    }
+    return AstTypeKind::Unknown;
+}
+
+/* ── Write resolved type annotation onto an AST node (H2 Phase B) ── */
+/*   element_kind_val: for compound types (Array, List, etc.), the element type.
+       Defaults to Unknown, which preserves backwards compatibility.                 */
+static void annotate_node(const ASTNode* node, AuroraType type,
+                          const std::string& user_type_name = "",
+                          AstTypeKind element_kind_val = AstTypeKind::Unknown) {
+    if (!node) return;
+    auto& ann = const_cast<ASTNode*>(node)->type_annotation;
+    ann.kind = to_ast_type_kind(type);
+    ann.type_name = user_type_name;
+    ann.element_kind = element_kind_val;
+}
+
+/* ── Annotate and return helper — used at every return site of infer_* ── */
+static AuroraType annotate_ret(const ASTNode* node, AuroraType type,
+                               const std::string& user_type_name = "",
+                               AstTypeKind element_kind_val = AstTypeKind::Unknown) {
+    annotate_node(node, type, user_type_name, element_kind_val);
+    return type;
+}
+
 /* ── ABI validation: check if a type name is valid for C FFI ── */
 bool is_valid_abi_type(const std::string& name) {
     auto pt = parse_extern_type(name);
@@ -41,6 +90,7 @@ void validate_abi_type(const std::string& name, int line, const std::string& con
 void TypeChecker::analyse(const ASTNode* root) {
     functions_.clear();
     scopes_.clear();
+    var_element_types_.clear();
     user_types_.clear();
     current_return_type_ = AuroraType::Unknown;
     inside_function_ = false;
@@ -68,8 +118,10 @@ void TypeChecker::define_match_pattern_vars(const ASTNode* pattern) {
     if (!pattern) return;
     switch (pattern->type) {
         case NodeType::Var:
-            if (pattern->value != "_")
+            if (pattern->value != "_") {
                 define_var(pattern->value, AuroraType::Int);
+                annotate_node(pattern, AuroraType::Int);  /* H2 Phase D2 */
+            }
             break;
         case NodeType::Call: {
             const ASTNode* fp = pattern->args.get();
@@ -103,6 +155,23 @@ void TypeChecker::define_var(const std::string& name, AuroraType type) {
         }
     }
     scopes_.back()[name] = type;
+}
+
+/* H2 Phase E-1: define variable with element kind tracking */
+void TypeChecker::define_var_elem(const std::string& name, AuroraType type,
+                                  AstTypeKind elem_kind) {
+    define_var(name, type);
+    if (elem_kind != AstTypeKind::Unknown)
+        var_element_types_[name] = elem_kind;
+    else
+        var_element_types_.erase(name);
+}
+
+/* H2 Phase E-1: lookup element kind for a variable */
+AstTypeKind TypeChecker::lookup_var_elem(const std::string& name) const {
+    auto it = var_element_types_.find(name);
+    if (it != var_element_types_.end()) return it->second;
+    return AstTypeKind::Unknown;
 }
 
 AuroraType TypeChecker::lookup_var(const std::string& name, int line) const {
@@ -632,6 +701,7 @@ void TypeChecker::register_functions(const ASTNode* node) {
                 if (param->right) {
                     if (param->right->type == NodeType::FunctionType) {
                         ptype = AuroraType::Pointer; /* callback → function pointer */
+                        annotate_node(param->right.get(), AuroraType::Function);  /* H2 Phase D */
                         /* Validate callback param types */
                         const ASTNode* cp = param->right->args.get();
                         while (cp) {
@@ -661,6 +731,17 @@ void TypeChecker::register_functions(const ASTNode* node) {
             }
             info.is_vararg = node->is_vararg;
             functions_[node->value] = info;
+            /* H2 Phase D: annotate ExternFn node with resolved types */
+            annotate_node(node, info.result);
+            {
+                const ASTNode* ap = node->args.get();
+                size_t ai = 0;
+                while (ap && ai < info.params.size()) {
+                    annotate_node(ap, info.params[ai]);
+                    ap = ap->next.get();
+                    ai++;
+                }
+            }
         }
         if (node->type == NodeType::Class) {
             oop_register_class(node);
@@ -732,6 +813,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
     switch (node->type) {
         case NodeType::Class: {
             oop_register_class(node);
+            annotate_node(node, AuroraType::Class, node->value);  /* H2 Phase D2 */
             push_scope();
             std::string saved_class = current_class_name_;
             int saved_depth = current_class_depth_;
@@ -784,9 +866,12 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                 const ASTNode* param = fn->args.get();
                 while (param) {
                     define_var(param->value, AuroraType::Unknown);
+                    annotate_node(param, AuroraType::Unknown);  /* H2 Phase D2 */
                     param = param->next.get();
                 }
                 if (fn->body) walk_block(fn->body.get());
+                /* H2 Phase D2: annotate inner function return type (task handle) */
+                annotate_node(fn, AuroraType::Int);
                 pop_scope();
             } else if (node->body) {
                 /* Plain async block: walk body */
@@ -888,7 +973,10 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                 const std::string& obj_name   = node->left->left ? node->left->left->value : "";
                 const std::string& field_name = node->left->value;
                 oop_check_field_access(obj_name, field_name, node->src_line);
-                infer_expr(node->right.get());
+                AuroraType field_type = infer_expr(node->right.get());
+                /* H2 Phase E-1: propagate element kind from RHS */
+                annotate_node(node, field_type, "",
+                    node->right ? node->right->type_annotation.element_kind : AstTypeKind::Unknown);
                 break;
             }
 
@@ -900,11 +988,17 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                     oop_check_new_object(call_name, node->right->args.get(), node->right->src_line);
                     oop_register_object(node->left->value, call_name);
                     define_var(node->left->value, AuroraType::Class);
+                    annotate_node(node, AuroraType::Class);
                     break;
                 }
             }
 
-            define_var(node->left->value, value_type);
+            /* H2 Phase E-1: store element kind alongside variable type */
+            AstTypeKind rhs_elem = node->right
+                ? node->right->type_annotation.element_kind
+                : AstTypeKind::Unknown;
+            define_var_elem(node->left->value, value_type, rhs_elem);
+            annotate_node(node, value_type, "", rhs_elem);
             break;
         }
 
@@ -938,6 +1032,9 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                     expect_assignable(current_return_type_, value_type, node->src_line);
                 }
             }
+            /* H2 Phase E-1: propagate element kind from value expression */
+            annotate_node(node, value_type, "",
+                node->left ? node->left->type_annotation.element_kind : AstTypeKind::Unknown);
             break;
         }
 
@@ -987,6 +1084,9 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             }
             push_scope();
             define_var(node->value, AuroraType::Int);
+            /* H2 Phase E-1: propagate element kind from range expression */
+            annotate_node(node, AuroraType::Int, "",
+                node->left ? node->left->type_annotation.element_kind : AstTypeKind::Unknown);
             walk_block(node->body.get());
             pop_scope();
             break;
@@ -1041,6 +1141,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             const ASTNode* param = node->args.get();
             while (param) {
                 define_var(param->value, AuroraType::Unknown);
+                annotate_node(param, AuroraType::Unknown);  /* H2 Phase D */
                 param = param->next.get();
             }
 
@@ -1085,6 +1186,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             fn.result = current_return_type_ == AuroraType::Unknown
                 ? AuroraType::Int
                 : current_return_type_;
+            annotate_node(node, fn.result);  /* H2 Phase D */
 
             pop_scope();
             current_return_type_ = saved_return;
@@ -1103,6 +1205,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             const ASTNode* param = node->args.get();
             while (param) {
                 define_var(param->value, AuroraType::Unknown);
+                annotate_node(param, AuroraType::Unknown);  /* H2 Phase D */
                 param = param->next.get();
             }
 
@@ -1111,6 +1214,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             fn.result = current_return_type_ == AuroraType::Unknown
                 ? AuroraType::Int
                 : current_return_type_;
+            annotate_node(node, fn.result);  /* H2 Phase D */
 
             pop_scope();
             current_return_type_ = saved_return;
@@ -1132,8 +1236,17 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
         case NodeType::Free:
         case NodeType::Reference:
         case NodeType::Pointer:
-            if (!node->value.empty()) lookup_var(node->value, node->src_line);
-            else if (node->left) infer_expr(node->left.get());
+            if (!node->value.empty()) {
+                /* H2 Phase E-1: propagate stored element kind for compound types */
+                auto var_type = lookup_var(node->value, node->src_line);
+                auto var_elem = lookup_var_elem(node->value);
+                annotate_node(node, var_type, "", var_elem);  /* H2 Phase D2 */
+            } else if (node->left) {
+                auto expr_type = infer_expr(node->left.get());
+                /* H2 Phase E-1: propagate element kind from expression */
+                annotate_node(node, expr_type, "",
+                    node->left->type_annotation.element_kind);
+            }
             break;
 
         case NodeType::New: {
@@ -1170,34 +1283,53 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
     if (!node) return AuroraType::Void;
 
     switch (node->type) {
-        case NodeType::Num:   return AuroraType::Int;
-        case NodeType::Float: return AuroraType::Float;
-        case NodeType::Str:   return AuroraType::String;
+        case NodeType::Num:   return annotate_ret(node, AuroraType::Int);
+        case NodeType::Float: return annotate_ret(node, AuroraType::Float);
+        case NodeType::Str:   return annotate_ret(node, AuroraType::String);
         case NodeType::Array: {
             /* Tuple if value == "__tuple__" */
             if (node->value == "__tuple__") {
+                AstTypeKind elem_kind = AstTypeKind::Unknown;
                 const ASTNode* elem = node->args.get();
-                while (elem) {
-                    infer_expr(elem);
+                if (elem) {
+                    AuroraType first = infer_expr(elem);
+                    elem_kind = to_ast_type_kind(first);
                     elem = elem->next.get();
                 }
-                return AuroraType::Tuple;
+                /* Check homogeneity — if any element differs, reset to Unknown */
+                while (elem) {
+                    AuroraType et = infer_expr(elem);
+                    if (to_ast_type_kind(et) != elem_kind)
+                        elem_kind = AstTypeKind::Unknown;
+                    elem = elem->next.get();
+                }
+                return annotate_ret(node, AuroraType::Tuple, "", elem_kind);
             }
+            /* H2 Phase E-1: determine element type from first element */
+            AstTypeKind elem_kind = AstTypeKind::Unknown;
             const ASTNode* elem = node->args.get();
+            if (elem) {
+                AuroraType first = infer_expr(elem);
+                elem_kind = to_ast_type_kind(first);
+                elem = elem->next.get();
+            }
             while (elem) {
                 infer_expr(elem);
                 elem = elem->next.get();
             }
-            return AuroraType::Array;
+            return annotate_ret(node, AuroraType::Array, "", elem_kind);
         }
         case NodeType::Var: {
             if (tracking_var_refs_)
                 var_refs_.insert(node->value);
             try {
-                return lookup_var(node->value, node->src_line);
+                auto r = lookup_var(node->value, node->src_line);
+                /* H2 Phase E-1: propagate stored element kind for compound types */
+                auto elem = lookup_var_elem(node->value);
+                return annotate_ret(node, r, "", elem);
             } catch (const TypeError&) {
                 if (functions_.count(node->value))
-                    return AuroraType::Unknown;
+                    return annotate_ret(node, AuroraType::Unknown);
                 throw;
             }
         }
@@ -1214,7 +1346,7 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
                 msg << "array index must be int";
                 throw TypeError(msg.str(), node->src_line);
             }
-            return AuroraType::Unknown;
+            return annotate_ret(node, AuroraType::Unknown);
         }
         case NodeType::BinOp:
             return infer_binop(node);
@@ -1226,7 +1358,7 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
             const std::string& obj_name   = node->left ? node->left->value : "";
             const std::string& field_name = node->value;
             oop_check_field_access(obj_name, field_name, node->src_line);
-            return AuroraType::Unknown;
+            return annotate_ret(node, AuroraType::Unknown);
         }
         case NodeType::New: {
             /* new ClassName(args) — handle as expression */
@@ -1237,7 +1369,7 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
                     arg = arg->next.get();
                 }
             }
-            return AuroraType::Class;
+            return annotate_ret(node, AuroraType::Class, node->value);
         }
         case NodeType::StructLiteral: {
             if (!global_type_registry().has_struct(node->value))
@@ -1247,7 +1379,7 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
                 if (f->left) infer_expr(f->left.get());
                 f = f->next.get();
             }
-            return AuroraType::Struct;
+            return annotate_ret(node, AuroraType::Struct, node->value);
         }
         case NodeType::Move:
         case NodeType::SharedRef:
@@ -1257,10 +1389,15 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
         case NodeType::Free:
         case NodeType::Reference:
         case NodeType::Pointer:
-            if (!node->value.empty()) return lookup_var(node->value, node->src_line);
-            return AuroraType::Unknown;
+            if (!node->value.empty()) {
+                auto r = lookup_var(node->value, node->src_line);
+                /* H2 Phase E-1: propagate stored element kind for compound types */
+                auto elem = lookup_var_elem(node->value);
+                return annotate_ret(node, r, "", elem);
+            }
+            return annotate_ret(node, AuroraType::Unknown);
         default:
-            return AuroraType::Unknown;
+            return annotate_ret(node, AuroraType::Unknown);
     }
 }
 
@@ -1272,28 +1409,28 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
     if (op == "+") {
         if (left == AuroraType::String || right == AuroraType::String) {
             if (left == AuroraType::Unknown || right == AuroraType::Unknown)
-                return AuroraType::String;
+                return annotate_ret(node, AuroraType::String);
             if (left == AuroraType::String && right == AuroraType::String)
-                return AuroraType::String;
-            return AuroraType::String;
+                return annotate_ret(node, AuroraType::String);
+            return annotate_ret(node, AuroraType::String);
         }
-        return common_numeric(left, right, node->src_line);
+        return annotate_ret(node, common_numeric(left, right, node->src_line));
     }
 
     if (op == "-" || op == "*" || op == "/" || op == "%" || op == "**" || op == "//")
-        return common_numeric(left, right, node->src_line);
+        return annotate_ret(node, common_numeric(left, right, node->src_line));
 
     if (op == "^" || op == "xor") {
         if ((left == AuroraType::Int || left == AuroraType::Bool || left == AuroraType::Unknown) &&
             (right == AuroraType::Int || right == AuroraType::Bool || right == AuroraType::Unknown))
-            return AuroraType::Int;
+            return annotate_ret(node, AuroraType::Int);
         std::ostringstream msg;
         msg << "xor needs int or bool values";
         throw TypeError(msg.str(), node->src_line);
     }
 
     if (op == "and" || op == "or" || op == "&&" || op == "||") {
-        if (is_boolish(left) && is_boolish(right)) return AuroraType::Bool;
+        if (is_boolish(left) && is_boolish(right)) return annotate_ret(node, AuroraType::Bool);
         std::ostringstream msg;
         msg << "'" << op << "' needs numeric or bool values";
         throw TypeError(msg.str(), node->src_line);
@@ -1306,7 +1443,7 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
             (left == AuroraType::String && right == AuroraType::Int) ||
             (left == AuroraType::Int && right == AuroraType::String)) {
             if (op == "==" || op == "!=")
-                return AuroraType::Bool;
+                return annotate_ret(node, AuroraType::Bool);
             if (left == AuroraType::String || right == AuroraType::String) {
                 std::ostringstream msg;
                 msg << "strings only support == and !=";
@@ -1315,19 +1452,19 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
         }
         if (left == AuroraType::String || right == AuroraType::String) {
             if ((op == "==" || op == "!=") && (left == right || left == AuroraType::Unknown || right == AuroraType::Unknown))
-                return AuroraType::Bool;
+                return annotate_ret(node, AuroraType::Bool);
             std::ostringstream msg;
             msg << "strings only support == and !=";
             throw TypeError(msg.str(), node->src_line);
         }
         common_numeric(left, right, node->src_line);
-        return AuroraType::Bool;
+        return annotate_ret(node, AuroraType::Bool);
     }
 
     if (op == "&" || op == "|" || op == "<<" || op == ">>") {
         if ((left == AuroraType::Int || left == AuroraType::Unknown) &&
             (right == AuroraType::Int || right == AuroraType::Unknown))
-            return AuroraType::Int;
+            return annotate_ret(node, AuroraType::Int);
         std::ostringstream msg;
         msg << "'" << op << "' needs int values";
         throw TypeError(msg.str(), node->src_line);
@@ -1335,7 +1472,7 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
 
     if (op == "in") {
         if (right == AuroraType::Array || right == AuroraType::Unknown)
-            return AuroraType::Bool;
+            return annotate_ret(node, AuroraType::Bool);
         std::ostringstream msg;
         msg << "'in' needs an array on the right";
         throw TypeError(msg.str(), node->src_line);
@@ -1349,18 +1486,18 @@ AuroraType TypeChecker::infer_binop(const ASTNode* node) {
 AuroraType TypeChecker::infer_unary(const ASTNode* node) {
     AuroraType value = infer_expr(node->left.get());
     if (node->value == "-") {
-        if (is_numeric(value)) return value;
+        if (is_numeric(value)) return annotate_ret(node, value);
         std::ostringstream msg;
         msg << "unary '-' needs a number";
         throw TypeError(msg.str(), node->src_line);
     }
     if (node->value == "not") {
-        if (is_boolish(value)) return AuroraType::Bool;
+        if (is_boolish(value)) return annotate_ret(node, AuroraType::Bool);
         std::ostringstream msg;
         msg << "'not' needs numeric or bool value";
         throw TypeError(msg.str(), node->src_line);
     }
-    return AuroraType::Unknown;
+    return annotate_ret(node, AuroraType::Unknown);
 }
 
 AuroraType TypeChecker::infer_call(const ASTNode* node) {
@@ -1370,47 +1507,74 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
             infer_expr(arg);
             arg = arg->next.get();
         }
-        return AuroraType::Void;
+        return annotate_ret(node, AuroraType::Void);
     }
 
     if (node->value == "array") {
+        /* H2 Phase E-1: determine element type from first argument */
+        AstTypeKind elem_kind = AstTypeKind::Unknown;
         const ASTNode* arg = node->args.get();
+        if (arg) {
+            AuroraType first = infer_expr(arg);
+            elem_kind = to_ast_type_kind(first);
+            arg = arg->next.get();
+        }
         while (arg) { infer_expr(arg); arg = arg->next.get(); }
-        return AuroraType::Array;
+        return annotate_ret(node, AuroraType::Array, "", elem_kind);
     }
 
     if (node->value == "tuple") {
+        /* H2 Phase E-1: determine element type from first argument (if homogeneous) */
+        AstTypeKind elem_kind = AstTypeKind::Unknown;
         const ASTNode* arg = node->args.get();
-        while (arg) { infer_expr(arg); arg = arg->next.get(); }
-        return AuroraType::Tuple;
+        if (arg) {
+            AuroraType first = infer_expr(arg);
+            elem_kind = to_ast_type_kind(first);
+            arg = arg->next.get();
+            while (arg) {
+                AuroraType et = infer_expr(arg);
+                if (to_ast_type_kind(et) != elem_kind)
+                    elem_kind = AstTypeKind::Unknown;
+                arg = arg->next.get();
+            }
+        }
+        return annotate_ret(node, AuroraType::Tuple, "", elem_kind);
     }
 
     /* ── Phase 2: collection constructors ── */
     if (node->value == "list" || node->value == "map" || node->value == "set" ||
         node->value == "vector" || node->value == "stack" || node->value == "queue" ||
         node->value == "json") {
+        /* H2 Phase E-1: determine element type from first argument (if any) */
+        AstTypeKind elem_kind = AstTypeKind::Unknown;
         const ASTNode* arg = node->args.get();
+        if (arg && node->value != "map" && node->value != "json") {
+            /* map/json are heterogeneous by nature — leave element_kind Unknown */
+            AuroraType first = infer_expr(arg);
+            elem_kind = to_ast_type_kind(first);
+            arg = arg->next.get();
+        }
         while (arg) { infer_expr(arg); arg = arg->next.get(); }
-        if (node->value == "list")   return AuroraType::List;
-        if (node->value == "map")    return AuroraType::Map;
-        if (node->value == "set")    return AuroraType::Set;
-        if (node->value == "vector") return AuroraType::Vector;
-        if (node->value == "stack")  return AuroraType::Stack;
-        if (node->value == "queue")  return AuroraType::Queue;
-        if (node->value == "json")   return AuroraType::Json;
+        if (node->value == "list")   return annotate_ret(node, AuroraType::List, "", elem_kind);
+        if (node->value == "map")    return annotate_ret(node, AuroraType::Map);
+        if (node->value == "set")    return annotate_ret(node, AuroraType::Set, "", elem_kind);
+        if (node->value == "vector") return annotate_ret(node, AuroraType::Vector, "", elem_kind);
+        if (node->value == "stack")  return annotate_ret(node, AuroraType::Stack, "", elem_kind);
+        if (node->value == "queue")  return annotate_ret(node, AuroraType::Queue, "", elem_kind);
+        if (node->value == "json")   return annotate_ret(node, AuroraType::Json);
     }
 
     /* ── typeof / sizeof — built-in inspection ── */
     if (node->value == "typeof" || node->value == "sizeof") {
         if (node->args) infer_expr(node->args.get());
-        if (node->value == "typeof") return AuroraType::String;
-        return AuroraType::Int;
+        if (node->value == "typeof") return annotate_ret(node, AuroraType::String);
+        return annotate_ret(node, AuroraType::Int);
     }
 
     /* ── panic / debug / log — built-in calls ── */
     if (node->value == "panic" || node->value == "debug" || node->value == "log") {
         if (node->args) infer_expr(node->args.get());
-        return AuroraType::Void;
+        return annotate_ret(node, AuroraType::Void);
     }
 
     {
@@ -1421,20 +1585,20 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
             oop_check_method_call(obj_name, method_name, node->src_line);
             const ASTNode* arg = node->args.get();
             while (arg) { infer_expr(arg); arg = arg->next.get(); }
-            return AuroraType::Unknown;
+            return annotate_ret(node, AuroraType::Unknown);
         }
     }
 
     if (global_class_registry().has(node->value)) {
         oop_check_new_object(node->value, node->args.get(), node->src_line);
-        return AuroraType::Class;
+        return annotate_ret(node, AuroraType::Class, node->value);
     }
 
     /* Check if the call name is a known variable (function pointer / lambda) */
     if (has_type(node->value)) {
         const ASTNode* arg = node->args.get();
         while (arg) { infer_expr(arg); arg = arg->next.get(); }
-        return AuroraType::Unknown;
+        return annotate_ret(node, AuroraType::Unknown);
     }
 
     auto it = functions_.find(node->value);
@@ -1453,28 +1617,43 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
     }
 
     if (node->value == "range" && (count == 1 || count == 2)) {
-        return it->second.result;
+        return annotate_ret(node, it->second.result);
     }
     if (node->value == "outputf" && count >= 1) {
-        return it->second.result;
+        return annotate_ret(node, it->second.result);
     }
     if ((node->value == "min" || node->value == "max") && count <= 2) {
-        return AuroraType::Unknown;
+        return annotate_ret(node, AuroraType::Unknown);
     }
     if (node->value == "replace" && count == 3) {
-        return AuroraType::String;
+        return annotate_ret(node, AuroraType::String);
     }
     if (node->value == "split" && count == 2) {
-        return AuroraType::Array;
+        return annotate_ret(node, AuroraType::Array, "", AstTypeKind::String);
     }
     if (node->value == "has" && count == 2) {
-        return AuroraType::Bool;
+        return annotate_ret(node, AuroraType::Bool);
     }
     if (node->value == "starts" && count == 2) {
-        return AuroraType::Bool;
+        return annotate_ret(node, AuroraType::Bool);
     }
     if (node->value == "ends" && count == 2) {
-        return AuroraType::Bool;
+        return annotate_ret(node, AuroraType::Bool);
+    }
+
+    /* H2 Phase E-1: builtins that return compound types with known element kinds */
+    if (node->value == "fields" && count == 1) {
+        return annotate_ret(node, AuroraType::Array, "", AstTypeKind::String);
+    }
+    if (node->value == "methods" && count == 1) {
+        return annotate_ret(node, AuroraType::Array, "", AstTypeKind::String);
+    }
+    if ((node->value == "unique" || node->value == "filter") && count >= 1) {
+        /* Element kind matches the input array's element kind */
+        AstTypeKind input_elem = node->args
+            ? node->args->type_annotation.element_kind
+            : AstTypeKind::Unknown;
+        return annotate_ret(node, AuroraType::Array, "", input_elem);
     }
 
     if (count < it->second.params.size() ||
@@ -1485,7 +1664,15 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
         throw TypeError(msg.str(), node->src_line);
     }
 
-    return it->second.result;
+    /* H2 Phase E-1: generic compound-return builtins propagate element kind from first arg */
+    if (it->second.result == AuroraType::Array && count >= 1) {
+        AstTypeKind input_elem = node->args
+            ? node->args->type_annotation.element_kind
+            : AstTypeKind::Unknown;
+        return annotate_ret(node, AuroraType::Array, "", input_elem);
+    }
+
+    return annotate_ret(node, it->second.result);
 }
 
 bool TypeChecker::is_numeric(AuroraType type) const {

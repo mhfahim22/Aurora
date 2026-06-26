@@ -554,6 +554,7 @@ int main(int argc, char* argv[]) {
             g_header_paths.push_back(argv[arg_idx++]);
     }
 
+    g_clang_args_storage.reserve(argc);  /* prevent reallocation, keeping c_str() pointers valid */
     for (int i = arg_idx; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             output_path = argv[++i];

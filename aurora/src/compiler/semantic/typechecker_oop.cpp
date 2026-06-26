@@ -137,7 +137,7 @@ void oop_register_class(const ASTNode* node) {
                     s->left->left->value == "self") {
                     const std::string& fname = s->left->value;
                     for (auto& f : info.fields)
-                        if (f.name == fname && f.is_string) return true;
+                        if (f.name == fname && f.type_kind == AstTypeKind::String) return true;
                 }
             }
             s = s->next.get();
@@ -192,10 +192,13 @@ void oop_register_class(const ASTNode* node) {
             if (stmt->right) {
                 if (stmt->right->type == NodeType::Str) {
                     field.default_value = "\"" + stmt->right->value + "\"";
-                    field.is_string = true;
+                    field.type_kind = AstTypeKind::String;
                 } else if (stmt->right->type == NodeType::Float) {
                     field.default_value = stmt->right->value;
-                    field.is_float = true;
+                    field.type_kind = AstTypeKind::Float;
+                } else if (stmt->right->type == NodeType::Num) {
+                    field.default_value = stmt->right->value;
+                    field.type_kind = AstTypeKind::Int;
                 } else {
                     field.default_value = stmt->right->value;
                 }
@@ -257,7 +260,12 @@ void oop_register_class(const ASTNode* node) {
                 method.vtable_index = next_vtable_idx++;
             }
 
-            method.returns_string = method_returns_string(stmt);
+            /* H2 Phase D2: prefer annotation on function node for return type */
+            if (stmt->type_annotation.kind != AstTypeKind::Unknown) {
+                method.return_kind = stmt->type_annotation.kind;
+            } else {
+                method.return_kind = method_returns_string(stmt) ? AstTypeKind::String : AstTypeKind::Unknown;
+            }
 
             info.methods.push_back(method);
         }

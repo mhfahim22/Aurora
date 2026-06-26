@@ -237,7 +237,7 @@ inline FFIModule load_binding(const std::string& au_path,
 
 #ifdef _WIN32
     lib_path += ".dll";
-#elif __APPLE__
+#elif defined(__APPLE__)
     lib_path += ".dylib";
 #else
     lib_path += ".so";
@@ -251,7 +251,7 @@ inline FFIModule load_binding(const std::string& au_path,
         lib_path += "_" + ecosystem;
 #ifdef _WIN32
         lib_path += ".dll";
-#elif __APPLE__
+#elif defined(__APPLE__)
         lib_path += ".dylib";
 #else
         lib_path += ".so";

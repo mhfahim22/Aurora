@@ -477,7 +477,7 @@ int64_t builtin_os(char* buf, int64_t buf_size) {
     if (!buf || buf_size <= 0) return 0;
 #ifdef _WIN32
     const char* os = "windows";
-#elif __APPLE__
+#elif defined(__APPLE__)
     const char* os = "macos";
 #elif __linux__
     const char* os = "linux";

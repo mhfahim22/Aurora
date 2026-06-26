@@ -51,7 +51,7 @@
 
 #define OPTIMIZE         1
 #define SHORT_OPCODES    1
-#if defined(EMSCRIPTEN)
+#if defined(EMSCRIPTEN) || defined(_MSC_VER)
 #define DIRECT_DISPATCH  0
 #else
 #define DIRECT_DISPATCH  1
@@ -12145,7 +12145,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
         if (!(flags & ATOD_INT_ONLY) &&
             (atod_type == ATOD_TYPE_FLOAT64) &&
             strstart(p, "Infinity", &p)) {
-            double d = 1.0 / 0.0;
+            double d = __JS_INF;
             if (is_neg)
                 d = -d;
             val = JS_NewFloat64(ctx, d);
@@ -22121,7 +22121,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
     if (!is_digit(*p)) {
         if (s->ext_json) {
             if (strstart((const char *)p, "Infinity", (const char **)&p)) {
-                d = 1.0 / 0.0;
+                d = __JS_INF;
                 if (*p_start == '-')
                     d = -d;
                 goto done;
@@ -44399,7 +44399,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
     uint32_t tag;
 
     if (unlikely(argc == 0)) {
-        return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
+        return __JS_NewFloat64(ctx, is_max ? -__JS_INF : __JS_INF);
     }
 
     tag = JS_VALUE_GET_TAG(argv[0]);
@@ -44578,39 +44578,63 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
     return __JS_NewFloat64(ctx, u.d - 1.0);
 }
 
+#ifdef _MSC_VER
+/* Wrappers to avoid C2099 with DLL-imported CRT functions in static
+   initializers. On MSVC+/MD, CRT function pointers are __declspec(dllimport)
+   which the compiler rejects as non-constant for static const arrays. */
+#define MATHWRAP1(name) static double js__##name(double a) { return name(a); }
+#define MATHWRAP2(name) static double js__##name(double a, double b) { return name(a, b); }
+MATHWRAP1(fabs)    MATHWRAP1(floor)   MATHWRAP1(ceil)
+MATHWRAP1(sqrt)    MATHWRAP1(acos)    MATHWRAP1(asin)
+MATHWRAP1(atan)    MATHWRAP1(cos)     MATHWRAP1(exp)
+MATHWRAP1(log)     MATHWRAP1(sin)     MATHWRAP1(tan)
+MATHWRAP1(trunc)   MATHWRAP1(cosh)    MATHWRAP1(sinh)
+MATHWRAP1(tanh)    MATHWRAP1(acosh)   MATHWRAP1(asinh)
+MATHWRAP1(atanh)   MATHWRAP1(expm1)   MATHWRAP1(log1p)
+MATHWRAP1(log2)    MATHWRAP1(log10)   MATHWRAP1(cbrt)
+MATHWRAP2(atan2)   MATHWRAP2(hypot)   MATHWRAP2(fmod)
+#undef MATHWRAP1
+#undef MATHWRAP2
+#define js_wrap_f_f(name)     js__##name
+#define js_wrap_f_f_f(name)   js__##name
+#else
+#define js_wrap_f_f(name)     name
+#define js_wrap_f_f_f(name)   name
+#endif
+
 static const JSCFunctionListEntry js_math_funcs[] = {
     JS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0 ),
     JS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1 ),
-    JS_CFUNC_SPECIAL_DEF("abs", 1, f_f, fabs ),
-    JS_CFUNC_SPECIAL_DEF("floor", 1, f_f, floor ),
-    JS_CFUNC_SPECIAL_DEF("ceil", 1, f_f, ceil ),
+    JS_CFUNC_SPECIAL_DEF("abs", 1, f_f, js_wrap_f_f(fabs) ),
+    JS_CFUNC_SPECIAL_DEF("floor", 1, f_f, js_wrap_f_f(floor) ),
+    JS_CFUNC_SPECIAL_DEF("ceil", 1, f_f, js_wrap_f_f(ceil) ),
     JS_CFUNC_SPECIAL_DEF("round", 1, f_f, js_math_round ),
-    JS_CFUNC_SPECIAL_DEF("sqrt", 1, f_f, sqrt ),
+    JS_CFUNC_SPECIAL_DEF("sqrt", 1, f_f, js_wrap_f_f(sqrt) ),
 
-    JS_CFUNC_SPECIAL_DEF("acos", 1, f_f, acos ),
-    JS_CFUNC_SPECIAL_DEF("asin", 1, f_f, asin ),
-    JS_CFUNC_SPECIAL_DEF("atan", 1, f_f, atan ),
-    JS_CFUNC_SPECIAL_DEF("atan2", 2, f_f_f, atan2 ),
-    JS_CFUNC_SPECIAL_DEF("cos", 1, f_f, cos ),
-    JS_CFUNC_SPECIAL_DEF("exp", 1, f_f, exp ),
-    JS_CFUNC_SPECIAL_DEF("log", 1, f_f, log ),
+    JS_CFUNC_SPECIAL_DEF("acos", 1, f_f, js_wrap_f_f(acos) ),
+    JS_CFUNC_SPECIAL_DEF("asin", 1, f_f, js_wrap_f_f(asin) ),
+    JS_CFUNC_SPECIAL_DEF("atan", 1, f_f, js_wrap_f_f(atan) ),
+    JS_CFUNC_SPECIAL_DEF("atan2", 2, f_f_f, js_wrap_f_f_f(atan2) ),
+    JS_CFUNC_SPECIAL_DEF("cos", 1, f_f, js_wrap_f_f(cos) ),
+    JS_CFUNC_SPECIAL_DEF("exp", 1, f_f, js_wrap_f_f(exp) ),
+    JS_CFUNC_SPECIAL_DEF("log", 1, f_f, js_wrap_f_f(log) ),
     JS_CFUNC_SPECIAL_DEF("pow", 2, f_f_f, js_pow ),
-    JS_CFUNC_SPECIAL_DEF("sin", 1, f_f, sin ),
-    JS_CFUNC_SPECIAL_DEF("tan", 1, f_f, tan ),
+    JS_CFUNC_SPECIAL_DEF("sin", 1, f_f, js_wrap_f_f(sin) ),
+    JS_CFUNC_SPECIAL_DEF("tan", 1, f_f, js_wrap_f_f(tan) ),
     /* ES6 */
-    JS_CFUNC_SPECIAL_DEF("trunc", 1, f_f, trunc ),
+    JS_CFUNC_SPECIAL_DEF("trunc", 1, f_f, js_wrap_f_f(trunc) ),
     JS_CFUNC_SPECIAL_DEF("sign", 1, f_f, js_math_sign ),
-    JS_CFUNC_SPECIAL_DEF("cosh", 1, f_f, cosh ),
-    JS_CFUNC_SPECIAL_DEF("sinh", 1, f_f, sinh ),
-    JS_CFUNC_SPECIAL_DEF("tanh", 1, f_f, tanh ),
-    JS_CFUNC_SPECIAL_DEF("acosh", 1, f_f, acosh ),
-    JS_CFUNC_SPECIAL_DEF("asinh", 1, f_f, asinh ),
-    JS_CFUNC_SPECIAL_DEF("atanh", 1, f_f, atanh ),
-    JS_CFUNC_SPECIAL_DEF("expm1", 1, f_f, expm1 ),
-    JS_CFUNC_SPECIAL_DEF("log1p", 1, f_f, log1p ),
-    JS_CFUNC_SPECIAL_DEF("log2", 1, f_f, log2 ),
-    JS_CFUNC_SPECIAL_DEF("log10", 1, f_f, log10 ),
-    JS_CFUNC_SPECIAL_DEF("cbrt", 1, f_f, cbrt ),
+    JS_CFUNC_SPECIAL_DEF("cosh", 1, f_f, js_wrap_f_f(cosh) ),
+    JS_CFUNC_SPECIAL_DEF("sinh", 1, f_f, js_wrap_f_f(sinh) ),
+    JS_CFUNC_SPECIAL_DEF("tanh", 1, f_f, js_wrap_f_f(tanh) ),
+    JS_CFUNC_SPECIAL_DEF("acosh", 1, f_f, js_wrap_f_f(acosh) ),
+    JS_CFUNC_SPECIAL_DEF("asinh", 1, f_f, js_wrap_f_f(asinh) ),
+    JS_CFUNC_SPECIAL_DEF("atanh", 1, f_f, js_wrap_f_f(atanh) ),
+    JS_CFUNC_SPECIAL_DEF("expm1", 1, f_f, js_wrap_f_f(expm1) ),
+    JS_CFUNC_SPECIAL_DEF("log1p", 1, f_f, js_wrap_f_f(log1p) ),
+    JS_CFUNC_SPECIAL_DEF("log2", 1, f_f, js_wrap_f_f(log2) ),
+    JS_CFUNC_SPECIAL_DEF("log10", 1, f_f, js_wrap_f_f(log10) ),
+    JS_CFUNC_SPECIAL_DEF("cbrt", 1, f_f, js_wrap_f_f(cbrt) ),
     JS_CFUNC_DEF("hypot", 2, js_math_hypot ),
     JS_CFUNC_DEF("random", 0, js_math_random ),
     JS_CFUNC_SPECIAL_DEF("f16round", 1, f_f, js_math_f16round ),
@@ -51039,7 +51063,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
     JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
     JS_CFUNC_DEF("escape", 1, js_global_escape ),
     JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
-    JS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0 ),
+    JS_PROP_DOUBLE_DEF("Infinity", __JS_INF, 0 ),
     JS_PROP_DOUBLE_DEF("NaN", NAN, 0 ),
     JS_PROP_UNDEFINED_DEF("undefined", 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "global", JS_PROP_CONFIGURABLE ),

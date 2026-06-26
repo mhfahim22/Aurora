@@ -631,8 +631,13 @@ static void gc_scan_and_mark_range(void* start, void* end, std::vector<GCRecord>
     }
 }
 
-static std::vector<GCRecord>*  gc_objects = nullptr; /* intentionally not deleted — exists until process exit */
-static std::vector<void*>*     gc_unknown_roots = nullptr; /* intentionally not deleted — exists until process exit */
+struct UnknownRoot {
+    void* ptr;
+    size_t size; /* 0 = unknown, will use default scan range */
+};
+
+static std::vector<GCRecord>*      gc_objects = nullptr; /* intentionally not deleted — exists until process exit */
+static std::vector<UnknownRoot>*   gc_unknown_roots = nullptr; /* intentionally not deleted — exists until process exit */
 static std::atomic<size_t>     gc_live_objects{0};
 static std::atomic<size_t>     gc_collected{0};
 static std::atomic<size_t>     gc_alloc_since_last{0};
@@ -656,10 +661,10 @@ static void gc_collect_impl(void) {
 
     /* Mark from unknown roots (scan their memory for pointers to GC objects) */
     if (gc_unknown_roots) {
-        for (void* root : *gc_unknown_roots) {
-            /* Unknown root memory may contain pointers to GC objects */
-            /* Scan up to 1 KB (conservative; we don't know allocation size) */
-            gc_scan_and_mark_range(root, static_cast<char*>(root) + 1024, *gc_objects);
+        for (auto& ur : *gc_unknown_roots) {
+            /* Use stored size if known; otherwise scan a generous 64 KB default */
+            size_t scan_size = ur.size > 0 ? ur.size : 65536;
+            gc_scan_and_mark_range(ur.ptr, static_cast<char*>(ur.ptr) + scan_size, *gc_objects);
         }
     }
 
@@ -781,7 +786,7 @@ void aurora_gc_init(void) {
         gc_objects = new std::vector<GCRecord>();
     }
     if (!gc_unknown_roots) {
-        gc_unknown_roots = new std::vector<void*>();
+        gc_unknown_roots = new std::vector<UnknownRoot>();
     }
     UNLOCK_GC();
 }
@@ -823,9 +828,26 @@ void aurora_gc_register_root(void* ptr) {
             return;
         }
     }
-    /* Unknown pointer — track in separate unknown_roots vector */
-    if (!gc_unknown_roots) gc_unknown_roots = new std::vector<void*>();
-    gc_unknown_roots->push_back(ptr);
+    /* Unknown pointer — track in separate unknown_roots vector (size=0 means use default scan range) */
+    if (!gc_unknown_roots) gc_unknown_roots = new std::vector<UnknownRoot>();
+    gc_unknown_roots->push_back({ptr, 0});
+    UNLOCK_GC();
+}
+
+void aurora_gc_register_root_sized(void* ptr, size_t size) {
+    if (!ptr) return;
+    LOCK_GC();
+    if (!gc_objects) gc_objects = new std::vector<GCRecord>();
+    for (auto& obj : *gc_objects) {
+        if (obj.ptr == ptr) {
+            obj.root_count++;
+            UNLOCK_GC();
+            return;
+        }
+    }
+    /* Unknown pointer — store with explicit size for full-range scan */
+    if (!gc_unknown_roots) gc_unknown_roots = new std::vector<UnknownRoot>();
+    gc_unknown_roots->push_back({ptr, size});
     UNLOCK_GC();
 }
 
@@ -843,7 +865,7 @@ void aurora_gc_unregister_root(void* ptr) {
     }
     if (gc_unknown_roots) {
         for (auto it = gc_unknown_roots->begin(); it != gc_unknown_roots->end(); ++it) {
-            if (*it == ptr) {
+            if (it->ptr == ptr) {
                 gc_unknown_roots->erase(it);
                 UNLOCK_GC();
                 return;

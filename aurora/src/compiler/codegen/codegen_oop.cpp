@@ -106,8 +106,34 @@ struct ObjRecord {
 static std::unordered_map<std::string, ObjRecord> obj_map_;
 
 /* ════════════════════════════════════════════════════════════
-   LLVM struct type তৈরি করা
-   ════════════════════════════════════════════════════════════ */
+    H2 Phase D2: annotation-aware field type helpers
+    ════════════════════════════════════════════════════════════ */
+/* These helpers prefer the resolved AstTypeKind (type_kind) over legacy
+   boolean flags (is_string, is_float). When type_kind is Unknown (not yet
+   populated or from the legacy path), they fall back to the booleans. */
+static llvm::Type* field_llvm_type(llvm::LLVMContext& ctx, const ClassFieldInfo& f) {
+    switch (f.type_kind) {
+        case AstTypeKind::String:  return llvm::PointerType::getUnqual(ctx);
+        case AstTypeKind::Float:   return llvm::Type::getDoubleTy(ctx);
+        default:                   return llvm::Type::getInt64Ty(ctx);
+    }
+}
+
+static bool field_annotation_is_string(const ClassFieldInfo& f) {
+    return f.type_kind == AstTypeKind::String;
+}
+
+static bool field_annotation_is_float(const ClassFieldInfo& f) {
+    return f.type_kind == AstTypeKind::Float;
+}
+
+static bool method_annotation_returns_string(const ClassMethodInfo& m) {
+    return m.return_kind == AstTypeKind::String;
+}
+
+/* ════════════════════════════════════════════════════════════
+    LLVM struct type তৈরি করা
+    ════════════════════════════════════════════════════════════ */
 
 /* Helper: returns the field index adjusted for vtable ptr offset.
    If class has vtable, field indices start at 1 (index 0 = vtable ptr). */
@@ -145,12 +171,7 @@ static llvm::StructType* get_or_create_struct(
         field_types.push_back(llvm::PointerType::getUnqual(ctx)); /* vtable ptr */
     }
     for (auto& f : all_fields) {
-        if (f.is_string)
-            field_types.push_back(llvm::PointerType::getUnqual(ctx)); /* i8* */
-        else if (f.is_float)
-            field_types.push_back(llvm::Type::getDoubleTy(ctx));
-        else
-            field_types.push_back(llvm::Type::getInt64Ty(ctx));
+        field_types.push_back(field_llvm_type(ctx, f));
     }
 
     return llvm::StructType::create(ctx, field_types, class_name);
@@ -229,13 +250,15 @@ llvm::Value* oop_gen_new_object(
             /* argument থেকে value নাও */
             val = arg_vals[i];
         } else {
-            /* default value use করো */
-            if (field.is_string) {
+            /* default value use করো — H2 Phase D2: prefer annotation */
+            bool is_str = field_annotation_is_string(field);
+            bool is_flt = field_annotation_is_float(field);
+            if (is_str) {
                 /* default string constant */
                 std::string def = field.default_value;
                 if (def.size() >= 2 && def.front() == '"') def = def.substr(1, def.size()-2);
                 val = builder.CreateGlobalStringPtr(def, ".str." + field.name);
-            } else if (field.is_float) {
+            } else if (is_flt) {
                 double dval = std::stod(field.default_value.empty() ? "0.0" : field.default_value);
                 val = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), dval);
             } else {
@@ -245,11 +268,15 @@ llvm::Value* oop_gen_new_object(
             }
         }
 
-        /* type mismatch হলে convert */
-        if (field.is_float && val->getType()->isIntegerTy())
-            val = builder.CreateSIToFP(val, llvm::Type::getDoubleTy(ctx));
-        else if (!field.is_string && !field.is_float && val->getType()->isDoubleTy())
-            val = builder.CreateFPToSI(val, llvm::Type::getInt64Ty(ctx));
+        /* type mismatch হলে convert — H2 Phase D2: prefer annotation */
+        {
+            bool is_str = field_annotation_is_string(field);
+            bool is_flt = field_annotation_is_float(field);
+            if (is_flt && val->getType()->isIntegerTy())
+                val = builder.CreateSIToFP(val, llvm::Type::getDoubleTy(ctx));
+            else if (!is_str && !is_flt && val->getType()->isDoubleTy())
+                val = builder.CreateFPToSI(val, llvm::Type::getInt64Ty(ctx));
+        }
 
         builder.CreateStore(val, field_ptr);
     }
@@ -287,14 +314,7 @@ llvm::Value* oop_gen_field_get(
             llvm::Value* field_ptr = builder.CreateStructGEP(
                 struct_ty, obj_ptr, storage_idx, obj_name + "." + field_name + "_gep");
 
-            llvm::Type* elem_ty;
-            if (all_fields[i].is_string)
-                elem_ty = llvm::PointerType::getUnqual(ctx);
-            else if (all_fields[i].is_float)
-                elem_ty = llvm::Type::getDoubleTy(ctx);
-            else
-                elem_ty = llvm::Type::getInt64Ty(ctx);
-
+            llvm::Type* elem_ty = field_llvm_type(ctx, all_fields[i]);
             return builder.CreateLoad(elem_ty, field_ptr, obj_name + "." + field_name);
         }
     }
@@ -335,12 +355,15 @@ void oop_gen_field_set(
             llvm::Value* field_ptr = builder.CreateStructGEP(
                 struct_ty, obj_ptr, storage_idx, obj_name + "." + field_name + "_set");
 
-            /* type convert যদি দরকার হয় */
-            if (all_fields[i].is_float && value->getType()->isIntegerTy())
-                value = builder.CreateSIToFP(value, llvm::Type::getDoubleTy(ctx));
-            else if (!all_fields[i].is_string && !all_fields[i].is_float
-                     && value->getType()->isDoubleTy())
-                value = builder.CreateFPToSI(value, llvm::Type::getInt64Ty(ctx));
+            /* type convert যদি দরকার হয় — H2 Phase D2: prefer annotation */
+            {
+                bool is_str = field_annotation_is_string(all_fields[i]);
+                bool is_flt = field_annotation_is_float(all_fields[i]);
+                if (is_flt && value->getType()->isIntegerTy())
+                    value = builder.CreateSIToFP(value, llvm::Type::getDoubleTy(ctx));
+                else if (!is_str && !is_flt && value->getType()->isDoubleTy())
+                    value = builder.CreateFPToSI(value, llvm::Type::getInt64Ty(ctx));
+            }
 
             builder.CreateStore(value, field_ptr);
             return;
@@ -431,7 +454,7 @@ static llvm::Value* oop_gen_method_call_impl(
         }
 
         llvm::Value* ret = builder.CreateCall(fn_ty, method_ptr, call_args, method_name + "_virt_ret");
-        if (ret->getType()->isPointerTy() && !method->returns_string)
+        if (ret->getType()->isPointerTy() && !method_annotation_returns_string(*method))
             ret = builder.CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx), "ret_unbox");
         return ret;
     }
@@ -451,7 +474,7 @@ static llvm::Value* oop_gen_method_call_impl(
     }
 
     llvm::Value* ret = builder.CreateCall(fn, call_args, method_name + "_ret");
-    if (ret->getType()->isPointerTy() && !method->returns_string)
+    if (ret->getType()->isPointerTy() && !method_annotation_returns_string(*method))
         ret = builder.CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx), "ret_unbox");
     return ret;
 }
@@ -493,70 +516,7 @@ llvm::Value* oop_gen_method_call_ptr(
         method_name, args_node, src_line, gen_expr);
 }
 
-/* ════════════════════════════════════════════════════════════
-   Method definition: class Person → function greet()
-   ClassName__methodName(self_ptr, params...) হিসেবে emit করা
-   ════════════════════════════════════════════════════════════ */
-void oop_gen_class(
-        llvm::LLVMContext& ctx,
-        llvm::IRBuilder<>& builder,
-        llvm::Module&      module,
-        const ASTNode*     class_node,
-        std::function<void(const ASTNode*, llvm::Function*, llvm::Value*, const std::string&)> gen_method_body)
-{
-    const std::string& class_name = class_node->value;
-    const ClassInfo* cls = global_class_registry().get(class_name);
-    if (!cls) return;
 
-    llvm::StructType* struct_ty = get_or_create_struct(ctx, class_name);
-
-    /* body walk করে method গুলো emit করা */
-    const ASTNode* stmt = class_node->body.get();
-    while (stmt) {
-        if (stmt->type == NodeType::Function) {
-            std::string llvm_name = class_name + "__" + stmt->value;
-
-            /* param types: self pointer + declared params */
-            std::vector<llvm::Type*> param_types;
-            param_types.push_back(llvm::PointerType::getUnqual(ctx)); /* self */
-
-            const ASTNode* param = stmt->args.get();
-            while (param) {
-                if (param->value != "self")
-                    param_types.push_back(llvm::Type::getInt64Ty(ctx));
-                param = param->next.get();
-            }
-
-            auto* fn_ty = llvm::FunctionType::get(
-                llvm::Type::getInt64Ty(ctx), param_types, false);
-
-            llvm::Function* fn = llvm::Function::Create(
-                fn_ty, llvm::Function::ExternalLinkage, llvm_name, module);
-
-            /* parameter names set করা */
-            auto arg_it = fn->arg_begin();
-            arg_it->setName("self");
-            llvm::Value* self_ptr = &*arg_it++;
-
-            param = stmt->args.get();
-            while (param) {
-                if (param->value != "self" && arg_it != fn->arg_end()) {
-                    arg_it->setName(param->value);
-                    ++arg_it;
-                }
-                param = param->next.get();
-            }
-
-            /* entry block */
-            llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx, "entry", fn);
-            builder.SetInsertPoint(entry);
-
-            /* method body generate করা */
-            gen_method_body(stmt, fn, self_ptr, class_name);
-        }
-        stmt = stmt->next.get();
-    }
-}
 
 /* ════════════════════════════════════════════════════════════
    self.field access inside method body
@@ -580,14 +540,7 @@ llvm::Value* oop_gen_self_field_get(
             llvm::Value* gep = builder.CreateStructGEP(
                 struct_ty, self_ptr, storage_idx, "self." + field_name + "_ptr");
 
-            llvm::Type* elem_ty;
-            if (all_fields[i].is_string)
-                elem_ty = llvm::PointerType::getUnqual(ctx);
-            else if (all_fields[i].is_float)
-                elem_ty = llvm::Type::getDoubleTy(ctx);
-            else
-                elem_ty = llvm::Type::getInt64Ty(ctx);
-
+            llvm::Type* elem_ty = field_llvm_type(ctx, all_fields[i]);
             return builder.CreateLoad(elem_ty, gep, "self." + field_name);
         }
     }
@@ -646,11 +599,14 @@ void oop_gen_self_field_set(
             llvm::Value* gep = builder.CreateStructGEP(
                 struct_ty, self_ptr, storage_idx, "self." + field_name + "_set");
 
-            if (all_fields[i].is_float && value->getType()->isIntegerTy())
-                value = builder.CreateSIToFP(value, llvm::Type::getDoubleTy(ctx));
-            else if (!all_fields[i].is_string && !all_fields[i].is_float
-                     && value->getType()->isDoubleTy())
-                value = builder.CreateFPToSI(value, llvm::Type::getInt64Ty(ctx));
+            {
+                bool is_str = field_annotation_is_string(all_fields[i]);
+                bool is_flt = field_annotation_is_float(all_fields[i]);
+                if (is_flt && value->getType()->isIntegerTy())
+                    value = builder.CreateSIToFP(value, llvm::Type::getDoubleTy(ctx));
+                else if (!is_str && !is_flt && value->getType()->isDoubleTy())
+                    value = builder.CreateFPToSI(value, llvm::Type::getInt64Ty(ctx));
+            }
 
             builder.CreateStore(value, gep);
             return;

@@ -522,7 +522,7 @@ static bool test_ir_full_pipeline() {
         for (const auto& inst : block.instructions) {
             inst_count++;
             if (auto* bc = std::get_if<IrBitCast>(&inst)) {
-                if (bc->value.is_const && bc->value.i64 == 30)
+                if (bc->value.is_const && bc->value.i64() == 30)
                     has_bitcast_30 = true;
             }
         }

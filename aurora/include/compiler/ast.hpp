@@ -7,6 +7,7 @@
 #include "compiler/ast/ast_memory.hpp"
 #include "compiler/ast/ast_stmt.hpp"
 #include "compiler/ast/ast_expr.hpp"
+#include "compiler/ast/ast_type.hpp"
 
 /* ════════════════════════════════════════════════════════════
    ast.hpp — Unified AST Node Types & Node Structure
@@ -178,6 +179,11 @@ struct ASTNode {
 
     /* Memory metadata — populated during analysis phases */
     MemoryMetadata memory_meta {};
+
+    /* Type annotation — populated by TypeChecker during semantic analysis.
+       Added for H2 staged type-system migration (Phase A). Codegen does
+       not fully consume this in Phase A. */
+    AstTypeAnnotation type_annotation {};
 
     /* FFI: varargs flag for extern function (...) */
     bool is_vararg { false };

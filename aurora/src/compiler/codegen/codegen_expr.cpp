@@ -120,15 +120,17 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
                 return i64(0);
             }
 
-            /* Build param types (all i8*) */
+            /* Build param types — prefer annotation, fall back to i8* */
             std::vector<llvm::Type*> param_types;
             const ASTNode* p = node->args.get();
             while (p) {
-                param_types.push_back(i8ptr_ty());
+                param_types.push_back(ast_kind_to_abi_type(ctx_, p->type_annotation.kind, i8ptr_ty()));
                 p = p->next.get();
             }
 
-            auto* fn_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+            auto lambda_ret_kind = get_annotation_kind(node);
+            auto* lambda_ret_ty  = ast_kind_to_abi_type(ctx_, lambda_ret_kind, i8ptr_ty());
+            auto* fn_type = llvm::FunctionType::get(lambda_ret_ty, param_types, false);
             auto* fn = llvm::Function::Create(
                 fn_type, llvm::Function::InternalLinkage,
                 node->value.empty() ? "_lambda_expr" : node->value, module_.get());
@@ -169,7 +171,16 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
 
             gen_block(node->body.get());
             pop_scope_and_drop();
-            safe_ret(llvm::ConstantPointerNull::get(i8ptr_ty()));
+            {
+                auto* rt = fn->getReturnType();
+                if (rt->isVoidTy()) {
+                    if (!current_block_terminated()) builder_->CreateRetVoid();
+                } else if (rt->isPointerTy()) {
+                    safe_ret(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(rt)));
+                } else {
+                    safe_ret(llvm::ConstantInt::get(rt, 0));
+                }
+            }
 
             literal_aurora_cache_ = std::move(saved_cache);
             cur_fn_ = saved_fn;
@@ -233,6 +244,11 @@ llvm::Value* Codegen::gen_var(const ASTNode* node) {
 }
 
 bool Codegen::expr_is_string_type(const ASTNode* node) {
+    /* H2 Phase C: prefer type_annotation over structural checks */
+    auto k = get_annotation_kind(node);
+    if (k != AstTypeKind::Unknown)
+        return k == AstTypeKind::String;
+    /* Fallback: structural checks for nodes not yet annotated */
     if (!node) return false;
     switch (node->type) {
         case NodeType::Str:  return true;
@@ -240,7 +256,7 @@ bool Codegen::expr_is_string_type(const ASTNode* node) {
         case NodeType::Float: return false;
         case NodeType::Var: {
             VarRecord* rec = lookup_var(node->value);
-            return rec && rec->is_string;
+            return rec && rec->type_kind == AstTypeKind::String;
         }
         case NodeType::Call: {
             auto dot = node->value.find('.');
@@ -256,15 +272,17 @@ bool Codegen::expr_is_string_type(const ASTNode* node) {
             }
             if (cls_name.empty()) return true;
             const ClassMethodInfo* mi = global_class_registry().find_method(cls_name, method_name);
-            return mi ? mi->returns_string : true;
+            return mi ? mi->return_kind == AstTypeKind::String : true;
         }
         case NodeType::Attribute: {
-            /* self.field — check field type */
             if (node->left && node->left->value == "self") {
                 std::string cls_name = oop_class_of("__self__");
                 if (!cls_name.empty()) {
                     const ClassFieldInfo* fi = global_class_registry().find_field(cls_name, node->value);
-                    return fi ? fi->is_string : true;
+                    if (fi) {
+                        return fi->type_kind == AstTypeKind::String;
+                    }
+                    return true;
                 }
             }
             return true;
@@ -272,7 +290,7 @@ bool Codegen::expr_is_string_type(const ASTNode* node) {
         case NodeType::Index:
             return false;
         default:
-            return true; /* default to string (safe for re-box) */
+            return true;
     }
 }
 
@@ -300,8 +318,9 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
         if (!L) L = i64(0);
         if (!R) R = i64(0);
 
-        /* If either side is a pointer → string concat */
-        if (L->getType()->isPointerTy() || R->getType()->isPointerTy()) {
+        /* If annotation says string, or either side is a pointer → string concat */
+        if (get_annotation_kind(node) == AstTypeKind::String ||
+            L->getType()->isPointerTy() || R->getType()->isPointerTy()) {
             /* Non-pointer operands: if the expression is a string type → re-box pointer;
                if it's an integer type → convert to string representation */
             if (!L->getType()->isPointerTy()) {
@@ -324,7 +343,9 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
 
         /* Both numeric — fall through to normal Add below */
         llvm::Value* Lv = L, *Rv = R;
-        bool is_float = Lv->getType()->isDoubleTy() || Rv->getType()->isDoubleTy();
+        /* H2 Phase C: prefer annotation for float detection, fall back to LLVM type */
+        bool is_float = (get_annotation_kind(node) == AstTypeKind::Float) ||
+                         Lv->getType()->isDoubleTy() || Rv->getType()->isDoubleTy();
         if (is_float) {
             auto* dbl = llvm::Type::getDoubleTy(ctx_);
             if (!Lv->getType()->isDoubleTy()) Lv = builder_->CreateSIToFP(Lv, dbl, "itof");
@@ -337,8 +358,9 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
     llvm::Value* L = gen_expr(node->left.get());
     llvm::Value* R = gen_expr(node->right.get());
 
-    /* Type promotion: if either side is double, promote the other */
-    bool is_float = L->getType()->isDoubleTy() || R->getType()->isDoubleTy();
+    /* H2 Phase C: prefer annotation for float detection, fall back to LLVM type */
+    bool is_float = (get_annotation_kind(node) == AstTypeKind::Float) ||
+                     L->getType()->isDoubleTy() || R->getType()->isDoubleTy();
     if (is_float) {
         auto* dbl = llvm::Type::getDoubleTy(ctx_);
         if (!L->getType()->isDoubleTy())
@@ -415,7 +437,9 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
 llvm::Value* Codegen::gen_unary(const ASTNode* node) {
     llvm::Value* val = gen_expr(node->left.get());
     if (node->value == "-") {
-        if (val->getType()->isDoubleTy())
+        /* H2 Phase C: prefer annotation for float negation, fall back to LLVM type */
+        if (get_annotation_kind(node->left.get()) == AstTypeKind::Float ||
+            val->getType()->isDoubleTy())
             return builder_->CreateFNeg(val, "neg");
 #if LLVM_VERSION_MAJOR >= 18
         return builder_->CreateNSWNeg(val, "neg");
@@ -436,13 +460,16 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
     /* Built-in: output(expr) — redirect to gen_output logic */
     if (node->value == "output" && node->args) {
         const ASTNode* arg = node->args.get();
-        if (arg->type == NodeType::Float) {
+        /* H2 Phase C: prefer annotation over node type check */
+        if (get_annotation_kind(arg) == AstTypeKind::Float &&
+            arg->type == NodeType::Float) {
             double fval = std::stod(arg->value);
             llvm::Value* fv = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), fval);
             builder_->CreateCall(fn_print_float_, { fv });
         } else if (arg->type == NodeType::Var) {
             VarRecord* rec = lookup_var(arg->value);
-            if (rec && rec->is_string) {
+            bool is_str = get_annotation_kind(arg) == AstTypeKind::String;
+            if (rec && is_str) {
                 llvm::Type* alloc_ty = [&]() -> llvm::Type* {
                     if (auto* ai = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr))
                         return ai->getAllocatedType();
@@ -457,9 +484,11 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
             } else {
                 llvm::Value* val = gen_expr(arg);
                 if (!val) val = i64(0);
-                if (val->getType()->isDoubleTy())
+                /* H2 Phase C: prefer annotation, fall back to LLVM type */
+                auto ak = get_annotation_kind(arg);
+                if (ak == AstTypeKind::Float || val->getType()->isDoubleTy())
                     builder_->CreateCall(fn_print_float_, { val });
-                else if (val->getType()->isPointerTy())
+                else if (ak == AstTypeKind::String || val->getType()->isPointerTy())
                     builder_->CreateCall(fn_print_str_, { val });
                 else
                     builder_->CreateCall(fn_printf_, { val });
@@ -467,9 +496,11 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         } else {
             llvm::Value* val = gen_expr(arg);
             if (!val) val = i64(0);
-            if (val->getType()->isDoubleTy())
+            /* H2 Phase C: prefer annotation, fall back to LLVM type */
+            auto ak = get_annotation_kind(arg);
+            if (ak == AstTypeKind::Float || val->getType()->isDoubleTy())
                 builder_->CreateCall(fn_print_float_, { val });
-            else if (val->getType()->isPointerTy())
+            else if (ak == AstTypeKind::String || val->getType()->isPointerTy())
                 builder_->CreateCall(fn_print_str_, { val });
             else
                 builder_->CreateCall(fn_printf_, { val });
@@ -982,12 +1013,16 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         }
         ret = builder_->CreateCall(fn_str_from_cstr_, { ret }, "cstr_wrap");
     }
-    /* If function returns i8* and is not known to return a string, bitcast to i64 */
+    /* Non-string pointer return: unbox boxed object to i64 (Aurora internal convention) */
     else if (ret->getType()->isPointerTy()) {
         bool is_str_fn = (global_string_fns().count(node->value) > 0);
         if (!is_str_fn)
             ret = builder_->CreatePtrToInt(ret, i64_ty(), "ret_unbox");
     }
+
+    /* Floating-point return: bitcast to i64 for Aurora's internal representation */
+    else if (ret->getType()->isFloatingPointTy())
+        ret = builder_->CreateBitCast(ret, i64_ty(), "ret_fp_unbox");
 
     /* Extend smaller integer types to i64 for Aurora's internal representation */
     else if (ret->getType()->isIntegerTy() && ret->getType()->getIntegerBitWidth() < 64)
@@ -1045,21 +1080,23 @@ llvm::Value* Codegen::gen_array(const ASTNode* node) {
 
     const ASTNode* el = node->args.get();
     while (el) {
-        if (el->type == NodeType::Str) {
+        /* H2 Phase C: prefer annotation over node type / LLVM type checks */
+        auto ek = get_annotation_kind(el);
+        if (ek == AstTypeKind::String) {
             auto* sp = builder_->CreateGlobalStringPtr(el->value, "arr_s");
             builder_->CreateCall(fn_array_push_str_, { arr, sp });
-        } else if (el->type == NodeType::Float) {
+        } else if (ek == AstTypeKind::Float) {
             double fv = std::stod(el->value);
             llvm::Value* fval = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), fv);
             builder_->CreateCall(fn_array_push_flt_, { arr, fval });
-        } else if (el->type == NodeType::Array) {
+        } else if (ek == AstTypeKind::Array) {
             llvm::Value* nested_arr = gen_array(el);
             builder_->CreateCall(fn_array_push_arr_, { arr, nested_arr });
         } else {
             llvm::Value* val = gen_expr(el);
             if (!val) val = i64(0);
-            /* If double → push as float */
-            if (val->getType()->isDoubleTy())
+            /* Fall back to LLVM type if annotation is unknown */
+            if (ek == AstTypeKind::Float || val->getType()->isDoubleTy())
                 builder_->CreateCall(fn_array_push_flt_, { arr, val });
             else
                 builder_->CreateCall(fn_array_push_int_, { arr, val });
@@ -1091,7 +1128,7 @@ llvm::Value* Codegen::gen_copy_expr(const ASTNode* node) {
     VarRecord* rec = lookup_var(name);
     if (!rec || !rec->alloca_ptr) return i64(0);
 
-    if (rec->is_array) {
+    if (get_annotation_kind(node) == AstTypeKind::Array) {
         llvm::Value* arr = builder_->CreateLoad(i64_ty(), rec->alloca_ptr, name + "_cexpr_src");
 
         llvm::Function* fn_copy = module_->getFunction("aurora_array_copy");

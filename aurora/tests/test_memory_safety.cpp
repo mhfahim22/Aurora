@@ -24,13 +24,13 @@
 /* ── Version Tests ── */
 bool test_version_info() {
     TEST_ASSERT(aurora_version() != nullptr, "Version string should not be null");
-    TEST_ASSERT(std::string(aurora_version()) == "1.0.0", "Version should be 1.0.0");
+    TEST_ASSERT(std::string(aurora_version()) == AURORA_VERSION_STRING, "Version should match " AURORA_VERSION_STRING);
     return true;
 }
 
 bool test_version_full() {
     std::string full = aurora_version_full();
-    TEST_ASSERT(full.find("1.0.0") != std::string::npos, "Full version should contain 1.0.0");
+    TEST_ASSERT(full.find(AURORA_VERSION_STRING) != std::string::npos, "Full version should contain " AURORA_VERSION_STRING);
     return true;
 }
 
@@ -238,8 +238,8 @@ bool test_gc_alloc_collect() {
     TEST_ASSERT(p2 != nullptr, "GC alloc 2 should succeed");
     TEST_ASSERT(p1 != p2, "GC allocs should return different addresses");
 
-    size_t live_after;
-    aurora_gc_get_stats(&live_after, &collected_before);
+    size_t live_after, collected_after;
+    aurora_gc_get_stats(&live_after, &collected_after);
     TEST_ASSERT(live_after == live_before + 2, "Live objects should increase by 2 after allocs");
 
     /* Root-sweep: register then unregister root — object should be freed on collect */

@@ -461,7 +461,7 @@ int cmd_binary_package() {
        << "platform: " <<
 #ifdef _WIN32
        "windows"
-#elif __APPLE__
+#elif defined(__APPLE__)
        "macos"
 #else
        "linux"

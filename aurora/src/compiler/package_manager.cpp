@@ -14,7 +14,56 @@
 #include <iostream>
 #include <filesystem>
 
+#ifdef _WIN32
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  include <cerrno>
+#endif
+
 namespace fs = std::filesystem;
+
+/* ── Safe process execution (no shell) ── */
+static int run_process(const std::string& exe, const std::vector<std::string>& args) {
+#ifdef _WIN32
+    std::string cmdline = "\"" + exe + "\"";
+    for (auto& a : args)
+        cmdline += " \"" + a + "\"";
+    STARTUPINFOA si = {};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi = {};
+    BOOL ok = CreateProcessA(nullptr, cmdline.data(), nullptr, nullptr, FALSE,
+                             CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    if (!ok) return -1;
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return (int)exit_code;
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        std::vector<char*> argv;
+        argv.reserve(args.size() + 2);
+        argv.push_back(const_cast<char*>(exe.c_str()));
+        for (auto& a : args)
+            argv.push_back(const_cast<char*>(a.c_str()));
+        argv.push_back(nullptr);
+        execvp(exe.c_str(), argv.data());
+        _exit(127);
+    } else if (pid < 0) {
+        return -1;
+    }
+    int status;
+    pid_t w;
+    do {
+        w = waitpid(pid, &status, 0);
+    } while (w == -1 && errno == EINTR);
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
+}
 
 /* ── Package manifest structure ── */
 struct PackageInfo {
@@ -162,17 +211,21 @@ static int cmd_package_build() {
     std::string exe_path = "build/" + info.name + ".exe";
 
     /* Build using external compiler */
-    std::string cmd = "aurorac \"" + entry_path + "\" --emit-obj";
-    int ret = std::system(cmd.c_str());
+    int ret = run_process("aurorac", { entry_path, "--emit-obj" });
     if (ret != 0) {
         std::cerr << "package: build failed\n";
         return ret;
     }
 
     /* Link with runtime */
-    cmd = "lld-link \"" + obj_path + "\" aurora_runtime.lib /OUT:\"" + exe_path
-        + "\" /NOLOGO /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE";
-    ret = std::system(cmd.c_str());
+    std::vector<std::string> link_args = {
+        obj_path, "aurora_runtime.lib",
+        "/OUT:" + exe_path,
+        "/NOLOGO",
+        "/ENTRY:mainCRTStartup",
+        "/SUBSYSTEM:CONSOLE"
+    };
+    ret = run_process("lld-link", link_args);
 
     if (ret == 0)
         std::cout << "package: built '" << exe_path << "'\n";

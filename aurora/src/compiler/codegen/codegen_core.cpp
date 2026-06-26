@@ -4,6 +4,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/TargetParser/Host.h>
 
 #include <stdexcept>
 #include <sstream>
@@ -37,8 +38,9 @@ void Codegen::generate(const ASTNode* root) {
     oop_clear_vtable_cache();
 
     /* Step 0 — set target info for LLVM optimization */
-    module_->setTargetTriple("x86_64-pc-windows-msvc");
-    module_->setDataLayout("e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    auto triple = llvm::sys::getProcessTriple();
+    module_->setTargetTriple(triple);
+    module_->setDataLayout(llvm_target_data_layout(triple));
 
     /* Step 1 — run type checking before LLVM IR is emitted. */
     TypeChecker type_checker;
@@ -294,11 +296,11 @@ void Codegen::emit_scope_cleanup(CodegenScope& scope) {
         if (slot_ty)
             value = builder_->CreateLoad(slot_ty, slot_ptr, kv.first + "_cleanup");
 
-        if (rec.is_array && value && value->getType()->isIntegerTy(64)) {
+        if (rec.type_kind == AstTypeKind::Array && value && value->getType()->isIntegerTy(64)) {
             builder_->CreateCall(fn_array_free_, { value });
             continue;
         }
-        if (rec.is_string) continue;
+        if (rec.type_kind == AstTypeKind::String) continue;
 
         switch (rec.state) {
             case OwnershipState::Shared:

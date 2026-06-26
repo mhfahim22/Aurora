@@ -38,9 +38,72 @@
 #include <array>
 #ifdef _WIN32
 #  include <windows.h>
+#else
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  include <cerrno>
 #endif
 
 namespace fs = std::filesystem;
+
+static bool verbose = false;
+
+/* ── Safe process execution helper (no shell) ── */
+#ifdef _WIN32
+static std::string windows_quote_arg(const std::string& s) {
+    std::string q = "\"";
+    for (char c : s) {
+        if (c == '"') q += "\\\"";
+        else q += c;
+    }
+    q += "\"";
+    return q;
+}
+#endif
+
+static int run_process(const std::string& exe, const std::vector<std::string>& args) {
+#ifdef _WIN32
+    std::string cmdline = windows_quote_arg(exe);
+    for (auto& a : args)
+        cmdline += " " + windows_quote_arg(a);
+
+    STARTUPINFOA si = {};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi = {};
+    BOOL ok = CreateProcessA(nullptr, cmdline.data(), nullptr, nullptr, FALSE,
+                             CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    if (!ok) return -1;
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return (int)exit_code;
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        std::vector<char*> argv;
+        argv.reserve(args.size() + 2);
+        argv.push_back(const_cast<char*>(exe.c_str()));
+        for (auto& a : args)
+            argv.push_back(const_cast<char*>(a.c_str()));
+        argv.push_back(nullptr);
+        execvp(exe.c_str(), argv.data());
+        _exit(127);
+    } else if (pid < 0) {
+        return -1;
+    }
+    int status;
+    pid_t w;
+    do {
+        w = waitpid(pid, &status, 0);
+    } while (w == -1 && errno == EINTR);
+    if (w == -1) return -1;
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return -1;
+#endif
+}
 
 /* ── Read entire file into string ── */
 static std::string read_file(const std::string& path) {
@@ -163,7 +226,7 @@ static std::string find_import_file(const std::string& name, const std::string& 
 
 /* ── Auto-resolve import via voss bridge ── */
 static std::string resolve_via_voss(const std::string& name, const std::string& exe_dir) {
-    std::cerr << "[voss] auto-resolving: " << name << "\n";
+    if (verbose) std::cerr << "[voss] auto-resolving: " << name << "\n";
 
     /* Find voss executable */
     std::string voss_exe = (fs::path(exe_dir) / "voss.exe").string();
@@ -181,7 +244,7 @@ static std::string resolve_via_voss(const std::string& name, const std::string& 
             }
         }
     }
-    std::cerr << "[voss] using: " << voss_exe << "\n";
+    if (verbose) std::cerr << "[voss] using: " << voss_exe << "\n";
 
     /* Determine ecosystem from prefix (eco:pkg) or use --auto */
     std::string eco_cmd = "--auto";
@@ -204,7 +267,7 @@ static std::string resolve_via_voss(const std::string& name, const std::string& 
 
     /* Build command: voss bridge <eco> <pkg> */
     std::string cmd = "\"" + voss_exe + "\" bridge " + eco_cmd + " \"" + safe_pkg + "\"";
-    std::cerr << "[voss] running: " << cmd << "\n";
+    if (verbose) std::cerr << "[voss] running: " << cmd << "\n";
 
 #ifdef _WIN32
     /* Run voss and capture output */
@@ -253,13 +316,50 @@ static std::string resolve_via_voss(const std::string& name, const std::string& 
     }
     CloseHandle(hRead);
 #else
-    /* POSIX: use popen */
+    /* POSIX: fork/exec with pipe capture (safe, no shell) */
     std::string result;
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return "";
+    int pipefd[2];
+    if (pipe(pipefd) < 0) return "";
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+
+        char* const argv[] = {
+            const_cast<char*>(voss_exe.c_str()),
+            const_cast<char*>("bridge"),
+            const_cast<char*>(eco_cmd.c_str()),
+            const_cast<char*>(safe_pkg.c_str()),
+            nullptr
+        };
+        execvp(voss_exe.c_str(), argv);
+        _exit(127);
+    } else if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return "";
+    }
+
+    close(pipefd[1]);
     char buf[4096];
-    while (fgets(buf, sizeof(buf), pipe)) result += buf;
-    int exit_code = pclose(pipe);
+    ssize_t n;
+    do {
+        n = read(pipefd[0], buf, sizeof(buf) - 1);
+        if (n > 0) {
+            buf[n] = 0;
+            result += buf;
+        }
+    } while (n > 0 || (n == -1 && errno == EINTR));
+    close(pipefd[0]);
+
+    int status;
+    pid_t w;
+    do {
+        w = waitpid(pid, &status, 0);
+    } while (w == -1 && errno == EINTR);
+    int exit_code = (w != -1 && WIFEXITED(status)) ? WEXITSTATUS(status) : -1;
 #endif
 
     if (exit_code != 0) {
@@ -295,11 +395,11 @@ static std::string resolve_via_voss(const std::string& name, const std::string& 
         return "";
     }
 
-    std::cerr << "[voss] bridge created: " << ecosystem << " → " << name << "\n";
+    if (verbose) std::cerr << "[voss] bridge created: " << ecosystem << " → " << name << "\n";
     if (dll_path.empty() || !fs::exists(dll_path)) {
-        std::cerr << "[voss] note: bridge DLL not found, runtime resolve may fall back\n";
+        if (verbose) std::cerr << "[voss] note: bridge DLL not found, runtime resolve may fall back\n";
     } else {
-        std::cerr << "[voss] ✅ bridge DLL: " << dll_path << "\n";
+        if (verbose) std::cerr << "[voss] ✅ bridge DLL: " << dll_path << "\n";
     }
 
     return au_path;
@@ -340,7 +440,7 @@ static std::string auto_bindgen(const std::string& header_path, const std::strin
         }
     }
 
-    std::cerr << "[auto-bindgen] " << hdr.filename().string() << " → " << out_path.filename().string() << "\n" << std::flush;
+    if (verbose) std::cerr << "[auto-bindgen] " << hdr.filename().string() << " → " << out_path.filename().string() << "\n" << std::flush;
 
     /* Sanitize: ensure header_path doesn't contain shell metacharacters */
     auto sanitized_path = header_path;
@@ -370,9 +470,8 @@ static std::string auto_bindgen(const std::string& header_path, const std::strin
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
 #else
-    std::string cmd = bindgen_exe + " " + sanitized_path
-                    + " -o " + out_path.string();
-    int exit_code = std::system(cmd.c_str());
+    std::vector<std::string> bindgen_args = { sanitized_path, "-o", out_path.string() };
+    int exit_code = run_process(bindgen_exe, bindgen_args);
 #endif
 
     if (exit_code != 0) {
@@ -400,7 +499,7 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
     for (auto& node : nodes) {
         if (node->type == NodeType::Import) {
             std::string path = node->value;
-            std::cerr << "[import] " << path << "\n" << std::flush;
+            if (verbose) std::cerr << "[import] " << path << "\n" << std::flush;
             std::string found = find_import_file(path, source_dir, exe_dir);
             if (found.empty()) {
                 /* Auto-bindgen: quoted header import or convention-based .h lookup */
@@ -548,13 +647,23 @@ static std::vector<std::string> detect_msvc_lib_paths() {
     std::vector<std::string> paths;
     char buf[512];
 
-    FILE* pipe = _popen(
-        "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\" "
-        "-latest -property installationPath -format value 2>nul", "r");
+    /* Try vswhere via PATH first, then via ProgramFiles env vars */
+    std::string vswhere_cmd = "vswhere -latest -property installationPath -format value 2>nul";
+    FILE* pipe = _popen(vswhere_cmd.c_str(), "r");
     if (!pipe) {
-        pipe = _popen(
-            "\"C:\\Program Files\\Microsoft Visual Studio\\Installer\\vswhere.exe\" "
-            "-latest -property installationPath -format value 2>nul", "r");
+        const char* pf[] = {
+            std::getenv("ProgramFiles(x86)"),
+            std::getenv("ProgramFiles"),
+            std::getenv("ProgramW6432"),
+        };
+        for (auto p : pf) {
+            if (!p) continue;
+            std::string cmd = std::string("\"") + p +
+                "\\Microsoft Visual Studio\\Installer\\vswhere.exe\" "
+                "-latest -property installationPath -format value 2>nul";
+            pipe = _popen(cmd.c_str(), "r");
+            if (pipe) break;
+        }
     }
     std::string vs_install;
     if (pipe) {
@@ -567,14 +676,21 @@ static std::vector<std::string> detect_msvc_lib_paths() {
     }
 
     if (vs_install.empty()) {
-        const char* candidates[] = {
-            "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community",
-            "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools",
-            "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\Community",
-            "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools",
+        const char* pf[] = {
+            std::getenv("ProgramFiles"),
+            std::getenv("ProgramFiles(x86)"),
+            std::getenv("ProgramW6432"),
         };
-        for (auto c : candidates) {
-            if (fs::exists(c)) { vs_install = c; break; }
+        for (auto p : pf) {
+            if (!p) continue;
+            std::string base = std::string(p) + "\\Microsoft Visual Studio";
+            const char* editions[] = { "2022\\Community", "2022\\BuildTools", "2022\\Professional", "2022\\Enterprise",
+                                       "2019\\Community", "2019\\BuildTools", "2019\\Professional", "2019\\Enterprise" };
+            for (auto e : editions) {
+                std::string candidate = base + "\\" + e;
+                if (fs::exists(candidate)) { vs_install = candidate; break; }
+            }
+            if (!vs_install.empty()) break;
         }
     }
 
@@ -595,9 +711,17 @@ static std::vector<std::string> detect_msvc_lib_paths() {
         }
     }
 
-    std::string kits_root = "C:\\Program Files (x86)\\Windows Kits\\10\\Lib";
-    if (!fs::exists(kits_root))
-        kits_root = "C:\\Program Files\\Windows Kits\\10\\Lib";
+    std::string kits_root;
+    const char* kit_pf[] = {
+        std::getenv("ProgramFiles(x86)"),
+        std::getenv("ProgramFiles"),
+        std::getenv("ProgramW6432"),
+    };
+    for (auto p : kit_pf) {
+        if (!p) continue;
+        kits_root = std::string(p) + "\\Windows Kits\\10\\Lib";
+        if (fs::exists(kits_root)) break;
+    }
     if (fs::exists(kits_root)) {
         std::string sdk_ver;
         for (auto& entry : fs::directory_iterator(kits_root)) {
@@ -621,22 +745,51 @@ static std::vector<std::string> detect_msvc_lib_paths() {
 /* ── Locate lld-link on Windows by searching common install paths ── */
 #ifdef _WIN32
 static std::string find_lld_link() {
-    /* Try PATH first */
-    std::vector<std::string> candidates = {
-        "lld-link",
+    /* 1) LLVM_HOME env var (most specific user override) */
+    const char* llvm_home = std::getenv("LLVM_HOME");
+    if (llvm_home) {
+        std::string p = std::string(llvm_home) + "\\bin\\lld-link.exe";
+        if (fs::exists(p)) return p;
+    }
+
+    /* 2) Search PATH via where.exe */
+    {
+        FILE* pipe = _popen("where lld-link 2>nul", "r");
+        if (pipe) {
+            char buf[512];
+            if (fgets(buf, sizeof(buf), pipe)) {
+                std::string path = buf;
+                while (!path.empty() && (path.back() == '\n' || path.back() == '\r'))
+                    path.pop_back();
+                if (fs::exists(path)) { _pclose(pipe); return path; }
+            }
+            _pclose(pipe);
+        }
+    }
+
+    /* 3) ProgramFiles env var based paths */
+    const char* pf[] = {
+        std::getenv("ProgramFiles"),
+        std::getenv("ProgramFiles(x86)"),
+        std::getenv("ProgramW6432"),
+    };
+    for (auto p : pf) {
+        if (!p) continue;
+        std::string c = std::string(p) + "\\LLVM\\bin\\lld-link.exe";
+        if (fs::exists(c)) return c;
+    }
+
+    /* 4) Hardcoded fallback paths (last resort) */
+    std::vector<std::string> fallbacks = {
         "C:\\LLVM\\bin\\lld-link.exe",
         "C:\\Program Files\\LLVM\\bin\\lld-link.exe",
         "C:\\Program Files (x86)\\LLVM\\bin\\lld-link.exe",
-        "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\LLVM\\bin\\lld-link.exe",
-        "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\LLVM\\bin\\lld-link.exe",
     };
-    /* Try LLVM_HOME env var */
-    const char* llvm_home = std::getenv("LLVM_HOME");
-    if (llvm_home)
-        candidates.push_back(std::string(llvm_home) + "\\bin\\lld-link.exe");
-    for (auto& c : candidates) {
+    for (auto& c : fallbacks) {
         if (fs::exists(c)) return c;
     }
+
+    /* 5) Bare name — let the OS resolve via PATH in CreateProcess */
     return "lld-link";
 }
 #endif
@@ -647,8 +800,8 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
                      const std::vector<std::string>& link_libs,
                      const std::vector<std::string>& lib_paths,
                      bool use_lto = false) {
-    std::string cmd;
-    std::string lto_flag;
+    std::string linker;
+    std::vector<std::string> args;
 
 #ifdef _WIN32
     /* ── Windows: lld-link (COFF) ── */
@@ -660,45 +813,46 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     if (!fs::exists(rt_lib))
         rt_lib = "aurora_runtime.lib";
 
-    if (use_lto) lto_flag = " /LTCG";
-
-    cmd = find_lld_link() + " \"" + obj_path + "\" \"" + rt_lib + "\" /OUT:\"" + exe_path
-        + "\" /NOLOGO /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE" + lto_flag;
+    linker = find_lld_link();
+    args = { obj_path, rt_lib,
+             "/OUT:" + exe_path, "/NOLOGO",
+             "/ENTRY:mainCRTStartup", "/SUBSYSTEM:CONSOLE" };
+    if (use_lto) args.push_back("/LTCG");
 
     for (auto& lp : lib_paths)
-        cmd += " /LIBPATH:\"" + lp + "\"";
+        args.push_back("/LIBPATH:" + lp);
 
     if (lib_paths.empty()) {
         auto msvc_paths = detect_msvc_lib_paths();
         for (auto& p : msvc_paths)
-            cmd += " /LIBPATH:\"" + p + "\"";
+            args.push_back("/LIBPATH:" + p);
     }
 
-    cmd += " msvcrt.lib";
+    args.push_back("msvcrt.lib");
     for (auto& lib : link_libs) {
-        std::string l = lib;
-        if (l.size() > 4 && l.substr(l.size() - 4) == ".lib")
-            cmd += " \"" + l + "\"";
+        if (lib.size() > 4 && lib.substr(lib.size() - 4) == ".lib")
+            args.push_back(lib);
         else
-            cmd += " \"" + l + ".lib\"";
+            args.push_back(lib + ".lib");
     }
 
-#elif __APPLE__
-    /* ── macOS: ld64.lld or clang++ ── */
+#elif defined(__APPLE__)
+    /* ── macOS: ld64.lld ── */
     std::string rt_lib = exe_dir + "/libaurora_runtime.a";
     if (!fs::exists(rt_lib))
         rt_lib = exe_dir + "/../build/libaurora_runtime.a";
     if (!fs::exists(rt_lib))
         rt_lib = "libaurora_runtime.a";
 
-    if (use_lto) lto_flag = " --lto-O3";
-
-    cmd = "ld64.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"" + lto_flag;
+    linker = "ld64.lld";
+    args = { "-o", exe_path, obj_path, rt_lib };
+    if (use_lto) args.push_back("--lto-O3");
     for (auto& lp : lib_paths)
-        cmd += " -L\"" + lp + "\"";
+        args.push_back("-L" + lp);
     for (auto& lib : link_libs)
-        cmd += " -l\"" + lib + "\"";
-    cmd += " -lc -lc++";
+        args.push_back("-l" + lib);
+    args.push_back("-lc");
+    args.push_back("-lc++");
 
 #else
     /* ── Linux/Unix: ld.lld (ELF) ── */
@@ -708,22 +862,20 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     if (!fs::exists(rt_lib))
         rt_lib = "libaurora_runtime.a";
 
-    if (use_lto) lto_flag = " --lto-O3";
-
-    cmd = "ld.lld -o \"" + exe_path + "\" \"" + obj_path + "\" \"" + rt_lib + "\"" + lto_flag;
+    linker = "ld.lld";
+    args = { "-o", exe_path, obj_path, rt_lib };
+    if (use_lto) args.push_back("--lto-O3");
     for (auto& lp : lib_paths)
-        cmd += " -L\"" + lp + "\"";
+        args.push_back("-L" + lp);
     for (auto& lib : link_libs)
-        cmd += " -l\"" + lib + "\"";
-    cmd += " -lc -lc++ -lm";
+        args.push_back("-l" + lib);
+    args.push_back("-lc");
+    args.push_back("-lc++");
+    args.push_back("-lm");
 #endif
 
     std::cout << "aurora: linking " << exe_path << "\n";
-    /* NOTE: path inputs (obj_path, exe_path, rt_lib, lib_paths, link_libs)
-       should be sanitized to prevent command injection. In the current design
-       these come from trusted sources (compiler internals, not user input),
-       but a production system should validate or escape all path arguments. */
-    int ret = std::system(cmd.c_str());
+    int ret = run_process(linker, args);
     if (ret != 0) {
         std::cerr << "aurora: link failed (exit " << ret << ")\n";
         return false;
@@ -807,6 +959,7 @@ int main(int argc, char** argv) {
         std::cerr << "  -Oz             Aggressively optimize for size\n";
         std::cerr << "  -ffast-math     Enable unsafe floating-point optimizations\n";
         std::cerr << "  -flto           Enable link-time optimization (ThinLTO)\n";
+        std::cerr << "  --verbose, -v   Show verbose stage/trace output for debugging\n";
         return 1;
     }
 
@@ -859,6 +1012,7 @@ int main(int argc, char** argv) {
         else if (arg == "-ffast-math") fast_math = true;
         else if (arg == "-flto") use_lto = true;
         else if (arg == "--coverage") enable_coverage = true;
+        else if (arg == "--verbose" || arg == "-v") verbose = true;
         else if (arg == "--run")      run_jit = true;
         else if (arg == "--repl") {} /* already handled */
         else if (arg == "--doc") {} /* already handled */
@@ -958,13 +1112,13 @@ int main(int argc, char** argv) {
 
     try {
         /* ── Stage 1: Lex ── */
-        std::cerr << "STAGE1: Lex\n" << std::flush;
+        if (verbose) std::cerr << "STAGE1: Lex\n" << std::flush;
         std::string source = read_file(source_path);
         Lexer lexer;
         auto lines = lexer.lex(source);
 
         /* ── Stage 2: Parse ── */
-        std::cerr << "STAGE2: Parse\n" << std::flush;
+        if (verbose) std::cerr << "STAGE2: Parse\n" << std::flush;
         Parser parser(lines);
         ASTNode::Ptr ast = parser.parse();
 
@@ -976,7 +1130,7 @@ int main(int argc, char** argv) {
         }
 
         /* ── Stage 3: Memory Analysis (Phase 1-8) ── */
-        std::cerr << "STAGE3: MemoryAnalysis\n" << std::flush;
+        if (verbose) std::cerr << "STAGE3: MemoryAnalysis\n" << std::flush;
         MemoryAnalyzer memory_analyzer;
         memory_analyzer.analyse(ast.get());
         memory_analyzer.apply_to_ast(ast.get());
@@ -1027,12 +1181,12 @@ int main(int argc, char** argv) {
 
         /* Check for errors before codegen */
         if (memory_analyzer.has_errors()) {
-            std::cerr << "STAGE4: Skipped (compilation errors)\n" << std::flush;
+            if (verbose) std::cerr << "STAGE4: Skipped (compilation errors)\n" << std::flush;
             return 1;
         }
 
         /* ── Stage 4: Code Generation ── */
-        std::cerr << "STAGE4: CodeGen\n" << std::flush;
+        if (verbose) std::cerr << "STAGE4: CodeGen\n" << std::flush;
         auto ctx = std::make_unique<llvm::LLVMContext>();
         std::unique_ptr<llvm::Module> module;
         auto builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
@@ -1047,25 +1201,25 @@ int main(int argc, char** argv) {
             /* ── Aurora IR pipeline: AST → Aurora IR → Optimize → Lower to LLVM IR ── */
             AstToIr ast_to_ir;
             IrModule ir_mod = ast_to_ir.translate(ast.get());
-            std::cerr << "STAGE4a: Aurora IR generated (" << ir_mod.functions.size()
-                      << " functions, " << ir_mod.type_pool.size() << " types)\n" << std::flush;
+            if (verbose) std::cerr << "STAGE4a: Aurora IR generated (" << ir_mod.functions.size()
+                                   << " functions, " << ir_mod.type_pool.size() << " types)\n" << std::flush;
 
             /* Optimize Aurora IR */
             try {
                 ir_optimize(ir_mod);
             } catch (const std::exception& e) {
-                std::cerr << "STAGE4b: Aurora IR optimization warning: " << e.what() << "\n" << std::flush;
+                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora IR optimization failed: " << e.what() << "\n" << std::flush;
             } catch (...) {
-                std::cerr << "STAGE4b: Aurora IR optimization warning (unknown exception)\n" << std::flush;
+                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora IR optimization failed (unknown exception)\n" << std::flush;
             }
-            std::cerr << "STAGE4b: Aurora IR optimized\n" << std::flush;
+            if (verbose) std::cerr << "STAGE4b: Aurora IR optimized\n" << std::flush;
 
             /* Lower to LLVM IR */
             module.reset(lower_ir_to_llvm(ir_mod, *ctx));
             if (!module)
                 module = std::make_unique<llvm::Module>("aurora_module", *ctx);
             module->setSourceFileName(source_path);
-            std::cerr << "STAGE4c: Lowered to LLVM IR\n" << std::flush;
+            if (verbose) std::cerr << "STAGE4c: Lowered to LLVM IR\n" << std::flush;
 
         } else if (use_optimized_codegen) {
             /* Use optimized codegen with memory analysis */
@@ -1080,25 +1234,25 @@ int main(int argc, char** argv) {
             codegen.set_coverage_enabled(enable_coverage);
             codegen.generate(ast.get());
         }
-        std::cerr << "STAGE4: Done\n" << std::flush;
+        if (verbose) std::cerr << "STAGE4: Done\n" << std::flush;
 
         /* ── Stage 5: Aurora custom optimizations (LLVM IR level) ── */
         if (!use_aurora_ir) {
-            std::cerr << "STAGE5: BeforeOpt: " << module->size() << " functions\n" << std::flush;
+            if (verbose) std::cerr << "STAGE5: BeforeOpt: " << module->size() << " functions\n" << std::flush;
             try {
                 run_aurora_optimizer(module.get());
             } catch (const std::exception& e) {
-                std::cerr << "STAGE5: Aurora optimizer warning: " << e.what() << "\n" << std::flush;
+                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora LLVM optimizer failed: " << e.what() << "\n" << std::flush;
             } catch (...) {
-                std::cerr << "STAGE5: Aurora optimizer warning (unknown exception)\n" << std::flush;
+                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora LLVM optimizer failed (unknown exception)\n" << std::flush;
             }
-            std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
+            if (verbose) std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
         }
 
         /* ── Stage 6: LLVM optimization + native CPU ── */
-        std::cerr << "STAGE6: init\n" << std::flush;
+        if (verbose) std::cerr << "STAGE6: init\n" << std::flush;
         std::string cpu = llvm::sys::getHostCPUName().str();
-        std::cerr << "STAGE6: cpu=" << cpu << "\n" << std::flush;
+        if (verbose) std::cerr << "STAGE6: cpu=" << cpu << "\n" << std::flush;
         {
             std::string features_str;
 #if LLVM_VERSION_MAJOR >= 19
@@ -1120,16 +1274,16 @@ int main(int argc, char** argv) {
                 }
             }
 #endif
-            std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
+            if (verbose) std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
             module->setTargetTriple(llvm::sys::getProcessTriple());
-            std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;
+            if (verbose) std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;
 
-            std::cerr << "STAGE6: creating managers\n" << std::flush;
+            if (verbose) std::cerr << "STAGE6: creating managers\n" << std::flush;
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
             llvm::CGSCCAnalysisManager CGAM;
             llvm::ModuleAnalysisManager MAM;
-            std::cerr << "STAGE6: creating passbuilder\n" << std::flush;
+            if (verbose) std::cerr << "STAGE6: creating passbuilder\n" << std::flush;
             llvm::PassBuilder PB;
 
             PB.registerModuleAnalyses(MAM);
@@ -1147,9 +1301,9 @@ int main(int argc, char** argv) {
                 : llvm::OptimizationLevel::O2;
             else ol = llvm::OptimizationLevel::O3;
 
-            std::cerr << "STAGE6: opt_level=" << opt_level << " ol_type=" << (opt_level == 0 ? "O0" : "O1+") << "\n" << std::flush;
+            if (verbose) std::cerr << "STAGE6: opt_level=" << opt_level << " ol_type=" << (opt_level == 0 ? "O0" : "O1+") << "\n" << std::flush;
             if (opt_level > 0) {
-                std::cerr << "STAGE6: building pipeline\n" << std::flush;
+                if (verbose) std::cerr << "STAGE6: building pipeline\n" << std::flush;
                 llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(ol);
                 MPM.run(*module, MAM);
 
@@ -1168,14 +1322,14 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        std::cerr << "STAGE6: opt" << opt_level << " done (cpu=" << cpu << ")\n" << std::flush;
+        if (verbose) std::cerr << "STAGE6: opt" << opt_level << " done (cpu=" << cpu << ")\n" << std::flush;
 
         if (run_jit) {
             /* JIT-execute main function */
-            std::cerr << "JIT: Starting execution\n" << std::flush;
+            if (verbose) std::cerr << "JIT: Starting execution\n" << std::flush;
             int exit_code = jit_execute_main(std::move(ctx), std::move(module));
             if (exit_code != 0 && exit_code != -1)
-                std::cerr << "JIT exit code: " << exit_code << "\n" << std::flush;
+                if (verbose) std::cerr << "JIT exit code: " << exit_code << "\n" << std::flush;
             return exit_code == -1 ? 1 : 0;
         }
 
@@ -1215,7 +1369,7 @@ int main(int argc, char** argv) {
             module->print(ir_os, nullptr);
             ir_os.flush();
 
-            std::cerr << "IR length: " << ir_str.size() << "\n" << std::flush;
+            if (verbose) std::cerr << "IR length: " << ir_str.size() << "\n" << std::flush;
 
             auto sep = source_path.find_last_of("/\\");
             std::string fname = (sep == std::string::npos) ? source_path : source_path.substr(sep + 1);
@@ -1227,7 +1381,7 @@ int main(int argc, char** argv) {
             ofs << ir_str;
             ofs.close();
 
-            std::cerr << "File written: " << out_path << "\n" << std::flush;
+            if (verbose) std::cerr << "File written: " << out_path << "\n" << std::flush;
         }
 
     } catch (const OwnershipError& e) {

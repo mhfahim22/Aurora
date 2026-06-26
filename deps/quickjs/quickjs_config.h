@@ -1,6 +1,9 @@
 /* QuickJS compatibility config for Windows (MSVC or Zig cc/MinGW) */
 /* This file is force-included first via -include /FI */
 
+#ifndef QUICKJS_CONFIG_H
+#define QUICKJS_CONFIG_H
+
 /* Always available: CONFIG_VERSION */
 #define CONFIG_VERSION "2021-03-27"
 
@@ -35,8 +38,14 @@
 #include <malloc.h>
 
 /* Provide gettimeofday for Windows (MSVC doesn't have it) */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
-struct timeval { long tv_sec; long tv_usec; };
+/* Include winsock2.h so that struct timeval is defined by the system headers.
+   This avoids redefinition conflicts when other headers (e.g. ws2tcpip.h)
+   pull in winsock2.h later in the translation unit. */
+#include <winsock2.h>
 static __forceinline int gettimeofday(struct timeval *tv, void *tz) {
     static int init = 0; static LARGE_INTEGER freq;
     if (!init) { QueryPerformanceFrequency(&freq); init = 1; }
@@ -48,6 +57,15 @@ static __forceinline int gettimeofday(struct timeval *tv, void *tz) {
 
 /* __attribute__ not supported by MSVC */
 #define __attribute__(x) /* nothing */
+#define __attribute(x) /* nothing */
+
+/* Use NaN-boxing for JSValue on MSVC (JSValue = uint64_t) to avoid
+   C2440 "cannot convert from 'JSValue' to 'JSValue'" errors caused by
+   MSVC rejecting identity casts on struct types. */
+#define JS_NAN_BOXING 1
+
+/* Infinity constant avoiding compile-time 1.0/0.0 (C2124 on MSVC) */
+#define __JS_INF ((double)1.0e308 * (double)1.0e308)
 
 /* force_inline / no_inline / maybe_unused for MSVC */
 #define force_inline __forceinline
@@ -56,13 +74,13 @@ static __forceinline int gettimeofday(struct timeval *tv, void *tz) {
 
 /* js_force_inline / printf format / warn_unused_result for MSVC */
 #define js_force_inline __forceinline
-#define __js_printf_like(f, a) /* nothing */
+#define __js_printf_like(a, b) /* nothing */
 #define __exception /* nothing */
 
 /* Disable source_location on MSVC (uses __builtin_FILE/LINE) */
 #define js_source_location __FILE__, __LINE__
 
-/* __builtin_ctz / __builtin_ctzll are GCC/Clang builtins — provide MSVC fallback */
+/* GCC/Clang builtins — provide MSVC fallbacks */
 #include <intrin.h>
 #ifdef __cplusplus
 extern "C" {
@@ -73,8 +91,20 @@ static __forceinline int __builtin_ctz(unsigned int x) {
 static __forceinline int __builtin_ctzll(unsigned long long x) {
     unsigned long idx; _BitScanForward64(&idx, x); return (int)idx;
 }
+static __forceinline int __builtin_clz(unsigned int x) {
+    unsigned long idx; _BitScanReverse(&idx, x); return (int)(31 - idx);
+}
+static __forceinline int __builtin_clzll(unsigned long long x) {
+    unsigned long idx; _BitScanReverse64(&idx, x); return (int)(63 - idx);
+}
+/* __builtin_expect is a branch prediction hint — no-op on non-GCC */
+#define __builtin_expect(x, expected) (x)
+/* __builtin_frame_address(0) — get return address */
+#define __builtin_frame_address(level) ((void *)((level) == 0 ? _AddressOfReturnAddress() : NULL))
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* _MSC_VER */
+
+#endif /* QUICKJS_CONFIG_H */

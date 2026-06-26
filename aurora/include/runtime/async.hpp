@@ -5,7 +5,6 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include <csetjmp>
 
 /* ── Task handle ── */
 typedef struct AuroraTask {
@@ -35,7 +34,7 @@ typedef struct AuroraFiber {
     void*              arg;
     void*              result;
     int                state;       /* 0=ready, 1=running, 2=yielded, 3=done */
-    void*              context;     /* platform-specific fiber handle / jmp_buf */
+    int                yielded;     /* flag set by yield, cleared on resume */
     struct AuroraFiber* next;       /* for scheduler queue */
 } AuroraFiber;
 

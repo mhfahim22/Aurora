@@ -1,8 +1,28 @@
 #include "compiler/typechecker.hpp"
 #include "compiler/type_registry.hpp"
 #include "compiler/ast.hpp"
+#include "compiler/ast/ast_type.hpp"
 
 #include <sstream>
+
+/* H2 Phase D2: inline annotation helper (annotate_node is static in typechecker.cpp) */
+static void annotate_node_decl(const ASTNode* node, AstTypeKind kind, const std::string& type_name = "") {
+    if (!node) return;
+    auto& ann = const_cast<ASTNode*>(node)->type_annotation;
+    ann.kind = kind;
+    ann.type_name = type_name;
+}
+
+/* H2 Phase E-2: extern type name to AstTypeKind conversion (mirrors resolve_type_name) */
+static AstTypeKind extern_type_name_to_kind(const std::string& name) {
+    if (name == "int" || name == "i64" || name == "Int" || name == "u64")    return AstTypeKind::Int;
+    if (name == "float" || name == "f64" || name == "Float" || name == "double") return AstTypeKind::Float;
+    if (name == "string" || name == "String" || name == "str" || name == "cstring") return AstTypeKind::String;
+    if (name == "bool" || name == "Bool")                                     return AstTypeKind::Bool;
+    if (name == "void" || name == "Void")                                     return AstTypeKind::Void;
+    if (name == "char")                                                       return AstTypeKind::Int;
+    return AstTypeKind::Unknown;
+}
 
 /* ── Register type alias: type T = BaseType ── */
 void TypeChecker::register_type_alias(const ASTNode* node) {
@@ -14,6 +34,27 @@ void TypeChecker::register_type_alias(const ASTNode* node) {
     if (base.empty()) return;
 
     global_type_registry().register_alias(alias, base);
+    /* H2 Phase D2: annotate with resolved base type */
+    {
+        AuroraType at = resolve_type_name(base);
+        static const auto aurora_to_ast = [](AuroraType t) -> AstTypeKind {
+            switch (t) {
+                case AuroraType::Unknown:  return AstTypeKind::Unknown;
+                case AuroraType::Int:      return AstTypeKind::Int;
+                case AuroraType::Float:    return AstTypeKind::Float;
+                case AuroraType::String:   return AstTypeKind::String;
+                case AuroraType::Bool:     return AstTypeKind::Bool;
+                case AuroraType::Struct:   return AstTypeKind::Struct;
+                case AuroraType::Enum:      return AstTypeKind::Enum;
+                case AuroraType::Interface: return AstTypeKind::Interface;
+                case AuroraType::Array:    return AstTypeKind::Array;
+                case AuroraType::Pointer:  return AstTypeKind::Pointer;
+                case AuroraType::Void:     return AstTypeKind::Void;
+                default:                   return AstTypeKind::Unknown;
+            }
+        };
+        annotate_node_decl(node, aurora_to_ast(at), base);
+    }
 }
 
 /* ── Register struct from AST ── */
@@ -38,6 +79,8 @@ void TypeChecker::register_struct(const ASTNode* node) {
             field.position = pos++;
             if (f->right) {
                 field.type_name = f->right->value;
+                field.type_kind = extern_type_name_to_kind(field.type_name);
+                /* element_kind stays Unknown — extern types are scalar/opaque */
                 /* ABI validation: check field type is C-compatible */
                 {
                     std::string kind = (node->type == NodeType::ExternUnion) ? "extern union" : "extern struct";
@@ -61,10 +104,13 @@ void TypeChecker::register_struct(const ASTNode* node) {
                 if (stmt->right) {
                     if (stmt->right->type == NodeType::Str) {
                         field.default_value = "\"" + stmt->right->value + "\"";
-                        field.is_string = true;
+                        field.type_kind = AstTypeKind::String;
                     } else if (stmt->right->type == NodeType::Float) {
                         field.default_value = stmt->right->value;
-                        field.is_float = true;
+                        field.type_kind = AstTypeKind::Float;
+                    } else if (stmt->right->type == NodeType::Num) {
+                        field.default_value = stmt->right->value;
+                        field.type_kind = AstTypeKind::Int;
                     } else {
                         field.default_value = stmt->right->value;
                     }
@@ -87,6 +133,7 @@ void TypeChecker::register_struct(const ASTNode* node) {
     user_types_[info.name] = std::move(entry);
 
     global_type_registry().register_struct(std::move(info));
+    annotate_node_decl(node, AstTypeKind::Struct, node->value);  /* H2 Phase D2 */
 }
 
 /* ── Register enum from AST ── */
@@ -113,6 +160,7 @@ void TypeChecker::register_enum(const ASTNode* node) {
     user_types_[info.name] = std::move(entry);
 
     global_type_registry().register_enum(std::move(info));
+    annotate_node_decl(node, AstTypeKind::Enum, node->value);  /* H2 Phase D2 */
 }
 
 /* ── Register interface from AST ── */
@@ -150,6 +198,7 @@ void TypeChecker::register_interface(const ASTNode* node) {
     user_types_[info.name] = std::move(entry);
 
     global_type_registry().register_interface(std::move(info));
+    annotate_node_decl(node, AstTypeKind::Interface, node->value);  /* H2 Phase D2 */
 }
 
 /* ── Type helpers ── */

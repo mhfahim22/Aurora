@@ -5,6 +5,8 @@
 #include <unordered_set>
 #include <stdexcept>
 
+#include "compiler/ast/ast_type.hpp"
+
 /* ════════════════════════════════════════════════════════════
    Aurora OOP — Class Registry
    ════════════════════════════════════════════════════════════
@@ -43,9 +45,9 @@ struct ClassFieldInfo {
     std::string name;
     std::string default_value;   /* default হিসেবে যা দেওয়া আছে, e.g. "0", "\"unknown\"" */
     int         position { 0 };  /* positional constructor এর জন্য order */
-    bool        is_string  { false };
-    bool        is_float   { false };
     Visibility  visibility { Visibility::Public };  /* Encapsulation */
+    AstTypeKind type_kind { AstTypeKind::Unknown };     /* H2 Phase D2: resolved field type */
+    AstTypeKind element_kind { AstTypeKind::Unknown };  /* H2 Phase E-2: for compound fields */
 };
 
 /* ── Method info ── */
@@ -57,7 +59,7 @@ struct ClassMethodInfo {
     bool                     is_abstract { false }; /* Abstraction */
     bool                     is_final    { false }; /* Abstraction */
     int                      vtable_index { -1 };   /* Polymorphism: index in vtable */
-    bool                     returns_string { false }; /* set by typechecker: true if the method returns a string */
+    AstTypeKind              return_kind { AstTypeKind::Unknown };  /* H2 Phase D2: resolved return type */
 };
 
 /* ── Full class definition ── */

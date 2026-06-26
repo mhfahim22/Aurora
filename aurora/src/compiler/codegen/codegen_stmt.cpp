@@ -77,28 +77,20 @@ void Codegen::gen_assign(const ASTNode* node) {
     llvm::Value* val = gen_expr(node->right.get());
     if (!val) val = i64(0);
 
-    /* Propagate is_array / is_string from source for type-preserving ops
-       (move, copy) — the RHS node type is not NodeType::Array in these cases. */
-    auto resolve_flags = [&](bool& out_array, bool& out_string) {
+    /* H3 Phase D: resolve type kind up front (annotation-first) */
+    auto resolve_kind = [&]() -> AstTypeKind {
         const ASTNode* rhs = node->right.get();
-        if (rhs->type == NodeType::Array) {
-            out_array = true; out_string = false; return;
-        }
-        if (rhs->type == NodeType::Str) {
-            out_array = false; out_string = true; return;
-        }
-        if (rhs->type == NodeType::Copy || rhs->type == NodeType::Move) {
-            /* look up source variable's flags */
+        auto rk = get_annotation_kind(rhs);
+        if (rk == AstTypeKind::Array || rk == AstTypeKind::String) return rk;
+        if (rk == AstTypeKind::Unknown && (rhs->type == NodeType::Copy || rhs->type == NodeType::Move)) {
             const std::string& src_name = rhs->value;
             VarRecord* src = lookup_var(src_name);
-            if (src) { out_array = src->is_array; out_string = src->is_string; return; }
+            if (src) return src->type_kind;
         }
-        out_array  = false;
-        out_string = val->getType()->isPointerTy();
+        return AstTypeKind::Unknown;
     };
 
-    bool flag_array = false, flag_string = false;
-    resolve_flags(flag_array, flag_string);
+    AstTypeKind assign_kind = resolve_kind();
 
     VarRecord* rec = lookup_var(name);
 
@@ -135,8 +127,7 @@ void Codegen::gen_assign(const ASTNode* node) {
         builder_->CreateStore(store_val, slot);
         declare_var(name, slot, init_state);
         auto* r = lookup_var(name);
-        r->is_array  = flag_array;
-        r->is_string = flag_string;
+        r->type_kind = assign_kind;
         rec = r;
     } else {
         auto* slot_ptr = rec->alloca_ptr;
@@ -161,8 +152,7 @@ void Codegen::gen_assign(const ASTNode* node) {
                 builder_->CreateStore(val, rec->alloca_ptr);
             }
         }
-        rec->is_array  = flag_array;
-        rec->is_string = flag_string;
+        rec->type_kind = assign_kind;
     }
 
     /* Closure-returning function calls: propagate is_closure to receiver */
@@ -202,9 +192,10 @@ void Codegen::gen_drop(const ASTNode* node) {
     auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
     llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
 
+    auto drop_k = get_annotation_kind(node);
     switch (rec->state) {
         case OwnershipState::Owned:
-            if (rec->is_array) {
+            if (drop_k == AstTypeKind::Array) {
                 llvm::Value* arr = builder_->CreateLoad(slot_ty, rec->alloca_ptr, node->value + "_drop");
                 builder_->CreateCall(fn_array_free_, { arr });
             } else if (slot_ty->isPointerTy()) {
@@ -236,7 +227,8 @@ void Codegen::gen_delete(const ASTNode* node) {
     if (!rec || !rec->alloca_ptr) return;
     auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
     llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
-    if (rec->is_array) {
+    auto del_k = get_annotation_kind(node);
+    if (del_k == AstTypeKind::Array) {
         llvm::Value* arr = builder_->CreateLoad(slot_ty, rec->alloca_ptr, node->left->value + "_delete");
         builder_->CreateCall(fn_array_free_, { arr });
     } else if (slot_ty->isPointerTy()) {
@@ -272,42 +264,46 @@ void Codegen::gen_borrow(const ASTNode* node) {
 void Codegen::gen_output(const ASTNode* node) {
     if (!node->left) return;
 
-    /* Float literal */
-    if (node->left->type == NodeType::Float) {
-        double fval = std::stod(node->left->value);
-        llvm::Value* fv = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), fval);
-        builder_->CreateCall(fn_print_float_, { fv });
-        return;
-    }
-
-    /* Variable */
-    if (node->left->type == NodeType::Var) {
-        VarRecord* rec = lookup_var(node->left->value);
-        if (rec && rec->alloca_ptr) {
-            auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
-            auto* global_var = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr);
-            llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType()
-                                 : global_var ? global_var->getValueType()
-                                 : i64_ty();
-            llvm::Value* val = builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->left->value);
-            if (rec->is_array)
-                builder_->CreateCall(fn_array_print_, { val });
-            else if (rec->is_string)
-                builder_->CreateCall(fn_print_str_, { val });
-            else if (alloc_ty->isDoubleTy())
-                builder_->CreateCall(fn_print_float_, { val });
-            else
-                builder_->CreateCall(fn_printf_, { val });
+    /* H2 Phase C: prefer annotation for type dispatch */
+    {
+        auto lk = get_annotation_kind(node->left.get());
+        /* Float literal */
+        if (lk == AstTypeKind::Float && node->left->type == NodeType::Float) {
+            double fval = std::stod(node->left->value);
+            llvm::Value* fv = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), fval);
+            builder_->CreateCall(fn_print_float_, { fv });
             return;
         }
-    }
 
-    /* Array literal */
-    if (node->left->type == NodeType::Array) {
-        llvm::Value* arr = gen_array(node->left.get());
-        builder_->CreateCall(fn_array_print_, { arr });
-        builder_->CreateCall(fn_array_free_,  { arr });
-        return;
+        /* Variable */
+        if (node->left->type == NodeType::Var) {
+            VarRecord* rec = lookup_var(node->left->value);
+            if (rec && rec->alloca_ptr) {
+                auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
+                auto* global_var = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr);
+                llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType()
+                                     : global_var ? global_var->getValueType()
+                                     : i64_ty();
+                llvm::Value* val = builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->left->value);
+                if (lk == AstTypeKind::Array)
+                    builder_->CreateCall(fn_array_print_, { val });
+                else if (lk == AstTypeKind::String)
+                    builder_->CreateCall(fn_print_str_, { val });
+                else if (lk == AstTypeKind::Float || alloc_ty->isDoubleTy())
+                    builder_->CreateCall(fn_print_float_, { val });
+                else
+                    builder_->CreateCall(fn_printf_, { val });
+                return;
+            }
+        }
+
+        /* Array literal */
+        if (lk == AstTypeKind::Array && node->left->type == NodeType::Array) {
+            llvm::Value* arr = gen_array(node->left.get());
+            builder_->CreateCall(fn_array_print_, { arr });
+            builder_->CreateCall(fn_array_free_,  { arr });
+            return;
+        }
     }
 
     /* Index access output(arr[i]) */
@@ -359,12 +355,16 @@ void Codegen::gen_output(const ASTNode* node) {
     /* Everything else */
     llvm::Value* val = gen_expr(node->left.get());
     if (!val) val = i64(0);
-    if (val->getType()->isDoubleTy())
-        builder_->CreateCall(fn_print_float_, { val });
-    else if (val->getType()->isPointerTy())
-        builder_->CreateCall(fn_print_str_, { val });
-    else
-        builder_->CreateCall(fn_printf_, { val });
+    /* H2 Phase C: prefer annotation, fall back to LLVM type */
+    {
+        auto lk = get_annotation_kind(node->left.get());
+        if (lk == AstTypeKind::Float || val->getType()->isDoubleTy())
+            builder_->CreateCall(fn_print_float_, { val });
+        else if (lk == AstTypeKind::String || val->getType()->isPointerTy())
+            builder_->CreateCall(fn_print_str_, { val });
+        else
+            builder_->CreateCall(fn_printf_, { val });
+    }
 }
 
 /* ── return expr ── */
@@ -382,9 +382,14 @@ void Codegen::gen_return(const ASTNode* node) {
         builder_->CreateRetVoid();
         return;
     }
-    /* Function returns i8*, so bitcast i64/int results to i8* */
+    /* Default return value matching the function's LLVM return type */
     if (!val) {
-        val = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(i8ptr_ty()));
+        if (ret_ty->isPointerTy())
+            val = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(ret_ty));
+        else if (ret_ty->isFloatingPointTy())
+            val = llvm::ConstantFP::get(ret_ty, 0.0);
+        else
+            val = llvm::ConstantInt::get(ret_ty, 0);
     } else if (val->getType()->isStructTy()) {
         /* Closure returns: heap-allocate storage so the struct survives
            the function return (stack allocas would be freed). */
@@ -394,9 +399,17 @@ void Codegen::gen_return(const ASTNode* node) {
             "ret_closure_heap");
         builder_->CreateStore(val, heap_slot);
         val = heap_slot;
-    } else if (val->getType() != i8ptr_ty()) {
-        if (val->getType()->isIntegerTy())
-            val = builder_->CreateIntToPtr(val, i8ptr_ty(), "ret_cast");
+    }
+    /* Convert val to match ret_ty if needed */
+    if (val->getType() != ret_ty) {
+        if (val->getType()->isIntegerTy() && ret_ty->isPointerTy())
+            val = builder_->CreateIntToPtr(val, ret_ty, "ret_cast");
+        else if (val->getType()->isPointerTy() && ret_ty->isIntegerTy())
+            val = builder_->CreatePtrToInt(val, ret_ty, "ret_unbox");
+        else if (val->getType()->isIntegerTy() && ret_ty->isFloatingPointTy())
+            val = builder_->CreateSIToFP(val, ret_ty, "ret_itof");
+        else if (val->getType()->isFloatingPointTy() && ret_ty->isIntegerTy())
+            val = builder_->CreateFPToSI(val, ret_ty, "ret_ftoi");
     }
     safe_ret(val);
 }
@@ -676,13 +689,16 @@ void Codegen::gen_for(const ASTNode* node) {
     bool is_array_iter = false;
     llvm::Value* arr_ptr_val = nullptr;
 
-    /* Check if the iterable is a variable holding an array */
-    if (node->left->type == NodeType::Var) {
-        VarRecord* iter_rec = lookup_var(node->left->value);
-        if (iter_rec && iter_rec->is_array) {
+    /* H3 Phase B: annotation-first array detection for for-in */
+    auto for_lk = get_annotation_kind(node->left.get());
+    if (for_lk == AstTypeKind::Array ||
+        (for_lk == AstTypeKind::Unknown && node->left->type == NodeType::Var)) {
+        VarRecord* iter_rec = node->left->type == NodeType::Var ? lookup_var(node->left->value) : nullptr;
+        if (for_lk == AstTypeKind::Array ||
+            (for_lk == AstTypeKind::Unknown && iter_rec && iter_rec->type_kind == AstTypeKind::Array)) {
             /* Array iteration: use aurora_array_len to get the length */
-            arr_ptr_val = builder_->CreateLoad(i64_ty(), iter_rec->alloca_ptr,
-                                                         node->left->value + "_arr_len");
+            llvm::Value* arr_raw = gen_expr(node->left.get());
+            arr_ptr_val = arr_raw;
             limit = builder_->CreateCall(fn_array_len_, { arr_ptr_val }, "arr_len");
             is_array_iter = true;
         }
@@ -769,7 +785,7 @@ void Codegen::gen_copy(const ASTNode* node) {
     VarRecord* rec = lookup_var(name);
     if (!rec || !rec->alloca_ptr) return;
 
-    if (rec->is_array) {
+    if (get_annotation_kind(node) == AstTypeKind::Array) {
         /* Re-assign the variable to a deep copy of itself */
         llvm::Value* arr = builder_->CreateLoad(i64_ty(), rec->alloca_ptr, name + "_copy_src");
 
@@ -798,7 +814,7 @@ void Codegen::gen_free(const ASTNode* node) {
     auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
     llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
 
-    if (rec->is_array) {
+    if (get_annotation_kind(node) == AstTypeKind::Array) {
         /* For arrays: call aurora_array_free directly */
         llvm::Value* arr = builder_->CreateLoad(slot_ty, rec->alloca_ptr, name + "_free_arr");
         builder_->CreateCall(fn_array_free_, {arr});
@@ -825,7 +841,8 @@ void Codegen::gen_lambda(const ASTNode* node) {
     std::string lambda_name = "_lambda_" + std::to_string(lambda_id++);
     bool has_captures = !node->captures.empty();
 
-    /* Build param types — env ptr first if capturing */
+    /* Build param types — env ptr first if capturing;
+       user params prefer annotation, fall back to i8* */
     std::vector<std::string> param_names;
     std::vector<llvm::Type*> param_types;
     if (has_captures) {
@@ -835,11 +852,13 @@ void Codegen::gen_lambda(const ASTNode* node) {
     const ASTNode* p = node->args.get();
     while (p) {
         param_names.push_back(p->value);
-        param_types.push_back(i8ptr_ty());
+        param_types.push_back(ast_kind_to_abi_type(ctx_, p->type_annotation.kind, i8ptr_ty()));
         p = p->next.get();
     }
 
-    auto* fn_type = llvm::FunctionType::get(i8ptr_ty(), param_types, false);
+    auto lambda_ret_kind = get_annotation_kind(node);
+    auto* lambda_ret_ty  = ast_kind_to_abi_type(ctx_, lambda_ret_kind, i8ptr_ty());
+    auto* fn_type = llvm::FunctionType::get(lambda_ret_ty, param_types, false);
     auto* fn = llvm::Function::Create(
         fn_type, llvm::Function::InternalLinkage, lambda_name, module_.get());
 
@@ -883,7 +902,16 @@ void Codegen::gen_lambda(const ASTNode* node) {
 
     gen_block(node->body.get());
     pop_scope_and_drop();
-    safe_ret(llvm::ConstantPointerNull::get(i8ptr_ty()));
+    {
+        auto* rt = fn->getReturnType();
+        if (rt->isVoidTy()) {
+            if (!current_block_terminated()) builder_->CreateRetVoid();
+        } else if (rt->isPointerTy()) {
+            safe_ret(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(rt)));
+        } else {
+            safe_ret(llvm::ConstantInt::get(rt, 0));
+        }
+    }
 
     literal_aurora_cache_ = std::move(saved_cache);
     cur_fn_ = saved_fn;

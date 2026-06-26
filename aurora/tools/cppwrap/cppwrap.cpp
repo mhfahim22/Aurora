@@ -687,6 +687,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* Parse args */
+    g_clang_args_storage.reserve(argc);  /* prevent reallocation, keeping c_str() pointers valid */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             g_output_dir = argv[++i];

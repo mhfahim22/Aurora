@@ -20,6 +20,7 @@
 #pragma comment(linker, "/EXPORT:aurora_gc_alloc")
 #pragma comment(linker, "/EXPORT:aurora_gc_collect")
 #pragma comment(linker, "/EXPORT:aurora_gc_register_root")
+#pragma comment(linker, "/EXPORT:aurora_gc_register_root_sized")
 #pragma comment(linker, "/EXPORT:aurora_gc_unregister_root")
 #pragma comment(linker, "/EXPORT:aurora_gc_get_stats")
 #pragma comment(linker, "/EXPORT:aurora_gc_set_auto_collect_threshold")

@@ -108,6 +108,7 @@ public:
 
 private:
     std::vector<std::unordered_map<std::string, AuroraType>> scopes_; /* TODO: add variable shadowing diagnostic (future) */
+    std::unordered_map<std::string, AstTypeKind> var_element_types_;  /* H2 Phase E-1: element kind per variable */
     std::unordered_map<std::string, FunctionTypeInfo> functions_;
 
     /* User-defined type registry (struct/class/enum/interface name -> TypeInfo) */
@@ -132,7 +133,9 @@ private:
     void pop_scope();
 
     void define_var(const std::string& name, AuroraType type);
+    void define_var_elem(const std::string& name, AuroraType type, AstTypeKind elem_kind);
     AuroraType lookup_var(const std::string& name, int line) const;
+    AstTypeKind lookup_var_elem(const std::string& name) const;
 
     void walk_block(const ASTNode* node);
     void walk_stmt(const ASTNode* node);

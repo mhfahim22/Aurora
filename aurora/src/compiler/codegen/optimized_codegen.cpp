@@ -1,7 +1,9 @@
 // optimized_codegen.cpp — Optimized Code Generation Implementation
 // Part of the Aurora compiler pipeline — Phase 6
 
+#include "compiler/codegen.hpp"
 #include "compiler/optimized_codegen.hpp"
+#include <llvm/TargetParser/Host.h>
 #include <sstream>
 #include <iostream>
 
@@ -24,8 +26,9 @@ void OptimizedCodegen::generate(const ASTNode* root,
     memory_analyzer_ = &memory_analyzer;
 
     /* Step 0: Set target info for LLVM optimization */
-    module_->setTargetTriple("x86_64-pc-windows-msvc");
-    module_->setDataLayout("e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128");
+    auto triple = llvm::sys::getProcessTriple();
+    module_->setTargetTriple(triple);
+    module_->setDataLayout(llvm_target_data_layout(triple));
 
     /* Step 1: Declare runtime helpers */
     declare_runtime_helpers();

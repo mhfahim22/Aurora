@@ -1,4 +1,5 @@
 #include "compiler/codegen_builtins.hpp"
+#include "compiler/codegen.hpp"
 #include "compiler/ast.hpp"
 
 #include <llvm/IR/Constants.h>
@@ -166,16 +167,29 @@ llvm::Value* codegen_builtin_section1(
         llvm::Value* val = node->args ? gen_expr(node->args.get()) : nullptr;
         llvm::Value* raw;
         if (val) {
-            if (val->getType()->isDoubleTy())
-                raw = builder.CreateGlobalStringPtr("float", "typeof");
-            else if (val->getType()->isPointerTy())
-                raw = builder.CreateGlobalStringPtr("string", "typeof");
-            else if (val->getType()->isIntegerTy(64))
-                raw = builder.CreateGlobalStringPtr("int", "typeof");
-            else if (val->getType()->isIntegerTy(1))
-                raw = builder.CreateGlobalStringPtr("bool", "typeof");
-            else
-                raw = builder.CreateGlobalStringPtr("unknown", "typeof");
+            /* H2 Phase C: prefer annotation over LLVM type introspection */
+            std::string type_name;
+            auto ak = node->args ? get_annotation_kind(node->args.get()) : AstTypeKind::Unknown;
+            switch (ak) {
+                case AstTypeKind::Float:   type_name = "float";  break;
+                case AstTypeKind::String:  type_name = "string"; break;
+                case AstTypeKind::Int:     type_name = "int";    break;
+                case AstTypeKind::Bool:    type_name = "bool";   break;
+                default: break;
+            }
+            if (type_name.empty()) {
+                if (val->getType()->isDoubleTy())
+                    type_name = "float";
+                else if (val->getType()->isPointerTy())
+                    type_name = "string";
+                else if (val->getType()->isIntegerTy(64))
+                    type_name = "int";
+                else if (val->getType()->isIntegerTy(1))
+                    type_name = "bool";
+                else
+                    type_name = "unknown";
+            }
+            raw = builder.CreateGlobalStringPtr(type_name, "typeof");
         } else {
             raw = builder.CreateGlobalStringPtr("unknown", "typeof");
         }
@@ -189,6 +203,12 @@ llvm::Value* codegen_builtin_section1(
     if (name == "sizeof") {
         llvm::Value* val = node->args ? gen_expr(node->args.get()) : nullptr;
         if (val) {
+            /* H2 Phase C: prefer annotation-based size for known types */
+            auto ak = node->args ? get_annotation_kind(node->args.get()) : AstTypeKind::Unknown;
+            if (ak == AstTypeKind::Float || ak == AstTypeKind::String ||
+                ak == AstTypeKind::Int || ak == AstTypeKind::Bool ||
+                ak == AstTypeKind::Pointer)
+                return llvm::ConstantInt::get(i64, 8);
             llvm::Type* ty = val->getType();
             if (ty->isDoubleTy())
                 return llvm::ConstantInt::get(i64, 8);
@@ -238,7 +258,11 @@ llvm::Value* codegen_builtin_section1(
     if (name == "has" && node->args && node->args->next) {
         llvm::Value* a = gen_expr(node->args.get());
         llvm::Value* b = gen_expr(node->args->next.get());
-        if (a->getType()->isPointerTy() || b->getType()->isPointerTy()) {
+        /* H2 Phase C: prefer annotation for string vs array dispatch */
+        auto ak = get_annotation_kind(node->args.get());
+        if (ak == AstTypeKind::String ||
+            (ak == AstTypeKind::Unknown &&
+             (a->getType()->isPointerTy() || b->getType()->isPointerTy()))) {
             a = to_ptr(builder, ctx, a);
             b = to_ptr(builder, ctx, b);
             return builder.CreateCall(builtins.has_str, { a, b }, "has_ret");
@@ -257,7 +281,10 @@ llvm::Value* codegen_builtin_section1(
     }
     if (name == "reverse" && node->args) {
         llvm::Value* val = gen_expr(node->args.get());
-        if (val->getType()->isPointerTy())
+        /* H2 Phase C: prefer annotation for string vs array dispatch */
+        auto ak = get_annotation_kind(node->args.get());
+        if (ak == AstTypeKind::String ||
+            (ak == AstTypeKind::Unknown && val->getType()->isPointerTy()))
             return builder.CreateCall(builtins.reverse_str, { val }, "reverse_ret");
         builder.CreateCall(builtins.reverse_arr, { val });
         return llvm::ConstantInt::get(i64, 0);
@@ -267,7 +294,10 @@ llvm::Value* codegen_builtin_section1(
     if (name == "strlen" && node->args && !node->args->next) {
         llvm::Value* val = gen_expr(node->args.get());
         if (!val) return llvm::ConstantInt::get(i64, 0);
-        if (val->getType()->isPointerTy())
+        /* H2 Phase C: prefer annotation for string detection */
+        auto ak = get_annotation_kind(node->args.get());
+        if (ak == AstTypeKind::String ||
+            (ak == AstTypeKind::Unknown && val->getType()->isPointerTy()))
             return builder.CreateCall(builtins.strlen_fn, { val }, "len_ret");
         return llvm::ConstantInt::get(i64, 0);
     }

@@ -20,6 +20,21 @@
 /* (defined in codegen_stmt.cpp, used here for struct field types) */
 static llvm::Type* extern_type_to_llvm(llvm::LLVMContext& ctx, const std::string& type_name);
 
+/* ── Helper: resolve LLVM type for a struct field, preferring AstTypeKind ── */
+static llvm::Type* struct_field_llvm_type(llvm::LLVMContext& ctx, const StructFieldInfo& f) {
+    if (f.type_kind != AstTypeKind::Unknown) {
+        switch (f.type_kind) {
+            case AstTypeKind::String:  return llvm::PointerType::getUnqual(ctx);
+            case AstTypeKind::Float:   return llvm::Type::getDoubleTy(ctx);
+            case AstTypeKind::Bool:    return llvm::Type::getInt8Ty(ctx);
+            default:                   return llvm::Type::getInt64Ty(ctx);
+        }
+    }
+    if (!f.type_name.empty())
+        return extern_type_to_llvm(ctx, f.type_name);
+    return llvm::Type::getInt64Ty(ctx);
+}
+
 /* ── struct type cache: struct_name → LLVM StructType ── */
 static std::unordered_map<std::string, StructLayout> struct_layout_cache_;
 
@@ -68,11 +83,7 @@ static llvm::StructType* get_or_create_struct_type(
     } else {
         for (auto& f : info->fields) {
             layout.field_names.push_back(f.name);
-            if (!f.type_name.empty()) {
-                layout.field_types.push_back(extern_type_to_llvm(ctx, f.type_name));
-            } else {
-                layout.field_types.push_back(llvm::Type::getInt64Ty(ctx));
-            }
+            layout.field_types.push_back(struct_field_llvm_type(ctx, f));
         }
     }
 
@@ -214,29 +225,8 @@ llvm::Value* codegen_struct_gep(
         llvm::Type* field_ty = llvm::Type::getInt64Ty(ctx);
         if (sinfo) {
             for (auto& f : sinfo->fields) {
-                if (f.name == field_name && !f.type_name.empty()) {
-                    /* Map type name to LLVM type using extern_type_to_llvm */
-                    /* (we call the static version via codegen_get_struct_type if it's a struct) */
-                    if (global_type_registry().has_struct(f.type_name))
-                        field_ty = get_or_create_struct_type(ctx, f.type_name);
-                    else if (global_type_registry().has_enum(f.type_name))
-                        field_ty = llvm::Type::getInt64Ty(ctx);
-                    else if (f.type_name == "int" || f.type_name == "i64" || f.type_name == "u64")
-                        field_ty = llvm::Type::getInt64Ty(ctx);
-                    else if (f.type_name == "i32" || f.type_name == "u32")
-                        field_ty = llvm::Type::getInt32Ty(ctx);
-                    else if (f.type_name == "i16")
-                        field_ty = llvm::Type::getInt16Ty(ctx);
-                    else if (f.type_name == "i8" || f.type_name == "char")
-                        field_ty = llvm::Type::getInt8Ty(ctx);
-                    else if (f.type_name == "float" || f.type_name == "f64" || f.type_name == "double")
-                        field_ty = llvm::Type::getDoubleTy(ctx);
-                    else if (f.type_name == "f32")
-                        field_ty = llvm::Type::getFloatTy(ctx);
-                    else if (f.type_name == "bool" || f.type_name == "Bool")
-                        field_ty = llvm::Type::getInt8Ty(ctx);
-                    else
-                        field_ty = llvm::PointerType::get(ctx, 0);
+                if (f.name == field_name) {
+                    field_ty = struct_field_llvm_type(ctx, f);
                     break;
                 }
             }

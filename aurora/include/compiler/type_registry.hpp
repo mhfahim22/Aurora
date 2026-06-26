@@ -4,14 +4,16 @@
 #include <unordered_map>
 #include <stdexcept>
 
+#include "compiler/ast/ast_type.hpp"
+
 /* ── Struct field info ── */
 struct StructFieldInfo {
     std::string name;
     std::string type_name;     /* field type annotation (e.g. "int", "float", "Point") */
     std::string default_value;
     int         position{ 0 };
-    bool        is_string{ false };
-    bool        is_float { false };
+    AstTypeKind type_kind { AstTypeKind::Unknown };      /* H2 Phase E-2: resolved field type */
+    AstTypeKind element_kind { AstTypeKind::Unknown };   /* H2 Phase E-2: for compound fields */
 };
 
 /* ── Full struct definition ── */

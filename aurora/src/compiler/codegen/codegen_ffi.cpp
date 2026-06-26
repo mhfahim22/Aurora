@@ -78,8 +78,18 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
             cb_sigs.push_back({pidx, cb_fn_type});
         } else {
             std::string ptype_name = "int";
-            if (param->right)
-                ptype_name = param->right->value;
+            /* H2 Phase D: prefer annotation over string-based type lookup */
+            {
+                auto pk = get_annotation_kind(param);
+                if (pk != AstTypeKind::Unknown) {
+                    if (pk == AstTypeKind::Struct && !param->type_annotation.type_name.empty())
+                        ptype_name = param->type_annotation.type_name;
+                    else
+                        ptype_name = ast_type_kind_name(pk);
+                } else if (param->right) {
+                    ptype_name = param->right->value;
+                }
+            }
             param_types.push_back(extern_type_to_llvm(ptype_name));
             /* Track cstring/pointer params for auto conversion & cost checking */
             if (ptype_name == "cstring" || ptype_name == "char*" ||
@@ -95,10 +105,19 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
     if (!cb_sigs.empty())
         extern_callback_sigs_[fname] = std::move(cb_sigs);
 
-    /* Return type */
+    /* Return type — H2 Phase D: prefer annotation over string-based lookup */
     std::string ret_type_name = "void";
-    if (node->left)
-        ret_type_name = node->left->value;
+    {
+        auto rk = get_annotation_kind(node);
+        if (rk != AstTypeKind::Unknown) {
+            if (rk == AstTypeKind::Struct && !node->type_annotation.type_name.empty())
+                ret_type_name = node->type_annotation.type_name;
+            else
+                ret_type_name = ast_type_kind_name(rk);
+        } else if (node->left) {
+            ret_type_name = node->left->value;
+        }
+    }
     llvm::Type* ret_type = extern_type_to_llvm(ret_type_name);
     /* Track if return type is cstring or pointer */
     if (ret_type_name == "cstring" || ret_type_name == "char*" ||
