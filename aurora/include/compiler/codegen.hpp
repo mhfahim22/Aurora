@@ -695,6 +695,9 @@ inline AstTypeKind get_annotation_kind(const ASTNode* node) {
     }
 }
 
+/* Ensure LLVM native target is initialized (X86, AArch64, etc.) */
+void ensure_llvm_init();
+
 /* ── Convenience free functions ── */
 
 /* Derive the LLVM data-layout string from a target triple.

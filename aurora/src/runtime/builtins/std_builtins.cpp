@@ -355,11 +355,18 @@ int64_t builtin_rand() {
 
 AuroraStr* builtin_read_file(const void* path_a) {
     const char* path = aurora_str_ptr(path_a);
-    char* cstr = aurora_fs_read_file(path ? path : "");
-    if (!cstr) return aurora_str_new(0);
-    AuroraStr* result = aurora_str_from_cstr(cstr);
-    free(cstr);
-    return result;
+    if (!path) path = "";
+    FILE* f = fopen(path, "rb");
+    if (!f) { return aurora_str_new(0); }
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* buf = (char*)malloc((size_t)size + 1);
+    if (!buf) { fclose(f); return aurora_str_new(0); }
+    fread(buf, 1, (size_t)size, f);
+    buf[size] = '\0';
+    fclose(f);
+    return aurora_str_from_parts(buf, (size_t)size, (size_t)size + 1);
 }
 
 int64_t builtin_write_file(const void* path_a, const void* content_a) {

@@ -51,14 +51,15 @@ typedef struct AuroraHttpRequest {
 
 /* ── HTTP Response ── */
 typedef struct AuroraHttpResponse {
-    int    status_code;
-    char*  status_text;
-    char** header_names;
-    char** header_values;
-    int    header_count;
-    int    header_cap;
-    char*  body;
-    int    sent;
+    int      status_code;
+    char*    status_text;
+    char**   header_names;
+    char**   header_values;
+    int      header_count;
+    int      header_cap;
+    char*    body;
+    size_t   body_len;
+    int      sent;
 } AuroraHttpResponse;
 
 /* ── HTTP Router entry ── */
@@ -89,6 +90,7 @@ AuroraHttpResponse* aurora_http_response_new(void);
 void                aurora_http_response_set_status(AuroraHttpResponse* res, int code, const char* text);
 void                aurora_http_response_set_header(AuroraHttpResponse* res, const char* name, const char* value);
 void                aurora_http_response_set_body(AuroraHttpResponse* res, const char* body);
+void                aurora_http_response_set_body_n(AuroraHttpResponse* res, const char* body, size_t len);
 void                aurora_http_response_set_json(AuroraHttpResponse* res, const char* body);
 int                 aurora_http_response_send(AuroraHttpResponse* res, int64_t sock);
 int                 aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int chunk_size);

@@ -1509,12 +1509,9 @@ void Codegen::gen_server(const ASTNode* node) {
         child = child->next.get();
     }
 
-    /* Start the server (non-blocking — bind + listen, no accept loop)
-       Use aurora_server_start instead of aurora_server_run so that the
-       program continues executing instead of blocking in an accept loop.
-       Users can explicitly call aurora_server_run() if blocking is desired. */
-    if (server_start_) {
-        builder_->CreateCall(server_start_, { srv });
+    /* Start the server (blocking — bind + listen + accept loop) */
+    if (server_run_) {
+        builder_->CreateCall(server_run_, { srv });
     }
 }
 

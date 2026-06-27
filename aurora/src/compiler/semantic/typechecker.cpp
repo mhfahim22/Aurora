@@ -354,6 +354,8 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["await"]         = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Unknown};
     functions_["chan"]          = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
     functions_["send"]          = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["html"]          = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["content_type"]  = FunctionTypeInfo{{AuroraType::String}};
     functions_["recv"]          = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Unknown};
 
     /* ── Event bus builtins ── */

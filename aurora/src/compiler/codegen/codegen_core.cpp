@@ -37,6 +37,9 @@ void Codegen::generate(const ASTNode* root) {
     oop_clear_object_types();
     oop_clear_vtable_cache();
 
+    /* Step 0 — ensure LLVM native target is initialized */
+    ensure_llvm_init();
+
     /* Step 0 — set target info for LLVM optimization */
     auto triple = llvm::sys::getProcessTriple();
     module_->setTargetTriple(triple);

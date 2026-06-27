@@ -29,9 +29,9 @@
 #include <memory>
 
 /* ── LLVM initialization guard ── */
-static bool llvm_initialized = false;
+bool llvm_initialized = false;
 
-static void ensure_llvm_init() {
+void ensure_llvm_init() {
     if (llvm_initialized) return;
 #if defined(__x86_64__) || defined(_M_X64) || defined(i386) || defined(__i386__) || defined(_M_IX86)
     LLVMInitializeX86TargetInfo();
@@ -228,6 +228,15 @@ llvm::Module* LLVMCodegen::module() { return module_.get(); }
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
 
+/* ── Force linker to include aurora_runtime.lib server.obj symbols ── */
+extern "C" void aurora_http_response_set_body_n(void*, const char*, size_t);
+extern "C" void aurora_server_static(void*, const char*, const char*);
+static void* _jit_dummy_server_syms[2] = {
+    (void*)(void*)&aurora_http_response_set_body_n,
+    (void*)(void*)&aurora_server_static
+};
+#include <llvm/Support/DynamicLibrary.h>
+
 static void log_error(llvm::Error err) {
     llvm::handleAllErrors(std::move(err), [](const llvm::ErrorInfoBase& E) {
         std::cerr << "JIT error: " << E.message() << "\n" << std::flush;
@@ -249,6 +258,30 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
         return -1;
     }
     auto& jit = *jit_or_err;
+
+    /* Register symbols the JIT may need from the runtime via absoluteSymbols */
+    {
+        auto& JD = jit->getMainJITDylib();
+        llvm::orc::SymbolMap sm;
+        auto intern = [&](const char* name) {
+            return jit->getExecutionSession().intern(name);
+        };
+        sm[intern("aurora_http_response_set_body_n")] =
+            llvm::orc::ExecutorSymbolDef(
+                llvm::orc::ExecutorAddr::fromPtr(
+                    (void*)(void*)&aurora_http_response_set_body_n),
+                llvm::JITSymbolFlags::Exported);
+        sm[intern("aurora_server_static")] =
+            llvm::orc::ExecutorSymbolDef(
+                llvm::orc::ExecutorAddr::fromPtr(
+                    (void*)(void*)&aurora_server_static),
+                llvm::JITSymbolFlags::Exported);
+        if (auto err = JD.define(llvm::orc::absoluteSymbols(std::move(sm))))
+            log_error(std::move(err));
+    }
+    /* Use dummy array to keep linker from discarding server.obj */
+    (void)_jit_dummy_server_syms[0];
+    (void)_jit_dummy_server_syms[1];
 
     /* Add current process symbols */
     auto gen = DynamicLibrarySearchGenerator::GetForCurrentProcess(

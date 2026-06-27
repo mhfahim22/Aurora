@@ -669,6 +669,10 @@ void Codegen::declare_domain_runtime_helpers() {
     http_resp_body_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_http_response_set_body", mod);
+    /* http_response_set_body_n(i8*, i8*, i64) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_set_body_n", mod);
     /* http_response_send(i8*, i64) → i32 */
     http_resp_send_ = llvm::Function::Create(
         llvm::FunctionType::get(i64, { ptr, i64 }, false),

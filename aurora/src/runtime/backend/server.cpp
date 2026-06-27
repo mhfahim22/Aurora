@@ -412,6 +412,22 @@ void aurora_http_response_set_body(AuroraHttpResponse* res, const char* body) {
     if (!res) return;
     free(res->body);
     res->body = body ? strdup(body) : nullptr;
+    res->body_len = res->body ? strlen(res->body) : 0;
+}
+
+void aurora_http_response_set_body_n(AuroraHttpResponse* res, const char* body, size_t len) {
+    if (!res) return;
+    free(res->body);
+    if (body && len > 0) {
+        res->body = (char*)malloc(len + 1);
+        if (res->body) {
+            memcpy(res->body, body, len);
+            res->body[len] = '\0';
+        }
+    } else {
+        res->body = nullptr;
+    }
+    res->body_len = len;
 }
 
 void aurora_http_response_set_json(AuroraHttpResponse* res, const char* body) {
@@ -428,7 +444,7 @@ int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
 
     /* Track if Content-Length is already explicitly set (e.g. for gzip) */
     int content_length_set = 0;
-    size_t body_len = res->body ? strlen(res->body) : 0;
+    size_t body_len = res->body_len > 0 ? res->body_len : (res->body ? strlen(res->body) : 0);
 
     for (int i = 0; i < res->header_count; i++) {
         if (strcmp(res->header_names[i], "Content-Length") == 0) {
@@ -515,7 +531,7 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
 
     /* Send body in chunks */
     if (res->body) {
-        size_t body_len = strlen(res->body);
+        size_t body_len = res->body_len > 0 ? res->body_len : strlen(res->body);
         const char* p = res->body;
         while (body_len > 0) {
             size_t this_chunk = (size_t)chunk_size;
@@ -902,7 +918,7 @@ static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* 
         }
         /* Gzip compress response body if accepted and body is large enough */
         if (gzip_accepted && res->body) {
-            size_t orig_len = strlen(res->body);
+            size_t orig_len = res->body_len > 0 ? res->body_len : strlen(res->body);
             fprintf(stderr, "[gzip-debug] accepted=true orig_len=%zu\n", orig_len);
             if (orig_len > 512) {
                 size_t gz_len = 0;
@@ -911,6 +927,7 @@ static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* 
                 if (gz) {
                     free(res->body);
                     res->body = (char*)gz;
+                    res->body_len = gz_len;
                     aurora_http_response_set_header(res, "Content-Encoding", "gzip");
                     char cl_buf[32];
                     snprintf(cl_buf, sizeof(cl_buf), "%zu", gz_len);
@@ -1077,11 +1094,10 @@ int aurora_server_serve_static(AuroraHttpRequest* req, AuroraHttpResponse* res, 
         char* buf = (char*)aurora_alloc((size_t)fsize + 1);
         size_t nread = fread(buf, 1, (size_t)fsize, fp);
         fclose(fp);
-        buf[nread] = '\0';
         aurora_http_response_set_status(res, 200, "OK");
         aurora_http_response_set_content_type(res, mime_type(full));
         aurora_http_response_set_header(res, "Cache-Control", "no-cache");
-        aurora_http_response_set_body(res, buf);
+        aurora_http_response_set_body_n(res, buf, nread);
         aurora_free(buf);
         return 1;
     }

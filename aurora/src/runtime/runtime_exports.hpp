@@ -209,6 +209,7 @@
 #pragma comment(linker, "/EXPORT:aurora_http_response_set_status_code")
 #pragma comment(linker, "/EXPORT:aurora_http_response_set_header")
 #pragma comment(linker, "/EXPORT:aurora_http_response_set_body")
+#pragma comment(linker, "/EXPORT:aurora_http_response_set_body_n")
 #pragma comment(linker, "/EXPORT:aurora_http_response_set_json")
 #pragma comment(linker, "/EXPORT:aurora_http_response_set_content_type")
 #pragma comment(linker, "/EXPORT:aurora_http_response_send")

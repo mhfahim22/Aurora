@@ -294,11 +294,9 @@ llvm::Value* codegen_builtin_section1(
     if (name == "strlen" && node->args && !node->args->next) {
         llvm::Value* val = gen_expr(node->args.get());
         if (!val) return llvm::ConstantInt::get(i64, 0);
-        /* H2 Phase C: prefer annotation for string detection */
         auto ak = get_annotation_kind(node->args.get());
-        if (ak == AstTypeKind::String ||
-            (ak == AstTypeKind::Unknown && val->getType()->isPointerTy()))
-            return builder.CreateCall(builtins.strlen_fn, { val }, "len_ret");
+        if (ak == AstTypeKind::String || ak == AstTypeKind::Unknown)
+            return builder.CreateCall(builtins.strlen_fn, { to_ptr(builder, ctx, val) }, "len_ret");
         return llvm::ConstantInt::get(i64, 0);
     }
 

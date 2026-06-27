@@ -581,6 +581,52 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         return i64(0);
     }
 
+    /* ── html(expr) — set response body with text/html content type ── */
+    if (node->value == "html") {
+        VarRecord* http_res_rec = lookup_var("__http_res");
+        if (!http_res_rec || !http_res_rec->alloca_ptr) return i64(0);
+        llvm::Value* res_val = builder_->CreateLoad(i8ptr_ty(), http_res_rec->alloca_ptr, "res");
+        llvm::Value* body = node->args ? gen_expr(node->args.get()) : i64(0);
+        llvm::Value* body_len = i64(0);
+        if (body) {
+            if (body->getType() != i8ptr_ty())
+                body = builder_->CreateIntToPtr(body, i8ptr_ty(), "body_ptr");
+            auto* strlen_fn = module_->getFunction("aurora_strlen");
+            if (strlen_fn)
+                body_len = builder_->CreateCall(strlen_fn, { body }, "body_len");
+            auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+            if (as_cstr)
+                body = builder_->CreateCall(as_cstr, { body }, "body_cstr");
+        }
+        auto* fn_set_body_n = module_->getFunction("aurora_http_response_set_body_n");
+        auto* fn_set_ct = module_->getFunction("aurora_http_response_set_content_type");
+        if (fn_set_body_n && body) {
+            builder_->CreateCall(fn_set_body_n, { res_val, body, body_len });
+            if (fn_set_ct)
+                builder_->CreateCall(fn_set_ct, { res_val, builder_->CreateGlobalStringPtr("text/html") });
+        }
+        return i64(0);
+    }
+
+    /* ── content_type(type) — set HTTP response Content-Type header ── */
+    if (node->value == "content_type") {
+        VarRecord* http_res_rec = lookup_var("__http_res");
+        if (!http_res_rec || !http_res_rec->alloca_ptr) return i64(0);
+        llvm::Value* res_val = builder_->CreateLoad(i8ptr_ty(), http_res_rec->alloca_ptr, "res");
+        llvm::Value* ct = node->args ? gen_expr(node->args.get()) : i64(0);
+        if (ct) {
+            if (ct->getType() != i8ptr_ty())
+                ct = builder_->CreateIntToPtr(ct, i8ptr_ty(), "ct_ptr");
+            auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+            if (as_cstr)
+                ct = builder_->CreateCall(as_cstr, { ct }, "ct_cstr");
+        }
+        auto* fn_set_ct = module_->getFunction("aurora_http_response_set_content_type");
+        if (fn_set_ct && ct)
+            builder_->CreateCall(fn_set_ct, { res_val, ct });
+        return i64(0);
+    }
+
     /* ── Phase 2: Collection type constructors ── */
     {
         /* Helper: i64 → i8* for collection API calls */
