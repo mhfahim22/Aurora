@@ -28,14 +28,15 @@ typedef struct AuroraChannel {
     bool                    closed;
 } AuroraChannel;
 
-/* ── Fiber (cooperative task) ── */
+/* ── Fiber (cooperative task with real context switching) ── */
 typedef struct AuroraFiber {
     void*             (*func)(void*);
     void*              arg;
     void*              result;
     int                state;       /* 0=ready, 1=running, 2=yielded, 3=done */
-    int                yielded;     /* flag set by yield, cleared on resume */
-    struct AuroraFiber* next;       /* for scheduler queue */
+    void*              os_handle;   /* OS fiber handle (Win: LPVOID, POSIX: ucontext_t*) */
+    void*              os_return;   /* OS return context (Win: main fiber, POSIX: ucontext_t*) */
+    void*              stack_mem;   /* allocated stack memory (POSIX only) */
 } AuroraFiber;
 
 extern "C" {
