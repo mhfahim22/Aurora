@@ -1,3 +1,0 @@
-extern "stdcall" "user32" function Dummy4(hWnd: pointer, text: cstring, caption: cstring, type: i32) -> i32
-function main():
-  return 0

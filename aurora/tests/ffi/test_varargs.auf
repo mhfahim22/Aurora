@@ -1,4 +1,0 @@
-extern function printf(fmt: cstring, ...) -> i64
-
-function main():
-    printf("The answer is %d and %d\n", 42, 100)

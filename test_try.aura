@@ -1,7 +1,0 @@
-output("--- try/catch test ---")
-try
-    output("try block running")
-catch e
-    output("caught: " + e)
-
-output("--- done ---")

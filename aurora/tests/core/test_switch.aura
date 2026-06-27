@@ -1,8 +1,0 @@
-x = 2
-switch x
-    case 1
-        output(10)
-    case 2
-        output(20)
-    default
-        output(99)

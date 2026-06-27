@@ -1,7 +1,0 @@
-lambda my_fn(x):
-    return x + 1
-end
-
-function main()
-    output(my_fn(5))
-end

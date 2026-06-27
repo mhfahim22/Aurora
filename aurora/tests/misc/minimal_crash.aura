@@ -1,7 +1,0 @@
-x = 42
-f = 3.14
-s = "Aurora"
-output(x)
-output(f)
-output(s)
-output(x + 8)

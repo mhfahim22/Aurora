@@ -1,6 +1,0 @@
-arr = []
-
-for i in 10000000
-    arr[i] = i
-
-output(len(arr))

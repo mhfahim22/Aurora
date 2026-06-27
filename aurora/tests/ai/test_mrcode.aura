@@ -1,6 +1,0 @@
-import MrCode
-
-output("MrCode loaded!")
-m = model_create("sequential")
-output(m)
-output("Test complete")

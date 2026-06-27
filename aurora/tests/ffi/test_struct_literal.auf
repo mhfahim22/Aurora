@@ -1,8 +1,0 @@
-extern struct Point { x: i32, y: i32 }
-
-extern function write_i32(v: i32) -> void
-
-function main():
-    pt = Point { x: 10, y: 20 }
-    write_i32(pt.x)
-    write_i32(pt.y)

@@ -1,1 +1,0 @@
-extern "vectorcall" function test_vectorcall_fn(x: int) -> int

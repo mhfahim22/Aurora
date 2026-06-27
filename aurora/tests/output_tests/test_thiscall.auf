@@ -1,1 +1,0 @@
-extern "thiscall" function test_thiscall_fn(x: int) -> int

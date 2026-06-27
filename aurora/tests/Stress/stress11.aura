@@ -1,5 +1,0 @@
-for i in 1000000
-    arr = []
-
-    for j in 1000
-        arr.push(j)

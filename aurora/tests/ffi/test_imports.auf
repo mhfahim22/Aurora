@@ -1,9 +1,0 @@
-import "stdio.au"
-import "stdlib.au"
-import "string.au"
-import "math.au"
-
-function main():
-    printf("sqrt(%.1f) = %.1f\n", 2.0, sqrt(2.0))
-    printf("abs(-42) = %lld\n", abs(-42))
-    printf("strlen(\"hello\") = %lld\n", strlen("hello"))

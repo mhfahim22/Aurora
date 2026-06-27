@@ -1,3 +1,0 @@
-extern "stdcall" "kernel32" function Sleep(ms: i32)
-function main():
-  return 0

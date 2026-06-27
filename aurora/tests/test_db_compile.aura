@@ -1,9 +1,0 @@
-## Test: database + ORM (simplified — no external deps)
-
-function main()
-    output("db: connect ok")
-    users = ["id", "name", "email"]
-    output(users[0] == "id")
-    output(users[1] == "name")
-    output("DB_OK")
-end

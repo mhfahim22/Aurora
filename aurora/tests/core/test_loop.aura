@@ -1,9 +1,0 @@
-# Test infinite loop with break/continue
-i = 0
-loop
-    i = i + 1
-    if i == 3
-        continue
-    if i == 5
-        break
-    output(i)

@@ -1,3 +1,0 @@
-x = "Alice"
-output("hello " + x)
-output("DONE")

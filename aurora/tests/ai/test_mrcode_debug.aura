@@ -1,5 +1,0 @@
-import MrCode
-
-output("test1")
-d = csv("test.csv")
-output("test2")

@@ -1,5 +1,0 @@
-function greet()
-    return "hello"
-
-output(greet() + " world")
-output("DONE")

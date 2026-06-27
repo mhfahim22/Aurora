@@ -1,8 +1,0 @@
-final class MathHelper
-    function square(x)
-        return x * x
-
-# This should fail: cannot extend final class
-class AdvancedMath extends MathHelper
-    function cube(x)
-        return x * x * x

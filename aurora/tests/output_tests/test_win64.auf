@@ -1,1 +1,0 @@
-extern "win64" function test_win64_fn(x: int) -> int

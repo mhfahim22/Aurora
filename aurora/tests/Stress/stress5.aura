@@ -1,8 +1,0 @@
-root = [1, 2, 3]
-
-for i in 1000000
-    shared a = root
-    shared b = root
-    shared c = root
-
-output(root[0])

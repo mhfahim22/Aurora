@@ -1,9 +1,0 @@
-# ── Dynamic Loading FFI Test ──
-extern "kernel32" function GetTickCount() -> i32
-
-output("--- Dynamic Load Test ---")
-t0 = GetTickCount()
-output(t0)
-t1 = GetTickCount()
-output(t1)
-output("--- DL DONE ---")

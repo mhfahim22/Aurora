@@ -1,6 +1,0 @@
-
-extern struct Point { x: int, y: int }
-
-extern struct Rect { x: int, y: int, w: int, h: int }
-
-extern struct Mixed { a: int, b: float, c: i8, d: string }

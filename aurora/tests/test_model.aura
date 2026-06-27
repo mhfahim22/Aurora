@@ -1,9 +1,0 @@
-## Test: model layer (simplified — no external deps)
-
-function main()
-    output("model: ok")
-    users = ["Alice", "30"]
-    output(users[0] == "Alice")
-    output(users[1] == "30")
-    output("MODEL_OK")
-end

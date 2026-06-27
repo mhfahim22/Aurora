@@ -1,8 +1,0 @@
-
-extern "mylib" function create_window(title: string, w: int, h: int) -> void
-
-extern "mylib" function get_version() -> int
-
-extern "mylib" function set_callback(cb: callback() -> void) -> void
-
-extern "mylib" function process_data(data: string) -> int

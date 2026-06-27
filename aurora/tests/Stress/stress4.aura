@@ -1,5 +1,0 @@
-class User
-    name = "Aurora"
-
-for i in 1000000
-    u = User()

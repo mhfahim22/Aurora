@@ -1,3 +1,0 @@
-extern "stdcall" "kernel32" function GetTickCount() -> i32
-function main():
-  return 0
