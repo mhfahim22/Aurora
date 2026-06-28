@@ -94,10 +94,17 @@ PHASE 1: RUNTIME CORE & CRITICAL FIXES (PRIORITY 1)
       • Added explicit #include <mutex> and #include <utility>
       • Build verified: aurora_runtime.lib + aurorac.exe compile cleanly
 
-[ ] TASK 1.8: Fix GC Internal Allocation
+[x] TASK 1.8: Fix GC Internal Allocation
     - Description: Mark-sweep uses 'new std::vector' internally, risking self-collection.
     - AI Prompt Target: Update 'runtime/gc.cpp'.
     - Requirements: Avoid heap-allocating management structures inside the GC allocator's core loop.
+    - Status: Complete. Replaced all dynamically-allocated management vectors with statics.
+      • gc_objects: changed from `static std::vector<GCRecord>*` (heap via `new`) to `static std::vector<GCRecord>` (BSS/data segment)
+      • gc_unknown_roots: same change; removed all `new std::vector<...>()` calls
+      • arena_gc_roots: same change
+      • Updated all 7 API functions (init, alloc, collect, register/unregister root, scan, clear) to use `.` syntax instead of `->`
+      • Removed all null-guard checks on vectors (static vectors are always valid)
+      • Build verified: aurora_runtime.lib + aurorac.exe compile cleanly
 
 
 ----------------------------------------------------------------------

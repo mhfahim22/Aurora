@@ -636,8 +636,8 @@ struct UnknownRoot {
     size_t size; /* 0 = unknown, will use default scan range */
 };
 
-static std::vector<GCRecord>*      gc_objects = nullptr; /* intentionally not deleted — exists until process exit */
-static std::vector<UnknownRoot>*   gc_unknown_roots = nullptr; /* intentionally not deleted — exists until process exit */
+static std::vector<GCRecord>        gc_objects; /* statically allocated — no 'new' in GC core */
+static std::vector<UnknownRoot>     gc_unknown_roots;
 static std::atomic<size_t>     gc_live_objects{0};
 static std::atomic<size_t>     gc_collected{0};
 static std::atomic<size_t>     gc_alloc_since_last{0};
@@ -645,27 +645,24 @@ static std::atomic<size_t>     gc_auto_threshold{5000}; /* auto-collect every 50
 
 /* Internal collect — assumes LOCK_GC is held */
 static void gc_collect_impl(void) {
-    if (!gc_objects || gc_objects->empty()) return;
+    if (gc_objects.empty()) return;
 
     /* ── Mark phase ── */
-    for (auto& obj : *gc_objects) {
+    for (auto& obj : gc_objects) {
         obj.marked = false;
     }
 
     /* Mark from registered roots */
-    for (auto& obj : *gc_objects) {
+    for (auto& obj : gc_objects) {
         if (obj.root_count > 0) {
-            gc_mark_reachable(obj, *gc_objects);
+            gc_mark_reachable(obj, gc_objects);
         }
     }
 
     /* Mark from unknown roots (scan their memory for pointers to GC objects) */
-    if (gc_unknown_roots) {
-        for (auto& ur : *gc_unknown_roots) {
-            /* Use stored size if known; otherwise scan a generous 64 KB default */
-            size_t scan_size = ur.size > 0 ? ur.size : 65536;
-            gc_scan_and_mark_range(ur.ptr, static_cast<char*>(ur.ptr) + scan_size, *gc_objects);
-        }
+    for (auto& ur : gc_unknown_roots) {
+        size_t scan_size = ur.size > 0 ? ur.size : 65536;
+        gc_scan_and_mark_range(ur.ptr, static_cast<char*>(ur.ptr) + scan_size, gc_objects);
     }
 
     /* Mark from stack roots */
@@ -700,7 +697,7 @@ static void gc_collect_impl(void) {
 #endif
         /* Scan from current frame toward the stack base */
         if (current_sp >= stack_limit && current_sp < stack_base) {
-            gc_scan_and_mark_range(current_sp, stack_base, *gc_objects);
+            gc_scan_and_mark_range(current_sp, stack_base, gc_objects);
         }
 #elif defined(__linux__)
         /* Linux — use pthread_getattr_np to get stack bounds */
@@ -712,7 +709,7 @@ static void gc_collect_impl(void) {
                 void* stack_end = static_cast<char*>(stack_addr) + stack_size;
                 void* sp = __builtin_frame_address(0);
                 if (sp >= stack_addr && sp < stack_end) {
-                    gc_scan_and_mark_range(sp, stack_end, *gc_objects);
+                    gc_scan_and_mark_range(sp, stack_end, gc_objects);
                 }
             }
             pthread_attr_destroy(&attr);
@@ -725,7 +722,7 @@ static void gc_collect_impl(void) {
         void* stack_end = static_cast<char*>(stack_addr) + stack_size;
         void* sp = __builtin_frame_address(0);
         if (sp >= stack_base && sp < stack_end) {
-            gc_scan_and_mark_range(sp, stack_end, *gc_objects);
+            gc_scan_and_mark_range(sp, stack_end, gc_objects);
         }
 #else
         /* Generic fallback — try pthread_getattr_np if available */
@@ -737,7 +734,7 @@ static void gc_collect_impl(void) {
                 void* stack_end = static_cast<char*>(stack_addr) + stack_size;
                 void* sp = __builtin_frame_address(0);
                 if (sp >= stack_addr && sp < stack_end) {
-                    gc_scan_and_mark_range(sp, stack_end, *gc_objects);
+                    gc_scan_and_mark_range(sp, stack_end, gc_objects);
                 }
             }
             pthread_attr_destroy(&attr);
@@ -746,7 +743,7 @@ static void gc_collect_impl(void) {
     }
 
     /* ── Unmark objects with no roots — explicit root_count overrides conservative stack scan ── */
-    for (auto& obj : *gc_objects) {
+    for (auto& obj : gc_objects) {
         if (obj.root_count <= 0) {
             obj.marked = false;
         }
@@ -754,16 +751,16 @@ static void gc_collect_impl(void) {
 
     /* ── Sweep phase ── */
     size_t freed = 0;
-    for (auto it = gc_objects->begin(); it != gc_objects->end(); ) {
+    for (auto it = gc_objects.begin(); it != gc_objects.end(); ) {
         if (!it->marked) {
             free(it->ptr);
-            it = gc_objects->erase(it);
+            it = gc_objects.erase(it);
             freed++;
         } else {
             ++it;
         }
     }
-    gc_live_objects.store(gc_objects->size(), std::memory_order_relaxed);
+    gc_live_objects.store(gc_objects.size(), std::memory_order_relaxed);
     gc_collected.fetch_add(freed, std::memory_order_relaxed);
 }
 
@@ -782,12 +779,8 @@ extern "C" {
 
 void aurora_gc_init(void) {
     LOCK_GC();
-    if (!gc_objects) {
-        gc_objects = new std::vector<GCRecord>();
-    }
-    if (!gc_unknown_roots) {
-        gc_unknown_roots = new std::vector<UnknownRoot>();
-    }
+    gc_objects.clear();
+    gc_unknown_roots.clear();
     UNLOCK_GC();
 }
 
@@ -797,9 +790,8 @@ void* aurora_gc_alloc(size_t size) {
         aurora_panic("aurora_gc_alloc: out of memory");
     }
     LOCK_GC();
-    if (!gc_objects) gc_objects = new std::vector<GCRecord>();
-    gc_objects->push_back({ptr, size, 0, false});
-    gc_live_objects.store(gc_objects->size(), std::memory_order_relaxed);
+    gc_objects.push_back({ptr, size, 0, false});
+    gc_live_objects.store(gc_objects.size(), std::memory_order_relaxed);
 
     /* Auto-collect when threshold exceeded — inside the lock to prevent races */
     size_t since_last = gc_alloc_since_last.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -820,8 +812,7 @@ void aurora_gc_collect(void) {
 void aurora_gc_register_root(void* ptr) {
     if (!ptr) return;
     LOCK_GC();
-    if (!gc_objects) gc_objects = new std::vector<GCRecord>();
-    for (auto& obj : *gc_objects) {
+    for (auto& obj : gc_objects) {
         if (obj.ptr == ptr) {
             obj.root_count++;
             UNLOCK_GC();
@@ -829,16 +820,14 @@ void aurora_gc_register_root(void* ptr) {
         }
     }
     /* Unknown pointer — track in separate unknown_roots vector (size=0 means use default scan range) */
-    if (!gc_unknown_roots) gc_unknown_roots = new std::vector<UnknownRoot>();
-    gc_unknown_roots->push_back({ptr, 0});
+    gc_unknown_roots.push_back({ptr, 0});
     UNLOCK_GC();
 }
 
 void aurora_gc_register_root_sized(void* ptr, size_t size) {
     if (!ptr) return;
     LOCK_GC();
-    if (!gc_objects) gc_objects = new std::vector<GCRecord>();
-    for (auto& obj : *gc_objects) {
+    for (auto& obj : gc_objects) {
         if (obj.ptr == ptr) {
             obj.root_count++;
             UNLOCK_GC();
@@ -846,30 +835,25 @@ void aurora_gc_register_root_sized(void* ptr, size_t size) {
         }
     }
     /* Unknown pointer — store with explicit size for full-range scan */
-    if (!gc_unknown_roots) gc_unknown_roots = new std::vector<UnknownRoot>();
-    gc_unknown_roots->push_back({ptr, size});
+    gc_unknown_roots.push_back({ptr, size});
     UNLOCK_GC();
 }
 
 void aurora_gc_unregister_root(void* ptr) {
     if (!ptr) return;
     LOCK_GC();
-    if (gc_objects) {
-        for (auto& obj : *gc_objects) {
-            if (obj.ptr == ptr) {
-                obj.root_count--;
-                UNLOCK_GC();
-                return;
-            }
+    for (auto& obj : gc_objects) {
+        if (obj.ptr == ptr) {
+            obj.root_count--;
+            UNLOCK_GC();
+            return;
         }
     }
-    if (gc_unknown_roots) {
-        for (auto it = gc_unknown_roots->begin(); it != gc_unknown_roots->end(); ++it) {
-            if (it->ptr == ptr) {
-                gc_unknown_roots->erase(it);
-                UNLOCK_GC();
-                return;
-            }
+    for (auto it = gc_unknown_roots.begin(); it != gc_unknown_roots.end(); ++it) {
+        if (it->ptr == ptr) {
+            gc_unknown_roots.erase(it);
+            UNLOCK_GC();
+            return;
         }
     }
     UNLOCK_GC();
@@ -956,7 +940,7 @@ static pthread_mutex_t arena_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 #define LOCK_ARENA_GC() pthread_mutex_lock(&arena_gc_lock)
 #define UNLOCK_ARENA_GC() pthread_mutex_unlock(&arena_gc_lock)
 #endif
-static std::vector<void*>* arena_gc_roots = nullptr; /* intentionally not deleted — exists until process exit */
+static std::vector<void*> arena_gc_roots;
 
 extern "C" {
 
@@ -964,8 +948,7 @@ extern "C" {
 void aurora_arena_register_gc_root(void* ptr) {
     if (!ptr) return;
     LOCK_ARENA_GC();
-    if (!arena_gc_roots) arena_gc_roots = new std::vector<void*>();
-    arena_gc_roots->push_back(ptr);
+    arena_gc_roots.push_back(ptr);
     /* Increment arena block refcount to prevent cross-thread UAF */
     LOCK_ARENA_BLOCKS();
     if (arena_blocks_global) {
@@ -982,11 +965,11 @@ void aurora_arena_register_gc_root(void* ptr) {
 
 /* Unregister an arena-allocated object from GC roots */
 void aurora_arena_unregister_gc_root(void* ptr) {
-    if (!ptr || !arena_gc_roots) return;
+    if (!ptr) return;
     LOCK_ARENA_GC();
-    for (auto it = arena_gc_roots->begin(); it != arena_gc_roots->end(); ++it) {
+    for (auto it = arena_gc_roots.begin(); it != arena_gc_roots.end(); ++it) {
         if (*it == ptr) {
-            arena_gc_roots->erase(it);
+            arena_gc_roots.erase(it);
             /* Decrement arena block refcount */
             LOCK_ARENA_BLOCKS();
             if (arena_blocks_global) {
@@ -1007,11 +990,10 @@ void aurora_arena_unregister_gc_root(void* ptr) {
 
 /* Tell GC to scan arena roots as well */
 void aurora_gc_scan_arena_roots(void) {
-    if (!arena_gc_roots || !gc_objects) return;
     LOCK_GC();
 
-    for (void* arena_ptr : *arena_gc_roots) {
-        for (auto& obj : *gc_objects) {
+    for (void* arena_ptr : arena_gc_roots) {
+        for (auto& obj : gc_objects) {
             if (obj.ptr == arena_ptr && obj.root_count == 0) {
                 obj.root_count = 1;
             }
@@ -1029,10 +1011,9 @@ int aurora_memory_is_pressure_high(void) {
 
 /* Hybrid: tell GC it can free arena objects by zeroing their root counts */
 void aurora_gc_clear_arena_roots(void) {
-    if (!arena_gc_roots || !gc_objects) return;
     LOCK_GC();
-    for (void* arena_ptr : *arena_gc_roots) {
-        for (auto& obj : *gc_objects) {
+    for (void* arena_ptr : arena_gc_roots) {
+        for (auto& obj : gc_objects) {
             if (obj.ptr == arena_ptr) {
                 obj.root_count = 0;
             }
