@@ -36,6 +36,8 @@ private:
     const std::vector<LexedLine>& lines_;
     int cur_;
     std::string pending_cost_ {}; /* @cost(zero|alloc|indirection) set by previous line */
+    std::vector<std::string> errors_;
+    bool had_error_ = false;
 
     ASTNode::Ptr parse_stmt();
 
@@ -65,6 +67,9 @@ public:
     ASTNode::Ptr parse_block(int parent_indent);
     ASTNode::Ptr parse_brace_block(int brace_depth = 1);
     void require_token_end(const std::vector<Token>& toks, int idx, const char* context) const;
+
+    bool had_error()                    const { return had_error_; }
+    const std::vector<std::string>& errors() const { return errors_; }
 
     bool skip_blanks();
     bool at_end()               const { return cur_ >= (int)lines_.size(); }

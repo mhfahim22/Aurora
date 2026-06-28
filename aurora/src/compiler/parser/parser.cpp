@@ -54,12 +54,18 @@ ASTNode::Ptr Parser::parse_block(int parent_indent) {
         if (!skip_blanks()) break;
         if (cur_indent() <= parent_indent) break;
 
-        auto stmt = parse_stmt();
-        if (!stmt) continue;
+        try {
+            auto stmt = parse_stmt();
+            if (!stmt) continue;
 
-        ASTNode* raw = stmt.get();
-        if (!head) { head = std::move(stmt); tail = raw; }
-        else       { tail->next = std::move(stmt); tail = raw; }
+            ASTNode* raw = stmt.get();
+            if (!head) { head = std::move(stmt); tail = raw; }
+            else       { tail->next = std::move(stmt); tail = raw; }
+        } catch (const std::runtime_error& e) {
+            had_error_ = true;
+            errors_.push_back(e.what());
+            advance();
+        }
     }
     return head;
 }
@@ -80,13 +86,20 @@ ASTNode::Ptr Parser::parse_brace_block(int brace_depth) {
         }
 
         brace_depth++;
-        auto stmt = parse_stmt();
-        brace_depth--;
+        try {
+            auto stmt = parse_stmt();
+            brace_depth--;
 
-        if (stmt) {
-            ASTNode* raw = stmt.get();
-            if (!head) { head = std::move(stmt); tail = raw; }
-            else       { tail->next = std::move(stmt); tail = raw; }
+            if (stmt) {
+                ASTNode* raw = stmt.get();
+                if (!head) { head = std::move(stmt); tail = raw; }
+                else       { tail->next = std::move(stmt); tail = raw; }
+            }
+        } catch (const std::runtime_error& e) {
+            had_error_ = true;
+            errors_.push_back(e.what());
+            brace_depth--;
+            advance();
         }
     }
     return head;

@@ -543,6 +543,16 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
             auto lines = lexer.lex(src);
             Parser parser(lines);
             auto imported = parser.parse();
+
+            if (parser.had_error()) {
+                for (const auto& err : parser.errors())
+                    std::cerr << "\n" << err;
+                std::cerr << "\n";
+                resolving.pop_back();
+                resolving_fast.erase(norm_path);
+                continue;
+            }
+
             imported = resolve_imports_impl(std::move(imported), source_dir, exe_dir, resolving, resolving_fast);
 
             resolving.pop_back();
@@ -1105,6 +1115,13 @@ int main(int argc, char** argv) {
                 Parser parser(lines);
                 ASTNode::Ptr ast = parser.parse();
 
+                if (parser.had_error()) {
+                    for (const auto& err : parser.errors())
+                        std::cerr << "\n" << err;
+                    std::cerr << "\n";
+                    continue;
+                }
+
                 /* Memory analysis */
                 MemoryAnalyzer memory_analyzer;
                 memory_analyzer.analyse(ast.get());
@@ -1152,6 +1169,13 @@ int main(int argc, char** argv) {
         if (verbose) std::cerr << "STAGE2: Parse\n" << std::flush;
         Parser parser(lines);
         ASTNode::Ptr ast = parser.parse();
+
+        if (parser.had_error()) {
+            for (const auto& err : parser.errors())
+                std::cerr << "\n" << err;
+            std::cerr << "\n";
+            return 1;
+        }
 
         /* ── Stage 2b: Resolve imports ── */
         {
