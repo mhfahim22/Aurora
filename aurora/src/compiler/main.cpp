@@ -10,6 +10,7 @@
 #include "compiler/ir/ast_to_ir.hpp"
 #include "compiler/ir/ir_lowering.hpp"
 #include "compiler/ir/ir_optimizer.hpp"
+#include "compiler/build_cache.hpp"
 #include "runtime/crash.h"
 
 #include <llvm/Support/FileSystem.h>
@@ -487,7 +488,8 @@ static std::string auto_bindgen(const std::string& header_path, const std::strin
 static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& source_dir,
                                          const std::string& exe_dir,
                                          std::vector<std::string>& resolving,
-                                         std::unordered_set<std::string>& resolving_fast) {
+                                         std::unordered_set<std::string>& resolving_fast,
+                                         std::vector<std::string>* collected_files = nullptr) {
     if (!root) return nullptr;
 
     std::vector<ASTNode::Ptr> nodes;
@@ -534,6 +536,7 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
                 throw std::runtime_error("aurora: circular import detected:\n  " + chain);
             }
             resolving.push_back(norm_path);
+            if (collected_files) collected_files->push_back(norm_path);
 
             /* TODO: support namespace/module scoping for imports —
                e.g., import com.example.foo should resolve within a
@@ -550,10 +553,11 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
                 std::cerr << "\n";
                 resolving.pop_back();
                 resolving_fast.erase(norm_path);
+                if (collected_files && !collected_files->empty()) collected_files->pop_back();
                 continue;
             }
 
-            imported = resolve_imports_impl(std::move(imported), source_dir, exe_dir, resolving, resolving_fast);
+            imported = resolve_imports_impl(std::move(imported), source_dir, exe_dir, resolving, resolving_fast, collected_files);
 
             resolving.pop_back();
             resolving_fast.erase(norm_path);
@@ -584,10 +588,11 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
 }
 
 /* ── Resolve imports in AST (public, with cycle detection) ── */
-static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_dir, const std::string& exe_dir) {
+static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_dir, const std::string& exe_dir,
+                                    std::vector<std::string>* collected_files = nullptr) {
     std::vector<std::string> resolving;
     std::unordered_set<std::string> resolving_fast;
-    return resolve_imports_impl(std::move(root), source_dir, exe_dir, resolving, resolving_fast);
+    return resolve_imports_impl(std::move(root), source_dir, exe_dir, resolving, resolving_fast, collected_files);
 }
 
 /* ── Emit object file using LLVM TargetMachine ── */
@@ -967,6 +972,7 @@ int main(int argc, char** argv) {
     bool fast_math = false;        /* -ffast-math: enable unsafe FP optimizations */
     bool use_lto = false;          /* -flto: enable link-time optimization */
     bool enable_coverage = false;  /* --coverage: enable code coverage tracing */
+    bool incremental = false;      /* --incremental: skip compilation if unchanged */
 
     /* Check for --repl, --doc, --package first */
     for (int i = 1; i < argc; i++) {
@@ -1000,6 +1006,7 @@ int main(int argc, char** argv) {
         std::cerr << "  -Oz             Aggressively optimize for size\n";
         std::cerr << "  -ffast-math     Enable unsafe floating-point optimizations\n";
         std::cerr << "  -flto           Enable link-time optimization (ThinLTO)\n";
+        std::cerr << "  --incremental   Enable incremental compilation (skip if sources unchanged)\n";
         std::cerr << "  --verbose, -v   Show verbose stage/trace output for debugging\n";
         return 1;
     }
@@ -1053,6 +1060,7 @@ int main(int argc, char** argv) {
         else if (arg == "-ffast-math") fast_math = true;
         else if (arg == "-flto") use_lto = true;
         else if (arg == "--coverage") enable_coverage = true;
+        else if (arg == "--incremental") incremental = true;
         else if (arg == "--verbose" || arg == "-v") verbose = true;
         else if (arg == "--run")      run_jit = true;
         else if (arg == "--repl") {} /* already handled */
@@ -1178,10 +1186,24 @@ int main(int argc, char** argv) {
         }
 
         /* ── Stage 2b: Resolve imports ── */
+        std::vector<std::string> source_files;
+        source_files.push_back(fs::absolute(source_path).string());
         {
             auto sep = source_path.find_last_of("/\\");
             std::string source_dir = (sep == std::string::npos) ? "." : source_path.substr(0, sep);
-            ast = resolve_imports(std::move(ast), source_dir, exe_dir);
+            ast = resolve_imports(std::move(ast), source_dir, exe_dir, &source_files);
+        }
+
+        /* ── Incremental compilation check ── */
+        if (incremental) {
+            std::string out_path = output_path.empty()
+                ? source_path.substr(0, source_path.rfind('.')) + ".exe"
+                : output_path;
+            BuildCache cache;
+            if (cache.is_up_to_date(source_path, source_files, out_path)) {
+                std::cout << "aurora: up to date (" << out_path << ")\n";
+                return 0;
+            }
         }
 
         /* ── Stage 3: Memory Analysis (Phase 1-8) ── */
@@ -1388,9 +1410,11 @@ int main(int argc, char** argv) {
             return exit_code == -1 ? 1 : 0;
         }
 
+        bool compile_success = false;
         if (emit_ir) {
             /* Print LLVM IR to stdout */
             module->print(llvm::outs(), nullptr);
+            compile_success = true;
         } else if (emit_obj) {
             /* Emit object file */
             std::string obj_path = output_path.empty()
@@ -1404,6 +1428,7 @@ int main(int argc, char** argv) {
             }
             if (emit_object_file(module.get(), obj_path, fast_math, use_lto)) {
                 std::cout << "aurora: object written to " << obj_path << "\n";
+                compile_success = true;
             } else {
                 return 1;
             }
@@ -1416,6 +1441,7 @@ int main(int argc, char** argv) {
                 if (!link_exe(obj_path, exe_path, exe_dir, link_libs, lib_paths, use_lto))
                     return 1;
                 std::cout << "aurora: executable written to " << exe_path << "\n";
+                compile_success = true;
             }
         } else {
             /* Write IR to .ll file */
@@ -1437,6 +1463,17 @@ int main(int argc, char** argv) {
             ofs.close();
 
             if (verbose) std::cerr << "File written: " << out_path << "\n" << std::flush;
+            compile_success = true;
+        }
+
+        /* ── Stage 7: Update build cache ── */
+        if (incremental && compile_success) {
+            std::string out_path = output_path.empty()
+                ? source_path.substr(0, source_path.rfind('.')) + ".exe"
+                : output_path;
+            BuildCache cache;
+            cache.mark_cached(out_path, source_files);
+            if (verbose) std::cerr << "CACHE: marked " << out_path << " as up-to-date\n" << std::flush;
         }
 
     } catch (const OwnershipError& e) {
