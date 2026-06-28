@@ -82,10 +82,17 @@ PHASE 1: RUNTIME CORE & CRITICAL FIXES (PRIORITY 1)
       • Rewrote tensor_v2.hpp as deprecated compatibility shim with #pragma message, typedef alias, and inline forwarders
       • Build verified: aurora_runtime.lib + aurorac.exe compile cleanly
 
-[ ] TASK 1.7: Fix Event Bus Vector Desynchronization
+[x] TASK 1.7: Fix Event Bus Vector Desynchronization
     - Description: Potential runtime crash on 'event_off' due to index mismatches.
     - AI Prompt Target: Update 'runtime/event_bus.cpp'.
     - Requirements: Change the internal storage mechanism to a vector of pairs containing handler and userdata.
+    - Status: Complete. Merged parallel vectors into a single vector of pairs.
+      • Replaced two parallel maps (handlers + user_data) with one map of std::vector<std::pair<handler, userdata>>
+      • event_on: emplace_back() pushes a single pair — can never desync
+      • event_off: erases from one vector; no second vector to go out of sync
+      • event_emit: takes one snapshot of pairs; passes correct userdata to each handler
+      • Added explicit #include <mutex> and #include <utility>
+      • Build verified: aurora_runtime.lib + aurorac.exe compile cleanly
 
 [ ] TASK 1.8: Fix GC Internal Allocation
     - Description: Mark-sweep uses 'new std::vector' internally, risking self-collection.
