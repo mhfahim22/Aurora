@@ -86,6 +86,12 @@ LLVMCodegen::LLVMCodegen(llvm::LLVMContext& ctx,
 
 void LLVMCodegen::generate(const ASTNode* root) {
     Codegen codegen(*ctx_, module_, builder_);
+    if (!source_file_path_.empty()) {
+        codegen.set_source_file(source_file_path_);
+        dibuilder_ = std::make_unique<llvm::DIBuilder>(*module_);
+        codegen.set_debug_builder(dibuilder_.get());
+        codegen.set_debug_enabled(true);
+    }
     codegen.generate(root);
 }
 
@@ -342,6 +348,7 @@ bool compile_aura_to_object(const std::string& source_path,
     }
 
     LLVMCodegen codegen;
+    codegen.set_source_file_path(source_path);
     codegen.generate(ast.get());
 
     if (optimize)

@@ -8,6 +8,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/DIBuilder.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -181,6 +182,10 @@ public:
     void set_source_file(const std::string& path);
     void emit_coverage_trace(int line);
 
+    /* ── Debug info control (public setters) ── */
+    void set_debug_builder(llvm::DIBuilder* db) { dibuilder_ = db; }
+    void set_debug_enabled(bool on) { debug_enabled_ = on; }
+
 private:
     /* ── LLVM infrastructure (references, not owned) ── */
     llvm::LLVMContext&                  ctx_;
@@ -343,6 +348,13 @@ private:
     std::string     source_file_path_;
     llvm::Value*    source_file_ptr_   { nullptr };
 
+    /* ── DWARF debug info (DIBuilder) ── */
+    llvm::DIBuilder*      dibuilder_        { nullptr };
+    llvm::DICompileUnit*  debug_cu_         { nullptr };
+    llvm::DIFile*         debug_file_       { nullptr };
+    llvm::DISubprogram*   debug_cur_fn_     { nullptr };
+    bool                  debug_enabled_    { false };
+
     /* ── Utility runtime functions ── */
     llvm::Function* fn_sleep_       { nullptr };
     llvm::Function* fn_time_        { nullptr };
@@ -457,6 +469,12 @@ private:
 
     /* Declare domain-specific runtime helpers (game, backend, UI, utility). */
     void declare_domain_runtime_helpers();
+
+    /* Initialize DWARF debug info — create compile unit + file */
+    void init_debug_info();
+
+    /* Helper: get or create a DIBasicType for the given AstTypeKind */
+    llvm::DIType* get_debug_type(AstTypeKind kind);
 
     /* ══════════════════════════════════════════
        Scope helpers
@@ -650,12 +668,17 @@ public:
     /* Access module */
     llvm::Module* module();
 
+    /* Set source file path (enables DWARF debug info) */
+    void set_source_file_path(const std::string& path) { source_file_path_ = path; }
+
 private:
     bool                     ctx_external_ { false };
     std::unique_ptr<llvm::LLVMContext>      owned_ctx_;   /* owned when ctx_external_==false */
     llvm::LLVMContext*       ctx_          { nullptr };
     std::unique_ptr<llvm::Module>           module_;
     std::unique_ptr<llvm::IRBuilder<>>      builder_;
+    std::unique_ptr<llvm::DIBuilder>        dibuilder_;
+    std::string              source_file_path_;
 };
 
 /* ── H2 Phase E-3: map resolved AstTypeKind to LLVM ABI type ──

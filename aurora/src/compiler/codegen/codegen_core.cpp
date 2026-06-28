@@ -3,6 +3,7 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/DebugInfo.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/TargetParser/Host.h>
 
@@ -20,6 +21,42 @@ Codegen::Codegen(llvm::LLVMContext& ctx,
 
 void Codegen::set_source_file(const std::string& path) {
     source_file_path_ = path;
+}
+
+void Codegen::init_debug_info() {
+    if (!dibuilder_ || !debug_enabled_) return;
+    std::string filename = source_file_path_;
+    std::string dir;
+    auto pos = filename.find_last_of("/\\");
+    if (pos != std::string::npos) {
+        dir = filename.substr(0, pos);
+        filename = filename.substr(pos + 1);
+    }
+    debug_file_ = dibuilder_->createFile(filename, dir);
+    debug_cu_ = dibuilder_->createCompileUnit(
+        llvm::dwarf::DW_LANG_C,
+        debug_file_,
+        "Aurora Compiler",
+        false, "", 0);
+}
+
+llvm::DIType* Codegen::get_debug_type(AstTypeKind kind) {
+    if (!dibuilder_) return nullptr;
+    switch (kind) {
+        case AstTypeKind::Int:
+        case AstTypeKind::Bool:
+            return dibuilder_->createBasicType("int", 64, llvm::dwarf::DW_ATE_signed);
+        case AstTypeKind::Float:
+            return dibuilder_->createBasicType("float", 64, llvm::dwarf::DW_ATE_float);
+        case AstTypeKind::String:
+            return dibuilder_->createPointerType(
+                dibuilder_->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
+                64);
+        case AstTypeKind::Void:
+            return nullptr;
+        default:
+            return dibuilder_->createBasicType("ptr", 64, llvm::dwarf::DW_ATE_address);
+    }
 }
 
 void Codegen::emit_coverage_trace(int line) {
@@ -44,6 +81,10 @@ void Codegen::generate(const ASTNode* root) {
     auto triple = llvm::sys::getProcessTriple();
     module_->setTargetTriple(triple);
     module_->setDataLayout(llvm_target_data_layout(triple));
+
+    /* Step 0a — initialize DWARF debug info */
+    if (debug_enabled_ && !source_file_path_.empty())
+        init_debug_info();
 
     /* Step 1 — run type checking before LLVM IR is emitted. */
     TypeChecker type_checker;
@@ -93,6 +134,23 @@ void Codegen::generate(const ASTNode* root) {
     }
     auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", cur_fn_);
     builder_->SetInsertPoint(entry_bb);
+
+    /* Create DISubprogram for the entry function (debug info) */
+    if (dibuilder_ && debug_file_) {
+        debug_cur_fn_ = dibuilder_->createFunction(
+            debug_file_,
+            entry_name,
+            cur_fn_->getName(),
+            debug_file_,
+            0,
+            dibuilder_->createSubroutineType(
+                dibuilder_->getOrCreateTypeArray(std::nullopt)),
+            0,
+            llvm::DINode::FlagZero,
+            llvm::DISubprogram::SPFlagDefinition);
+        if (debug_cur_fn_)
+            cur_fn_->setSubprogram(debug_cur_fn_);
+    }
 
     /* Initialize coverage source file ptr now that builder has insertion point */
     if (!source_file_path_.empty())
@@ -146,6 +204,23 @@ void Codegen::generate(const ASTNode* root) {
             auto* mb = llvm::BasicBlock::Create(ctx_, "entry", cur_fn_);
             builder_->SetInsertPoint(mb);
 
+            /* Create DISubprogram for wrapping main (debug info) */
+            if (dibuilder_ && debug_file_) {
+                auto* main_sp = dibuilder_->createFunction(
+                    debug_file_,
+                    "main",
+                    cur_fn_->getName(),
+                    debug_file_,
+                    0,
+                    dibuilder_->createSubroutineType(
+                        dibuilder_->getOrCreateTypeArray(std::nullopt)),
+                    0,
+                    llvm::DINode::FlagZero,
+                    llvm::DISubprogram::SPFlagDefinition);
+                if (main_sp)
+                    cur_fn_->setSubprogram(main_sp);
+            }
+
             /* Install crash handler */
             {
                 llvm::Function* init_crash = module_->getFunction("aurora_install_crash_handler");
@@ -159,6 +234,10 @@ void Codegen::generate(const ASTNode* root) {
             builder_->CreateRet(llvm::ConstantInt::get(i32_ty, 0));
         }
     }
+
+    /* Step 9 — finalize DWARF debug info (must be after all codegen) */
+    if (dibuilder_)
+        dibuilder_->finalize();
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -359,7 +438,21 @@ llvm::AllocaInst* Codegen::create_entry_alloca(const std::string& name,
     llvm::IRBuilder<> tmp_builder(
         &cur_fn_->getEntryBlock(),
          cur_fn_->getEntryBlock().begin());
-    return tmp_builder.CreateAlloca(ty, nullptr, name);
+    auto* alloca = tmp_builder.CreateAlloca(ty, nullptr, name);
+
+    /* Emit llvm.dbg.declare for debug info */
+    if (dibuilder_ && debug_cur_fn_ && !name.empty() && name[0] != '_') {
+        auto* dbg_ty = get_debug_type(AstTypeKind::Int);
+        if (!dbg_ty) dbg_ty = dibuilder_->createBasicType("i64", 64, llvm::dwarf::DW_ATE_signed);
+        auto* var = dibuilder_->createAutoVariable(
+            debug_cur_fn_, name, debug_file_, 0, dbg_ty, true);
+        dibuilder_->insertDeclare(
+            alloca, var, dibuilder_->createExpression(),
+            llvm::DILocation::get(ctx_, 0, 0, debug_cur_fn_),
+            &*cur_fn_->getEntryBlock().begin());
+    }
+
+    return alloca;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -427,6 +520,9 @@ bool Codegen::safe_ret(llvm::Value* value) {
    ════════════════════════════════════════════════════════════ */
 void Codegen::gen_block(const ASTNode* node) {
     while (node) {
+        if (dibuilder_ && node->src_line > 0 && debug_cur_fn_)
+            builder_->SetCurrentDebugLocation(
+                llvm::DILocation::get(ctx_, node->src_line, 0, debug_cur_fn_));
         gen_stmt(node);
         if (current_block_terminated()) break;
         node = node->next.get();

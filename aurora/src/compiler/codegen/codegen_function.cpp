@@ -45,8 +45,30 @@ void Codegen::gen_function(const ASTNode* node) {
     if (closure_returning_fns_.count(node->value))
         fn->addFnAttr(llvm::Attribute::NoInline);
 
+    /* Create DISubprogram for debug info */
+    llvm::DISubprogram* sp = nullptr;
+    if (dibuilder_ && debug_file_) {
+        llvm::DITypeRefArray param_debug_types;
+        sp = dibuilder_->createFunction(
+            debug_file_,
+            node->value,
+            fn->getName(),
+            debug_file_,
+            node->src_line,
+            dibuilder_->createSubroutineType(
+                dibuilder_->getOrCreateTypeArray(std::nullopt)),
+            node->src_line,
+            llvm::DINode::FlagZero,
+            llvm::DISubprogram::SPFlagDefinition);
+        if (sp) {
+            fn->setSubprogram(sp);
+            debug_cur_fn_ = sp;
+        }
+    }
+
     auto* entry_bb  = llvm::BasicBlock::Create(ctx_, "entry", fn);
     auto* saved_fn  = cur_fn_;
+    auto* saved_fn_sp = debug_cur_fn_;
     auto* saved_bb  = builder_->GetInsertBlock();
     auto  saved_cache  = std::move(literal_aurora_cache_);
     auto  saved_scopes = std::move(scopes_);
@@ -89,6 +111,7 @@ void Codegen::gen_function(const ASTNode* node) {
     /* Restore caller context */
     literal_aurora_cache_ = std::move(saved_cache);
     scopes_ = std::move(saved_scopes);
+    debug_cur_fn_ = saved_fn_sp;
     cur_fn_ = saved_fn;
     if (saved_bb) builder_->SetInsertPoint(saved_bb);
 }

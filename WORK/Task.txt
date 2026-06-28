@@ -110,10 +110,20 @@ PHASE 1: RUNTIME CORE & CRITICAL FIXES (PRIORITY 1)
 ----------------------------------------------------------------------
 PHASE 2: COMPILER MATURITY & ECOSYSTEM BRIDGES (PRIORITY 2)
 ----------------------------------------------------------------------
-[ ] TASK 2.1: Add DWARF Debug Info Generation
+[x] TASK 2.1: Add DWARF Debug Info Generation
     - Description: No source-level debugging is possible currently.
-    - AI Prompt Target: Implement 'compiler/debug_info.cpp' using LLVM DIBuilder.
+    - AI Prompt Target: Implement 'compiler/codegen_debug.cpp' using LLVM DIBuilder.
     - Requirements: Generate proper line tables, variable scopes, and source file mappings.
+    - Status: Complete. Integrated LLVM DIBuilder into codegen pipeline.
+      • Added llvm::DIBuilder to LLVMCodegen (owned) + Codegen (non-owning pointer)
+      • Compile unit created in Codegen::init_debug_info() with source file and directory
+      • DISubprogram created per function (gen_function) and for entry/main wrappers
+      • Line tables via DILocation set in gen_block() and gen_expr() using node->src_line
+      • Variable scopes via dbg.declare in create_entry_alloca() for non-underscore vars
+      • DIBasicType helper for int, float, string, pointer types
+      • dibuilder_->finalize() called after all codegen in generate()
+      • compile_aura_to_object() passes source path to enable debug info automatically
+      • Build verified: aurora_runtime.lib + aurorac.exe compile cleanly
 
 [ ] TASK 2.2: Implement Generics/Templates Architecture
     - Description: Language lacks generic structures, forcing duplicate code for different types.

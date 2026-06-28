@@ -34,6 +34,9 @@ llvm::Value* Codegen::get_literal_aurora(const std::string& str) {
 
 llvm::Value* Codegen::gen_expr(const ASTNode* node) {
     if (!node) return i64(0);
+    if (dibuilder_ && node->src_line > 0 && debug_cur_fn_)
+        builder_->SetCurrentDebugLocation(
+            llvm::DILocation::get(ctx_, node->src_line, 0, debug_cur_fn_));
     switch (node->type) {
         case NodeType::Num:       return i64(std::stoll(node->value));
         case NodeType::Float:     return llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), std::stod(node->value));
