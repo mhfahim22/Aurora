@@ -113,6 +113,16 @@ AuroraTensor* aurora_tensor_new_bf16(int64_t ndim, int64_t* shape) {
     return t;
 }
 
+/* ── Unified constructor (dispatches by dtype) ── */
+AuroraTensor* aurora_tensor_new_with_dtype(int64_t ndim, int64_t* shape, int dtype) {
+    switch (dtype) {
+        case TENSOR_F32: return aurora_tensor_new_f32(ndim, shape);
+        case TENSOR_F16: return aurora_tensor_new_f16(ndim, shape);
+        case TENSOR_BF16: return aurora_tensor_new_bf16(ndim, shape);
+        default: return aurora_tensor_new(ndim, shape);
+    }
+}
+
 void aurora_tensor_free(AuroraTensor* t) {
     if (!t) return;
     free(t->shape);
@@ -799,6 +809,36 @@ void aurora_tensor_tanh(AuroraTensor* t) {
         t->backward_fn = backward_tanh;
         if (t->prev_count == 0) {
             t->prev[t->prev_count++] = t;
+        }
+    }
+}
+
+void aurora_tensor_gelu(AuroraTensor* t) {
+    if (!t) return;
+    int64_t n = t->total_size;
+    for (int64_t i = 0; i < n; i++) {
+        double x = tensor_read_f64(t, i);
+        double v = 0.5 * x * (1.0 + tanh(0.7978845608 * (x + 0.044715 * x * x * x)));
+        switch (t->dtype) {
+            case TENSOR_F32: t->data_f32[i] = (float)v; break;
+            case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
+            case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
+            default: t->data[i] = v; break;
+        }
+    }
+}
+
+void aurora_tensor_silu(AuroraTensor* t) {
+    if (!t) return;
+    int64_t n = t->total_size;
+    for (int64_t i = 0; i < n; i++) {
+        double x = tensor_read_f64(t, i);
+        double v = x / (1.0 + exp(-x));
+        switch (t->dtype) {
+            case TENSOR_F32: t->data_f32[i] = (float)v; break;
+            case TENSOR_F16: ((uint16_t*)t->data_ptr)[i] = f32_to_f16((float)v); break;
+            case TENSOR_BF16: ((uint16_t*)t->data_ptr)[i] = f32_to_bf16((float)v); break;
+            default: t->data[i] = v; break;
         }
     }
 }

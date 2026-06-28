@@ -186,7 +186,6 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/std/collections.cpp
     aurora/src/runtime/ai/tensor.cpp
     aurora/src/runtime/ai/autograd.cpp
-    aurora/src/runtime/ai/tensor_v2.cpp
     aurora/src/runtime/ai/dataloader.cpp
     aurora/src/runtime/ai/predict.cpp
     aurora/src/runtime/ai/ai_enterprise.cpp

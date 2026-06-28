@@ -1,5 +1,5 @@
 #include "runtime/dataloader.hpp"
-#include "runtime/tensor_v2.hpp"
+#include "runtime/tensor.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -167,11 +167,11 @@ void* dataloader_next_batch(DataLoader* dl) {
     int64_t shape[2] = { bs, ncols };
 
     /* Create tensor */
-    AuroraTensorV2* batch = tensor_v2_new(2, shape, dl->dtype);
+    AuroraTensor* batch = aurora_tensor_new_with_dtype(2, shape, dl->dtype);
 
     /* Open file and seek to data start */
     FILE* f = fopen(dl->path, "rb");
-    if (!f) { tensor_v2_free(batch); return nullptr; }
+    if (!f) { aurora_tensor_free(batch); return nullptr; }
 
     /* Skip header if needed (read first line but we already know it's there) */
     /* We need to skip to the right line. Re-count from start. */
@@ -210,7 +210,7 @@ void* dataloader_next_batch(DataLoader* dl) {
             int parsed = parse_csv_line_f32(tmp, row_data, ncols);
             for (int c = parsed; c < ncols; c++) row_data[c] = 0.0f;
         } else {
-            double* row_data = batch->data_f64 + r * ncols;
+            double* row_data = batch->data + r * ncols;
             int parsed = parse_csv_line(tmp, row_data, ncols);
             for (int c = parsed; c < ncols; c++) row_data[c] = 0.0;
         }

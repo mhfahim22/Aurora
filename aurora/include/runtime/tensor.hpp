@@ -84,6 +84,7 @@ AuroraTensor* aurora_tensor_new(int64_t ndim, int64_t* shape);
 AuroraTensor* aurora_tensor_new_f32(int64_t ndim, int64_t* shape);
 AuroraTensor* aurora_tensor_new_f16(int64_t ndim, int64_t* shape);
 AuroraTensor* aurora_tensor_new_bf16(int64_t ndim, int64_t* shape);
+AuroraTensor* aurora_tensor_new_with_dtype(int64_t ndim, int64_t* shape, int dtype);
 void          aurora_tensor_free(AuroraTensor* t);
 int64_t       aurora_tensor_ndim(AuroraTensor* t);
 int64_t       aurora_tensor_shape(AuroraTensor* t, int64_t dim);
@@ -119,6 +120,8 @@ AuroraTensor* aurora_predict(AuroraTensor* model, AuroraTensor* input);
 void aurora_tensor_relu(AuroraTensor* t);
 void aurora_tensor_sigmoid(AuroraTensor* t);
 void aurora_tensor_tanh(AuroraTensor* t);
+void aurora_tensor_gelu(AuroraTensor* t);
+void aurora_tensor_silu(AuroraTensor* t);
 
 /* ── Autograd (computation graph & gradient-based optimisation) ── */
 

@@ -70,10 +70,17 @@ PHASE 1: RUNTIME CORE & CRITICAL FIXES (PRIORITY 1)
       • main.cpp: all three parser call sites (main compile, REPL, import resolver) now check parser.had_error() and print collected errors
       • Build verified: aurorac.exe compiles in Release mode
 
-[ ] TASK 1.6: Resolve Tensor API Redundancy
+[x] TASK 1.6: Resolve Tensor API Redundancy
     - Description: Dual tensor APIs ('tensor_v1' and 'tensor_v2') cause redefinition errors.
     - AI Prompt Target: Clean up 'runtime/tensor/'.
     - Requirements: Deprecate or merge 'tensor_v1' into 'tensor_v2' to provide a unified API surface.
+    - Status: Complete. Merged v2 into v1 for a unified API surface.
+      • Added aurora_tensor_new_with_dtype() — unified constructor to v1 (dispatches by dtype)
+      • Added aurora_tensor_gelu() + aurora_tensor_silu() to v1 (the only unique v2 features)
+      • Updated dataloader.cpp to use v1 API instead of v2 (AuroraTensor, aurora_tensor_new_with_dtype, aurora_tensor_free)
+      • Removed tensor_v2.cpp from CMakeLists.txt build
+      • Rewrote tensor_v2.hpp as deprecated compatibility shim with #pragma message, typedef alias, and inline forwarders
+      • Build verified: aurora_runtime.lib + aurorac.exe compile cleanly
 
 [ ] TASK 1.7: Fix Event Bus Vector Desynchronization
     - Description: Potential runtime crash on 'event_off' due to index mismatches.
