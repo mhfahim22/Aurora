@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iostream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -44,9 +45,18 @@ public:
             return nullptr;
         }
 
+        /* Cycle detection */
+        std::string norm = fs::absolute(full_path).string();
+        if (!resolving_.insert(norm).second) {
+            std::cerr << "error at line " << line
+                      << ": circular import detected: '" << import_path << "'\n";
+            return nullptr;
+        }
+
         /* Read, lex, parse */
         std::ifstream f(full_path);
         if (!f.is_open()) {
+            resolving_.erase(norm);
             std::cerr << "error at line " << line
                       << ": cannot open module: " << full_path << "\n";
             return nullptr;
@@ -60,6 +70,8 @@ public:
 
         Parser parser(lines);
         ASTNode::Ptr ast = parser.parse();
+
+        resolving_.erase(norm);
 
         /* Register in cache */
         ResolvedModule mod;
@@ -77,6 +89,7 @@ public:
 
 private:
     std::string search_path_;
+    std::unordered_set<std::string> resolving_;
     std::unordered_map<std::string, ResolvedModule> cache_;
 
     std::string find_file(const std::string& name) {

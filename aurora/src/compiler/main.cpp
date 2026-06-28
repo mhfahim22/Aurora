@@ -33,6 +33,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <unordered_set>
 #include <filesystem>
 #include <cstdlib>
 #include <array>
@@ -482,8 +483,11 @@ static std::string auto_bindgen(const std::string& header_path, const std::strin
     return fs::absolute(out_path).string();
 }
 
-/* ── Resolve imports in AST ── */
-static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_dir, const std::string& exe_dir) {
+/* ── Resolve imports in AST (internal, with cycle detection) ── */
+static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& source_dir,
+                                         const std::string& exe_dir,
+                                         std::vector<std::string>& resolving,
+                                         std::unordered_set<std::string>& resolving_fast) {
     if (!root) return nullptr;
 
     std::vector<ASTNode::Ptr> nodes;
@@ -515,6 +519,22 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
             if (found.empty()) {
                 throw std::runtime_error("aurora: cannot find import: " + path);
             }
+
+            /* Normalize path for cycle detection */
+            std::string norm_path = fs::absolute(found).string();
+
+            if (!resolving_fast.insert(norm_path).second) {
+                /* Build the resolution chain for the error message */
+                std::string chain;
+                for (size_t i = 0; i < resolving.size(); ++i) {
+                    if (i > 0) chain += " → ";
+                    chain += resolving[i];
+                }
+                chain += " → " + norm_path;
+                throw std::runtime_error("aurora: circular import detected:\n  " + chain);
+            }
+            resolving.push_back(norm_path);
+
             /* TODO: support namespace/module scoping for imports —
                e.g., import com.example.foo should resolve within a
                module com.example { ... } scope, not the global scope. */
@@ -523,7 +543,11 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
             auto lines = lexer.lex(src);
             Parser parser(lines);
             auto imported = parser.parse();
-            imported = resolve_imports(std::move(imported), source_dir, exe_dir);
+            imported = resolve_imports_impl(std::move(imported), source_dir, exe_dir, resolving, resolving_fast);
+
+            resolving.pop_back();
+            resolving_fast.erase(norm_path);
+
             if (imported) {
                 if (!head) {
                     head = std::move(imported);
@@ -547,6 +571,13 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
     }
 
     return head;
+}
+
+/* ── Resolve imports in AST (public, with cycle detection) ── */
+static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_dir, const std::string& exe_dir) {
+    std::vector<std::string> resolving;
+    std::unordered_set<std::string> resolving_fast;
+    return resolve_imports_impl(std::move(root), source_dir, exe_dir, resolving, resolving_fast);
 }
 
 /* ── Emit object file using LLVM TargetMachine ── */
