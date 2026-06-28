@@ -843,6 +843,179 @@ void aurora_tensor_silu(AuroraTensor* t) {
     }
 }
 
+AuroraTensor* aurora_tensor_cross_entropy(AuroraTensor* pred, AuroraTensor* target) {
+    if (!pred || !target) return nullptr;
+    int64_t shape[1] = {1};
+    AuroraTensor* loss = (pred->dtype == TENSOR_F32) ?
+        aurora_tensor_new_f32(1, shape) : aurora_tensor_new(1, shape);
+    if (!loss) return nullptr;
+    double sum = 0.0;
+    int64_t n = pred->total_size < target->total_size ? pred->total_size : target->total_size;
+    for (int64_t i = 0; i < n; i++) {
+        double p = tensor_read_f64(pred, i);
+        double t = tensor_read_f64(target, i);
+        p = p < 1e-15 ? 1e-15 : (p > 1 - 1e-15 ? 1 - 1e-15 : p);
+        sum -= t * log(p);
+    }
+    loss->data[0] = sum;
+    link_grad(loss, backward_cross_entropy, pred, target, 0, 0);
+    return loss;
+}
+
+AuroraTensor* aurora_tensor_conv2d(AuroraTensor* input, AuroraTensor* kernel, int64_t stride, int64_t padding) {
+    if (!input || !kernel || input->ndim < 4 || kernel->ndim < 4) return nullptr;
+    int64_t N = input->shape[0], IC = input->shape[1], IH = input->shape[2], IW = input->shape[3];
+    int64_t OC = kernel->shape[0], KC = kernel->shape[1], KH = kernel->shape[2], KW = kernel->shape[3];
+    if (IC != KC) return nullptr;
+    int64_t OH = (IH + 2 * padding - KH) / stride + 1;
+    int64_t OW = (IW + 2 * padding - KW) / stride + 1;
+    int64_t oshape[4] = {N, OC, OH, OW};
+    AuroraTensor* r = (input->dtype == TENSOR_F32) ?
+        aurora_tensor_new_f32(4, oshape) : aurora_tensor_new(4, oshape);
+    if (!r) return nullptr;
+    for (int64_t n = 0; n < N; n++)
+        for (int64_t oc = 0; oc < OC; oc++)
+            for (int64_t oh = 0; oh < OH; oh++)
+                for (int64_t ow = 0; ow < OW; ow++) {
+                    double sum = 0.0;
+                    for (int64_t kc = 0; kc < KC; kc++)
+                        for (int64_t kh = 0; kh < KH; kh++)
+                            for (int64_t kw = 0; kw < KW; kw++) {
+                                int64_t ih = oh * stride + kh - padding;
+                                int64_t iw = ow * stride + kw - padding;
+                                if (ih >= 0 && ih < IH && iw >= 0 && iw < IW)
+                                    sum += tensor_read_f64(input, n * IC * IH * IW + kc * IH * IW + ih * IW + iw)
+                                         * tensor_read_f64(kernel, oc * KC * KH * KW + kc * KH * KW + kh * KW + kw);
+                            }
+                    int64_t idx = n * OC * OH * OW + oc * OH * OW + oh * OW + ow;
+                    if (r->dtype == TENSOR_F32) r->data_f32[idx] = (float)sum; else r->data[idx] = sum;
+                }
+    link_grad(r, backward_conv2d, input, kernel, 0, 0);
+    return r;
+}
+
+AuroraTensor* aurora_tensor_maxpool2d(AuroraTensor* input, int64_t pool_size, int64_t stride) {
+    if (!input || input->ndim < 4) return nullptr;
+    int64_t N = input->shape[0], C = input->shape[1], H = input->shape[2], W = input->shape[3];
+    if (stride <= 0) stride = pool_size;
+    int64_t OH = (H - pool_size) / stride + 1;
+    int64_t OW = (W - pool_size) / stride + 1;
+    int64_t oshape[4] = {N, C, OH, OW};
+    AuroraTensor* r = (input->dtype == TENSOR_F32) ?
+        aurora_tensor_new_f32(4, oshape) : aurora_tensor_new(4, oshape);
+    if (!r) return nullptr;
+    for (int64_t n = 0; n < N; n++)
+        for (int64_t c = 0; c < C; c++)
+            for (int64_t oh = 0; oh < OH; oh++)
+                for (int64_t ow = 0; ow < OW; ow++) {
+                    double max_val = -1e100;
+                    for (int64_t ph = 0; ph < pool_size; ph++)
+                        for (int64_t pw = 0; pw < pool_size; pw++) {
+                            int64_t ih = oh * stride + ph, iw = ow * stride + pw;
+                            double v = tensor_read_f64(input, n * C * H * W + c * H * W + ih * W + iw);
+                            if (v > max_val) max_val = v;
+                        }
+                    int64_t idx = n * C * OH * OW + c * OH * OW + oh * OW + ow;
+                    if (r->dtype == TENSOR_F32) r->data_f32[idx] = (float)max_val; else r->data[idx] = max_val;
+                }
+    link_grad(r, backward_maxpool2d, input, 0, 0, 0);
+    return r;
+}
+
+AuroraTensor* aurora_tensor_batchnorm(AuroraTensor* input, AuroraTensor* gamma, AuroraTensor* beta) {
+    if (!input || input->ndim < 4) return nullptr;
+    int64_t N = input->shape[0], C = input->shape[1], H = input->shape[2], W = input->shape[3];
+    int64_t oshape[4] = {N, C, H, W};
+    AuroraTensor* r = (input->dtype == TENSOR_F32) ?
+        aurora_tensor_new_f32(4, oshape) : aurora_tensor_new(4, oshape);
+    if (!r) return nullptr;
+    int64_t spatial = H * W, per_channel = N * spatial;
+    for (int64_t c = 0; c < C; c++) {
+        double mean = 0.0, var = 0.0;
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++)
+                mean += tensor_read_f64(input, n * C * spatial + c * spatial + s);
+        mean /= (double)per_channel;
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++) {
+                double d = tensor_read_f64(input, n * C * spatial + c * spatial + s) - mean;
+                var += d * d;
+            }
+        var /= (double)per_channel;
+        double std_inv = 1.0 / sqrt(var + 1e-8);
+        double g = gamma ? tensor_read_f64(gamma, c) : 1.0;
+        double b = beta ? tensor_read_f64(beta, c) : 0.0;
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++) {
+                int64_t idx = n * C * spatial + c * spatial + s;
+                double x = tensor_read_f64(input, idx);
+                double y = g * (x - mean) * std_inv + b;
+                if (r->dtype == TENSOR_F32) r->data_f32[idx] = (float)y; else r->data[idx] = y;
+            }
+    }
+    link_grad(r, backward_batchnorm, input, gamma, beta, 0);
+    return r;
+}
+
+AuroraTensor* aurora_tensor_dropout(AuroraTensor* input, double prob) {
+    if (!input) return nullptr;
+    AuroraTensor* r = aurora_tensor_clone(input);
+    if (!r) return nullptr;
+    double scale = 1.0 / (1.0 - prob + 1e-8);
+    for (int64_t i = 0; i < r->total_size; i++) {
+        double v = tensor_read_f64(r, i);
+        double mask = ((double)rand() / (double)RAND_MAX) >= prob ? 1.0 : 0.0;
+        v = mask * v * scale;
+        if (r->dtype == TENSOR_F32) r->data_f32[i] = (float)v; else r->data[i] = v;
+    }
+    return r;
+}
+
+AuroraTensor* aurora_tensor_attention(AuroraTensor* Q, AuroraTensor* K, AuroraTensor* V) {
+    if (!Q || !K || !V) return nullptr;
+    int64_t N = Q->shape[0], L = Q->shape[1], S = K->shape[1], D = Q->shape[2];
+    int64_t oshape[3] = {N, L, D};
+    AuroraTensor* r = (Q->dtype == TENSOR_F32) ?
+        aurora_tensor_new_f32(3, oshape) : aurora_tensor_new(3, oshape);
+    if (!r) return nullptr;
+    double scale = 1.0 / sqrt((double)D);
+    for (int64_t n = 0; n < N; n++) {
+        for (int64_t l = 0; l < L; l++) {
+            for (int64_t s = 0; s < S; s++) {
+                double max_qk = -1e100;
+                for (int64_t sp = 0; sp < S; sp++) {
+                    double qk = 0.0;
+                    for (int64_t d = 0; d < D; d++)
+                        qk += tensor_read_f64(Q, n * L * D + l * D + d) * tensor_read_f64(K, n * S * D + sp * D + d);
+                    if (qk > max_qk) max_qk = qk;
+                }
+                double sum_exp = 0.0;
+                for (int64_t sp = 0; sp < S; sp++) {
+                    double qk = 0.0;
+                    for (int64_t d = 0; d < D; d++)
+                        qk += tensor_read_f64(Q, n * L * D + l * D + d) * tensor_read_f64(K, n * S * D + sp * D + d);
+                    sum_exp += exp((qk - max_qk) * scale);
+                }
+                if (sum_exp <= 0) continue;
+                double qk = 0.0;
+                for (int64_t d = 0; d < D; d++)
+                    qk += tensor_read_f64(Q, n * L * D + l * D + d) * tensor_read_f64(K, n * S * D + s * D + d);
+                double attn = exp((qk - max_qk) * scale) / sum_exp;
+                for (int64_t d = 0; d < D; d++) {
+                    double v_val = tensor_read_f64(V, n * S * D + s * D + d);
+                    int64_t idx = n * L * D + l * D + d;
+                    if (r->dtype == TENSOR_F32)
+                        r->data_f32[idx] += (float)(attn * v_val);
+                    else
+                        r->data[idx] += attn * v_val;
+                }
+            }
+        }
+    }
+    link_grad(r, backward_attention, Q, K, V, 0);
+    return r;
+}
+
 /* ── Neural network operations ── */
 AuroraTensor* aurora_neural_forward(AuroraTensor* input, AuroraTensor* weights, AuroraTensor* bias) {
     if (!input || !weights) return nullptr;

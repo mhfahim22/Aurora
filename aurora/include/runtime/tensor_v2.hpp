@@ -30,14 +30,6 @@ extern "C" {
 
 /* Deprecated alias — use AuroraTensor instead */
 typedef AuroraTensor AuroraTensorV2;
-    int64_t  ndim;
-    int64_t* shape;
-    void*    data;      /* generic pointer (always valid) */
-    double*  data_f64;  /* convenient access for F64 (same as data) */
-    float*   data_f32;  /* convenient access for F32 (same as data) */
-    int64_t  total_size;
-    int      dtype;     /* TENSOR_F64 or TENSOR_F32 */
-} AuroraTensorV2;
 
 /* ── Deprecated compatibility wrappers (forward to v1 API) ── */
 

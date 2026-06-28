@@ -115,6 +115,12 @@ AuroraTensor* aurora_tensor_clone(AuroraTensor* t);
 /* ── Neural network operations ── */
 AuroraTensor* aurora_neural_forward(AuroraTensor* input, AuroraTensor* weights, AuroraTensor* bias);
 AuroraTensor* aurora_predict(AuroraTensor* model, AuroraTensor* input);
+AuroraTensor* aurora_tensor_cross_entropy(AuroraTensor* pred, AuroraTensor* target);
+AuroraTensor* aurora_tensor_conv2d(AuroraTensor* input, AuroraTensor* kernel, int64_t stride, int64_t padding);
+AuroraTensor* aurora_tensor_maxpool2d(AuroraTensor* input, int64_t pool_size, int64_t stride);
+AuroraTensor* aurora_tensor_batchnorm(AuroraTensor* input, AuroraTensor* gamma, AuroraTensor* beta);
+AuroraTensor* aurora_tensor_dropout(AuroraTensor* input, double prob);
+AuroraTensor* aurora_tensor_attention(AuroraTensor* Q, AuroraTensor* K, AuroraTensor* V);
 
 /* ── Activation functions ── */
 void aurora_tensor_relu(AuroraTensor* t);
@@ -150,6 +156,13 @@ void backward_matmul(AuroraTensor* self);
 void backward_relu(AuroraTensor* self);
 void backward_sigmoid(AuroraTensor* self);
 void backward_tanh(AuroraTensor* self);
+void backward_softmax(AuroraTensor* self);
+void backward_cross_entropy(AuroraTensor* self);
+void backward_conv2d(AuroraTensor* self);
+void backward_maxpool2d(AuroraTensor* self);
+void backward_batchnorm(AuroraTensor* self);
+void backward_dropout(AuroraTensor* self);
+void backward_attention(AuroraTensor* self);
 
 /* Graph construction helper — wires result into the autograd graph */
 AuroraTensor* link_grad(AuroraTensor* result, autograd_backward_fn backward,

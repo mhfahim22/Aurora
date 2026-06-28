@@ -101,11 +101,10 @@ void backward_div(AuroraTensor* self) {
 void backward_pow(AuroraTensor* self) {
     if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
     AuroraTensor* a = self->prev[0];
-    double exp_val = 2.0;
     for (int64_t j = 0; j < a->total_size; j++) {
         double av = tensor_read_f64(a, j);
         double sg = (j < self->total_size) ? self->grad[j] : 0.0;
-        a->grad[j] += sg * exp_val * pow(av, exp_val - 1.0);
+        a->grad[j] += sg * 2.0 * av;
     }
 }
 
@@ -166,6 +165,188 @@ void backward_tanh(AuroraTensor* self) {
     }
 }
 
+void backward_softmax(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    int64_t n = input->total_size;
+    int64_t m = self->total_size < n ? self->total_size : n;
+    for (int64_t j = 0; j < m; j++) {
+        double sm = tensor_read_f64(self, j);
+        double sg = (self->grad && j < self->total_size) ? self->grad[j] : 0.0;
+        input->grad[j] += sm * sg * (1.0 - sm);
+    }
+}
+
+void backward_cross_entropy(AuroraTensor* self) {
+    if (self->prev_count < 2 || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* pred = self->prev[0];
+    AuroraTensor* target = self->prev[1];
+    double sg = (self->grad && self->total_size > 0) ? self->grad[0] : 1.0;
+    int64_t n = pred->total_size < target->total_size ? pred->total_size : target->total_size;
+    for (int64_t j = 0; j < n; j++) {
+        double p = tensor_read_f64(pred, j);
+        double t = tensor_read_f64(target, j);
+        pred->grad[j] += sg * (p - t);
+    }
+}
+
+void backward_conv2d(AuroraTensor* self) {
+    if (self->prev_count < 2 || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    AuroraTensor* kernel = self->prev[1];
+    if (!input->grad || !kernel->grad) return;
+    int64_t IC = input->shape[1], IH = input->shape[2], IW = input->shape[3];
+    int64_t OC = kernel->shape[0], KC = kernel->shape[1], KH = kernel->shape[2], KW = kernel->shape[3];
+    int64_t OH = self->shape[2], OW = self->shape[3];
+    int64_t OH_OW = OH * OW;
+    for (int64_t oc = 0; oc < OC; oc++) {
+        for (int64_t oh = 0; oh < OH; oh++) {
+            for (int64_t ow = 0; ow < OW; ow++) {
+                double sg = (self->grad) ? self->grad[oc * OH_OW + oh * OW + ow] : 0.0;
+                for (int64_t kc = 0; kc < KC; kc++) {
+                    int64_t ih = oh, iw = ow;
+                    double kv = tensor_read_f64(kernel, oc * KC * KH * KW + kc * KH * KW + 0 * KW + 0);
+                    input->grad[kc * IH * IW + ih * IW + iw] += sg * kv;
+                    kernel->grad[oc * KC * KH * KW + kc * KH * KW + 0 * KW + 0] += sg * tensor_read_f64(input, kc * IH * IW + ih * IW + iw);
+                }
+            }
+        }
+    }
+}
+
+void backward_maxpool2d(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    int64_t C = input->shape[1], H = input->shape[2], W = input->shape[3];
+    int64_t OH = self->shape[2], OW = self->shape[3];
+    int64_t pool_h = H / OH, pool_w = W / OW;
+    for (int64_t c = 0; c < C; c++) {
+        for (int64_t oh = 0; oh < OH; oh++) {
+            for (int64_t ow = 0; ow < OW; ow++) {
+                int64_t max_h = 0, max_w = 0;
+                double max_val = -1e100;
+                for (int64_t ph = 0; ph < pool_h; ph++) {
+                    for (int64_t pw = 0; pw < pool_w; pw++) {
+                        int64_t ih = oh * pool_h + ph, iw = ow * pool_w + pw;
+                        double v = tensor_read_f64(input, c * H * W + ih * W + iw);
+                        if (v > max_val) { max_val = v; max_h = ih; max_w = iw; }
+                    }
+                }
+                double sg = (self->grad) ? self->grad[c * OH * OW + oh * OW + ow] : 0.0;
+                input->grad[c * H * W + max_h * W + max_w] += sg;
+            }
+        }
+    }
+}
+
+void backward_batchnorm(AuroraTensor* self) {
+    if (self->prev_count < 3 || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    AuroraTensor* gamma = self->prev[1];
+    AuroraTensor* beta  = self->prev[2];
+    if (!input->grad) return;
+    int64_t C = input->shape[1], H = input->shape[2], W = input->shape[3];
+    int64_t N = input->shape[0];
+    int64_t spatial = H * W, per_channel = N * spatial;
+    for (int64_t c = 0; c < C; c++) {
+        double mean = 0.0, var = 0.0;
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++)
+                mean += tensor_read_f64(input, n * C * spatial + c * spatial + s);
+        mean /= (double)per_channel;
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++) {
+                double d = tensor_read_f64(input, n * C * spatial + c * spatial + s) - mean;
+                var += d * d;
+            }
+        var /= (double)per_channel;
+        double std_inv = 1.0 / sqrt(var + 1e-8);
+        double g = gamma ? tensor_read_f64(gamma, c) : 1.0;
+        double sum_dy = 0.0, sum_dy_x = 0.0;
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++) {
+                int64_t idx = n * C * spatial + c * spatial + s;
+                double dy = (self->grad) ? self->grad[idx] : 0.0;
+                double x = tensor_read_f64(input, idx);
+                sum_dy += dy;
+                sum_dy_x += dy * x;
+            }
+        double dx_mean = -sum_dy * std_inv / (double)per_channel;
+        double dx_var = -sum_dy_x * std_inv / (2.0 * (var + 1e-8) * (double)per_channel);
+        for (int64_t n = 0; n < N; n++)
+            for (int64_t s = 0; s < spatial; s++) {
+                int64_t idx = n * C * spatial + c * spatial + s;
+                double dy = (self->grad) ? self->grad[idx] : 0.0;
+                double x = tensor_read_f64(input, idx);
+                double x_hat = (x - mean) * std_inv;
+                input->grad[idx] += g * std_inv * (dy - sum_dy / (double)per_channel - x_hat * sum_dy_x / (double)per_channel);
+                if (gamma && gamma->grad) gamma->grad[c] += dy * x_hat;
+                if (beta && beta->grad)  beta->grad[c] += dy;
+            }
+    }
+}
+
+void backward_dropout(AuroraTensor* self) {
+    if (!self->prev_count || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* input = self->prev[0];
+    double scale = (self->prev_count >= 2 && self->prev[1]) ? (1.0 / (1.0 - tensor_read_f64(self->prev[1], 0))) : 1.0;
+    for (int64_t j = 0; j < input->total_size && j < self->total_size; j++) {
+        double out = tensor_read_f64(self, j);
+        double sg = (self->grad && j < self->total_size) ? self->grad[j] : 0.0;
+        input->grad[j] += (out != 0.0) ? sg * scale : 0.0;
+    }
+}
+
+void backward_attention(AuroraTensor* self) {
+    if (self->prev_count < 3 || !self->prev[0] || !self->prev[0]->grad) return;
+    AuroraTensor* Q = self->prev[0];
+    AuroraTensor* K = self->prev[1];
+    AuroraTensor* V = self->prev[2];
+    int64_t N = Q->shape[0], L = Q->shape[1], S = K->shape[1], D = Q->shape[2];
+    double scale = 1.0 / sqrt((double)D);
+    for (int64_t n = 0; n < N; n++) {
+        for (int64_t l = 0; l < L; l++) {
+            for (int64_t s = 0; s < S; s++) {
+                double sum_exp = 0.0;
+                double max_qk = -1e100;
+                for (int64_t sp = 0; sp < S; sp++) {
+                    double qk = 0.0;
+                    for (int64_t d = 0; d < D; d++)
+                        qk += tensor_read_f64(Q, n * L * D + l * D + d) * tensor_read_f64(K, n * S * D + sp * D + d);
+                    if (qk > max_qk) max_qk = qk;
+                }
+                double attn = 0.0;
+                for (int64_t sp = 0; sp < S; sp++) {
+                    double qk = 0.0;
+                    for (int64_t d = 0; d < D; d++)
+                        qk += tensor_read_f64(Q, n * L * D + l * D + d) * tensor_read_f64(K, n * S * D + sp * D + d);
+                    sum_exp += exp((qk - max_qk) * scale);
+                }
+                if (sum_exp > 0) {
+                    double qk = 0.0;
+                    for (int64_t d = 0; d < D; d++)
+                        qk += tensor_read_f64(Q, n * L * D + l * D + d) * tensor_read_f64(K, n * S * D + s * D + d);
+                    attn = exp((qk - max_qk) * scale) / sum_exp;
+                }
+                for (int64_t d = 0; d < D; d++) {
+                    int64_t out_idx = n * L * D + l * D + d;
+                    double v_val = tensor_read_f64(V, n * S * D + s * D + d);
+                    double sg = (self->grad) ? self->grad[out_idx] : 0.0;
+                    double dv = sg * attn;
+                    if (V->grad) V->grad[n * S * D + s * D + d] += dv;
+                    for (int64_t dp = 0; dp < D; dp++) {
+                        double k_val = tensor_read_f64(K, n * S * D + s * D + dp);
+                        double q_val = tensor_read_f64(Q, n * L * D + l * D + dp);
+                        double d_attn = sg * v_val * attn * (1.0 - attn) * scale;
+                        if (Q->grad) Q->grad[n * L * D + l * D + dp] += d_attn * k_val;
+                        if (K->grad) K->grad[n * S * D + s * D + dp] += d_attn * q_val;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /* ── Graph construction helper ── */
 
 AuroraTensor* link_grad(AuroraTensor* result, autograd_backward_fn backward,
@@ -185,24 +366,54 @@ AuroraTensor* link_grad(AuroraTensor* result, autograd_backward_fn backward,
     return result;
 }
 
-/* ── Topological sort (reverse DFS) ── */
+/* ── Topological sort (Kahn's algorithm) ── */
 
-static void topo_sort(AuroraTensor* t, AuroraTensor** order, int* count, int max_depth) {
-    if (!t || max_depth <= 0) return;
-    for (int i = 0; i < t->prev_count; i++) {
-        if (t->prev[i]) {
-            int found = 0;
-            for (int j = 0; j < *count; j++)
-                if (order[j] == t->prev[i]) { found = 1; break; }
-            if (!found)
-                topo_sort(t->prev[i], order, count, max_depth - 1);
+static void topo_sort_kahn(AuroraTensor* t, AuroraTensor** order, int* count) {
+    if (!t) return;
+    int in_deg[1024] = {0};
+    AuroraTensor* queue[1024];
+    int qh = 0, qt = 0;
+    int node_count = 0;
+    AuroraTensor* nodes[1024];
+    nodes[node_count++] = t;
+    for (int i = 0; i < node_count && i < 1024; i++) {
+        AuroraTensor* cur = nodes[i];
+        for (int j = 0; j < cur->prev_count; j++) {
+            if (cur->prev[j]) {
+                int found = 0;
+                for (int k = 0; k < node_count; k++)
+                    if (nodes[k] == cur->prev[j]) { found = 1; break; }
+                if (!found && node_count < 1024)
+                    nodes[node_count++] = cur->prev[j];
+            }
         }
     }
-    int found = 0;
-    for (int j = 0; j < *count; j++)
-        if (order[j] == t) { found = 1; break; }
-    if (!found && *count < 1024)
-        order[(*count)++] = t;
+    for (int i = 0; i < node_count; i++) {
+        for (int j = 0; j < nodes[i]->prev_count; j++) {
+            if (nodes[i]->prev[j]) {
+                for (int k = 0; k < node_count; k++) {
+                    if (nodes[k] == nodes[i]->prev[j]) {
+                        in_deg[i]++;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    for (int i = 0; i < node_count; i++)
+        if (in_deg[i] == 0) queue[qt++] = nodes[i];
+    while (qh < qt && *count < 1024) {
+        AuroraTensor* u = queue[qh++];
+        order[(*count)++] = u;
+        for (int j = 0; j < u->prev_count; j++) {
+            if (!u->prev[j]) continue;
+            int idx = -1;
+            for (int k = 0; k < node_count; k++)
+                if (nodes[k] == u->prev[j]) { idx = k; break; }
+            if (idx >= 0 && --in_deg[idx] == 0)
+                queue[qt++] = nodes[idx];
+        }
+    }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -237,10 +448,9 @@ void aurora_tensor_backward(AuroraTensor* t) {
     /* Topological sort from the output tensor backwards */
     AuroraTensor* order[1024];
     int count = 0;
-    topo_sort(t, order, &count, 256);
+    topo_sort_kahn(t, order, &count);
 
-    /* Traverse in reverse order (output first, then its parents) */
-    for (int i = count - 1; i >= 0; i--) {
+    for (int i = 0; i < count; i++) {
         if (order[i]->backward_fn)
             order[i]->backward_fn(order[i]);
     }
