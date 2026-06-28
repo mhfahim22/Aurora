@@ -838,6 +838,123 @@ static std::string find_lld_link() {
     /* 5) Bare name — let the OS resolve via PATH in CreateProcess */
     return "lld-link";
 }
+
+/* ── Find MSVC link.exe as fallback when lld-link is not available ── */
+static std::string find_msvc_link() {
+    /* 1) Try VSINSTALLDIR env var (set by vcvarsall.bat / VS dev prompt) */
+    const char* vs_dir = std::getenv("VSINSTALLDIR");
+    if (vs_dir) {
+        std::string base = std::string(vs_dir) + "\\VC\\Tools\\MSVC";
+        if (fs::exists(base)) {
+            for (auto& entry : fs::directory_iterator(base)) {
+                if (!entry.is_directory()) continue;
+                std::string ver = entry.path().filename().string();
+                std::vector<std::string> candidates = {
+                    base + "\\" + ver + "\\bin\\Hostx64\\x64\\link.exe",
+                    base + "\\" + ver + "\\bin\\Hostx86\\x64\\link.exe",
+                };
+                for (auto& c : candidates) {
+                    if (fs::exists(c)) return c;
+                }
+            }
+        }
+    }
+
+    /* 2) Search PATH via where.exe */
+    {
+        FILE* pipe = _popen("where link.exe 2>nul", "r");
+        if (pipe) {
+            char buf[512];
+            while (fgets(buf, sizeof(buf), pipe)) {
+                std::string path = buf;
+                while (!path.empty() && (path.back() == '\n' || path.back() == '\r'))
+                    path.pop_back();
+                if (path.size() >= 12 && path.rfind("link.exe") != std::string::npos) {
+                    /* Skip the VC/bin link.exe (that's a different tool).
+                       We want VC/Tools/MSVC/<ver>/bin/Hostx64/x64/link.exe */
+                    if (path.find("\\bin\\Hostx64\\x64\\link.exe") != std::string::npos ||
+                        path.find("\\bin\\Hostx86\\x64\\link.exe") != std::string::npos) {
+                        if (fs::exists(path)) { _pclose(pipe); return path; }
+                    }
+                }
+            }
+            _pclose(pipe);
+        }
+    }
+
+    /* 3) Detect VS installation (same logic as detect_msvc_lib_paths) */
+    char buf[512];
+    std::string vs_install;
+
+    /* Try vswhere via PATH */
+    {
+        FILE* pipe = _popen("vswhere -latest -property installationPath -format value 2>nul", "r");
+        if (!pipe) {
+            const char* pf_env[] = { std::getenv("ProgramFiles(x86)"), std::getenv("ProgramFiles"), std::getenv("ProgramW6432") };
+            for (auto p : pf_env) {
+                if (!p) continue;
+                std::string cmd = std::string("\"") + p + "\\Microsoft Visual Studio\\Installer\\vswhere.exe\" -latest -property installationPath -format value 2>nul";
+                pipe = _popen(cmd.c_str(), "r");
+                if (pipe) break;
+            }
+        }
+        if (pipe) {
+            if (fgets(buf, sizeof(buf), pipe)) {
+                vs_install = buf;
+                while (!vs_install.empty() && (vs_install.back() == '\n' || vs_install.back() == '\r'))
+                    vs_install.pop_back();
+            }
+            _pclose(pipe);
+        }
+    }
+
+    /* Fallback: enumerate VS editions directly */
+    if (vs_install.empty()) {
+        const char* pf_env[] = { std::getenv("ProgramFiles"), std::getenv("ProgramFiles(x86)"), std::getenv("ProgramW6432") };
+        for (auto p : pf_env) {
+            if (!p) continue;
+            std::string base = std::string(p) + "\\Microsoft Visual Studio";
+            const char* editions[] = { "2022\\Community", "2022\\BuildTools", "2022\\Professional", "2022\\Enterprise",
+                                       "2019\\Community", "2019\\BuildTools", "2019\\Professional", "2019\\Enterprise" };
+            for (auto e : editions) {
+                std::string candidate = base + "\\" + e;
+                if (fs::exists(candidate)) { vs_install = candidate; break; }
+            }
+            if (!vs_install.empty()) break;
+        }
+    }
+
+    if (!vs_install.empty()) {
+        std::string msvc_root = vs_install + "\\VC\\Tools\\MSVC";
+        if (fs::exists(msvc_root)) {
+            for (auto& entry : fs::directory_iterator(msvc_root)) {
+                if (!entry.is_directory()) continue;
+                std::string ver = entry.path().filename().string();
+                std::vector<std::string> candidates = {
+                    msvc_root + "\\" + ver + "\\bin\\Hostx64\\x64\\link.exe",
+                    msvc_root + "\\" + ver + "\\bin\\Hostx86\\x64\\link.exe",
+                };
+                for (auto& c : candidates) {
+                    if (fs::exists(c)) return c;
+                }
+            }
+        }
+    }
+
+    /* 4) Try common MSVC installation paths as last resort */
+    std::vector<std::string> fallback_paths = {
+        "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.4.0\\bin\\Hostx64\\x64\\link.exe",
+        "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.3.0\\bin\\Hostx64\\x64\\link.exe",
+        "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.4.0\\bin\\Hostx64\\x64\\link.exe",
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.0\\bin\\Hostx64\\x64\\link.exe",
+    };
+    for (auto& c : fallback_paths) {
+        if (fs::exists(c)) return c;
+    }
+
+    /* 5) Bare name — let the OS resolve via PATH */
+    return "link.exe";
+}
 #endif
 
 /* ── Link object file into executable (cross-platform) ── */
@@ -850,7 +967,7 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     std::vector<std::string> args;
 
 #ifdef _WIN32
-    /* ── Windows: lld-link (COFF) ── */
+    /* ── Windows: lld-link (COFF) with MSVC link.exe fallback ── */
     std::string rt_lib = exe_dir + "/aurora_runtime.lib";
     if (!fs::exists(rt_lib))
         rt_lib = exe_dir + "/lib/aurora_runtime.lib";
@@ -859,28 +976,69 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
     if (!fs::exists(rt_lib))
         rt_lib = "aurora_runtime.lib";
 
-    linker = find_lld_link();
-    args = { obj_path, rt_lib,
+    /* Build common args (compatible between lld-link and MSVC link.exe) */
+    auto build_link_args = [&]() -> std::vector<std::string> {
+        std::vector<std::string> a = { obj_path, rt_lib,
              "/OUT:" + exe_path, "/NOLOGO",
              "/ENTRY:mainCRTStartup", "/SUBSYSTEM:CONSOLE" };
-    if (use_lto) args.push_back("/LTCG");
+        if (use_lto) a.push_back("/LTCG");
+        for (auto& lp : lib_paths)
+            a.push_back("/LIBPATH:" + lp);
+        if (lib_paths.empty()) {
+            auto msvc_paths = detect_msvc_lib_paths();
+            for (auto& p : msvc_paths)
+                a.push_back("/LIBPATH:" + p);
+        }
+        a.push_back("msvcrt.lib");
+        for (auto& lib : link_libs) {
+            if (lib.size() > 4 && lib.substr(lib.size() - 4) == ".lib")
+                a.push_back(lib);
+            else
+                a.push_back(lib + ".lib");
+        }
+        return a;
+    };
 
-    for (auto& lp : lib_paths)
-        args.push_back("/LIBPATH:" + lp);
-
-    if (lib_paths.empty()) {
-        auto msvc_paths = detect_msvc_lib_paths();
-        for (auto& p : msvc_paths)
-            args.push_back("/LIBPATH:" + p);
+    /* Try lld-link first */
+    linker = find_lld_link();
+    bool is_lld_bare = (linker == "lld-link");
+    args = build_link_args();
+    if (!is_lld_bare) {
+        /* lld-link found at a specific path — try it */
+        std::cout << "aurora: linking " << exe_path << " (lld-link)\n";
+        int ret = run_process(linker, args);
+        if (ret == 0) return true;
+        std::cerr << "aurora: lld-link failed (exit " << ret << "), trying MSVC link.exe...\n";
     }
 
-    args.push_back("msvcrt.lib");
-    for (auto& lib : link_libs) {
-        if (lib.size() > 4 && lib.substr(lib.size() - 4) == ".lib")
-            args.push_back(lib);
-        else
-            args.push_back(lib + ".lib");
+    /* Fallback: try MSVC link.exe */
+    linker = find_msvc_link();
+    /* Check if we found a real link.exe (not just the bare name) */
+    {
+        bool found_real_link = false;
+        if (linker != "link.exe") {
+            found_real_link = true; /* specific path found */
+        } else {
+            /* Check if link.exe is on PATH */
+            FILE* pipe = _popen("where link.exe 2>nul", "r");
+            if (pipe) {
+                char buf[512];
+                found_real_link = (fgets(buf, sizeof(buf), pipe) != nullptr);
+                _pclose(pipe);
+            }
+        }
+        if (found_real_link) {
+            std::cout << "aurora: linking " << exe_path << " (MSVC link.exe)\n";
+            args = build_link_args();
+            int ret = run_process(linker, args);
+            if (ret == 0) return true;
+            std::cerr << "aurora: MSVC link.exe also failed (exit " << ret << ")\n";
+            return false;
+        }
     }
+
+    std::cerr << "aurora: no suitable linker found (tried lld-link, link.exe)\n";
+    return false;
 
 #elif defined(__APPLE__)
     /* ── macOS: ld64.lld ── */

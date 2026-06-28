@@ -156,10 +156,15 @@ PHASE 2: COMPILER MATURITY & ECOSYSTEM BRIDGES (PRIORITY 2)
       • Modified main.cpp: added --incremental flag; cache check after import resolution (skips codegen/emit/link if unchanged); cache update on successful compilation
       • Cache stored in .aurora_cache/cache.txt as key-value entries
 
-[ ] TASK 2.5: Fix Linker Search Paths (Windows)
+[x] TASK 2.5: Fix Linker Search Paths (Windows)
     - Description: Builds fail on Windows if LLVM is not present in the system PATH environment variable.
     - AI Prompt Target: Update Windows-specific build driver logic.
     - Requirements: Add a fallback routine to search for MSVC 'link.exe' if LLVM's 'lld-link' is missing.
+    - Status: Complete. Added MSVC link.exe fallback in link_exe().
+      • Added find_msvc_link(): searches via VSINSTALLDIR env var, PATH, vswhere, ProgramFiles enumeration, hardcoded paths
+      • Added find_lld_link(): existing function unchanged
+      • Modified link_exe(): tries lld-link first; on failure (or if lld-link not found), falls back to MSVC link.exe with same /LIBPATH flags
+      • Build verified: aurorac.exe compiles cleanly in Release
 
 
 ----------------------------------------------------------------------
