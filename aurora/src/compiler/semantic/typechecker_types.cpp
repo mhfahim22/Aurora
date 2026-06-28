@@ -68,6 +68,16 @@ void TypeChecker::register_struct(const ASTNode* node) {
     info.is_union = (node->type == NodeType::ExternUnion);
     info.is_opaque = (node->type == NodeType::ExternStruct && !node->args);
 
+    /* Detect generic structs */
+    if (node->template_params) {
+        info.is_generic = true;
+        const ASTNode* tp = node->template_params.get();
+        while (tp) {
+            info.generic_params.push_back(tp->value);
+            tp = tp->next.get();
+        }
+    }
+
     int pos = 0;
 
     if (node->type == NodeType::ExternStruct || node->type == NodeType::ExternUnion) {

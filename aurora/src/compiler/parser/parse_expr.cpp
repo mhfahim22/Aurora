@@ -336,6 +336,52 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             return parse_trailing_chains(std::move(call), toks, idx, cnt);
         }
 
+        /* generic call: name[Type1, Type2](args) */
+        if (idx < cnt && toks[idx].is_operator('[')) {
+            int saved_idx = idx;
+            idx++;
+            bool looks_like_type_args = true;
+            int check_idx = idx;
+            while (check_idx < cnt && !toks[check_idx].is_operator(']')) {
+                if (toks[check_idx].is_operator(',')) { check_idx++; continue; }
+                if (!(toks[check_idx].is_identifier() || toks[check_idx].is(TokenType::Keyword))) {
+                    looks_like_type_args = false; break;
+                }
+                check_idx++;
+            }
+            if (looks_like_type_args && check_idx < cnt && toks[check_idx].is_operator(']')) {
+                idx = saved_idx + 1;
+                auto call = make_node(NodeType::Call, name, src_ln);
+                ASTNode* ta_tail = nullptr;
+                while (idx < cnt && !toks[idx].is_operator(']')) {
+                    if (toks[idx].is_operator(',')) { idx++; continue; }
+                    if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                        auto ta = make_node(NodeType::TypeArg, toks[idx].value, src_ln);
+                        ASTNode* raw = ta.get();
+                        if (!call->template_args) { call->template_args = std::move(ta); ta_tail = raw; }
+                        else                       { ta_tail->next = std::move(ta); ta_tail = raw; }
+                    }
+                    idx++;
+                }
+                if (idx < cnt) idx++;
+                if (idx < cnt && toks[idx].is_operator('(')) {
+                    idx++;
+                    ASTNode* tail = nullptr;
+                    while (idx < cnt && !toks[idx].is_operator(')')) {
+                        if (toks[idx].is_operator(',')) { idx++; continue; }
+                        auto arg = parse_expr(toks, idx);
+                        ASTNode* raw = arg.get();
+                        if (!call->args) { call->args = std::move(arg); tail = raw; }
+                        else             { tail->next = std::move(arg); tail = raw; }
+                    }
+                    if (idx < cnt) idx++;
+                    else throw_missing_close(src_ln, 0, ')', "generic call");
+                }
+                return parse_trailing_chains(std::move(call), toks, idx, cnt);
+            }
+            idx = saved_idx;
+        }
+
         /* array index */
         if (idx < cnt && toks[idx].is_operator('[')) {
             idx++;

@@ -91,6 +91,18 @@ struct FunctionTypeInfo {
     AuroraType              result { AuroraType::Unknown };
     std::string             class_name;  /* if method, the owning class */
     bool                    is_vararg { false };
+
+    /* Generic/template support */
+    bool is_generic{ false };
+    std::vector<std::string> generic_params;  /* e.g. ["T", "U"] for function foo[T, U](...) */
+    const ASTNode* generic_ast_node{ nullptr };  /* original AST node for monomorphization */
+
+    /* Build a mangled name for a monomorphized instance */
+    std::string instantiated_name(const std::vector<std::string>& type_args) const {
+        std::string result = class_name.empty() ? "" : class_name + "__";
+        /* We'll append the original name during registration */
+        return result; /* caller should append */
+    }
 };
 
 class TypeChecker {

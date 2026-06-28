@@ -51,6 +51,23 @@ ASTNode::Ptr Parser::parse_class() {
 
     int idx = di + 2;
 
+    /* ── Generic type parameters: class Foo[T, U] ── */
+    if (idx < cnt && toks[idx].is_operator('[')) {
+        idx++;
+        ASTNode* tp_tail = nullptr;
+        while (idx < cnt && !toks[idx].is_operator(']')) {
+            if (toks[idx].is_operator(',')) { idx++; continue; }
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                auto tp = make_node(NodeType::TypeParam, toks[idx].value, ln);
+                ASTNode* raw = tp.get();
+                if (!stmt->template_params) { stmt->template_params = std::move(tp); tp_tail = raw; }
+                else                         { tp_tail->next = std::move(tp); tp_tail = raw; }
+            }
+            idx++;
+        }
+        if (idx < cnt && toks[idx].is_operator(']')) idx++;
+    }
+
     /* extends ParentClass */
     if (idx < cnt && toks[idx].is_keyword("extends")) {
         idx++;

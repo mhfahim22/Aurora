@@ -152,6 +152,10 @@ enum class NodeType {
     ARCAlloc,     /* @arc    — force ARC allocation */
     GCAlloc,      /* @gc     — force GC allocation */
 
+    /* ── Phase 2: Generics / Templates ── */
+    TypeParam,    /* T in function foo[T](x: T): T */
+    TypeArg,      /* Int in foo[Int](x) call or Point[Int] type */
+
     /* ── Phase 10: Misc new keywords ── */
     Panic,        /* panic — halt execution */
     Debug,        /* debug — debug output */
@@ -174,6 +178,10 @@ struct ASTNode {
     Ptr orelse {};
     Ptr next   {};
     Ptr args   {};
+
+    /* Generic / template type parameters (function foo[T, U](...)) and type args (foo[Int, Float](...)) */
+    Ptr template_params {};
+    Ptr template_args   {};
 
     int src_line { 0 };
 

@@ -17,6 +17,24 @@ ASTNode::Ptr Parser::parse_struct() {
     auto stmt = make_node(NodeType::StructDecl, sname, ln);
 
     int idx = 2;
+
+    /* ── Generic type parameters: struct Foo[T, U] ── */
+    if (idx < cnt && toks[idx].is_operator('[')) {
+        idx++;
+        ASTNode* tp_tail = nullptr;
+        while (idx < cnt && !toks[idx].is_operator(']')) {
+            if (toks[idx].is_operator(',')) { idx++; continue; }
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                auto tp = make_node(NodeType::TypeParam, toks[idx].value, ln);
+                ASTNode* raw = tp.get();
+                if (!stmt->template_params) { stmt->template_params = std::move(tp); tp_tail = raw; }
+                else                         { tp_tail->next = std::move(tp); tp_tail = raw; }
+            }
+            idx++;
+        }
+        if (idx < cnt && toks[idx].is_operator(']')) idx++;
+    }
+
     if (idx < cnt && toks[idx].is_operator(':')) idx++;
     require_token_end(toks, idx, "struct definition");
     advance();

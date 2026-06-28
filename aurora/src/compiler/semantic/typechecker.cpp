@@ -722,6 +722,16 @@ void TypeChecker::register_functions(const ASTNode* node) {
                 info.params.push_back(AuroraType::Unknown);
                 param = param->next.get();
             }
+            /* Detect generic functions (those with type parameters) */
+            if (node->template_params) {
+                info.is_generic = true;
+                const ASTNode* tp = node->template_params.get();
+                while (tp) {
+                    info.generic_params.push_back(tp->value);
+                    tp = tp->next.get();
+                }
+                info.generic_ast_node = node;
+            }
             functions_[node->value] = info;
         }
         if (node->type == NodeType::ExternFn) {
@@ -1206,6 +1216,10 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             }
 
             auto& fn = functions_[node->value];
+            /* Preserve generic info if set during registration */
+            bool saved_is_generic = fn.is_generic;
+            auto saved_generic_params = fn.generic_params;
+            const ASTNode* saved_generic_ast = fn.generic_ast_node;
             fn.params.clear();
             {
                 const ASTNode* pp = node->args.get();
@@ -1217,6 +1231,9 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             fn.result = current_return_type_ == AuroraType::Unknown
                 ? AuroraType::Int
                 : current_return_type_;
+            fn.is_generic = saved_is_generic;
+            fn.generic_params = std::move(saved_generic_params);
+            fn.generic_ast_node = saved_generic_ast;
             annotate_node(node, fn.result);  /* H2 Phase D */
 
             pop_scope();
@@ -1242,9 +1259,16 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
 
             walk_block(node->body.get());
             auto& fn = functions_[node->value];
+            /* Preserve generic info if set during registration */
+            bool saved_is_generic = fn.is_generic;
+            auto saved_generic_params = fn.generic_params;
+            const ASTNode* saved_generic_ast = fn.generic_ast_node;
             fn.result = current_return_type_ == AuroraType::Unknown
                 ? AuroraType::Int
                 : current_return_type_;
+            fn.is_generic = saved_is_generic;
+            fn.generic_params = std::move(saved_generic_params);
+            fn.generic_ast_node = saved_generic_ast;
             annotate_node(node, fn.result);  /* H2 Phase D */
 
             pop_scope();
@@ -1548,6 +1572,45 @@ AuroraType TypeChecker::infer_unary(const ASTNode* node) {
 }
 
 AuroraType TypeChecker::infer_call(const ASTNode* node) {
+    /* ── Generic function call: foo[Int, Float](x, y) ── */
+    if (node->template_args) {
+        auto it = functions_.find(node->value);
+        if (it == functions_.end()) {
+            std::ostringstream msg;
+            msg << "unknown generic function '" << node->value << "'";
+            throw TypeError(msg.str(), node->src_line);
+        }
+        if (!it->second.is_generic) {
+            std::ostringstream msg;
+            msg << "function '" << node->value << "' is not generic";
+            throw TypeError(msg.str(), node->src_line);
+        }
+        /* Build mangled name: foo__Int__Float for foo[Int, Float] */
+        std::string mangled = node->value;
+        const ASTNode* ta = node->template_args.get();
+        while (ta) {
+            mangled += "__" + ta->value;
+            ta = ta->next.get();
+        }
+        /* Instantiate concrete version if not already */
+        if (functions_.count(mangled) == 0) {
+            FunctionTypeInfo concrete = it->second;
+            concrete.is_generic = false;
+            concrete.generic_params.clear();
+            concrete.generic_ast_node = nullptr;
+            functions_[mangled] = concrete;
+        }
+        /* Type-check args */
+        size_t count = 0;
+        const ASTNode* arg = node->args.get();
+        while (arg) {
+            infer_expr(arg);
+            count++;
+            arg = arg->next.get();
+        }
+        return annotate_ret(node, functions_[mangled].result);
+    }
+
     if (node->value == "output") {
         const ASTNode* arg = node->args.get();
         while (arg) {

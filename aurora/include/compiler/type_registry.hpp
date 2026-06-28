@@ -21,6 +21,8 @@ struct StructInfo {
     std::string name;
     bool        is_union{ false };   /* true for extern union declarations */
     bool        is_opaque{ false };  /* true for opaque (forward-declared) extern structs */
+    bool        is_generic{ false }; /* true if this struct has generic type params */
+    std::vector<std::string> generic_params; /* e.g. ["T", "U"] for struct Foo[T, U] */
     std::vector<StructFieldInfo> fields;
 
     int field_index(const std::string& fname) const {
