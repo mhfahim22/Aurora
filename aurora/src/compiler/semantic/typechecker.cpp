@@ -3,6 +3,7 @@
 #include "compiler/type_registry.hpp"
 
 #include <sstream>
+#include <iostream>
 
 /* ── FFI helper: parse type name string → AuroraType ── */
 static AuroraType parse_extern_type(const std::string& name) {
@@ -16,6 +17,34 @@ static AuroraType parse_extern_type(const std::string& name) {
     if (name == "void" || name == "Void")    return AuroraType::Void;
     if (name == "bool" || name == "Bool")    return AuroraType::Bool;
     if (name == "pointer" || name == "Pointer" || name == "ptr" || name == "void*") return AuroraType::Pointer;
+    return AuroraType::Unknown;
+}
+
+/* ── AstTypeKind → AuroraType conversion (reverse) ── */
+static AuroraType ast_kind_to_type(AstTypeKind k) {
+    switch (k) {
+        case AstTypeKind::Unknown:   return AuroraType::Unknown;
+        case AstTypeKind::Int:       return AuroraType::Int;
+        case AstTypeKind::Float:     return AuroraType::Float;
+        case AstTypeKind::String:    return AuroraType::String;
+        case AstTypeKind::Bool:      return AuroraType::Bool;
+        case AstTypeKind::Array:     return AuroraType::Array;
+        case AstTypeKind::Struct:    return AuroraType::Struct;
+        case AstTypeKind::Function:  return AuroraType::Function;
+        case AstTypeKind::Class:     return AuroraType::Class;
+        case AstTypeKind::Void:      return AuroraType::Void;
+        case AstTypeKind::Enum:      return AuroraType::Enum;
+        case AstTypeKind::Interface: return AuroraType::Interface;
+        case AstTypeKind::Tuple:     return AuroraType::Tuple;
+        case AstTypeKind::Pointer:   return AuroraType::Pointer;
+        case AstTypeKind::List:      return AuroraType::List;
+        case AstTypeKind::Map:       return AuroraType::Map;
+        case AstTypeKind::Set:       return AuroraType::Set;
+        case AstTypeKind::Vector:    return AuroraType::Vector;
+        case AstTypeKind::Stack:     return AuroraType::Stack;
+        case AstTypeKind::Queue:     return AuroraType::Queue;
+        case AstTypeKind::Json:      return AuroraType::Json;
+    }
     return AuroraType::Unknown;
 }
 
@@ -1348,6 +1377,10 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
                 msg << "array index must be int";
                 throw TypeError(msg.str(), node->src_line);
             }
+            /* Use element type from array variable annotation */
+            AstTypeKind elem_kind = lookup_var_elem(node->value);
+            if (elem_kind != AstTypeKind::Unknown)
+                return annotate_ret(node, ast_kind_to_type(elem_kind), "", elem_kind);
             return annotate_ret(node, AuroraType::Unknown);
         }
         case NodeType::BinOp:
@@ -1360,6 +1393,16 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
             const std::string& obj_name   = node->left ? node->left->value : "";
             const std::string& field_name = node->value;
             oop_check_field_access(obj_name, field_name, node->src_line);
+            /* Look up field type from class registry */
+            if (!obj_name.empty()) {
+                std::string class_name = oop_class_of_var(obj_name);
+                if (!class_name.empty()) {
+                    const ClassFieldInfo* field = global_class_registry().find_field(class_name, field_name);
+                    if (field && field->type_kind != AstTypeKind::Unknown)
+                        return annotate_ret(node, ast_kind_to_type(field->type_kind), "",
+                            field->element_kind);
+                }
+            }
             return annotate_ret(node, AuroraType::Unknown);
         }
         case NodeType::New: {
@@ -1499,7 +1542,9 @@ AuroraType TypeChecker::infer_unary(const ASTNode* node) {
         msg << "'not' needs numeric or bool value";
         throw TypeError(msg.str(), node->src_line);
     }
-    return annotate_ret(node, AuroraType::Unknown);
+    std::ostringstream msg;
+    msg << "unsupported unary operator '" << node->value << "'";
+    throw TypeError(msg.str(), node->src_line);
 }
 
 AuroraType TypeChecker::infer_call(const ASTNode* node) {
@@ -1587,6 +1632,13 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
             oop_check_method_call(obj_name, method_name, node->src_line);
             const ASTNode* arg = node->args.get();
             while (arg) { infer_expr(arg); arg = arg->next.get(); }
+            /* Look up method return type from class registry */
+            std::string class_name = oop_class_of_var(obj_name);
+            if (!class_name.empty()) {
+                const ClassMethodInfo* method = global_class_registry().find_method(class_name, method_name);
+                if (method && method->return_kind != AstTypeKind::Unknown)
+                    return annotate_ret(node, ast_kind_to_type(method->return_kind));
+            }
             return annotate_ret(node, AuroraType::Unknown);
         }
     }
@@ -1703,7 +1755,15 @@ AuroraType TypeChecker::common_numeric(AuroraType left, AuroraType right, int li
 }
 
 void TypeChecker::expect_assignable(AuroraType target, AuroraType value, int line) const {
-    if (target == AuroraType::Unknown || value == AuroraType::Unknown) return;
+    if (target == AuroraType::Unknown || value == AuroraType::Unknown) {
+        /* Log diagnostic when Unknown propagates through a type check */
+        if (target != AuroraType::Unknown && value == AuroraType::Unknown) {
+            std::cerr << "[typecheck] warning at line " << line
+                      << ": expected '" << aurora_type_name(target)
+                      << "' but value type is unknown\n";
+        }
+        return;
+    }
     if (target == value) return;
     if (target == AuroraType::Float && value == AuroraType::Int) return;
 

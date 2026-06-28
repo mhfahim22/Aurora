@@ -392,3 +392,10 @@ void oop_register_object(const std::string& var_name,
 void oop_clear_object_types() {
     tc_object_types_.clear();
 }
+
+/* ── Getter: class name for a registered object variable ── */
+std::string oop_class_of_var(const std::string& var_name) {
+    auto it = tc_object_types_.find(var_name);
+    if (it != tc_object_types_.end()) return it->second;
+    return "";
+}

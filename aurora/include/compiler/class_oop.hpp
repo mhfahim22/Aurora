@@ -316,6 +316,7 @@ void oop_check_field_access (const std::string& obj_name,
 void oop_register_object    (const std::string& var_name,
                               const std::string& class_name);
 void oop_clear_object_types ();
+std::string oop_class_of_var(const std::string& var_name);  /* getter for object type map */
 
 /* ── Visibility helpers ── */
 bool oop_is_accessible(Visibility member_vis, Visibility context_vis,
