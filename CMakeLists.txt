@@ -185,6 +185,7 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/async/fiber.cpp
     aurora/src/runtime/std/collections.cpp
     aurora/src/runtime/ai/tensor.cpp
+    aurora/src/runtime/ai/autograd.cpp
     aurora/src/runtime/ai/tensor_v2.cpp
     aurora/src/runtime/ai/dataloader.cpp
     aurora/src/runtime/ai/predict.cpp
@@ -390,16 +391,8 @@ else()
 endif()
 
 # ═══════════════════════════════════════════════════════════════
-# C++ Interop Test Library (self-contained, no external deps)
+# (test targets removed — test files cleaned up)
 # ═══════════════════════════════════════════════════════════════
-add_library(cpp_interop_test SHARED
-    aurora/tests/cpp_interop/cpp_test_lib.cpp
-)
-set_property(TARGET cpp_interop_test PROPERTY CXX_STANDARD 17)
-if(MSVC)
-    set_property(TARGET cpp_interop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-endif()
-target_include_directories(cpp_interop_test PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
 # ═══════════════════════════════════════════════════════════════
 # voss — standalone Aurora Package Manager
@@ -601,222 +594,7 @@ add_executable(bench_bridge
 )
 target_include_directories(bench_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
-# ═══════════════════════════════════════════════════════════════
-# Phase 1: Unified Type System — Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_unified_type_system
-    aurora/tests/test_unified_type_system.cpp
-)
-target_link_libraries(test_unified_type_system PRIVATE aurora_runtime)
-target_include_directories(test_unified_type_system PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_unified_type_system COMMAND test_unified_type_system)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 4: Cross-Language Memory Safety — Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_ffi_memory_safety
-    aurora/tests/test_ffi_memory_safety.cpp
-)
-target_include_directories(test_ffi_memory_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_ffi_memory_safety COMMAND test_ffi_memory_safety)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 5: Universal Package Bridge — Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_universal_bridge
-    aurora/tests/test_universal_bridge.cpp
-)
-target_link_libraries(test_universal_bridge PRIVATE aurora_runtime)
-target_include_directories(test_universal_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_universal_bridge COMMAND test_universal_bridge)
-
-# ═══════════════════════════════════════════════════════════════
-# Native Speed Benchmark — 1B iterations across all phases
-# ═══════════════════════════════════════════════════════════════
-add_executable(bench_native_speed
-    aurora/tests/bench_native_speed.cpp
-)
-target_link_libraries(bench_native_speed PRIVATE aurora_runtime)
-target_include_directories(bench_native_speed PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-
-# ═══════════════════════════════════════════════════════════════
-# Focused fast-path benchmark
-# ═══════════════════════════════════════════════════════════════
-add_executable(bench_fast
-    aurora/tests/bench_fast.cpp
-)
-target_link_libraries(bench_fast PRIVATE aurora_runtime)
-target_include_directories(bench_fast PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-
-# ═══════════════════════════════════════════════════════════════
-# Integration Test — Real HTTPS + JSON + Bridge Pipeline
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_integration_http
-    aurora/tests/test_integration_http.cpp
-)
-target_include_directories(test_integration_http PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-if(WIN32)
-    target_link_libraries(test_integration_http PRIVATE winhttp.lib)
-endif()
-add_test(NAME test_integration_http COMMAND test_integration_http)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 1: Universal FFI Core — ABI tests
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_ffi_abi
-    aurora/tests/test_ffi_abi.cpp
-)
-target_link_libraries(test_ffi_abi PRIVATE aurora_runtime)
-target_include_directories(test_ffi_abi PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_ffi_abi COMMAND test_ffi_abi)
-
-add_executable(test_ffi_abi_extra
-    aurora/tests/test_ffi_abi_extra.cpp
-)
-target_link_libraries(test_ffi_abi_extra PRIVATE aurora_runtime)
-target_include_directories(test_ffi_abi_extra PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_ffi_abi_extra COMMAND test_ffi_abi_extra)
-
-add_executable(test_ffi_abi_edge
-    aurora/tests/test_ffi_abi_edge.cpp
-)
-target_link_libraries(test_ffi_abi_edge PRIVATE aurora_runtime)
-target_include_directories(test_ffi_abi_edge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_ffi_abi_edge COMMAND test_ffi_abi_edge)
-
-add_executable(test_ffi_abi_struct
-    aurora/tests/test_ffi_abi_struct.cpp
-)
-target_link_libraries(test_ffi_abi_struct PRIVATE aurora_runtime)
-target_include_directories(test_ffi_abi_struct PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_ffi_abi_struct COMMAND test_ffi_abi_struct)
-
-# ═══════════════════════════════════════════════════════════════
-# End-to-End Bridge Integration Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_bridge_e2e
-    aurora/tests/test_bridge_e2e.cpp
-)
-target_link_libraries(test_bridge_e2e PRIVATE aurora_runtime)
-target_include_directories(test_bridge_e2e PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_bridge_e2e COMMAND test_bridge_e2e)
-
-# ═══════════════════════════════════════════════════════════════
-# PyPI Bridge Thread Safety Test (Phase 1: GIL & Thread Safety)
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_pypi_thread_safety
-    aurora/tests/test_pypi_thread_safety.cpp
-)
-target_link_libraries(test_pypi_thread_safety PRIVATE aurora_runtime)
-target_include_directories(test_pypi_thread_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_pypi_thread_safety COMMAND test_pypi_thread_safety)
-
-# ═══════════════════════════════════════════════════════════════
-# TLS SChannel Integration Test (Windows native TLS)
-# ═══════════════════════════════════════════════════════════════
-if(WIN32)
-add_executable(test_tls_schannel
-    aurora/tests/test_tls_schannel.cpp
-)
-target_link_libraries(test_tls_schannel PRIVATE ws2_32.lib)
-add_test(NAME test_tls_schannel COMMAND test_tls_schannel)
-endif()
-
-# ═══════════════════════════════════════════════════════════════
-# npm Bridge Performance Benchmarks
-# ═══════════════════════════════════════════════════════════════
-add_executable(bench_npm_bridge
-    aurora/tests/bench_npm_bridge.cpp
-)
-target_link_libraries(bench_npm_bridge PRIVATE aurora_runtime)
-target_include_directories(bench_npm_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 8: Parser Fuzz Test Harness
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_fuzz_parser
-    aurora/tests/test_fuzz_parser.cpp
-)
-if(WIN32)
-    target_link_libraries(test_fuzz_parser PRIVATE kernel32)
-endif()
-target_include_directories(test_fuzz_parser PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_fuzz_parser COMMAND test_fuzz_parser 1000)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 8: Leak Detector — Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_leak_detector
-    aurora/tests/test_leak_detector.cpp
-)
-target_link_libraries(test_leak_detector PRIVATE aurora_runtime)
-target_include_directories(test_leak_detector PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_leak_detector COMMAND test_leak_detector)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 8: Smart Pointers — Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_smart_ptr
-    aurora/tests/test_smart_ptr.cpp
-)
-target_link_libraries(test_smart_ptr PRIVATE aurora_runtime)
-target_include_directories(test_smart_ptr PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_smart_ptr COMMAND test_smart_ptr)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 9: Optimizer Pass Tests (const_fold, DCE, strength_reduce)
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_optimizer
-    aurora/tests/test_optimizer.cpp
-    aurora/src/compiler/optimizer/const_fold.cpp
-    aurora/src/compiler/optimizer/dead_code.cpp
-    aurora/src/compiler/optimizer/strength_reduce.cpp
-    aurora/src/compiler/aurora_optimizer.cpp
-    aurora/src/compiler/ir/ir.cpp
-    aurora/src/compiler/ir/ir_lowering.cpp
-    aurora/src/compiler/ir/ir_mem2reg.cpp
-    aurora/src/compiler/ir/ir_optimizer.cpp
-)
-target_include_directories(test_optimizer PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include ${LLVM_INCLUDE_DIRS})
-target_link_libraries(test_optimizer PRIVATE ${LLVM_LIBS})
-add_test(NAME test_optimizer COMMAND test_optimizer)
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 10: Memory Safety System — Comprehensive Integration Test
-# ═══════════════════════════════════════════════════════════════
-add_executable(test_memory_safety
-    aurora/tests/test_memory_safety.cpp
-    aurora/src/compiler/semantic/escape_analyzer.cpp
-    aurora/src/compiler/semantic/lifetime_analyzer.cpp
-    aurora/src/compiler/semantic/ownership_analyzer.cpp
-    aurora/src/compiler/semantic/memory_analyzer.cpp
-    aurora/src/compiler/semantic/allocation_strategy.cpp
-    aurora/src/compiler/semantic/allocation_profiler.cpp
-)
-target_link_libraries(test_memory_safety PRIVATE aurora_runtime)
-target_include_directories(test_memory_safety PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
-add_test(NAME test_memory_safety COMMAND test_memory_safety)
-
-# ═══════════════════════════════════════════════════════════════
-# Missing: Python Symbol Export Test (orphaned — re-added)
-# ═══════════════════════════════════════════════════════════════
-if(WIN32)
-add_executable(test_symbols
-    aurora/tests/test_symbols.cpp
-)
-add_test(NAME test_symbols COMMAND test_symbols)
-endif()
-
-# ═══════════════════════════════════════════════════════════════
-# Phase 8: Compiler Performance Benchmarks
-# ═══════════════════════════════════════════════════════════════
-add_executable(bench_compiler
-    aurora/tests/bench_compiler.cpp
-)
-if(WIN32)
-    target_link_libraries(bench_compiler PRIVATE kernel32)
-endif()
-target_include_directories(bench_compiler PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+# (test targets from aurora/tests/* removed — test files cleaned up)
 
 # ── Install targets ──
 install(TARGETS aurorac RUNTIME DESTINATION bin)

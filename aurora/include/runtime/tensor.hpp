@@ -120,6 +120,39 @@ void aurora_tensor_relu(AuroraTensor* t);
 void aurora_tensor_sigmoid(AuroraTensor* t);
 void aurora_tensor_tanh(AuroraTensor* t);
 
+/* ── Autograd (computation graph & gradient-based optimisation) ── */
+
+/* Enable / disable gradient tracking on a tensor */
+void aurora_tensor_set_requires_grad(AuroraTensor* t, int flag);
+
+/* Reset gradients of a tensor to zero (call between training steps) */
+void aurora_tensor_zero_grad(AuroraTensor* t);
+
+/* Run the backward pass — computes gradients for all ancestors via chain rule */
+void aurora_tensor_backward(AuroraTensor* t);
+
+/* Apply one step of SGD: param = param - lr * param->grad */
+void aurora_tensor_sgd_step(AuroraTensor* param, double lr);
+
+/* Backward function type — stored in AuroraTensor::backward_fn */
+typedef void (*autograd_backward_fn)(AuroraTensor*);
+
+/* Per-operation backward implementations (used by tensor.cpp link_grad calls) */
+void backward_add(AuroraTensor* self);
+void backward_sub(AuroraTensor* self);
+void backward_mul(AuroraTensor* self);
+void backward_div(AuroraTensor* self);
+void backward_pow(AuroraTensor* self);
+void backward_matmul(AuroraTensor* self);
+void backward_relu(AuroraTensor* self);
+void backward_sigmoid(AuroraTensor* self);
+void backward_tanh(AuroraTensor* self);
+
+/* Graph construction helper — wires result into the autograd graph */
+AuroraTensor* link_grad(AuroraTensor* result, autograd_backward_fn backward,
+                         AuroraTensor* input1, AuroraTensor* input2,
+                         AuroraTensor* input3, AuroraTensor* input4);
+
 #ifdef __cplusplus
 }
 #endif
