@@ -1,0 +1,53 @@
+## Aurora Standard Library — Regular Expressions
+## Usage:  import "regex"
+##
+## Pattern matching, search, replace, and count.
+## Uses std::regex (ECMAScript grammar).
+##
+## Example:
+##   import "regex"
+##   if regex_match("hello", "hello world")
+##     output("matches!")
+##   end
+##   replaced = regex_replace("world", "hello world", "there")
+##   output(replaced)  # "hello there"
+## ════════════════════════════════════════════════════════════
+
+## ── Core regex functions ──
+extern function aurora_regex_match(pattern: cstring, text: cstring) -> i32
+extern function aurora_regex_replace(pattern: cstring, text: cstring, replacement: cstring) -> cstring
+extern function aurora_regex_search(pattern: cstring, text: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_regex_count(pattern: cstring, text: cstring) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Check if pattern matches entire text ──
+function regex_match(pattern, text):
+    return aurora_regex_match(pattern, text) == 1
+end
+
+## ── Replace first occurrence ──
+function regex_replace(pattern, text, replacement):
+    result = aurora_regex_replace(pattern, text, replacement)
+    if result == nil
+        return ""
+    end
+    return result
+end
+
+## ── Search for pattern, return first match ──
+function regex_search(pattern, text):
+    buf = cstring_repeat(1024)
+    n = aurora_regex_search(pattern, text, buf, 1024)
+    if n <= 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+## ── Count non-overlapping matches ──
+function regex_count(pattern, text):
+    return aurora_regex_count(pattern, text)
+end

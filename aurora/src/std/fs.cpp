@@ -144,4 +144,63 @@ char* aurora_fs_basename(const char* path) {
     return result;
 }
 
+char* aurora_fs_listdir(const char* path) {
+    if (!path) return nullptr;
+#if defined(_WIN32)
+    char search[MAX_PATH];
+    snprintf(search, sizeof(search), "%s\\*", path);
+    WIN32_FIND_DATAA ffd;
+    HANDLE hFind = FindFirstFileA(search, &ffd);
+    if (hFind == INVALID_HANDLE_VALUE) return nullptr;
+    size_t cap = 512, len = 0;
+    char* buf = (char*)aurora_alloc(cap);
+    if (!buf) { FindClose(hFind); return nullptr; }
+    buf[0] = '\0';
+    do {
+        const char* name = ffd.cFileName;
+        size_t nlen = strlen(name);
+        if (len + nlen + 2 > cap) {
+            cap *= 2;
+            char* nb = (char*)aurora_alloc(cap);
+            if (!nb) { aurora_free(buf); FindClose(hFind); return nullptr; }
+            memcpy(nb, buf, len);
+            aurora_free(buf);
+            buf = nb;
+        }
+        memcpy(buf + len, name, nlen);
+        len += nlen;
+        buf[len++] = '\n';
+    } while (FindNextFileA(hFind, &ffd) != 0);
+    FindClose(hFind);
+    buf[len] = '\0';
+    return buf;
+#else
+    DIR* d = opendir(path);
+    if (!d) return nullptr;
+    size_t cap = 512, len = 0;
+    char* buf = (char*)aurora_alloc(cap);
+    if (!buf) { closedir(d); return nullptr; }
+    buf[0] = '\0';
+    struct dirent* ent;
+    while ((ent = readdir(d)) != nullptr) {
+        const char* name = ent->d_name;
+        size_t nlen = strlen(name);
+        if (len + nlen + 2 > cap) {
+            cap *= 2;
+            char* nb = (char*)aurora_alloc(cap);
+            if (!nb) { aurora_free(buf); closedir(d); return nullptr; }
+            memcpy(nb, buf, len);
+            aurora_free(buf);
+            buf = nb;
+        }
+        memcpy(buf + len, name, nlen);
+        len += nlen;
+        buf[len++] = '\n';
+    }
+    closedir(d);
+    buf[len] = '\0';
+    return buf;
+#endif
+}
+
 }

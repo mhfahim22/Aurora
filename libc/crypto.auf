@@ -1,0 +1,156 @@
+## Aurora Standard Library — Cryptography
+## Usage:  import "crypto"
+##
+## SHA-256 hashing, HMAC-SHA256, AES encryption, and Base64 encoding.
+##
+## Example:
+##   import "crypto"
+##   hash = sha256("hello")
+##   mac  = hmac_sha256("key", "message")
+##   enc  = aes128_ecb_encrypt(key, plaintext)
+##   b64  = base64_encode(data)
+## ════════════════════════════════════════════════════════════
+
+## ── SHA-256 ──
+extern function aurora_sha256(data: cstring, len: i64, out: cstring) -> void
+
+## ── HMAC-SHA256 ──
+extern function aurora_hmac_sha256(key: cstring, key_len: i64,
+                                   data: cstring, data_len: i64,
+                                   out: cstring) -> void
+
+## ── AES-128 ECB ──
+extern function aurora_aes128_ecb_encrypt(key: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+extern function aurora_aes128_ecb_decrypt(key: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+## ── AES-256 ECB ──
+extern function aurora_aes256_ecb_encrypt(key: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+extern function aurora_aes256_ecb_decrypt(key: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+## ── AES-128 CBC ──
+extern function aurora_aes128_cbc_encrypt(key: cstring, iv: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+extern function aurora_aes128_cbc_decrypt(key: cstring, iv: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+## ── AES-256 CBC ──
+extern function aurora_aes256_cbc_encrypt(key: cstring, iv: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+extern function aurora_aes256_cbc_decrypt(key: cstring, iv: cstring, input: cstring,
+                                          len: i64, output: cstring) -> i32
+
+## ── Base64 ──
+extern function aurora_base64_encode(data: cstring, len: i64,
+                                     out: cstring, out_size: i64) -> i32
+extern function aurora_base64_decode(in: cstring, out: cstring, out_size: i64) -> i32
+
+## ── Hex encoding ──
+extern function aurora_hex_encode(data: cstring, len: i64) -> cstring
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── SHA-256 hash (returns hex string) ──
+function sha256(data):
+    buf = allocate(32)
+    aurora_sha256(data, len(data), buf)
+    result = aurora_hex_encode(buf, 32)
+    free(buf)
+    if result == nil
+        return ""
+    end
+    return result
+end
+
+## ── HMAC-SHA256 (returns hex string) ──
+function hmac_sha256(key, data):
+    buf = allocate(32)
+    aurora_hmac_sha256(key, len(key), data, len(data), buf)
+    result = aurora_hex_encode(buf, 32)
+    free(buf)
+    if result == nil
+        return ""
+    end
+    return result
+end
+
+## ── AES-128 ECB encrypt ──
+function aes128_ecb_encrypt(key, data):
+    output = allocate(len(data))
+    written = aurora_aes128_ecb_encrypt(key, data, len(data), output)
+    if written < 0
+        free(output)
+        return ""
+    end
+    result = output
+    return result
+end
+
+## ── AES-128 ECB decrypt ──
+function aes128_ecb_decrypt(key, data):
+    output = allocate(len(data))
+    written = aurora_aes128_ecb_decrypt(key, data, len(data), output)
+    if written < 0
+        free(output)
+        return ""
+    end
+    return output
+end
+
+## ── AES-256 ECB encrypt ──
+function aes256_ecb_encrypt(key, data):
+    output = allocate(len(data))
+    written = aurora_aes256_ecb_encrypt(key, data, len(data), output)
+    if written < 0
+        free(output)
+        return ""
+    end
+    return output
+end
+
+## ── AES-256 ECB decrypt ──
+function aes256_ecb_decrypt(key, data):
+    output = allocate(len(data))
+    written = aurora_aes256_ecb_decrypt(key, data, len(data), output)
+    if written < 0
+        free(output)
+        return ""
+    end
+    return output
+end
+
+## ── Base64 encode ──
+function base64_encode(data):
+    needed = ((len(data) + 2) / 3) * 4 + 1
+    buf = allocate(needed)
+    written = aurora_base64_encode(data, len(data), buf, needed)
+    if written < 0
+        free(buf)
+        return ""
+    end
+    return buf
+end
+
+## ── Base64 decode ──
+function base64_decode(data):
+    bufsize = len(data) / 4 * 3
+    if bufsize < 1
+        return ""
+    end
+    buf = allocate(bufsize)
+    written = aurora_base64_decode(data, buf, bufsize)
+    if written < 0
+        free(buf)
+        return ""
+    end
+    return buf
+end

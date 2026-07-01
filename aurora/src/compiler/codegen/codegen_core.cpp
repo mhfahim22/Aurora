@@ -90,6 +90,24 @@ void Codegen::generate(const ASTNode* root) {
     TypeChecker type_checker;
     type_checker.analyse(root);
 
+    /* Step 1b — create forward declarations for concrete generic functions.
+       These must exist before the AST walk so gen_call can resolve them
+       by mangled name. Bodies are emitted in Step 9. */
+    {
+        auto& concrete_generics = type_checker.get_concrete_generics();
+        for (auto& [mangled, info] : concrete_generics) {
+            if (info.generic_node && !module_->getFunction(mangled)) {
+                std::vector<llvm::Type*> param_types;
+                for (auto k : info.param_kinds)
+                    param_types.push_back(ast_kind_to_abi_type(ctx_, k, i64_ty()));
+                auto* ret_ty = ast_kind_to_abi_type(ctx_, info.result_kind, i8ptr_ty());
+                auto* fn_type = llvm::FunctionType::get(ret_ty, param_types, false);
+                llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
+                                       mangled, module_.get());
+            }
+        }
+    }
+
     /* Step 2 — run ownership analysis (throws OwnershipError on violations) */
     ownership_.analyse(root);
 
@@ -235,7 +253,20 @@ void Codegen::generate(const ASTNode* root) {
         }
     }
 
-    /* Step 9 — finalize DWARF debug info (must be after all codegen) */
+    /* Step 9 — emit concrete generic function instantiations (monomorphization).
+       These use the original generic function body but with
+       resolved param/result types and mangled names. */
+    {
+        auto& concrete_generics = type_checker.get_concrete_generics();
+        for (auto& [mangled, info] : concrete_generics) {
+            if (info.generic_node && info.generic_node->body) {
+                gen_generic_instance(mangled, info.generic_node,
+                                     info.param_kinds, info.result_kind);
+            }
+        }
+    }
+
+    /* Step 10 — finalize DWARF debug info (must be after all codegen) */
     if (dibuilder_)
         dibuilder_->finalize();
 }
@@ -411,7 +442,7 @@ void Codegen::emit_scope_cleanup(CodegenScope& scope) {
 }
 
 void Codegen::emit_all_scope_cleanup() {
-    for (int i = (int)scopes_.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
         emit_scope_cleanup(scopes_[i]);
         if (current_block_terminated()) break;
     }
@@ -419,13 +450,33 @@ void Codegen::emit_all_scope_cleanup() {
 
 void Codegen::declare_var(const std::string& name,
                           llvm::Value*       alloca_ptr,
-                          OwnershipState     state) {
+                          OwnershipState     state,
+                          AstTypeKind        type_kind) {
     if (scopes_.empty()) push_scope();
     scopes_.back().vars[name] = VarRecord{ alloca_ptr, state };
+    scopes_.back().vars[name].type_kind = type_kind;
+
+    /* Emit llvm.dbg.declare for user-visible variables */
+    if (dibuilder_ && debug_cur_fn_ && !name.empty() && name[0] != '_' && type_kind != AstTypeKind::Unknown) {
+        if (auto* AI = llvm::dyn_cast<llvm::AllocaInst>(alloca_ptr)) {
+            auto* dbg_ty = get_debug_type(type_kind);
+            if (!dbg_ty) dbg_ty = get_debug_type(AstTypeKind::Int);
+            if (!dbg_ty) dbg_ty = dibuilder_->createBasicType("int", 64, llvm::dwarf::DW_ATE_signed);
+            llvm::DILocation* cur_loc = builder_->getCurrentDebugLocation();
+            unsigned line = cur_loc ? cur_loc->getLine() : 0;
+            unsigned col = cur_loc ? cur_loc->getColumn() : 0;
+            auto* var = dibuilder_->createAutoVariable(
+                debug_cur_fn_, name, debug_file_, line, dbg_ty, true);
+            dibuilder_->insertDeclare(
+                AI, var, dibuilder_->createExpression(),
+                llvm::DILocation::get(ctx_, line, col, debug_cur_fn_),
+                &*cur_fn_->getEntryBlock().begin());
+        }
+    }
 }
 
 VarRecord* Codegen::lookup_var(const std::string& name) {
-    for (int i = (int)scopes_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; i--) {
         auto* r = scopes_[i].find(name);
         if (r) return r;
     }
@@ -439,18 +490,6 @@ llvm::AllocaInst* Codegen::create_entry_alloca(const std::string& name,
         &cur_fn_->getEntryBlock(),
          cur_fn_->getEntryBlock().begin());
     auto* alloca = tmp_builder.CreateAlloca(ty, nullptr, name);
-
-    /* Emit llvm.dbg.declare for debug info */
-    if (dibuilder_ && debug_cur_fn_ && !name.empty() && name[0] != '_') {
-        auto* dbg_ty = get_debug_type(AstTypeKind::Int);
-        if (!dbg_ty) dbg_ty = dibuilder_->createBasicType("i64", 64, llvm::dwarf::DW_ATE_signed);
-        auto* var = dibuilder_->createAutoVariable(
-            debug_cur_fn_, name, debug_file_, 0, dbg_ty, true);
-        dibuilder_->insertDeclare(
-            alloca, var, dibuilder_->createExpression(),
-            llvm::DILocation::get(ctx_, 0, 0, debug_cur_fn_),
-            &*cur_fn_->getEntryBlock().begin());
-    }
 
     return alloca;
 }
@@ -522,7 +561,7 @@ void Codegen::gen_block(const ASTNode* node) {
     while (node) {
         if (dibuilder_ && node->src_line > 0 && debug_cur_fn_)
             builder_->SetCurrentDebugLocation(
-                llvm::DILocation::get(ctx_, node->src_line, 0, debug_cur_fn_));
+                llvm::DILocation::get(ctx_, node->src_line, node->src_col, debug_cur_fn_));
         gen_stmt(node);
         if (current_block_terminated()) break;
         node = node->next.get();

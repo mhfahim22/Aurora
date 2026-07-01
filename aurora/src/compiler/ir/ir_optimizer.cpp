@@ -76,7 +76,7 @@ static std::unordered_set<std::string> defs_in_block(const IrBasicBlock& bb) {
    ════════════════════════════════════════════════════════════ */
 
 bool ir_fold_constants(IrFunction& fn, std::vector<IrType>& pool) {
-    (void)pool;
+    static_cast<void>(pool);
     bool changed = false;
 
     for (auto& bb : fn.blocks) {
@@ -86,26 +86,26 @@ bool ir_fold_constants(IrFunction& fn, std::vector<IrType>& pool) {
             /* Fold binary ops with both constants */
             if (auto* binop = std::get_if<IrBinOpInst>(&inst)) {
                 if (binop->lhs.is_const && binop->rhs.is_const) {
-                    uint64_t l = (uint64_t)binop->lhs.i64(), r = (uint64_t)binop->rhs.i64(), v = 0;
+                    uint64_t l = static_cast<uint64_t>(binop->lhs.i64()), r = static_cast<uint64_t>(binop->rhs.i64()), v = 0;
                     bool ok = true;
                     switch (binop->op) {
                         case IrBinOp::Add: v = l + r; break;
                         case IrBinOp::Sub: v = l - r; break;
                         case IrBinOp::Mul: v = l * r; break;
-                        case IrBinOp::SDiv: if (r == 0) { ok = false; break; } v = (uint64_t)((int64_t)l / (int64_t)r); break;
+                        case IrBinOp::SDiv: if (r == 0) { ok = false; break; } v = static_cast<uint64_t>(static_cast<int64_t>(l) / static_cast<int64_t>(r)); break;
                         case IrBinOp::UDiv: if (r == 0) { ok = false; break; } v = l / r; break;
-                        case IrBinOp::SRem: if (r == 0) { ok = false; break; } v = (uint64_t)((int64_t)l % (int64_t)r); break;
+                        case IrBinOp::SRem: if (r == 0) { ok = false; break; } v = static_cast<uint64_t>(static_cast<int64_t>(l) % static_cast<int64_t>(r)); break;
                         case IrBinOp::URem: if (r == 0) { ok = false; break; } v = l % r; break;
                         case IrBinOp::And: v = l & r; break;
                         case IrBinOp::Or:  v = l | r; break;
                         case IrBinOp::Xor: v = l ^ r; break;
                         case IrBinOp::Shl: v = l << r; break;
-                        case IrBinOp::AShr: v = (uint64_t)((int64_t)l >> r); break;
+                        case IrBinOp::AShr: v = static_cast<uint64_t>(static_cast<int64_t>(l) >> r); break;
                         case IrBinOp::LShr: v = l >> r; break;
                         default: ok = false; break;
                     }
                     if (ok) {
-                        auto cv = ir_const_i64((int64_t)v);
+                        auto cv = ir_const_i64(static_cast<int64_t>(v));
                         cv.type_idx = binop->lhs.type_idx >= 0 ? binop->lhs.type_idx : binop->rhs.type_idx;
                         bb.instructions[i] = IrBitCast{cv, cv.type_idx, binop->result_name};
                         changed = true;
@@ -125,10 +125,10 @@ bool ir_fold_constants(IrFunction& fn, std::vector<IrType>& pool) {
                         case IrCmpPred::SGT: v = l > r; break;
                         case IrCmpPred::SLE: v = l <= r; break;
                         case IrCmpPred::SGE: v = l >= r; break;
-                        case IrCmpPred::ULT: v = (uint64_t)l < (uint64_t)r; break;
-                        case IrCmpPred::UGT: v = (uint64_t)l > (uint64_t)r; break;
-                        case IrCmpPred::ULE: v = (uint64_t)l <= (uint64_t)r; break;
-                        case IrCmpPred::UGE: v = (uint64_t)l >= (uint64_t)r; break;
+                        case IrCmpPred::ULT: v = static_cast<uint64_t>(l) < static_cast<uint64_t>(r); break;
+                        case IrCmpPred::UGT: v = static_cast<uint64_t>(l) > static_cast<uint64_t>(r); break;
+                        case IrCmpPred::ULE: v = static_cast<uint64_t>(l) <= static_cast<uint64_t>(r); break;
+                        case IrCmpPred::UGE: v = static_cast<uint64_t>(l) >= static_cast<uint64_t>(r); break;
                     }
                     auto idx = ir_make_primitive(pool, IrTypeKind::Int1);
                     auto cv = ir_const_i64(v ? 1 : 0);
@@ -165,13 +165,13 @@ static bool is_side_effecting(const IrInstruction& inst) {
         if constexpr (std::is_same_v<T, IrBr>) return true;
         if constexpr (std::is_same_v<T, IrCondBr>) return true;
         if constexpr (std::is_same_v<T, IrStrLiteral>) return true; /* string literals have side effects (alloc) */
-        (void)i;
+        static_cast<void>(i);
         return false;
     }, inst);
 }
 
 bool ir_eliminate_dead_code(IrFunction& fn, std::vector<IrType>& pool) {
-    (void)pool;
+    static_cast<void>(pool);
     bool changed = false;
 
     /* Collect all SSA uses across all blocks */

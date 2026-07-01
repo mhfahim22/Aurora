@@ -1,5 +1,7 @@
+#include "common/errors.hpp"
 #include "compiler/codegen.hpp"
 #include "compiler/class_oop.hpp"
+#include "compiler/type_registry.hpp"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -36,7 +38,7 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
     if (!node) return i64(0);
     if (dibuilder_ && node->src_line > 0 && debug_cur_fn_)
         builder_->SetCurrentDebugLocation(
-            llvm::DILocation::get(ctx_, node->src_line, 0, debug_cur_fn_));
+            llvm::DILocation::get(ctx_, node->src_line, node->src_col, debug_cur_fn_));
     switch (node->type) {
         case NodeType::Num:       return i64(std::stoll(node->value));
         case NodeType::Float:     return llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx_), std::stod(node->value));
@@ -119,7 +121,7 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
         case NodeType::Lambda: {
             /* Inline lambda expression — create LLVM function, return i8* fn ptr */
             if (!node->captures.empty()) {
-                std::cerr << "[codegen] warning: inline lambda with captures not yet supported, returning 0\n";
+                global_diag().warn(node->src_line, "inline lambda with captures not yet supported, returning 0");
                 return i64(0);
             }
 
@@ -148,16 +150,44 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
                 arg.setName(pname);
             }
 
+            /* Emit debug info for the lambda function */
+            llvm::DISubprogram* lambda_sp = nullptr;
+            if (dibuilder_) {
+                llvm::SmallVector<llvm::Metadata*, 4> param_dbg_types;
+                param_dbg_types.push_back(get_debug_type(lambda_ret_kind));
+                const ASTNode* pp = node->args.get();
+                while (pp) {
+                    param_dbg_types.push_back(get_debug_type(pp->type_annotation.kind));
+                    pp = pp->next.get();
+                }
+                auto* subr_ty = dibuilder_->createSubroutineType(
+                    dibuilder_->getOrCreateTypeArray(param_dbg_types));
+                lambda_sp = dibuilder_->createFunction(
+                    debug_file_, fn->getName(), fn->getName(), debug_file_,
+                    node->src_line, subr_ty, node->src_line,
+                    llvm::DINode::FlagPrototyped,
+                    llvm::DISubprogram::SPFlagDefinition);
+                fn->setSubprogram(lambda_sp);
+            }
+
             auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", fn);
             auto* saved_fn = cur_fn_;
             auto* saved_bb = builder_->GetInsertBlock();
             auto saved_scopes = std::move(scopes_);
             auto saved_cache = std::move(literal_aurora_cache_);
+            auto* saved_debug_fn = debug_cur_fn_;
             scopes_.clear();
 
             cur_fn_ = fn;
+            debug_cur_fn_ = lambda_sp;
             builder_->SetInsertPoint(entry_bb);
             push_scope();
+
+            /* Set DILocation for lambda body if debug enabled */
+            if (dibuilder_ && lambda_sp) {
+                auto* loc = llvm::DILocation::get(ctx_, node->src_line, node->src_col, lambda_sp);
+                builder_->SetCurrentDebugLocation(loc);
+            }
 
             /* Allocate and store params */
             ai = 0;
@@ -168,7 +198,7 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
                 if (val->getType() != i64_ty())
                     val = builder_->CreatePtrToInt(val, i64_ty(), p->value + "_unbox");
                 builder_->CreateStore(val, slot);
-                declare_var(p->value, slot, OwnershipState::Owned);
+                declare_var(p->value, slot, OwnershipState::Owned, p->type_annotation.kind);
                 p = p->next.get();
             }
 
@@ -187,15 +217,14 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
 
             literal_aurora_cache_ = std::move(saved_cache);
             cur_fn_ = saved_fn;
+            debug_cur_fn_ = saved_debug_fn;
             scopes_ = std::move(saved_scopes);
             if (saved_bb) builder_->SetInsertPoint(saved_bb);
 
             return builder_->CreateBitCast(fn, i8ptr_ty(), "lambda_ptr");
         }
         default: {
-            std::cerr << "[codegen] warning: unhandled expression node type "
-                      << (int)node->type << " at line " << node->src_line
-                      << ", returning 0\n";
+            global_diag().warn(node->src_line, "unhandled expression node type " + std::to_string(static_cast<int>(node->type)) + ", returning 0");
             return i64(0);
         }
     }
@@ -460,6 +489,13 @@ llvm::Value* Codegen::gen_unary(const ASTNode* node) {
 }
 
 llvm::Value* Codegen::gen_call(const ASTNode* node) {
+    /* Helper: convert i64 value to double for float output if annotation says float */
+    auto to_float_val = [&](llvm::Value* v, const ASTNode* n) -> llvm::Value* {
+        if (v && !v->getType()->isDoubleTy() && get_annotation_kind(n) == AstTypeKind::Float)
+            return builder_->CreateBitCast(v, llvm::Type::getDoubleTy(ctx_), "fp_val");
+        return v;
+    };
+
     /* Built-in: output(expr) — redirect to gen_output logic */
     if (node->value == "output" && node->args) {
         const ASTNode* arg = node->args.get();
@@ -485,7 +521,7 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
                     val = builder_->CreateIntToPtr(val, i8ptr_ty(), arg->value + "_str");
                 builder_->CreateCall(fn_print_str_, { val });
             } else {
-                llvm::Value* val = gen_expr(arg);
+                llvm::Value* val = to_float_val(gen_expr(arg), arg);
                 if (!val) val = i64(0);
                 /* H2 Phase C: prefer annotation, fall back to LLVM type */
                 auto ak = get_annotation_kind(arg);
@@ -497,7 +533,7 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
                     builder_->CreateCall(fn_printf_, { val });
             }
         } else {
-            llvm::Value* val = gen_expr(arg);
+            llvm::Value* val = to_float_val(gen_expr(arg), arg);
             if (!val) val = i64(0);
             /* H2 Phase C: prefer annotation, fall back to LLVM type */
             auto ak = get_annotation_kind(arg);
@@ -891,7 +927,49 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         }
     }
 
-    llvm::Function* callee = module_->getFunction(node->value);
+    /* For generic calls, use the mangled function name */
+    std::string callee_name = node->value;
+    if (node->template_args) {
+        const ASTNode* ta = node->template_args.get();
+        while (ta) {
+            callee_name += "__" + ta->value;
+            ta = ta->next.get();
+        }
+    }
+
+    /* ── Struct construction: Box[Int](42) ── */
+    if (node->template_args && global_type_registry().has_struct(callee_name)) {
+        llvm::StructType* st = codegen_get_struct_type(ctx_, callee_name);
+        if (!st) return i64(0);
+        llvm::Value* ptr = codegen_struct_alloca(ctx_, *builder_, cur_fn_, callee_name, callee_name + ".inst");
+        const ASTNode* f = node->args.get();
+        unsigned idx = 0;
+        while (f && idx < st->getNumElements()) {
+            llvm::Value* fval = gen_expr(f);
+            if (fval) {
+                llvm::Value* fptr = builder_->CreateStructGEP(st, ptr, idx);
+                llvm::Type* field_ty = st->getElementType(idx);
+                if (fval->getType() != field_ty) {
+                    if (fval->getType()->isIntegerTy() && field_ty->isFloatingPointTy())
+                        fval = builder_->CreateSIToFP(fval, field_ty, "field_itof");
+                    else if (fval->getType()->isFloatingPointTy() && field_ty->isIntegerTy())
+                        fval = builder_->CreateFPToSI(fval, field_ty, "field_ftoi");
+                    else if (fval->getType()->isIntegerTy() && field_ty->isIntegerTy()) {
+                        if (fval->getType()->getIntegerBitWidth() > field_ty->getIntegerBitWidth())
+                            fval = builder_->CreateTrunc(fval, field_ty, "field_trunc");
+                        else
+                            fval = builder_->CreateZExt(fval, field_ty, "field_zext");
+                    }
+                }
+                builder_->CreateStore(fval, fptr);
+            }
+            idx++;
+            f = f->next.get();
+        }
+        return ptr;
+    }
+
+    llvm::Function* callee = module_->getFunction(callee_name);
     if (!callee) {
         /* Not a direct function — check if it's a lambda/closure variable */
         VarRecord* rec = lookup_var(node->value);
@@ -1032,6 +1110,11 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
             v = builder_->CreateIntToPtr(v, param_ty, "arg_cast");
         else if (!is_vararg_param && param_ty->isIntegerTy() && v->getType()->isPointerTy())
             v = builder_->CreatePtrToInt(v, param_ty, "arg_cast");
+        /* Float ↔ integer conversion */
+        else if (!is_vararg_param && param_ty->isFloatingPointTy() && v->getType()->isIntegerTy())
+            v = builder_->CreateSIToFP(v, param_ty, "arg_itof");
+        else if (!is_vararg_param && param_ty->isIntegerTy() && v->getType()->isFloatingPointTy())
+            v = builder_->CreateFPToSI(v, param_ty, "arg_ftoi");
 
         args.push_back(v);
         pidx++;

@@ -1,0 +1,24 @@
+## Test: Python Bridge Integration
+## Verifies extern "python" declarations generate valid IR
+
+extern "python" "json" function dumps(obj: pointer) -> string
+extern "python" "json" function loads(s: string) -> pointer
+extern "python" "builtins" function len(obj: pointer) -> i64
+extern "python" "builtins" function int_from_i64(val: i64) -> i64
+extern "python" "builtins" function float_from_f64(val: Float) -> Float
+extern "python" "builtins" function str_from_bool(val: bool) -> string
+
+## Dict operations
+extern "python" function dict_new() -> pointer
+extern "python" function dict_set(d: pointer, k: i64, v: i64)
+extern "python" function dict_get(d: pointer, k: i64) -> i64
+extern "python" function dict_size(d: pointer) -> i64
+
+function main():
+  outputln("Python bridge loaded")
+  d = dict_new()
+  dict_set(d, 1, 42)
+  v = dict_get(d, 1)
+  outputln(v)
+  sz = dict_size(d)
+  outputln(sz)

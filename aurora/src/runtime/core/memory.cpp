@@ -130,6 +130,38 @@ static int arena_block_count(void) {
     return n;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Fixed-capacity vector (no heap allocation) for GC internals
+// ═══════════════════════════════════════════════════════════════
+template<typename T, size_t Max>
+struct FixedVec {
+    T data[Max];
+    size_t n = 0;
+
+    T* begin() { return data; }
+    T* end() { return data + n; }
+    const T* begin() const { return data; }
+    const T* end() const { return data + n; }
+
+    T& operator[](size_t i) { return data[i]; }
+    const T& operator[](size_t i) const { return data[i]; }
+
+    void push_back(const T& v) { if (n < Max) data[n++] = v; }
+    bool empty() const { return n == 0; }
+    size_t size() const { return n; }
+    void clear() { n = 0; }
+
+    T* erase(T* it) {
+        ptrdiff_t idx = it - data;
+        if (idx >= 0 && (size_t)idx < n) {
+            for (size_t i = idx; i + 1 < n; i++)
+                data[i] = data[i + 1];
+            --n;
+        }
+        return data + idx;
+    }
+};
+
 /* ── Global arena block tracking (for is_arena_ptr and cross-thread safety) ── */
 struct ArenaBlockRange {
     void*    start;
@@ -147,25 +179,23 @@ static pthread_mutex_t arena_blocks_lock = PTHREAD_MUTEX_INITIALIZER;
 #define UNLOCK_ARENA_BLOCKS() pthread_mutex_unlock(&arena_blocks_lock)
 #endif
 
-static std::vector<ArenaBlockRange>* arena_blocks_global = nullptr; /* intentionally not deleted — exists until process exit */
+enum { MAX_ARENA_BLOCKS = 256 };
+static FixedVec<ArenaBlockRange, MAX_ARENA_BLOCKS> arena_blocks;
 
 static void track_arena_block(void* start, size_t size) {
     LOCK_ARENA_BLOCKS();
-    if (!arena_blocks_global) arena_blocks_global = new std::vector<ArenaBlockRange>();
-    arena_blocks_global->push_back({start, static_cast<char*>(start) + size, 0});
+    arena_blocks.push_back({start, static_cast<char*>(start) + size, 0});
     UNLOCK_ARENA_BLOCKS();
 }
 
 static void untrack_arena_block(void* start, size_t size) {
     LOCK_ARENA_BLOCKS();
-    if (arena_blocks_global) {
-        void* end = static_cast<char*>(start) + size;
-        for (auto it = arena_blocks_global->begin(); it != arena_blocks_global->end(); ) {
-            if (it->start == start && it->end == end) {
-                it = arena_blocks_global->erase(it);
-            } else {
-                ++it;
-            }
+    void* end = static_cast<char*>(start) + size;
+    for (auto it = arena_blocks.begin(); it != arena_blocks.end(); ) {
+        if (it->start == start && it->end == end) {
+            it = arena_blocks.erase(it);
+        } else {
+            ++it;
         }
     }
     UNLOCK_ARENA_BLOCKS();
@@ -173,12 +203,10 @@ static void untrack_arena_block(void* start, size_t size) {
 
 static bool is_arena_ptr(void* ptr) {
     LOCK_ARENA_BLOCKS();
-    if (arena_blocks_global) {
-        for (auto& range : *arena_blocks_global) {
-            if (ptr >= range.start && ptr < range.end) {
-                UNLOCK_ARENA_BLOCKS();
-                return true;
-            }
+    for (auto& range : arena_blocks) {
+        if (ptr >= range.start && ptr < range.end) {
+            UNLOCK_ARENA_BLOCKS();
+            return true;
         }
     }
     UNLOCK_ARENA_BLOCKS();
@@ -262,10 +290,10 @@ void aurora_arena_free(void) {
         bool can_free = true;
         /* Check refcount — only free blocks with no outstanding GC roots */
         LOCK_ARENA_BLOCKS();
-        if (arena_blocks_global) {
+        {
             void* data_start = block->data;
             void* data_end = static_cast<char*>(block->data) + ARENA_BLOCK_SIZE;
-            for (auto& range : *arena_blocks_global) {
+            for (auto& range : arena_blocks) {
                 if (range.start == data_start && range.end == data_end) {
                     if (range.refcount > 0) {
                         can_free = false;
@@ -586,8 +614,10 @@ struct GCRecord {
     bool marked;
 };
 
+enum { MAX_GC_OBJECTS = 65536, MAX_UNKNOWN_ROOTS = 1024 };
+
 /* ── Mark helper (C++ linkage, outside extern "C") ── */
-static void gc_mark_reachable(GCRecord& obj, std::vector<GCRecord>& objects) {
+static void gc_mark_reachable(GCRecord& obj, FixedVec<GCRecord, MAX_GC_OBJECTS>& objects) {
     if (obj.marked) return;
     obj.marked = true;
     if (obj.size == 0) return;
@@ -612,7 +642,7 @@ static void gc_mark_reachable(GCRecord& obj, std::vector<GCRecord>& objects) {
 }
 
 /* Scan a memory range for pointers to GC objects and mark them */
-static void gc_scan_and_mark_range(void* start, void* end, std::vector<GCRecord>& objects) {
+static void gc_scan_and_mark_range(void* start, void* end, FixedVec<GCRecord, MAX_GC_OBJECTS>& objects) {
     if (!start || !end || start >= end) return;
     for (char* p = static_cast<char*>(start); p + static_cast<ptrdiff_t>(sizeof(void*)) <= static_cast<char*>(end); p += sizeof(void*)) {
         void* candidate;
@@ -636,8 +666,8 @@ struct UnknownRoot {
     size_t size; /* 0 = unknown, will use default scan range */
 };
 
-static std::vector<GCRecord>        gc_objects; /* statically allocated — no 'new' in GC core */
-static std::vector<UnknownRoot>     gc_unknown_roots;
+static FixedVec<GCRecord, MAX_GC_OBJECTS>   gc_objects; /* statically allocated — no heap in GC core */
+static FixedVec<UnknownRoot, MAX_UNKNOWN_ROOTS> gc_unknown_roots;
 static std::atomic<size_t>     gc_live_objects{0};
 static std::atomic<size_t>     gc_collected{0};
 static std::atomic<size_t>     gc_alloc_since_last{0};
@@ -940,7 +970,8 @@ static pthread_mutex_t arena_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 #define LOCK_ARENA_GC() pthread_mutex_lock(&arena_gc_lock)
 #define UNLOCK_ARENA_GC() pthread_mutex_unlock(&arena_gc_lock)
 #endif
-static std::vector<void*> arena_gc_roots;
+enum { MAX_ARENA_GC_ROOTS = 4096 };
+static FixedVec<void*, MAX_ARENA_GC_ROOTS> arena_gc_roots;
 
 extern "C" {
 
@@ -951,12 +982,10 @@ void aurora_arena_register_gc_root(void* ptr) {
     arena_gc_roots.push_back(ptr);
     /* Increment arena block refcount to prevent cross-thread UAF */
     LOCK_ARENA_BLOCKS();
-    if (arena_blocks_global) {
-        for (auto& range : *arena_blocks_global) {
-            if (ptr >= range.start && ptr < range.end) {
-                range.refcount++;
-                break;
-            }
+    for (auto& range : arena_blocks) {
+        if (ptr >= range.start && ptr < range.end) {
+            range.refcount++;
+            break;
         }
     }
     UNLOCK_ARENA_BLOCKS();
@@ -972,12 +1001,10 @@ void aurora_arena_unregister_gc_root(void* ptr) {
             arena_gc_roots.erase(it);
             /* Decrement arena block refcount */
             LOCK_ARENA_BLOCKS();
-            if (arena_blocks_global) {
-                for (auto& range : *arena_blocks_global) {
-                    if (ptr >= range.start && ptr < range.end) {
-                        if (range.refcount > 0) range.refcount--;
-                        break;
-                    }
+            for (auto& range : arena_blocks) {
+                if (ptr >= range.start && ptr < range.end) {
+                    if (range.refcount > 0) range.refcount--;
+                    break;
                 }
             }
             UNLOCK_ARENA_BLOCKS();

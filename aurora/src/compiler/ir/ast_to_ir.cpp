@@ -179,7 +179,7 @@ void AstToIr::walk(const ASTNode* node) {
 
     case NodeType::Match: {
         walk(node->left.get());
-        const ASTNode* cp = node->body.get();
+        const ASTNode* cp = node->args.get();
         while (cp) {
             walk_block(cp->body.get());
             cp = cp->next.get();

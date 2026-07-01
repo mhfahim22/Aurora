@@ -361,6 +361,7 @@ AuroraTensor* link_grad(AuroraTensor* result, autograd_backward_fn backward,
         }
     }
     if (result->requires_grad) {
+        if (result->grad) free(result->grad);
         result->grad = (double*)calloc((size_t)result->total_size, sizeof(double));
     }
     return result;
@@ -393,7 +394,7 @@ static void topo_sort_kahn(AuroraTensor* t, AuroraTensor** order, int* count) {
             if (nodes[i]->prev[j]) {
                 for (int k = 0; k < node_count; k++) {
                     if (nodes[k] == nodes[i]->prev[j]) {
-                        in_deg[i]++;
+                        in_deg[k]++;  /* prev[j] is a dependency of nodes[i] */
                         break;
                     }
                 }
@@ -405,13 +406,13 @@ static void topo_sort_kahn(AuroraTensor* t, AuroraTensor** order, int* count) {
     while (qh < qt && *count < 1024) {
         AuroraTensor* u = queue[qh++];
         order[(*count)++] = u;
-        for (int j = 0; j < u->prev_count; j++) {
-            if (!u->prev[j]) continue;
-            int idx = -1;
-            for (int k = 0; k < node_count; k++)
-                if (nodes[k] == u->prev[j]) { idx = k; break; }
-            if (idx >= 0 && --in_deg[idx] == 0)
-                queue[qt++] = nodes[idx];
+        for (int k = 0; k < node_count; k++) {
+            for (int j = 0; j < nodes[k]->prev_count; j++) {
+                if (nodes[k]->prev[j] == u && --in_deg[k] == 0) {
+                    queue[qt++] = nodes[k];
+                    break;
+                }
+            }
         }
     }
 }

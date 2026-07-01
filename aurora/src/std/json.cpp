@@ -416,6 +416,10 @@ int aurora_json_array_len(JsonValue* arr) {
     return arr ? arr->count : 0;
 }
 
+int aurora_json_type(JsonValue* val) {
+    return val ? val->type : -1;
+}
+
 void aurora_json_free(JsonValue* val) {
     if (!val) return;
     if (val->type == JSON_STR) {

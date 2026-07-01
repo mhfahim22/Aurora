@@ -1,5 +1,6 @@
 #include "compiler/codegen.hpp"
 #include "compiler/type_registry.hpp"
+#include "common/errors.hpp"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <iostream>
@@ -51,6 +52,12 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
     if (!node) return;
     const std::string& fname = node->value;
     if (fname.empty()) return;
+
+    /* ── Route cross-ecosystem externs to bridge codegen ── */
+    if (is_ecosystem_extern(node)) {
+        gen_bridge_fn(node);
+        return;
+    }
 
     /* Parse calling convention */
     llvm::CallingConv::ID call_conv = parse_calling_conv(node->calling_conv);
@@ -133,7 +140,7 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
        Cost checking: verify declared @cost matches actual types
      ════════════════════════════════════════════════════════════════════ */
     if (!node->cost_level.empty()) {
-        /* Raw pointer (void*) is zero-cost at the FFI boundary — just a register.
+        /* Raw pointer static_cast<void *>( is) zero-cost at the FFI boundary — just a register.
            cstring/char* requires string marshaling = alloc.
            Callbacks require trampoline = indirection. */
         bool needs_marshal = str_info.return_is_cstring || !str_info.param_indices.empty();
@@ -145,17 +152,11 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
         else                       actual_cost = "zero";
 
         if (node->cost_level == "zero" && needs_marshal) {
-            std::cerr << "\033[1;33mWarning\033[0m: extern function '" << fname
-                      << "' declared @cost(zero) but uses string marshaling"
-                      << " (actual cost: " << actual_cost << ")\n";
+            global_diag().warn(0, "extern function '" + fname + "' declared @cost(zero) but uses string marshaling (actual cost: " + actual_cost + ")");
         } else if (node->cost_level == "zero" && has_callback) {
-            std::cerr << "\033[1;33mWarning\033[0m: extern function '" << fname
-                      << "' declared @cost(zero) but uses callback parameters"
-                      << " (actual cost: " << actual_cost << ")\n";
+            global_diag().warn(0, "extern function '" + fname + "' declared @cost(zero) but uses callback parameters (actual cost: " + actual_cost + ")");
         } else if (node->cost_level == "alloc" && has_callback) {
-            std::cerr << "\033[1;33mWarning\033[0m: extern function '" << fname
-                      << "' declared @cost(alloc) but uses callback parameters"
-                      << " (actual cost: " << actual_cost << ")\n";
+            global_diag().warn(0, "extern function '" + fname + "' declared @cost(alloc) but uses callback parameters (actual cost: " + actual_cost + ")");
         }
     }
 

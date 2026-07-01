@@ -135,11 +135,11 @@ llvm::Value* Codegen::gen_tensor_expr(const ASTNode* node) {
             auto* gep = builder_->CreateInBoundsGEP(
                 llvm::ArrayType::get(i64_ty, dims.size()),
                 shape_alloca,
-                { i64(0), i64((int)i) });
+                { i64(0), i64(static_cast<int>(i)) });
             builder_->CreateStore(dims[i], gep);
         }
 
-        auto* ndim = i64((int64_t)dims.size());
+        auto* ndim = i64(static_cast<int64_t>(dims.size()));
         auto* shape_ptr = builder_->CreateBitCast(shape_alloca, ptr_ty);
         return builder_->CreateCall(tensor_new_, { ndim, shape_ptr }, "tensor");
     }

@@ -598,7 +598,7 @@ void OwnershipAnalyzer::propagate_ownership(const std::string& name) {
     /* If has aliases, might need shared ownership */
     if (!it->second.aliases.empty() && it->second.type == OwnershipType::Single) {
         it->second.type = OwnershipType::Shared;
-        it->second.owner_count = (int)it->second.aliases.size() + 1;
+        it->second.owner_count = static_cast<int>(it->second.aliases.size()) + 1;
     }
 }
 
@@ -706,7 +706,7 @@ void OwnershipAnalyzer::pop_scope() {
 }
 
 bool OwnershipAnalyzer::is_local_var(const std::string& name) const {
-    for (int i = (int)scope_stack_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scope_stack_.size()) - 1; i >= 0; i--) {
         if (scope_stack_[i].local_vars.count(name) > 0) {
             return true;
         }

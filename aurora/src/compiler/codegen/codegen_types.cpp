@@ -73,7 +73,7 @@ static llvm::StructType* get_or_create_struct_type(
             llvm::Type* ft = extern_type_to_llvm(ctx, f.type_name);
             all_field_tys.push_back(ft);
             int64_t sz = dl.getTypeStoreSize(ft);
-            if (sz > max_size) { max_size = sz; max_idx = (int)all_field_tys.size() - 1; }
+            if (sz > max_size) { max_size = sz; max_idx = static_cast<int>(all_field_tys.size()) - 1; }
         }
         /* Store ALL field names for field access */
         for (auto& f : info->fields)
@@ -106,20 +106,20 @@ void Codegen::gen_struct_decl(const ASTNode* node) {
    Enums become an i64 for now (the discriminant). */
 void Codegen::gen_enum_decl(const ASTNode* node) {
     /* Enum values are just i64 constants — no runtime code needed */
-    (void)node;
+    static_cast<void>(node);
 }
 
 /* ── Codegen: type alias ──
    Type aliases are compile-time only — no codegen needed. */
 void Codegen::gen_type_alias(const ASTNode* node) {
-    (void)node;
+    static_cast<void>(node);
 }
 
 /* ── Codegen: interface declaration ──
    Interfaces are compile-time only — no codegen needed
    (vtables will come in a later phase). */
 void Codegen::gen_interface_decl(const ASTNode* node) {
-    (void)node;
+    static_cast<void>(node);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -144,7 +144,7 @@ int codegen_struct_field_index(const std::string& struct_name,
     auto it = struct_layout_cache_.find(struct_name);
     if (it == struct_layout_cache_.end()) return -1;
     auto& names = it->second.field_names;
-    for (int i = 0; i < (int)names.size(); i++)
+    for (int i = 0; i < static_cast<int>(names.size()); i++)
         if (names[i] == field_name) return i;
     return -1;
 }

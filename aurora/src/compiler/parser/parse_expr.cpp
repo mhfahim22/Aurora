@@ -35,6 +35,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
             }
             std::string field = toks[idx++].value;
             int src_ln = toks[idx-2].line;
+            int src_col = toks[idx-2].col;
 
             /* method call: obj.method(args) */
             if (idx < cnt && toks[idx].is_operator('(')) {
@@ -59,7 +60,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
                     call_name += field;
                 }
 
-                auto call  = make_node(NodeType::Call, call_name, src_ln);
+                auto call  = make_node(NodeType::Call, call_name, src_ln, src_col);
                 call->left = std::move(base);
                 ASTNode* tail = nullptr;
                 while (idx < cnt && !toks[idx].is_operator(')')) {
@@ -103,7 +104,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
 }
 
 ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
-    int cnt = (int)toks.size();
+    int cnt = static_cast<int>(toks.size());
     if (idx >= cnt) return make_node(NodeType::Num, "0");
 
     const Token& t = toks[idx];
@@ -336,7 +337,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             return parse_trailing_chains(std::move(call), toks, idx, cnt);
         }
 
-        /* generic call: name[Type1, Type2](args) */
+        /* generic call: name[Type1, Type2](args) — only if '(' follows ']' */
         if (idx < cnt && toks[idx].is_operator('[')) {
             int saved_idx = idx;
             idx++;
@@ -350,34 +351,38 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
                 check_idx++;
             }
             if (looks_like_type_args && check_idx < cnt && toks[check_idx].is_operator(']')) {
-                idx = saved_idx + 1;
-                auto call = make_node(NodeType::Call, name, src_ln);
-                ASTNode* ta_tail = nullptr;
-                while (idx < cnt && !toks[idx].is_operator(']')) {
-                    if (toks[idx].is_operator(',')) { idx++; continue; }
-                    if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
-                        auto ta = make_node(NodeType::TypeArg, toks[idx].value, src_ln);
-                        ASTNode* raw = ta.get();
-                        if (!call->template_args) { call->template_args = std::move(ta); ta_tail = raw; }
-                        else                       { ta_tail->next = std::move(ta); ta_tail = raw; }
-                    }
-                    idx++;
-                }
-                if (idx < cnt) idx++;
-                if (idx < cnt && toks[idx].is_operator('(')) {
-                    idx++;
-                    ASTNode* tail = nullptr;
-                    while (idx < cnt && !toks[idx].is_operator(')')) {
+                int close_idx = check_idx;
+                int after_close = close_idx + 1;
+                if (after_close < cnt && toks[after_close].is_operator('(')) {
+                    idx = saved_idx + 1;
+                    auto call = make_node(NodeType::Call, name, src_ln);
+                    ASTNode* ta_tail = nullptr;
+                    while (idx < cnt && !toks[idx].is_operator(']')) {
                         if (toks[idx].is_operator(',')) { idx++; continue; }
-                        auto arg = parse_expr(toks, idx);
-                        ASTNode* raw = arg.get();
-                        if (!call->args) { call->args = std::move(arg); tail = raw; }
-                        else             { tail->next = std::move(arg); tail = raw; }
+                        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                            auto ta = make_node(NodeType::TypeArg, toks[idx].value, src_ln);
+                            ASTNode* raw = ta.get();
+                            if (!call->template_args) { call->template_args = std::move(ta); ta_tail = raw; }
+                            else                       { ta_tail->next = std::move(ta); ta_tail = raw; }
+                        }
+                        idx++;
                     }
                     if (idx < cnt) idx++;
-                    else throw_missing_close(src_ln, 0, ')', "generic call");
+                    if (idx < cnt && toks[idx].is_operator('(')) {
+                        idx++;
+                        ASTNode* tail = nullptr;
+                        while (idx < cnt && !toks[idx].is_operator(')')) {
+                            if (toks[idx].is_operator(',')) { idx++; continue; }
+                            auto arg = parse_expr(toks, idx);
+                            ASTNode* raw = arg.get();
+                            if (!call->args) { call->args = std::move(arg); tail = raw; }
+                            else             { tail->next = std::move(arg); tail = raw; }
+                        }
+                        if (idx < cnt) idx++;
+                        else throw_missing_close(src_ln, 0, ')', "generic call");
+                    }
+                    return parse_trailing_chains(std::move(call), toks, idx, cnt);
                 }
-                return parse_trailing_chains(std::move(call), toks, idx, cnt);
             }
             idx = saved_idx;
         }
@@ -470,7 +475,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
 }
 
 ASTNode::Ptr Parser::parse_unary(const std::vector<Token>& toks, int& idx) {
-    int cnt = (int)toks.size();
+    int cnt = static_cast<int>(toks.size());
     if (idx < cnt) {
         if (toks[idx].is_operator('-')) {
             int op_line = toks[idx].line;
@@ -492,7 +497,7 @@ ASTNode::Ptr Parser::parse_unary(const std::vector<Token>& toks, int& idx) {
 
 ASTNode::Ptr Parser::parse_term(const std::vector<Token>& toks, int& idx) {
     auto left = parse_unary(toks, idx);
-    int  cnt  = (int)toks.size();
+    int  cnt  = static_cast<int>(toks.size());
     while (idx < cnt && toks[idx].is(TokenType::Operator)) {
         const std::string& v = toks[idx].value;
         if (v != "*" && v != "/" && v != "//" && v != "%" && v != "**") break;
@@ -507,7 +512,7 @@ ASTNode::Ptr Parser::parse_term(const std::vector<Token>& toks, int& idx) {
 
 ASTNode::Ptr Parser::parse_add(const std::vector<Token>& toks, int& idx) {
     auto left = parse_term(toks, idx);
-    int  cnt  = (int)toks.size();
+    int  cnt  = static_cast<int>(toks.size());
     while (idx < cnt && toks[idx].is(TokenType::Operator) &&
            (toks[idx].value == "+" || toks[idx].value == "-")) {
         auto op  = make_node(NodeType::BinOp, toks[idx].value, toks[idx].line);
@@ -521,7 +526,7 @@ ASTNode::Ptr Parser::parse_add(const std::vector<Token>& toks, int& idx) {
 
 ASTNode::Ptr Parser::parse_range(const std::vector<Token>& toks, int& idx) {
     auto left = parse_add(toks, idx);
-    int  cnt  = (int)toks.size();
+    int  cnt  = static_cast<int>(toks.size());
     /* range operator: a..b (exclusive), a..=b (inclusive) */
     if (idx < cnt && toks[idx].is(TokenType::Operator) &&
         (toks[idx].value == ".." || toks[idx].value == "..=")) {
@@ -537,7 +542,7 @@ ASTNode::Ptr Parser::parse_range(const std::vector<Token>& toks, int& idx) {
 
 ASTNode::Ptr Parser::parse_bitwise(const std::vector<Token>& toks, int& idx) {
     auto left = parse_range(toks, idx);
-    int  cnt  = (int)toks.size();
+    int  cnt  = static_cast<int>(toks.size());
     while (idx < cnt) {
         bool is_xor_op = toks[idx].is(TokenType::Operator) && toks[idx].value == "^";
         bool is_xor_kw = toks[idx].is_keyword("xor");
@@ -561,7 +566,7 @@ ASTNode::Ptr Parser::parse_bitwise(const std::vector<Token>& toks, int& idx) {
 
 ASTNode::Ptr Parser::parse_cmp(const std::vector<Token>& toks, int& idx) {
     auto left = parse_bitwise(toks, idx);
-    int  cnt  = (int)toks.size();
+    int  cnt  = static_cast<int>(toks.size());
     if (idx >= cnt) return left;
 
     /* Symbol comparisons: ==, !=, <, >, <=, >= */

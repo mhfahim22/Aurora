@@ -7,12 +7,19 @@ bool Parser::skip_blanks() {
     return !at_end();
 }
 
+void Parser::panic_recover(int line_indent) {
+    advance();
+    while (!at_end() && cur_indent() > line_indent) {
+        advance();
+    }
+}
+
 ASTNode::Ptr Parser::parse() {
     return parse_block(-1);
 }
 
 void Parser::require_token_end(const std::vector<Token>& toks, int idx, const char* context) const {
-    if (idx >= (int)toks.size()) return;
+    if (idx >= static_cast<int>(toks.size())) return;
 
     const Token& t = toks[idx];
     std::string msg = "unexpected token '" + t.value + "' in " + context;
@@ -52,7 +59,8 @@ ASTNode::Ptr Parser::parse_block(int parent_indent) {
 
     while (!at_end()) {
         if (!skip_blanks()) break;
-        if (cur_indent() <= parent_indent) break;
+        int stmt_indent = cur_indent();
+        if (stmt_indent <= parent_indent) break;
 
         try {
             auto stmt = parse_stmt();
@@ -64,7 +72,7 @@ ASTNode::Ptr Parser::parse_block(int parent_indent) {
         } catch (const std::runtime_error& e) {
             had_error_ = true;
             errors_.push_back(e.what());
-            advance();
+            panic_recover(stmt_indent);
         }
     }
     return head;

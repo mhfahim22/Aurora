@@ -1,6 +1,8 @@
 #include "runtime/backend.hpp"
 #include "common/platform.hpp"
 #include "runtime/memory.hpp"
+#include "runtime/tls.hpp"
+#include "runtime/websocket.hpp"
 #include "std/json.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -147,6 +149,22 @@ void aurora_server_clear_middleware(AuroraServer* srv) {
     srv->middleware_count = 0;
     srv->middleware_cap = 0;
     printf("[server] middleware cleared\n");
+}
+
+/* ── Enable TLS on server ── */
+int aurora_server_enable_tls(AuroraServer* srv, const char* cert_path, const char* key_path) {
+    if (!srv) return 0;
+    if (srv->tls_ctx) {
+        aurora_tls_ctx_free(srv->tls_ctx);
+        srv->tls_ctx = nullptr;
+    }
+    srv->tls_ctx = aurora_tls_server_ctx_new(cert_path, key_path);
+    if (srv->tls_ctx) {
+        printf("[server] TLS enabled\n");
+        return 1;
+    }
+    printf("[server] TLS enable failed\n");
+    return 0;
 }
 
 /* ── Query string parser ── */
@@ -436,8 +454,21 @@ void aurora_http_response_set_json(AuroraHttpResponse* res, const char* body) {
     aurora_http_response_set_body(res, body);
 }
 
+/* ── Send bytes via raw socket or TLS ── */
+static int send_raw(int64_t sock, int64_t tls_handle, const char* data, int len) {
+    if (tls_handle > 0) {
+        return aurora_tls_write(tls_handle, data, len);
+    }
+#ifdef _WIN32
+    return (int)send((SOCKET)(intptr_t)sock, data, len, 0);
+#else
+    return (int)send((int)sock, data, (size_t)len, MSG_NOSIGNAL);
+#endif
+}
+
 int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
     if (!res || res->sent) return -1;
+    int64_t tls = res->tls_handle;
     char header_buf[4096];
     int len = snprintf(header_buf, sizeof(header_buf),
         "HTTP/1.1 %d %s\r\n", res->status_code, res->status_text ? res->status_text : "Unknown");
@@ -465,11 +496,7 @@ int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
     const char* p = header_buf;
     int remaining = len;
     while (remaining > 0) {
-#ifdef _WIN32
-        int n = (int)send((SOCKET)(intptr_t)sock, p, remaining, 0);
-#else
-        int n = (int)send((int)sock, p, (size_t)remaining, MSG_NOSIGNAL);
-#endif
+        int n = send_raw(sock, tls, p, remaining);
         if (n <= 0) break;
         p += n;
         remaining -= n;
@@ -478,11 +505,7 @@ int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
         p = res->body;
         int bremaining = (int)body_len;
         while (bremaining > 0) {
-#ifdef _WIN32
-            int n = (int)send((SOCKET)(intptr_t)sock, p, bremaining, 0);
-#else
-            int n = (int)send((int)sock, p, (size_t)bremaining, MSG_NOSIGNAL);
-#endif
+            int n = send_raw(sock, tls, p, bremaining);
             if (n <= 0) break;
             p += n;
             bremaining -= n;
@@ -497,11 +520,11 @@ int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
 int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int chunk_size) {
     if (!res || res->sent) return -1;
     if (chunk_size <= 0) chunk_size = 4096;
+    int64_t tls = res->tls_handle;
     char header_buf[4096];
     int len = snprintf(header_buf, sizeof(header_buf),
         "HTTP/1.1 %d %s\r\n", res->status_code, res->status_text ? res->status_text : "Unknown");
 
-    /* Write all user-set headers EXCEPT Content-Length (chunked doesn't use it) */
     for (int i = 0; i < res->header_count; i++) {
         if (strcmp(res->header_names[i], "Content-Length") == 0)
             continue;
@@ -509,27 +532,20 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
             "%s: %s\r\n", res->header_names[i], res->header_values[i]);
     }
 
-    /* Add Transfer-Encoding: chunked */
     len += snprintf(header_buf + len, sizeof(header_buf) - (size_t)len - 1,
         "Transfer-Encoding: chunked\r\n\r\n");
 
-    /* Send headers */
     {
         const char* p = header_buf;
         int remaining = len;
         while (remaining > 0) {
-#ifdef _WIN32
-            int n = (int)send((SOCKET)(intptr_t)sock, p, remaining, 0);
-#else
-            int n = (int)send((int)sock, p, (size_t)remaining, MSG_NOSIGNAL);
-#endif
+            int n = send_raw(sock, tls, p, remaining);
             if (n <= 0) return -1;
             p += n;
             remaining -= n;
         }
     }
 
-    /* Send body in chunks */
     if (res->body) {
         size_t body_len = res->body_len > 0 ? res->body_len : strlen(res->body);
         const char* p = res->body;
@@ -542,11 +558,7 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
                 const char* sp = size_buf;
                 int s_remaining = size_len;
                 while (s_remaining > 0) {
-#ifdef _WIN32
-                    int n = (int)send((SOCKET)(intptr_t)sock, sp, s_remaining, 0);
-#else
-                    int n = (int)send((int)sock, sp, (size_t)s_remaining, MSG_NOSIGNAL);
-#endif
+                    int n = send_raw(sock, tls, sp, s_remaining);
                     if (n <= 0) return -1;
                     sp += n;
                     s_remaining -= n;
@@ -555,11 +567,7 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
             {
                 int c_remaining = (int)this_chunk;
                 while (c_remaining > 0) {
-#ifdef _WIN32
-                    int n = (int)send((SOCKET)(intptr_t)sock, p, c_remaining, 0);
-#else
-                    int n = (int)send((int)sock, p, (size_t)c_remaining, MSG_NOSIGNAL);
-#endif
+                    int n = send_raw(sock, tls, p, c_remaining);
                     if (n <= 0) return -1;
                     p += n;
                     c_remaining -= n;
@@ -567,24 +575,15 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
             }
             {
                 const char* crlf = "\r\n";
-#ifdef _WIN32
-                send((SOCKET)(intptr_t)sock, crlf, 2, 0);
-#else
-                send((int)sock, crlf, 2, MSG_NOSIGNAL);
-#endif
+                send_raw(sock, tls, crlf, 2);
             }
             body_len -= this_chunk;
         }
     }
 
-    /* Terminating chunk: 0\r\n\r\n */
     {
         const char* term = "0\r\n\r\n";
-#ifdef _WIN32
-        send((SOCKET)(intptr_t)sock, term, 5, 0);
-#else
-        send((int)sock, term, 5, MSG_NOSIGNAL);
-#endif
+        send_raw(sock, tls, term, 5);
     }
 
     res->sent = 1;
@@ -853,24 +852,62 @@ static unsigned int gzip_crc32(const unsigned char* buf, size_t len);
 static unsigned char* gzip_compress(const unsigned char* input, size_t input_len, size_t* out_len);
 
 /* ── Per-client request handling (runs in its own thread) ── */
-static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* router) {
+static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer* srv, AuroraRouter* router) {
 #ifdef _WIN32
     SOCKET client = (SOCKET)(intptr_t)client_sock;
 #else
     int client = (int)client_sock;
 #endif
-    /* Set 5-second receive timeout for keep-alive idle */
     set_recv_timeout(client_sock, 5);
     char raw[65536];
     int keep_alive_max = 100;
-    for (int ka_count = 0; ka_count < keep_alive_max; ka_count++) {
+
+    /* ── Recv helper: read from raw socket or TLS ── */
+    auto recv_data = [&](char* buf, int buf_size) -> int {
+        if (tls_handle > 0) {
+            return aurora_tls_read(tls_handle, buf, buf_size);
+        }
 #ifdef _WIN32
-        int n = recv(client, raw, sizeof(raw) - 1, 0);
+        return recv(client, buf, buf_size, 0);
 #else
-        int n = (int)recv(client, raw, sizeof(raw) - 1, 0);
+        return (int)recv(client, buf, (size_t)buf_size, 0);
 #endif
+    };
+
+    for (int ka_count = 0; ka_count < keep_alive_max; ka_count++) {
+        int n = recv_data(raw, (int)sizeof(raw) - 1);
         if (n <= 0) break;
         raw[n] = '\0';
+
+        /* ── Check for WebSocket upgrade ── */
+        if (aurora_ws_is_upgrade(raw)) {
+            const char* ws_key = aurora_ws_get_key(raw);
+            if (ws_key) {
+                if (aurora_ws_upgrade(ws_key, client_sock, tls_handle) == 1) {
+                    fprintf(stderr, "[ws] upgrade successful\n");
+                    uint8_t* payload = NULL;
+                    int opcode = 0;
+                    while (1) {
+                        int plen = aurora_ws_read_frame(client_sock, tls_handle, &payload, &opcode);
+                        if (plen <= 0) break;
+                        if (opcode == WS_OPCODE_CLOSE) {
+                            aurora_ws_close(client_sock, tls_handle);
+                            aurora_free(payload);
+                            break;
+                        }
+                        if (opcode == WS_OPCODE_PING) {
+                            aurora_ws_write_frame(client_sock, tls_handle, WS_OPCODE_PONG, payload, plen);
+                        } else if (opcode == WS_OPCODE_TEXT || opcode == WS_OPCODE_BIN) {
+                            aurora_ws_write_frame(client_sock, tls_handle, opcode, payload, plen);
+                        }
+                        aurora_free(payload);
+                        payload = NULL;
+                    }
+                }
+            }
+            break;
+        }
+
         char* body_start = strstr(raw, "\r\n\r\n");
         if (body_start) {
             int header_end = (int)(body_start - raw) + 4;
@@ -886,11 +923,7 @@ static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* 
             if (needed > (int)sizeof(raw) - 1)
                 needed = (int)sizeof(raw) - 1;
             while (n < needed) {
-#ifdef _WIN32
-                int r = recv(client, raw + n, needed - n, 0);
-#else
-                int r = (int)recv(client, raw + n, needed - n, 0);
-#endif
+                int r = recv_data(raw + n, needed - n);
                 if (r <= 0) break;
                 n += r;
                 raw[n] = '\0';
@@ -900,6 +933,7 @@ static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* 
         int gzip_accepted = accepts_gzip(raw);
         AuroraHttpRequest* req = aurora_http_parse_request(raw);
         AuroraHttpResponse* res = aurora_http_response_new();
+        res->tls_handle = tls_handle;
         aurora_http_response_set_header(res, "Content-Type", "text/plain");
         if (ka) {
             aurora_http_response_set_header(res, "Connection", "keep-alive");
@@ -916,14 +950,11 @@ static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* 
             aurora_http_response_set_status(res, 400, "Bad Request");
             aurora_http_response_set_body(res, "Bad Request");
         }
-        /* Gzip compress response body if accepted and body is large enough */
         if (gzip_accepted && res->body) {
             size_t orig_len = res->body_len > 0 ? res->body_len : strlen(res->body);
-            fprintf(stderr, "[gzip-debug] accepted=true orig_len=%zu\n", orig_len);
             if (orig_len > 512) {
                 size_t gz_len = 0;
                 unsigned char* gz = gzip_compress((const unsigned char*)res->body, orig_len, &gz_len);
-                fprintf(stderr, "[gzip-debug] compress returned=%p gz_len=%zu\n", gz, gz_len);
                 if (gz) {
                     free(res->body);
                     res->body = (char*)gz;
@@ -932,26 +963,34 @@ static void handle_client(int64_t client_sock, AuroraServer* srv, AuroraRouter* 
                     char cl_buf[32];
                     snprintf(cl_buf, sizeof(cl_buf), "%zu", gz_len);
                     aurora_http_response_set_header(res, "Content-Length", cl_buf);
-                    fprintf(stderr, "[gzip-debug] compression applied: %zu -> %zu bytes\n", orig_len, gz_len);
-                } else {
-                    fprintf(stderr, "[gzip-debug] compression failed\n");
                 }
             }
         }
-#ifdef _WIN32
-        aurora_http_response_send(res, (int64_t)(intptr_t)client);
-#else
-        aurora_http_response_send(res, (int64_t)client);
-#endif
+        aurora_http_response_send(res, client_sock);
         aurora_http_request_free(req);
         aurora_http_response_free(res);
-        if (!ka) break; /* close after single request if not keep-alive */
+        if (!ka) break;
     }
+    if (tls_handle > 0)
+        aurora_tls_close(tls_handle);
+    else {
 #ifdef _WIN32
-    closesocket(client);
+        closesocket(client);
 #else
-    close(client);
+        close(client);
 #endif
+    }
+}
+
+/* ── Create a TLS handle for an accepted socket, or return 0 ── */
+static int64_t try_tls_accept(int64_t client_sock, AuroraServer* srv) {
+    if (!srv || !srv->tls_ctx) return 0;
+    int64_t tls_handle = aurora_tls_accept(client_sock, srv->tls_ctx);
+    if (tls_handle < 0) {
+        fprintf(stderr, "[server] TLS accept failed\n");
+        return -1;
+    }
+    return tls_handle;
 }
 
 /* ── Server accept + handle (single-thread, backward compat) ── */
@@ -963,14 +1002,19 @@ void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
     int addr_len = sizeof(client_addr);
     SOCKET client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
     if (client == INVALID_SOCKET) return;
-    handle_client((int64_t)(intptr_t)client, srv, router);
+    int64_t client_sock = (int64_t)(intptr_t)client;
+    int64_t tls = try_tls_accept(client_sock, srv);
+    if (tls >= 0) handle_client(client_sock, tls, srv, router);
+    else closesocket(client);
 #else
     int listen_sock = (int)(intptr_t)srv->handle;
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
     int client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
     if (client < 0) return;
-    handle_client((int64_t)client, srv, router);
+    int64_t tls = try_tls_accept((int64_t)client, srv);
+    if (tls >= 0) handle_client((int64_t)client, tls, srv, router);
+    else close(client);
 #endif
 }
 
@@ -981,6 +1025,8 @@ static std::atomic<int64_t> g_total_connections{0};
 void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
     if (!srv || !srv->handle || !srv->running) return;
     printf("[server] accept loop (thread-per-connection) started on port %d\n", srv->port);
+    if (srv->tls_ctx)
+        printf("[server] TLS enabled\n");
     while (srv->running) {
 #ifdef _WIN32
         SOCKET listen_sock = (SOCKET)(intptr_t)srv->handle;
@@ -1001,10 +1047,20 @@ void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
             continue;
         }
 #endif
+        int64_t client_sock = (int64_t)(intptr_t)client;
+        int64_t tls = try_tls_accept(client_sock, srv);
+        if (tls < 0) { /* TLS accept failed — close connection */
+#ifdef _WIN32
+            closesocket(client);
+#else
+            close(client);
+#endif
+            continue;
+        }
         g_active_connections.fetch_add(1);
         g_total_connections.fetch_add(1);
-        std::thread([client, srv, router]() {
-            handle_client((int64_t)(intptr_t)client, srv, router);
+        std::thread([client_sock, tls, srv, router]() {
+            handle_client(client_sock, tls, srv, router);
             g_active_connections.fetch_sub(1);
         }).detach();
     }

@@ -1,0 +1,13 @@
+## Test: Rust Bridge Integration
+## Verifies extern "rust" declarations generate valid IR
+
+extern "rust" "mycrate" function compute(data: i64) -> i64
+extern "rust" "mycrate" function process_slice(ptr: i64, len: i64) -> i64
+extern "rust" "mycrate" function try_get(index: i64) -> i64
+extern "rust" "mycrate" function divide(a: i64, b: i64) -> i64
+extern "rust" "mycrate" function greet(name: i64) -> i64
+
+function main():
+  outputln("Rust bridge loaded")
+  result = compute(42)
+  outputln(result)

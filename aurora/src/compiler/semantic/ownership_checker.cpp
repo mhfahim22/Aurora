@@ -43,7 +43,7 @@ void OwnershipTracker::declare(const std::string& name,
 }
 
 VarInfo* OwnershipTracker::lookup(const std::string& name) {
-    for (int i = (int)scopes_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; i--) {
         auto* v = scopes_[i].find(name);
         if (v) return v;
     }
@@ -134,7 +134,7 @@ void OwnershipTracker::end_all_borrows(const std::string& lender_name, int end_l
    ════════════════════════════════════════════════════════════ */
 
 OwnershipState OwnershipTracker::state_of(const std::string& name) const {
-    for (int i = (int)scopes_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; i--) {
         const Scope& s = scopes_[i];
         auto it = s.vars.find(name);
         if (it != s.vars.end()) return it->second.state;
@@ -433,7 +433,7 @@ void OwnershipTracker::do_drop(const std::string& name, int ln) {
         }
     }
 
-    for (int i = (int)scopes_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; i--) {
         auto it = scopes_[i].vars.find(name);
         if (it != scopes_[i].vars.end()) {
             scopes_[i].vars.erase(it);

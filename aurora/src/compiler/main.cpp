@@ -1,3 +1,5 @@
+#include "common/errors.hpp"
+
 #include "compiler/lexer.hpp"
 #include "compiler/parser.hpp"
 #include "compiler/ownership.hpp"
@@ -22,6 +24,7 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/DebugInfo.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/Transforms/Scalar/IndVarSimplify.h>
 #include <llvm/Transforms/Scalar/LoopUnrollPass.h>
@@ -49,6 +52,63 @@
 namespace fs = std::filesystem;
 
 static bool verbose = false;
+
+static const char* AURORA_VERSION = "0.3.3";
+
+/* ── Check if a trimmed line ends with a block-starting colon ── */
+static bool line_needs_continuation(const std::string& line) {
+    std::string s = line;
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return false;
+    if (start > 0) s = s.substr(start);
+    size_t end = s.find_last_not_of(" \t\r\n");
+    if (end != std::string::npos) s = s.substr(0, end + 1);
+    if (s.empty()) return false;
+    if (s.back() == ':') return true;
+
+    bool in_str = false;
+    int parens = 0, brackets = 0, braces = 0;
+    for (char c : s) {
+        if (c == '"') { in_str = !in_str; continue; }
+        if (in_str) continue;
+        if (c == '(') parens++;
+        else if (c == ')') parens--;
+        else if (c == '[') brackets++;
+        else if (c == ']') brackets--;
+        else if (c == '{') braces++;
+        else if (c == '}') braces--;
+    }
+    return parens > 0 || brackets > 0 || braces > 0;
+}
+
+/* ── Print usage to stderr ── */
+static void print_usage() {
+    std::cerr << "Usage: aurorac <source.aura> [--emit-obj] [-o output] [-l lib] [-L path]\n";
+    std::cerr << "       aurorac --repl\n";
+    std::cerr << "       aurorac --doc <source.aura> [output.html]\n";
+    std::cerr << "       aurorac --package <init|install|build|list|clean>\n";
+    std::cerr << "       aurorac --help\n";
+    std::cerr << "       aurorac --version\n";
+    std::cerr << "\n";
+    std::cerr << "Options:\n";
+    std::cerr << "  --help          Show this help message\n";
+    std::cerr << "  --version       Show version info\n";
+    std::cerr << "  --emit-ir       Print LLVM IR to stdout\n";
+    std::cerr << "  --emit-obj      Emit object file (and link if -l used)\n";
+    std::cerr << "  -o <file>       Output path (.obj or .exe)\n";
+    std::cerr << "  -l <lib>        Library to link against (e.g. -l user32)\n";
+    std::cerr << "  -L <path>       Library search path\n";
+    std::cerr << "  --run           JIT-execute main function\n";
+    std::cerr << "  -O0/-O1/-O2/-O3  Optimization level (default: -O3)\n";
+    std::cerr << "  -Os             Optimize for size\n";
+    std::cerr << "  -Oz             Aggressively optimize for size\n";
+    std::cerr << "  -ffast-math     Enable unsafe floating-point optimizations\n";
+    std::cerr << "  -flto           Enable link-time optimization (ThinLTO)\n";
+    std::cerr << "  --incremental   Enable incremental compilation (skip if sources unchanged)\n";
+    std::cerr << "  --coverage      Enable code coverage tracing\n";
+    std::cerr << "  --debug, -g     Emit DWARF debug info for debugging\n";
+    std::cerr << "  --verbose, -v   Show verbose stage/trace output for debugging\n";
+}
 
 /* ── Safe process execution helper (no shell) ── */
 #ifdef _WIN32
@@ -80,7 +140,7 @@ static int run_process(const std::string& exe, const std::vector<std::string>& a
     GetExitCodeProcess(pi.hProcess, &exit_code);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    return (int)exit_code;
+    return static_cast<int>(exit_code);
 #else
     pid_t pid = fork();
     if (pid == 0) {
@@ -530,10 +590,15 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
                 std::string chain;
                 for (size_t i = 0; i < resolving.size(); ++i) {
                     if (i > 0) chain += " → ";
-                    chain += resolving[i];
+                    /* Show short filename instead of full path */
+                    std::string p = resolving[i];
+                    auto pos = p.find_last_of("/\\");
+                    chain += (pos != std::string::npos) ? p.substr(pos + 1) : p;
                 }
-                chain += " → " + norm_path;
-                throw std::runtime_error("aurora: circular import detected:\n  " + chain);
+                auto pos = norm_path.find_last_of("/\\");
+                std::string short_path = (pos != std::string::npos) ? norm_path.substr(pos + 1) : norm_path;
+                chain += " → " + short_path;
+                throw std::runtime_error("Error: Circular dependency detected\n  " + chain);
             }
             resolving.push_back(norm_path);
             if (collected_files) collected_files->push_back(norm_path);
@@ -588,10 +653,17 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
 }
 
 /* ── Resolve imports in AST (public, with cycle detection) ── */
-static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_dir, const std::string& exe_dir,
+static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_path,
+                                    const std::string& source_dir, const std::string& exe_dir,
                                     std::vector<std::string>* collected_files = nullptr) {
     std::vector<std::string> resolving;
     std::unordered_set<std::string> resolving_fast;
+
+    /* Seed with the source file to detect cycles back to root */
+    std::string src_norm = fs::absolute(source_path).string();
+    resolving.push_back(src_norm);
+    resolving_fast.insert(src_norm);
+
     return resolve_imports_impl(std::move(root), source_dir, exe_dir, resolving, resolving_fast, collected_files);
 }
 
@@ -747,8 +819,8 @@ static std::vector<std::string> detect_msvc_lib_paths() {
         std::string msvc_ver;
         for (auto& entry : fs::directory_iterator(msvc_root)) {
             if (entry.is_directory()) {
-                msvc_ver = entry.path().filename().string();
-                break;
+                std::string v = entry.path().filename().string();
+                if (v > msvc_ver) msvc_ver = v;
             }
         }
         if (!msvc_ver.empty()) {
@@ -772,8 +844,8 @@ static std::vector<std::string> detect_msvc_lib_paths() {
         std::string sdk_ver;
         for (auto& entry : fs::directory_iterator(kits_root)) {
             if (entry.is_directory()) {
-                sdk_ver = entry.path().filename().string();
-                break;
+                std::string v = entry.path().filename().string();
+                if (v > sdk_ver) sdk_ver = v;
             }
         }
         if (!sdk_ver.empty()) {
@@ -846,12 +918,16 @@ static std::string find_msvc_link() {
     if (vs_dir) {
         std::string base = std::string(vs_dir) + "\\VC\\Tools\\MSVC";
         if (fs::exists(base)) {
+            std::string best_ver;
             for (auto& entry : fs::directory_iterator(base)) {
                 if (!entry.is_directory()) continue;
-                std::string ver = entry.path().filename().string();
+                std::string v = entry.path().filename().string();
+                if (v > best_ver) best_ver = v;
+            }
+            if (!best_ver.empty()) {
                 std::vector<std::string> candidates = {
-                    base + "\\" + ver + "\\bin\\Hostx64\\x64\\link.exe",
-                    base + "\\" + ver + "\\bin\\Hostx86\\x64\\link.exe",
+                    base + "\\" + best_ver + "\\bin\\Hostx64\\x64\\link.exe",
+                    base + "\\" + best_ver + "\\bin\\Hostx86\\x64\\link.exe",
                 };
                 for (auto& c : candidates) {
                     if (fs::exists(c)) return c;
@@ -886,14 +962,14 @@ static std::string find_msvc_link() {
     char buf[512];
     std::string vs_install;
 
-    /* Try vswhere via PATH */
+    /* Try vswhere via PATH (include all products for Build Tools support) */
     {
-        FILE* pipe = _popen("vswhere -latest -property installationPath -format value 2>nul", "r");
+        FILE* pipe = _popen("vswhere -latest -products * -property installationPath -format value 2>nul", "r");
         if (!pipe) {
             const char* pf_env[] = { std::getenv("ProgramFiles(x86)"), std::getenv("ProgramFiles"), std::getenv("ProgramW6432") };
             for (auto p : pf_env) {
                 if (!p) continue;
-                std::string cmd = std::string("\"") + p + "\\Microsoft Visual Studio\\Installer\\vswhere.exe\" -latest -property installationPath -format value 2>nul";
+                std::string cmd = std::string("\"") + p + "\\Microsoft Visual Studio\\Installer\\vswhere.exe\" -latest -products * -property installationPath -format value 2>nul";
                 pipe = _popen(cmd.c_str(), "r");
                 if (pipe) break;
             }
@@ -957,6 +1033,27 @@ static std::string find_msvc_link() {
 }
 #endif
 
+/* ── Quick import scanner (line-based, no lexer needed) ──
+   Scans source text for `import "path"` patterns to collect
+   dependency paths for incremental compilation pre-check.    */
+static std::vector<std::string> scan_import_paths(const std::string& source_text,
+                                                    const std::string& source_dir) {
+    std::vector<std::string> paths;
+    size_t pos = 0;
+    while ((pos = source_text.find("import", pos)) != std::string::npos) {
+        size_t quote1 = source_text.find('"', pos);
+        if (quote1 == std::string::npos) { pos += 6; continue; }
+        size_t quote2 = source_text.find('"', quote1 + 1);
+        if (quote2 == std::string::npos) { pos = quote1 + 1; continue; }
+        std::string import_path = source_text.substr(quote1 + 1, quote2 - quote1 - 1);
+        fs::path resolved = fs::absolute(source_dir) / import_path;
+        if (fs::exists(resolved))
+            paths.push_back(fs::absolute(resolved).string());
+        pos = quote2 + 1;
+    }
+    return paths;
+}
+
 /* ── Link object file into executable (cross-platform) ── */
 static bool link_exe(const std::string& obj_path, const std::string& exe_path,
                      const std::string& exe_dir,
@@ -999,12 +1096,10 @@ static bool link_exe(const std::string& obj_path, const std::string& exe_path,
         return a;
     };
 
-    /* Try lld-link first */
+    /* Try lld-link first (specific path or bare-name on PATH) */
     linker = find_lld_link();
-    bool is_lld_bare = (linker == "lld-link");
     args = build_link_args();
-    if (!is_lld_bare) {
-        /* lld-link found at a specific path — try it */
+    {
         std::cout << "aurora: linking " << exe_path << " (lld-link)\n";
         int ret = run_process(linker, args);
         if (ret == 0) return true;
@@ -1130,13 +1225,61 @@ int main(int argc, char** argv) {
     bool fast_math = false;        /* -ffast-math: enable unsafe FP optimizations */
     bool use_lto = false;          /* -flto: enable link-time optimization */
     bool enable_coverage = false;  /* --coverage: enable code coverage tracing */
+    bool enable_debug = false;     /* --debug / -g: enable DWARF debug info */
     bool incremental = false;      /* --incremental: skip compilation if unchanged */
 
-    /* Check for --repl, --doc, --package first */
+/* ── Compute hash of all compiler flags that affect output ── */
+auto compute_flags_hash = [&]() -> std::string {
+    std::stringstream ss;
+    ss << "opt=" << opt_level
+       << ",opt_size=" << opt_size
+       << ",opt_size_aggressive=" << opt_size_aggressive
+       << ",fast_math=" << fast_math
+       << ",lto=" << use_lto
+       << ",coverage=" << enable_coverage
+       << ",debug=" << enable_debug
+       << ",aurora_ir=" << use_aurora_ir
+       << ",optimized_codegen=" << use_optimized_codegen
+       << ",emit_ir=" << emit_ir
+       << ",emit_obj=" << emit_obj
+       << ",run_jit=" << run_jit;
+    return BuildCache::sha256_hex(ss.str());
+};
+
+/* ── Determine actual output file path for cache tracking ──
+   Returns empty string if output goes to stdout (no file).    */
+auto get_output_path = [&]() -> std::string {
+    if (emit_ir) return "";
+    if (emit_obj) {
+        std::string obj_out = output_path.empty()
+            ? source_path.substr(0, source_path.rfind('.')) + ".obj"
+            : output_path;
+        if (obj_out.size() > 4 && obj_out.substr(obj_out.size() - 4) == ".exe")
+            return obj_out;
+        if (!link_libs.empty()) {
+            std::string exe_path = output_path.empty()
+                ? source_path.substr(0, source_path.rfind('.')) + ".exe"
+                : output_path;
+            return exe_path;
+        }
+        return obj_out;
+    }
+    auto sep = source_path.find_last_of("/\\");
+    std::string fname = (sep == std::string::npos) ? source_path : source_path.substr(sep + 1);
+    fname = fname.substr(0, fname.rfind('.')) + ".ll";
+    return "output/ir/" + fname;
+};
+
+    /* Check for --repl, --doc, --package, --help, --version first */
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "--repl") repl_mode = true;
         if (arg == "--doc") doc_mode = true;
+        if (arg == "--help") { print_usage(); return 0; }
+        if (arg == "--version") {
+            std::cout << "Aurorac version " << AURORA_VERSION << "\n";
+            return 0;
+        }
         if (arg == "--package") {
             package_mode = true;
             /* Collect remaining args for package command */
@@ -1148,24 +1291,7 @@ int main(int argc, char** argv) {
 
     /* For REPL/doc/package mode, source file is optional */
     if (!repl_mode && !doc_mode && !package_mode && argc < 2) {
-        std::cerr << "Usage: aurorac <source.aura> [--emit-obj] [-o output] [-l lib] [-L path]\n";
-        std::cerr << "       aurorac --repl\n";
-        std::cerr << "       aurorac --doc <source.aura> [output.html]\n";
-        std::cerr << "       aurorac --package <init|install|build|list|clean>\n";
-        std::cerr << "\n";
-        std::cerr << "Options:\n";
-        std::cerr << "  --emit-ir       Print LLVM IR to stdout\n";
-        std::cerr << "  --emit-obj      Emit object file (and link if -l used)\n";
-        std::cerr << "  -o <file>       Output path (.obj or .exe)\n";
-        std::cerr << "  -l <lib>        Library to link against (e.g. -l user32)\n";
-        std::cerr << "  -L <path>       Library search path\n";
-        std::cerr << "  -O0/-O1/-O2/-O3  Optimization level (default: -O3)\n";
-        std::cerr << "  -Os             Optimize for size\n";
-        std::cerr << "  -Oz             Aggressively optimize for size\n";
-        std::cerr << "  -ffast-math     Enable unsafe floating-point optimizations\n";
-        std::cerr << "  -flto           Enable link-time optimization (ThinLTO)\n";
-        std::cerr << "  --incremental   Enable incremental compilation (skip if sources unchanged)\n";
-        std::cerr << "  --verbose, -v   Show verbose stage/trace output for debugging\n";
+        print_usage();
         return 1;
     }
 
@@ -1219,11 +1345,14 @@ int main(int argc, char** argv) {
         else if (arg == "-flto") use_lto = true;
         else if (arg == "--coverage") enable_coverage = true;
         else if (arg == "--incremental") incremental = true;
+        else if (arg == "--debug" || arg == "-g") enable_debug = true;
         else if (arg == "--verbose" || arg == "-v") verbose = true;
         else if (arg == "--run")      run_jit = true;
         else if (arg == "--repl") {} /* already handled */
         else if (arg == "--doc") {} /* already handled */
         else if (arg == "--package") {} /* already handled */
+        else if (arg == "--help") {} /* already handled */
+        else if (arg == "--version") {} /* already handled */
     }
 
     /* ── Package Mode ── */
@@ -1242,42 +1371,60 @@ int main(int argc, char** argv) {
 
     /* ── REPL Mode ── */
     if (repl_mode) {
-        std::cout << "╔══════════════════════════════════════════╗\n";
-        std::cout << "║     Aurora Language REPL v1.0           ║\n";
-        std::cout << "║     Type code, press Enter to run.      ║\n";
-        std::cout << "║     Type 'exit' to quit.                ║\n";
-        std::cout << "╚══════════════════════════════════════════╝\n";
+        bool term = color_enabled(stdout);
+        std::cout << (term ? "\x1b[1m" : "") << "Aurora "
+                  << (term ? "\x1b[32m" : "") << "REPL" << (term ? "\x1b[0m" : "") << " v"
+                  << AURORA_VERSION << " (exit with :q or Ctrl+C)\n";
 
-        std::vector<std::string> history;
-        std::string line;
-        while (true) {
-            std::cout << "aura> " << std::flush;
-            if (!std::getline(std::cin, line)) {
-                std::cout << "\n";
-                break;
+        /* Helper: detect user's indentation from first non-empty line */
+        auto detect_indent = [](const std::string& raw) -> int {
+            size_t pos = 0;
+            while (pos < raw.size()) {
+                size_t nl = raw.find('\n', pos);
+                std::string l = raw.substr(pos, nl - pos);
+                if (!l.empty() && l.find_first_not_of(" \t\r") != std::string::npos) {
+                    size_t first_nonws = l.find_first_not_of(" \t");
+                    if (first_nonws != std::string::npos && first_nonws > 0)
+                        return (int)first_nonws;
+                    return 0;
+                }
+                if (nl == std::string::npos) break;
+                pos = nl + 1;
             }
-            if (line == "exit" || line == ":q") break;
-            if (line.empty()) continue;
+            return 2;
+        };
 
-            history.push_back(line);
+        /* Helper: indent each non-blank line by the detected amount */
+        auto indent_body = [](const std::string& raw, int indent) -> std::string {
+            std::string indent_str(static_cast<size_t>(indent), ' ');
+            std::string out;
+            size_t pos = 0;
+            while (pos < raw.size()) {
+                size_t nl = raw.find('\n', pos);
+                std::string l = raw.substr(pos, nl - pos);
+                if (!l.empty() && l.find_first_not_of(" \t\r") != std::string::npos)
+                    out += indent_str + l + "\n";
+                else
+                    out += "\n";
+                if (nl == std::string::npos) break;
+                pos = nl + 1;
+            }
+            return out;
+        };
 
-            /* Build full source buffer from history */
-            std::string source;
-            for (const auto& h : history)
-                source += h + "\n";
-
-            /* Wrap in function main() — no return type, indented body */
+        /* Helper: compile and JIT-run a complete snippet */
+        auto exec_repl = [&](const std::string& code) {
+            int user_indent = detect_indent(code);
+            std::string indent_str(static_cast<size_t>(user_indent), ' ');
             std::string wrapped =
-                "function main():\n"
-                "  " + line + "\n"
-                "  return 0\n";
+                "function main():\n" +
+                indent_body(code, user_indent) +
+                indent_str + "return 0\n";
 
             try {
-                /* Lex */
                 Lexer lexer;
                 auto lines = lexer.lex(wrapped);
 
-                /* Parse */
                 Parser parser(lines);
                 ASTNode::Ptr ast = parser.parse();
 
@@ -1285,35 +1432,81 @@ int main(int argc, char** argv) {
                     for (const auto& err : parser.errors())
                         std::cerr << "\n" << err;
                     std::cerr << "\n";
-                    continue;
+                    return;
                 }
 
-                /* Memory analysis */
                 MemoryAnalyzer memory_analyzer;
                 memory_analyzer.analyse(ast.get());
                 memory_analyzer.apply_to_ast(ast.get());
 
                 if (memory_analyzer.has_errors()) {
                     std::cerr << "REPL: compilation errors\n";
-                    continue;
+                    return;
                 }
 
-                /* Codegen */
                 auto ctx = std::make_unique<llvm::LLVMContext>();
                 auto module = std::make_unique<llvm::Module>("aurora_repl", *ctx);
                 auto builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
                 Codegen codegen(*ctx, module, builder);
                 codegen.set_source_file(source_path);
                 codegen.set_coverage_enabled(enable_coverage);
+                std::unique_ptr<llvm::DIBuilder> debug_builder;
+                if (enable_debug && !source_path.empty()) {
+                    debug_builder = std::make_unique<llvm::DIBuilder>(*module);
+                    codegen.set_debug_builder(debug_builder.get());
+                    codegen.set_debug_enabled(true);
+                }
                 codegen.generate(ast.get());
 
-                /* Run JIT */
                 int exit_code = jit_execute_main(std::move(ctx), std::move(module));
                 if (exit_code != 0 && exit_code != -1)
                     std::cout << "exit: " << exit_code << "\n";
 
             } catch (const std::exception& e) {
                 std::cerr << "REPL error: " << e.what() << "\n";
+            }
+        };
+
+        std::string buffer;
+        bool continuation = false;
+
+        while (true) {
+            std::cout << (continuation ? "> " : ">> ") << std::flush;
+
+            std::string line;
+            if (!std::getline(std::cin, line)) {
+                std::cout << "\n";
+                break;
+            }
+
+            if (line == "exit" || line == ":q") break;
+
+            if (!continuation) {
+                if (line.empty()) continue;
+
+                if (line == ":paste") {
+                    std::string paste_buf, pline;
+                    while (std::getline(std::cin, pline) && !pline.empty())
+                        paste_buf += pline + "\n";
+                    if (!paste_buf.empty()) exec_repl(paste_buf);
+                    continue;
+                }
+
+                if (line_needs_continuation(line)) {
+                    buffer = line + "\n";
+                    continuation = true;
+                    continue;
+                }
+
+                exec_repl(line);
+            } else {
+                if (line.empty()) {
+                    exec_repl(buffer);
+                    buffer.clear();
+                    continuation = false;
+                    continue;
+                }
+                buffer += line + "\n";
             }
         }
         return 0;
@@ -1322,6 +1515,27 @@ int main(int argc, char** argv) {
     if (source_path.empty() && !repl_mode) {
         std::cerr << "Usage: aurorac <source.aura> [options]\n";
         return 1;
+    }
+
+    /* ── Pre-check: cache lookup before lex/parse ──
+       Scans source text for imports (no lexer needed) to build
+       the full dependency list up front, skipping ALL stages if
+       the cache is still fresh.                                */
+    std::string cache_out = get_output_path();
+    if (incremental && !cache_out.empty()) {
+        std::string pre_source = read_file(source_path);
+        auto sep = source_path.find_last_of("/\\");
+        std::string source_dir = (sep == std::string::npos) ? "." : source_path.substr(0, sep);
+        auto import_paths = scan_import_paths(pre_source, source_dir);
+        std::vector<std::string> pre_files;
+        pre_files.push_back(fs::absolute(source_path).string());
+        pre_files.insert(pre_files.end(), import_paths.begin(), import_paths.end());
+        std::string pre_flags = compute_flags_hash();
+        BuildCache pre_cache;
+        if (pre_cache.is_up_to_date(pre_files, cache_out, pre_flags)) {
+            std::cout << "aurora: up to date (" << cache_out << ")\n";
+            return 0;
+        }
     }
 
     try {
@@ -1349,17 +1563,15 @@ int main(int argc, char** argv) {
         {
             auto sep = source_path.find_last_of("/\\");
             std::string source_dir = (sep == std::string::npos) ? "." : source_path.substr(0, sep);
-            ast = resolve_imports(std::move(ast), source_dir, exe_dir, &source_files);
+            ast = resolve_imports(std::move(ast), source_path, source_dir, exe_dir, &source_files);
         }
 
-        /* ── Incremental compilation check ── */
-        if (incremental) {
-            std::string out_path = output_path.empty()
-                ? source_path.substr(0, source_path.rfind('.')) + ".exe"
-                : output_path;
+        /* ── Incremental compilation check (post-import-resolution) ── */
+        if (incremental && !cache_out.empty()) {
+            std::string flags = compute_flags_hash();
             BuildCache cache;
-            if (cache.is_up_to_date(source_path, source_files, out_path)) {
-                std::cout << "aurora: up to date (" << out_path << ")\n";
+            if (cache.is_up_to_date(source_files, cache_out, flags)) {
+                std::cout << "aurora: up to date (" << cache_out << ")\n";
                 return 0;
             }
         }
@@ -1443,9 +1655,9 @@ int main(int argc, char** argv) {
             try {
                 ir_optimize(ir_mod);
             } catch (const std::exception& e) {
-                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora IR optimization failed: " << e.what() << "\n" << std::flush;
+                global_diag().warn(0, "Aurora IR optimization failed: " + std::string(e.what()));
             } catch (...) {
-                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora IR optimization failed (unknown exception)\n" << std::flush;
+                global_diag().warn(0, "Aurora IR optimization failed (unknown exception)");
             }
             if (verbose) std::cerr << "STAGE4b: Aurora IR optimized\n" << std::flush;
 
@@ -1467,9 +1679,26 @@ int main(int argc, char** argv) {
             Codegen codegen(*ctx, module, builder);
             codegen.set_source_file(source_path);
             codegen.set_coverage_enabled(enable_coverage);
+            std::unique_ptr<llvm::DIBuilder> debug_builder;
+            if (enable_debug && !source_path.empty()) {
+                debug_builder = std::make_unique<llvm::DIBuilder>(*module);
+                codegen.set_debug_builder(debug_builder.get());
+                codegen.set_debug_enabled(true);
+            }
             codegen.generate(ast.get());
         }
         if (verbose) std::cerr << "STAGE4: Done\n" << std::flush;
+
+        /* ── Stage 4b: LLVM IR verification ── */
+        if (enable_debug || verbose) {
+            std::string err_str;
+            llvm::raw_string_ostream err_os(err_str);
+            if (llvm::verifyModule(*module, &err_os)) {
+                global_diag().warn(0, "LLVM IR verification failed:\n" + err_str);
+            } else if (verbose) {
+                std::cerr << "STAGE4b: verifyModule OK\n" << std::flush;
+            }
+        }
 
         /* ── Stage 5: Aurora custom optimizations (LLVM IR level) ── */
         if (!use_aurora_ir) {
@@ -1477,9 +1706,9 @@ int main(int argc, char** argv) {
             try {
                 run_aurora_optimizer(module.get());
             } catch (const std::exception& e) {
-                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora LLVM optimizer failed: " << e.what() << "\n" << std::flush;
+                global_diag().warn(0, "Aurora LLVM optimizer failed: " + std::string(e.what()));
             } catch (...) {
-                std::cerr << "\n\033[1;33m[Warning]\033[0m Aurora LLVM optimizer failed (unknown exception)\n" << std::flush;
+                global_diag().warn(0, "Aurora LLVM optimizer failed (unknown exception)");
             }
             if (verbose) std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
         }
@@ -1624,24 +1853,23 @@ int main(int argc, char** argv) {
             compile_success = true;
         }
 
-        /* ── Stage 7: Update build cache ── */
-        if (incremental && compile_success) {
-            std::string out_path = output_path.empty()
-                ? source_path.substr(0, source_path.rfind('.')) + ".exe"
-                : output_path;
+        /* ── Stage 7: Update build cache (with flags hash) ── */
+        if (incremental && compile_success && !cache_out.empty()) {
+            std::string flags = compute_flags_hash();
             BuildCache cache;
-            cache.mark_cached(out_path, source_files);
-            if (verbose) std::cerr << "CACHE: marked " << out_path << " as up-to-date\n" << std::flush;
+            cache.mark_cached(cache_out, source_files, flags);
+            if (verbose) std::cerr << "CACHE: marked " << cache_out << " as up-to-date\n" << std::flush;
         }
 
     } catch (const OwnershipError& e) {
-        std::cerr << "\n\033[1;31m[Ownership Error]\033[0m\n  " << e.what() << "\n";
+        bool cerr_color = color_enabled(stderr);
+        std::cerr << "\n" << (cerr_color ? "\033[1;31m" : "") << "[Ownership Error]" << (cerr_color ? "\033[0m" : "") << "\n  " << e.what() << "\n";
         return 1;
     } catch (const TypeError& e) {
-        std::cerr << "\n\033[1;31m[Error]\033[0m Line " << e.line << ": " << e.what() << "\n";
+        std::cerr << "\n" << (color_enabled(stderr) ? "\033[1;31m" : "") << "[Error]" << (color_enabled(stderr) ? "\033[0m" : "") << " Line " << e.line << ": " << e.what() << "\n";
         return 1;
     } catch (const std::exception& e) {
-        std::cerr << "\n\033[1;31m[Error]\033[0m " << e.what() << "\n";
+        std::cerr << "\n" << (color_enabled(stderr) ? "\033[1;31m" : "") << "[Error]" << (color_enabled(stderr) ? "\033[0m" : "") << " " << e.what() << "\n";
         return 1;
     }
 

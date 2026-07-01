@@ -14,7 +14,7 @@
 
 static int count_instructions(llvm::Function& fn) {
     int n = 0;
-    for (auto& bb : fn) n += (int)bb.size();
+    for (auto& bb : fn) n += static_cast<int>(bb.size());
     return n;
 }
 

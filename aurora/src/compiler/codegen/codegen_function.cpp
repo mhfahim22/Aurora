@@ -3,6 +3,7 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/ADT/SmallVector.h>
 
 /* ════════════════════════════════════════════════════════════
    Function / Class / Method generation  (codegen_function.cpp)
@@ -13,10 +14,12 @@ void Codegen::gen_function(const ASTNode* node) {
     /* Build param type list — prefer annotation, fall back to i64 */
     std::vector<std::string>    param_names;
     std::vector<llvm::Type*>    param_types;
+    std::vector<AstTypeKind>    param_type_kinds;
     const ASTNode* p = node->args.get();
     while (p) {
         param_names.push_back(p->value);
         param_types.push_back(ast_kind_to_abi_type(ctx_, p->type_annotation.kind, i64_ty()));
+        param_type_kinds.push_back(p->type_annotation.kind);
         p = p->next.get();
     }
 
@@ -48,7 +51,10 @@ void Codegen::gen_function(const ASTNode* node) {
     /* Create DISubprogram for debug info */
     llvm::DISubprogram* sp = nullptr;
     if (dibuilder_ && debug_file_) {
-        llvm::DITypeRefArray param_debug_types;
+        llvm::SmallVector<llvm::Metadata*, 8> debug_types;
+        debug_types.push_back(get_debug_type(ret_kind));
+        for (auto k : param_type_kinds)
+            debug_types.push_back(get_debug_type(k));
         sp = dibuilder_->createFunction(
             debug_file_,
             node->value,
@@ -56,7 +62,7 @@ void Codegen::gen_function(const ASTNode* node) {
             debug_file_,
             node->src_line,
             dibuilder_->createSubroutineType(
-                dibuilder_->getOrCreateTypeArray(std::nullopt)),
+                dibuilder_->getOrCreateTypeArray(debug_types)),
             node->src_line,
             llvm::DINode::FlagZero,
             llvm::DISubprogram::SPFlagDefinition);
@@ -66,9 +72,9 @@ void Codegen::gen_function(const ASTNode* node) {
         }
     }
 
+    auto* saved_fn_sp = debug_cur_fn_;
     auto* entry_bb  = llvm::BasicBlock::Create(ctx_, "entry", fn);
     auto* saved_fn  = cur_fn_;
-    auto* saved_fn_sp = debug_cur_fn_;
     auto* saved_bb  = builder_->GetInsertBlock();
     auto  saved_cache  = std::move(literal_aurora_cache_);
     auto  saved_scopes = std::move(scopes_);
@@ -89,7 +95,7 @@ void Codegen::gen_function(const ASTNode* node) {
     for (auto& arg : fn->args()) {
         auto* slot = create_entry_alloca(param_names[ai], i64_ty());
         builder_->CreateStore(&arg, slot);
-        declare_var(param_names[ai], slot, OwnershipState::Owned);
+        declare_var(param_names[ai], slot, OwnershipState::Owned, param_type_kinds[ai]);
         ai++;
     }
 
@@ -97,6 +103,133 @@ void Codegen::gen_function(const ASTNode* node) {
     pop_scope_and_drop();
 
     /* Default return: appropriate zero for the function's return type */
+    {
+        auto* rt = fn->getReturnType();
+        if (rt->isVoidTy()) {
+            if (!current_block_terminated()) builder_->CreateRetVoid();
+        } else if (rt->isPointerTy()) {
+            safe_ret(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(rt)));
+        } else {
+            safe_ret(llvm::ConstantInt::get(rt, 0));
+        }
+    }
+
+    /* Restore caller context */
+    literal_aurora_cache_ = std::move(saved_cache);
+    scopes_ = std::move(saved_scopes);
+    debug_cur_fn_ = saved_fn_sp;
+    cur_fn_ = saved_fn;
+    if (saved_bb) builder_->SetInsertPoint(saved_bb);
+}
+
+/* ── Concrete generic function instantiation ──
+   Emits a monomorphized version of a generic function with
+   resolved param types and the mangled instantiation name.
+   The LLVM function declaration is expected to already exist
+   (created as a forward decl in generate()).               */
+void Codegen::gen_generic_instance(const std::string& mangled_name,
+                                    const ASTNode* generic_node,
+                                    const std::vector<AstTypeKind>& param_kinds,
+                                    AstTypeKind result_kind) {
+    /* Build param names from the generic AST node */
+    std::vector<std::string> param_names;
+    {
+        const ASTNode* p = generic_node->args.get();
+        while (p) {
+            param_names.push_back(p->value);
+            p = p->next.get();
+        }
+    }
+
+    llvm::Function* fn = module_->getFunction(mangled_name);
+    if (!fn) {
+        /* Build param type list from concrete kinds (forward decl missing) */
+        std::vector<llvm::Type*> param_types;
+        size_t pk_idx = 0;
+        const ASTNode* p2 = generic_node->args.get();
+        while (p2) {
+            AstTypeKind kind = (pk_idx < param_kinds.size())
+                ? param_kinds[pk_idx]
+                : AstTypeKind::Unknown;
+            param_types.push_back(ast_kind_to_abi_type(ctx_, kind, i64_ty()));
+            pk_idx++;
+            p2 = p2->next.get();
+        }
+        auto* ret_ty = ast_kind_to_abi_type(ctx_, result_kind, i8ptr_ty());
+        auto* fn_type = llvm::FunctionType::get(ret_ty, param_types, false);
+        fn = llvm::Function::Create(
+            fn_type, llvm::Function::ExternalLinkage,
+            mangled_name, module_.get());
+    }
+
+    /* Name the LLVM arguments */
+    int ai = 0;
+    for (auto& arg : fn->args()) {
+        arg.setName(param_names[ai]);
+        if (arg.getType()->isPointerTy()) {
+            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm::Attribute::NoAlias);
+        }
+        ai++;
+    }
+
+    /* Prevent inlining of closure-returning functions */
+    if (closure_returning_fns_.count(generic_node->value))
+        fn->addFnAttr(llvm::Attribute::NoInline);
+
+    /* Create DISubprogram for debug info */
+    llvm::DISubprogram* sp = nullptr;
+    if (dibuilder_ && debug_file_) {
+        llvm::SmallVector<llvm::Metadata*, 8> debug_types;
+        debug_types.push_back(get_debug_type(result_kind));
+        for (auto k : param_kinds)
+            debug_types.push_back(get_debug_type(k));
+        sp = dibuilder_->createFunction(
+            debug_file_,
+            mangled_name,
+            fn->getName(),
+            debug_file_,
+            generic_node->src_line,
+            dibuilder_->createSubroutineType(
+                dibuilder_->getOrCreateTypeArray(debug_types)),
+            generic_node->src_line,
+            llvm::DINode::FlagZero,
+            llvm::DISubprogram::SPFlagDefinition);
+        if (sp) {
+            fn->setSubprogram(sp);
+            debug_cur_fn_ = sp;
+        }
+    }
+
+    auto* saved_fn_sp = debug_cur_fn_;
+    auto* entry_bb  = llvm::BasicBlock::Create(ctx_, "entry", fn);
+    auto* saved_fn  = cur_fn_;
+    auto* saved_bb  = builder_->GetInsertBlock();
+    auto  saved_cache  = std::move(literal_aurora_cache_);
+    auto  saved_scopes = std::move(scopes_);
+
+    cur_fn_ = fn;
+    builder_->SetInsertPoint(entry_bb);
+    push_scope();
+
+    if (coverage_enabled_)
+        emit_coverage_trace(generic_node->src_line);
+
+    /* Allocate params with concrete LLVM type matching the function signature */
+    ai = 0;
+    for (auto& arg : fn->args()) {
+        llvm::Type* arg_ty = arg.getType();
+        auto* slot = create_entry_alloca(param_names[ai], arg_ty);
+        builder_->CreateStore(&arg, slot);
+        declare_var(param_names[ai], slot, OwnershipState::Owned,
+                    ai < static_cast<int>(param_kinds.size()) ? param_kinds[ai] : AstTypeKind::Unknown);
+        ai++;
+    }
+
+    gen_block(generic_node->body.get());
+    pop_scope_and_drop();
+
+    /* Default return */
     {
         auto* rt = fn->getReturnType();
         if (rt->isVoidTy()) {
@@ -171,6 +304,36 @@ void Codegen::gen_class_oop(const ASTNode* node) {
             llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx_, "entry", fn);
             builder_->SetInsertPoint(entry);
             cur_fn_ = fn;
+
+            /* Create DISubprogram for OOP method */
+            llvm::DISubprogram* saved_method_sp = debug_cur_fn_;
+            if (dibuilder_ && debug_file_) {
+                llvm::SmallVector<llvm::Metadata*, 8> debug_types;
+                debug_types.push_back(get_debug_type(method_ret_kind));
+                debug_types.push_back(dibuilder_->createBasicType("self", 64, llvm::dwarf::DW_ATE_address));
+                const ASTNode* mp = stmt->args.get();
+                while (mp) {
+                    if (mp->value != "self")
+                        debug_types.push_back(get_debug_type(mp->type_annotation.kind));
+                    mp = mp->next.get();
+                }
+                auto* method_sp = dibuilder_->createFunction(
+                    debug_file_,
+                    stmt->value,
+                    fn->getName(),
+                    debug_file_,
+                    stmt->src_line,
+                    dibuilder_->createSubroutineType(
+                        dibuilder_->getOrCreateTypeArray(debug_types)),
+                    stmt->src_line,
+                    llvm::DINode::FlagZero,
+                    llvm::DISubprogram::SPFlagDefinition);
+                if (method_sp) {
+                    fn->setSubprogram(method_sp);
+                    debug_cur_fn_ = method_sp;
+                }
+            }
+
             literal_aurora_cache_.clear();
             push_scope();
 
@@ -189,7 +352,7 @@ void Codegen::gen_class_oop(const ASTNode* node) {
                     if (val->getType() != i64_ty())
                         val = builder_->CreatePtrToInt(val, i64_ty(), param->value + "_unbox");
                     builder_->CreateStore(val, slot);
-                    declare_var(param->value, slot, OwnershipState::Owned);
+                    declare_var(param->value, slot, OwnershipState::Owned, param->type_annotation.kind);
                     ++ai;
                 }
                 param = param->next.get();
@@ -198,6 +361,9 @@ void Codegen::gen_class_oop(const ASTNode* node) {
             /* Walk method body */
             const ASTNode* body = stmt->body.get();
             while (body) {
+                if (dibuilder_ && body->src_line > 0 && debug_cur_fn_)
+                    builder_->SetCurrentDebugLocation(
+                        llvm::DILocation::get(ctx_, body->src_line, body->src_col, debug_cur_fn_));
                 gen_stmt_in_method(body, self_ptr, class_name);
                 body = body->next.get();
             }
@@ -214,6 +380,7 @@ void Codegen::gen_class_oop(const ASTNode* node) {
             }
 
             pop_scope_and_drop();
+            debug_cur_fn_ = saved_method_sp;
         }
         stmt = stmt->next.get();
     }

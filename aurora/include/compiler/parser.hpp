@@ -1,27 +1,32 @@
 #pragma once
 #include "compiler/ast.hpp"
 #include "compiler/lexer.hpp"
+#include "common/errors.hpp"
 #include <sstream>
 
 /* ════════════════════════════════════════════════════════════
    Error formatting helpers
    ════════════════════════════════════════════════════════════ */
 inline std::string format_error(int line, int col, const std::string& msg) {
+    bool color = color_enabled(stderr);
     std::ostringstream ss;
-    ss << "\033[1;31mError\033[0m at \033[1;33mline " << line;
+    ss << (color ? "\033[1;31m" : "") << "Error" << (color ? "\033[0m" : "") << " at "
+       << (color ? "\033[1;33m" : "") << "line " << line;
     if (col > 0) ss << ", column " << col;
-    ss << "\033[0m: " << msg;
+    ss << (color ? "\033[0m" : "") << ": " << msg;
     return ss.str();
 }
 
 inline std::string format_error_with_hint(int line, int col,
                                            const std::string& msg,
                                            const std::string& hint) {
+    bool color = color_enabled(stderr);
     std::ostringstream ss;
-    ss << "\033[1;31mError\033[0m at \033[1;33mline " << line;
+    ss << (color ? "\033[1;31m" : "") << "Error" << (color ? "\033[0m" : "") << " at "
+       << (color ? "\033[1;33m" : "") << "line " << line;
     if (col > 0) ss << ", column " << col;
-    ss << "\033[0m: " << msg << "\n";
-    ss << "  \033[1;36mhint:\033[0m " << hint;
+    ss << (color ? "\033[0m" : "") << ": " << msg << "\n";
+    ss << "  " << (color ? "\033[1;36m" : "") << "hint:" << (color ? "\033[0m" : "") << " " << hint;
     return ss.str();
 }
 
@@ -36,6 +41,7 @@ private:
     const std::vector<LexedLine>& lines_;
     int cur_;
     std::string pending_cost_ {}; /* @cost(zero|alloc|indirection) set by previous line */
+    std::string pending_ecosystem_ {}; /* "python", "quickjs", "rust" set by extern string */
     std::vector<std::string> errors_;
     bool had_error_ = false;
 
@@ -76,4 +82,7 @@ public:
     const LexedLine& cur_line() const { return lines_[cur_]; }
     int  cur_indent()           const { return at_end() ? -1 : cur_line().indent; }
     void advance()                    { cur_++; }
+
+    /* Panic-mode error recovery: skip error line + its indented body */
+    void panic_recover(int line_indent);
 };

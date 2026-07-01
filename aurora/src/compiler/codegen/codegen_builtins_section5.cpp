@@ -22,7 +22,7 @@ llvm::Value* codegen_builtin_section5(
     std::function<llvm::Value*(const ASTNode*)> gen_expr,
     llvm::Module* module)
 {
-    (void)module;
+    static_cast<void>(module);
 
     /* ── Data loading ── */
     if (name == "csv" && node->args) {

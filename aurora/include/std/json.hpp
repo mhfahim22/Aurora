@@ -41,6 +41,9 @@ double    aurora_json_get_num(JsonValue* obj, const char* key);
 char*     aurora_json_get_str(JsonValue* obj, const char* key);
 JsonValue* aurora_json_get_obj(JsonValue* obj, const char* key);
 
+/* ── Type inspection ── */
+int aurora_json_type(JsonValue* val);
+
 /* ── Array access ── */
 void      aurora_json_array_push(JsonValue* arr, JsonValue* val);
 JsonValue* aurora_json_array_get(JsonValue* arr, int idx);

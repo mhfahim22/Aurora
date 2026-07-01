@@ -42,7 +42,7 @@ static std::map<size_t, std::vector<size_t>> build_predecessors(IrFunction& fn) 
     std::map<size_t, std::vector<size_t>> preds;
     for (size_t bi = 0; bi < fn.blocks.size(); bi++) {
         /* Initialize empty predecessor list */
-        (void)preds[bi];
+        static_cast<void>(preds[bi]);
         for (const auto& inst : fn.blocks[bi].instructions) {
             if (auto* br = std::get_if<IrBr>(&inst)) {
                 for (size_t bj = 0; bj < fn.blocks.size(); bj++)
@@ -62,7 +62,7 @@ static std::map<size_t, std::vector<size_t>> build_predecessors(IrFunction& fn) 
 }
 
 bool ir_mem2reg(IrFunction& fn, std::vector<IrType>& pool) {
-    (void)pool;
+    static_cast<void>(pool);
     if (fn.blocks.empty()) return false;
 
     IrBasicBlock& entry = fn.blocks.front();

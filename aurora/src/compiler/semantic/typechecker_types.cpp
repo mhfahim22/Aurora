@@ -50,6 +50,7 @@ void TypeChecker::register_type_alias(const ASTNode* node) {
                 case AuroraType::Array:    return AstTypeKind::Array;
                 case AuroraType::Pointer:  return AstTypeKind::Pointer;
                 case AuroraType::Void:     return AstTypeKind::Void;
+                case AuroraType::Generic:  return AstTypeKind::Unknown;
                 default:                   return AstTypeKind::Unknown;
             }
         };
@@ -121,6 +122,9 @@ void TypeChecker::register_struct(const ASTNode* node) {
                     } else if (stmt->right->type == NodeType::Num) {
                         field.default_value = stmt->right->value;
                         field.type_kind = AstTypeKind::Int;
+                    } else if (stmt->right->type == NodeType::Var) {
+                        field.type_name = stmt->right->value;
+                        field.default_value = "0";
                     } else {
                         field.default_value = stmt->right->value;
                     }
@@ -216,13 +220,17 @@ bool TypeChecker::is_user_type(const std::string& name) const {
     return user_types_.count(name) > 0 || global_type_registry().is_user_type(name);
 }
 
-AuroraType TypeChecker::resolve_type_name(const std::string& name) const {
-    if (name == "int")    return AuroraType::Int;
-    if (name == "float")  return AuroraType::Float;
-    if (name == "string") return AuroraType::String;
-    if (name == "bool")   return AuroraType::Bool;
-    if (name == "void")   return AuroraType::Void;
+AuroraType TypeChecker::resolve_type_name(const std::string& name) {
+    if (name == "int" || name == "Int" || name == "i64" || name == "u64") return AuroraType::Int;
+    if (name == "float" || name == "Float" || name == "f64" || name == "double") return AuroraType::Float;
+    if (name == "string" || name == "String" || name == "str") return AuroraType::String;
+    if (name == "bool" || name == "Bool") return AuroraType::Bool;
+    if (name == "void" || name == "Void") return AuroraType::Void;
     if (name == "array")  return AuroraType::Array;
+
+    /* Check generic type parameters (T, U, etc. in generic function bodies) */
+    if (is_generic_param(name))
+        return AuroraType::Generic;
 
     /* Check type aliases */
     if (global_type_registry().is_alias(name)) {
@@ -235,4 +243,89 @@ AuroraType TypeChecker::resolve_type_name(const std::string& name) const {
     if (it != user_types_.end()) return it->second.kind;
 
     return AuroraType::Unknown;
+}
+
+/* ── Instantiate a generic struct ── */
+std::string TypeChecker::instantiate_generic_struct(const std::string& struct_name, const ASTNode* template_args) {
+    const StructInfo* sinfo = global_type_registry().get_struct(struct_name);
+    if (!sinfo || !sinfo->is_generic) return "";
+
+    /* Build type param → concrete type map */
+    std::unordered_map<std::string, AuroraType> type_map;
+    {
+        const ASTNode* tp = nullptr;
+        {
+            /* Find the AST node with template_params (look in user_types_ to get original struct def) */
+            auto ut = user_types_.find(struct_name);
+            if (ut == user_types_.end()) return "";
+        }
+        /* Match generic params to template args by position */
+        size_t tp_idx = 0;
+        const ASTNode* ta = template_args;
+        while (ta && tp_idx < sinfo->generic_params.size()) {
+            type_map[sinfo->generic_params[tp_idx]] = resolve_type_name(ta->value);
+            tp_idx++;
+            ta = ta->next.get();
+        }
+        if (tp_idx != sinfo->generic_params.size()) return "";
+    }
+
+    /* Build mangled name: Box__Int__Float */
+    std::string mangled = struct_name;
+    {
+        const ASTNode* ta = template_args;
+        while (ta) {
+            mangled += "__" + ta->value;
+            ta = ta->next.get();
+        }
+    }
+
+    if (global_type_registry().has_struct(mangled))
+        return mangled;
+
+    /* Create concrete struct info */
+    StructInfo concrete;
+    concrete.name = mangled;
+    concrete.is_generic = false;
+
+    /* Resolve field types */
+    for (auto& f : sinfo->fields) {
+        StructFieldInfo field;
+        field.name = f.name;
+        field.position = static_cast<int>(concrete.fields.size());
+        field.default_value = f.default_value;
+
+        if (!f.type_name.empty()) {
+            auto tm = type_map.find(f.type_name);
+            if (tm != type_map.end()) {
+                field.type_kind = to_ast_type_kind(tm->second);
+                field.type_name = f.type_name;
+            } else {
+                field.type_name = f.type_name;
+                field.type_kind = to_ast_type_kind(resolve_type_name(f.type_name));
+            }
+        }
+        concrete.fields.push_back(field);
+    }
+
+    /* Register in global type registry */
+    global_type_registry().register_struct(concrete);
+
+    /* Register in user_types_ for type resolution */
+    UserTypeEntry entry;
+    entry.kind = AuroraType::Struct;
+    for (auto& f : concrete.fields) {
+        AuroraType ft = AuroraType::Unknown;
+        if (!f.type_name.empty()) {
+            auto tm = type_map.find(f.type_name);
+            if (tm != type_map.end())
+                ft = tm->second;
+            else
+                ft = resolve_type_name(f.type_name);
+        }
+        entry.fields.emplace_back(f.name, ft);
+    }
+    user_types_[mangled] = std::move(entry);
+
+    return mangled;
 }

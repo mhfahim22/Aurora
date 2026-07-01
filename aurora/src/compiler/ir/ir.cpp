@@ -6,7 +6,7 @@
    ════════════════════════════════════════════════════════════ */
 
 int32_t ir_type_pool_add(std::vector<IrType>& pool, IrType t) {
-    int32_t idx = (int32_t)pool.size();
+    int32_t idx = static_cast<int32_t>(pool.size());
     pool.push_back(std::move(t));
     return idx;
 }
@@ -45,7 +45,7 @@ int32_t ir_make_struct(std::vector<IrType>& pool, const std::string& name, std::
 /* Simple linear-scan deduplication for primitive types.
    Callers (e.g. AstToIr) maintain a type_cache_ to avoid repeated O(n) scans. */
 int32_t ir_make_primitive(std::vector<IrType>& pool, IrTypeKind kind) {
-    for (int32_t i = 0; i < (int32_t)pool.size(); i++)
+    for (int32_t i = 0; i < static_cast<int32_t>(pool.size()); i++)
         if (pool[i].kind == kind) return i;
     IrType t;
     t.kind = kind;
@@ -109,8 +109,8 @@ IrBasicBlock* IrModule::get_block(const IrFunction& fn, const std::string& name)
 }
 
 int32_t IrModule::add_string(const std::string& s) {
-    int32_t idx = (int32_t)string_pool.size();
-    for (int32_t i = 0; i < (int32_t)string_pool.size(); i++)
+    int32_t idx = static_cast<int32_t>(string_pool.size());
+    for (int32_t i = 0; i < static_cast<int32_t>(string_pool.size()); i++)
         if (string_pool[i] == s) return i;
     string_pool.push_back(s);
     return idx;
@@ -144,7 +144,7 @@ static std::string type_str(const IrType& t, const std::vector<IrType>& pool) {
         case IrTypeKind::Float32: case IrTypeKind::Float64:
             return kind_name(t.kind);
         case IrTypeKind::Ptr: {
-            if (t.child_idx >= 0 && (size_t)t.child_idx < pool.size())
+            if (t.child_idx >= 0 && static_cast<size_t>(t.child_idx) < pool.size())
                 return type_str(pool[t.child_idx], pool) + "*";
             return "void*";
         }
@@ -154,14 +154,14 @@ static std::string type_str(const IrType& t, const std::vector<IrType>& pool) {
             for (size_t i = 0; i < t.field_idxs.size(); i++) {
                 if (i > 0) s += ", ";
                 int32_t fi = t.field_idxs[i];
-                s += (fi >= 0 && (size_t)fi < pool.size()) ? type_str(pool[fi], pool) : "?";
+                s += (fi >= 0 && static_cast<size_t>(fi) < pool.size()) ? type_str(pool[fi], pool) : "?";
             }
             return s + " }";
         }
         case IrTypeKind::Array: {
             std::string s = "[" + std::to_string(t.array_size) + " x ";
             int32_t ci = t.child_idx;
-            s += (ci >= 0 && (size_t)ci < pool.size()) ? type_str(pool[ci], pool) : "?";
+            s += (ci >= 0 && static_cast<size_t>(ci) < pool.size()) ? type_str(pool[ci], pool) : "?";
             return s + "]";
         }
         case IrTypeKind::Func: {
@@ -169,11 +169,11 @@ static std::string type_str(const IrType& t, const std::vector<IrType>& pool) {
             for (size_t i = 0; i < t.param_idxs.size(); i++) {
                 if (i > 0) s += ", ";
                 int32_t pi = t.param_idxs[i];
-                s += (pi >= 0 && (size_t)pi < pool.size()) ? type_str(pool[pi], pool) : "?";
+                s += (pi >= 0 && static_cast<size_t>(pi) < pool.size()) ? type_str(pool[pi], pool) : "?";
             }
             int32_t ri = t.ret_idx;
             s += ") -> ";
-            s += (ri >= 0 && (size_t)ri < pool.size()) ? type_str(pool[ri], pool) : "?";
+            s += (ri >= 0 && static_cast<size_t>(ri) < pool.size()) ? type_str(pool[ri], pool) : "?";
             return s;
         }
     }
@@ -182,7 +182,7 @@ static std::string type_str(const IrType& t, const std::vector<IrType>& pool) {
 
 static std::string val_str(const IrValue& v, const std::vector<IrType>& pool) {
     std::string t;
-    if (v.type_idx >= 0 && (size_t)v.type_idx < pool.size())
+    if (v.type_idx >= 0 && static_cast<size_t>(v.type_idx) < pool.size())
         t = type_str(pool[v.type_idx], pool) + " ";
     if (v.is_const) {
         return t + std::to_string(v.i64());
@@ -222,11 +222,11 @@ static void print_inst(std::ostream& os, const IrInstruction& inst,
         using T = std::decay_t<decltype(i)>;
         if constexpr (std::is_same_v<T, IrAlloca>) {
             os << indent << "%" << i.result_name << " = alloca "
-               << ((i.type_idx >= 0 && (size_t)i.type_idx < pool.size())
+               << ((i.type_idx >= 0 && static_cast<size_t>(i.type_idx) < pool.size())
                    ? type_str(pool[i.type_idx], pool) : "?") << "\n";
         } else if constexpr (std::is_same_v<T, IrLoad>) {
             std::string ty;
-            if (i.loaded_type >= 0 && (size_t)i.loaded_type < pool.size())
+            if (i.loaded_type >= 0 && static_cast<size_t>(i.loaded_type) < pool.size())
                 ty = type_str(pool[i.loaded_type], pool);
             os << indent << "%" << i.result_name << " = load " << ty << ", " << val_str(i.ptr, pool) << "\n";
         } else if constexpr (std::is_same_v<T, IrStore>) {
@@ -241,7 +241,7 @@ static void print_inst(std::ostream& os, const IrInstruction& inst,
             os << indent;
             if (!i.result_name.empty()) {
                 std::string rt;
-                if (i.ret_type_idx >= 0 && (size_t)i.ret_type_idx < pool.size())
+                if (i.ret_type_idx >= 0 && static_cast<size_t>(i.ret_type_idx) < pool.size())
                     rt = type_str(pool[i.ret_type_idx], pool) + " ";
                 os << "%" << i.result_name << " = call " << rt;
             } else {
@@ -261,7 +261,7 @@ static void print_inst(std::ostream& os, const IrInstruction& inst,
             os << indent << "br " << val_str(i.cond, pool) << ", label %" << i.true_bb << ", label %" << i.false_bb << "\n";
         } else if constexpr (std::is_same_v<T, IrPhi>) {
             std::string pt;
-            if (i.type_idx >= 0 && (size_t)i.type_idx < pool.size())
+            if (i.type_idx >= 0 && static_cast<size_t>(i.type_idx) < pool.size())
                 pt = type_str(pool[i.type_idx], pool) + " ";
             os << indent << "%" << i.result_name << " = phi " << pt << "[ ";
             for (size_t j = 0; j < i.incoming.size(); j++) {
@@ -276,7 +276,7 @@ static void print_inst(std::ostream& os, const IrInstruction& inst,
             os << "\n";
         } else if constexpr (std::is_same_v<T, IrBitCast>) {
             os << indent << "%" << i.result_name << " = bitcast " << val_str(i.value, pool)
-               << " to " << ((i.target_type >= 0 && (size_t)i.target_type < pool.size())
+               << " to " << ((i.target_type >= 0 && static_cast<size_t>(i.target_type) < pool.size())
                    ? type_str(pool[i.target_type], pool) : "?") << "\n";
         } else if constexpr (std::is_same_v<T, IrStrLiteral>) {
             os << indent << "%" << i.result_name << " = strlit " << i.string_idx << "\n";
@@ -297,7 +297,7 @@ std::string IrModule::to_string() const {
 
     for (const auto& g : globals) {
         os << "global @" << g.name
-           << " : " << ((g.type_idx >= 0 && (size_t)g.type_idx < type_pool.size())
+           << " : " << ((g.type_idx >= 0 && static_cast<size_t>(g.type_idx) < type_pool.size())
                ? type_str(type_pool[g.type_idx], type_pool) : "?");
         if (g.is_constant) os << " (const)";
         os << "\n";
@@ -309,7 +309,7 @@ std::string IrModule::to_string() const {
         for (size_t i = 0; i < fn.params.size(); i++) {
             if (i > 0) os << ", ";
             int32_t ti = fn.params[i].type_idx;
-            os << ((ti >= 0 && (size_t)ti < type_pool.size())
+            os << ((ti >= 0 && static_cast<size_t>(ti) < type_pool.size())
                    ? type_str(type_pool[ti], type_pool) : "?")
                << " %" << fn.params[i].name;
         }

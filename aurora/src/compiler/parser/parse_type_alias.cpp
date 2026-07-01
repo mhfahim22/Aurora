@@ -5,7 +5,7 @@
 ASTNode::Ptr Parser::parse_type_alias() {
     const LexedLine& ll   = cur_line();
     const auto&      toks = ll.tokens;
-    int              cnt  = (int)toks.size();
+    int              cnt  = static_cast<int>(toks.size());
     int              ln   = ll.line_no;
 
     if (cnt < 4 || !toks[1].is_identifier() || !toks[2].is_operator('='))

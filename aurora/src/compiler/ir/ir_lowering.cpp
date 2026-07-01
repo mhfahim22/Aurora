@@ -13,7 +13,7 @@
 
 static llvm::Type* lower_type(int32_t idx, const std::vector<IrType>& pool,
                                llvm::LLVMContext& ctx) {
-    if (idx < 0 || (size_t)idx >= pool.size())
+    if (idx < 0 || static_cast<size_t>(idx) >= pool.size())
         return llvm::Type::getVoidTy(ctx);
 
     const IrType& t = pool[idx];
@@ -54,11 +54,11 @@ static llvm::Value* lower_value(const IrValue& v, llvm::IRBuilder<>& builder,
                                  const std::vector<IrType>& pool,
                                  std::unordered_map<std::string, llvm::Value*>& ssa_map) {
     if (v.is_const) {
-        if (v.type_idx >= 0 && (size_t)v.type_idx < pool.size()) {
+        if (v.type_idx >= 0 && static_cast<size_t>(v.type_idx) < pool.size()) {
             if (pool[v.type_idx].kind == IrTypeKind::Float64)
                 return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat(v.f64()));
             if (pool[v.type_idx].kind == IrTypeKind::Float32)
-                return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat((float)v.f64()));
+                return llvm::ConstantFP::get(builder.getContext(), llvm::APFloat(static_cast<float>(v.f64())));
         }
         return llvm::ConstantInt::get(llvm::Type::getInt64Ty(builder.getContext()), v.i64());
     }
@@ -74,7 +74,7 @@ static llvm::Value* lower_instruction(const IrInstruction& inst, llvm::IRBuilder
                                        llvm::Function* cur_fn) {
     return std::visit([&](const auto& i) -> llvm::Value* {
         using T = std::decay_t<decltype(i)>;
-        (void)string_pool; (void)str_cache;
+        static_cast<void>(string_pool); static_cast<void>(str_cache);
 
         if constexpr (std::is_same_v<T, IrAlloca>) {
             auto* ty = lower_type(i.type_idx, pool, builder.getContext());
@@ -202,7 +202,7 @@ static llvm::Value* lower_instruction(const IrInstruction& inst, llvm::IRBuilder
         else if constexpr (std::is_same_v<T, IrPhi>) {
             auto* phi = builder.CreatePHI(
                 lower_type(i.type_idx, pool, builder.getContext()),
-                (unsigned)i.incoming.size(), i.result_name);
+                static_cast<unsigned>(i.incoming.size()), i.result_name);
             for (const auto& [val_name, block_name] : i.incoming) {
                 if (val_name.empty() || block_name.empty()) continue;
                 auto* val = lower_value(ir_ssa(val_name, i.type_idx), builder, pool, ssa_map);
@@ -224,7 +224,7 @@ static llvm::Value* lower_instruction(const IrInstruction& inst, llvm::IRBuilder
                 llvm_indices.push_back(lower_value(idx, builder, pool, ssa_map));
             /* Determine pointee type from the pointer's element type */
             llvm::Type* elem_ty = llvm::Type::getInt64Ty(builder.getContext());
-            if (i.ptr.type_idx >= 0 && (size_t)i.ptr.type_idx < pool.size()) {
+            if (i.ptr.type_idx >= 0 && static_cast<size_t>(i.ptr.type_idx) < pool.size()) {
                 int32_t child = pool[i.ptr.type_idx].child_idx;
                 if (child >= 0)
                     elem_ty = lower_type(child, pool, builder.getContext());
@@ -253,7 +253,7 @@ static llvm::Value* lower_instruction(const IrInstruction& inst, llvm::IRBuilder
             /* Need a C string pointer: create GlobalStringPtr */
             auto& ctx = builder.getContext();
             auto* mod = builder.GetInsertBlock()->getModule();
-            const std::string& str = (size_t)i.string_idx < string_pool.size()
+            const std::string& str = static_cast<size_t>(i.string_idx) < string_pool.size()
                 ? string_pool[i.string_idx] : "";
             auto* gstr = builder.CreateGlobalStringPtr(str, ".str." + std::to_string(i.string_idx));
             /* Call aurora_str_from_cstr to create AuroraStr* */

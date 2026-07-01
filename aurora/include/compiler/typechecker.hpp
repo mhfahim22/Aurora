@@ -1,5 +1,6 @@
 #pragma once
 #include "compiler/ast.hpp"
+#include "compiler/ast/ast_type.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -31,6 +32,9 @@ enum class AuroraType {
     Stack,
     Queue,
     Json,
+
+    /* Generic type parameter (unknown at analysis time, resolved at instantiation) */
+    Generic,
 };
 
 struct TypeInfo {
@@ -70,8 +74,38 @@ inline const char* aurora_type_name(AuroraType t) {
         case AuroraType::Queue:   return "queue";
         case AuroraType::Json:    return "json";
         case AuroraType::Pointer: return "pointer";
+        case AuroraType::Generic: return "generic";
     }
     return "unknown";
+}
+
+/* ── AuroraType → AstTypeKind conversion ── */
+inline AstTypeKind to_ast_type_kind(AuroraType t) {
+    switch (t) {
+        case AuroraType::Unknown:  return AstTypeKind::Unknown;
+        case AuroraType::Void:     return AstTypeKind::Void;
+        case AuroraType::Int:      return AstTypeKind::Int;
+        case AuroraType::Float:    return AstTypeKind::Float;
+        case AuroraType::String:   return AstTypeKind::String;
+        case AuroraType::Bool:     return AstTypeKind::Bool;
+        case AuroraType::Array:    return AstTypeKind::Array;
+        case AuroraType::Struct:   return AstTypeKind::Struct;
+        case AuroraType::Function: return AstTypeKind::Function;
+        case AuroraType::Class:    return AstTypeKind::Class;
+        case AuroraType::Enum:      return AstTypeKind::Enum;
+        case AuroraType::Interface: return AstTypeKind::Interface;
+        case AuroraType::Tuple:    return AstTypeKind::Tuple;
+        case AuroraType::Pointer:  return AstTypeKind::Pointer;
+        case AuroraType::List:     return AstTypeKind::List;
+        case AuroraType::Map:       return AstTypeKind::Map;
+        case AuroraType::Set:       return AstTypeKind::Set;
+        case AuroraType::Vector:   return AstTypeKind::Vector;
+        case AuroraType::Stack:    return AstTypeKind::Stack;
+        case AuroraType::Queue:    return AstTypeKind::Queue;
+        case AuroraType::Json:     return AstTypeKind::Json;
+        case AuroraType::Generic:  return AstTypeKind::Unknown;
+    }
+    return AstTypeKind::Unknown;
 }
 
 /* ── ABI validation ── */
@@ -97,12 +131,22 @@ struct FunctionTypeInfo {
     std::vector<std::string> generic_params;  /* e.g. ["T", "U"] for function foo[T, U](...) */
     const ASTNode* generic_ast_node{ nullptr };  /* original AST node for monomorphization */
 
-    /* Build a mangled name for a monomorphized instance */
-    std::string instantiated_name(const std::vector<std::string>& type_args) const {
-        std::string result = class_name.empty() ? "" : class_name + "__";
-        /* We'll append the original name during registration */
-        return result; /* caller should append */
+    /* Build a mangled name for a monomorphized instance.
+       The function name is tracked externally in the TypeChecker's fns_ map. */
+    std::string instantiated_name(const std::string& fn_name,
+                                  const std::vector<std::string>& type_args) const {
+        std::string result = class_name.empty() ? fn_name : class_name + "__" + fn_name;
+        for (auto& ta : type_args)
+            result += "__" + ta;
+        return result;
     }
+};
+
+/* Concrete generic instantiation record — used by codegen to emit monomorphized functions */
+struct ConcreteGenericInfo {
+    const ASTNode* generic_node{ nullptr };     /* original generic function AST node */
+    std::vector<AstTypeKind> param_kinds{};     /* resolved param type kinds */
+    AstTypeKind result_kind{ AstTypeKind::Unknown };
 };
 
 class TypeChecker {
@@ -118,10 +162,24 @@ public:
     const std::string& current_class_name() const { return current_class_name_; }
     bool is_inside_class() const { return !current_class_name_.empty(); }
 
+    /* Access concrete generic instantiations (for codegen) */
+    const std::unordered_map<std::string, ConcreteGenericInfo>& get_concrete_generics() const {
+        return concrete_generics_;
+    }
+
+    /* Instantiate a generic struct: create concrete struct type with mangled name */
+    std::string instantiate_generic_struct(const std::string& struct_name, const ASTNode* template_args);
+
 private:
     std::vector<std::unordered_map<std::string, AuroraType>> scopes_; /* TODO: add variable shadowing diagnostic (future) */
     std::unordered_map<std::string, AstTypeKind> var_element_types_;  /* H2 Phase E-1: element kind per variable */
     std::unordered_map<std::string, FunctionTypeInfo> functions_;
+
+    /* Per-variable struct type name tracking (e.g. "b" → "Box__Int") */
+    std::unordered_map<std::string, std::string> var_struct_types_;
+
+    /* Per-variable enum type name tracking (e.g. "col" → "Color") */
+    std::unordered_map<std::string, std::string> var_enum_types_;
 
     /* User-defined type registry (struct/class/enum/interface name -> TypeInfo) */
     struct UserTypeEntry {
@@ -148,6 +206,7 @@ private:
     void define_var_elem(const std::string& name, AuroraType type, AstTypeKind elem_kind);
     AuroraType lookup_var(const std::string& name, int line) const;
     AstTypeKind lookup_var_elem(const std::string& name) const;
+    std::string lookup_var_enum(const std::string& name) const;
 
     void walk_block(const ASTNode* node);
     void walk_stmt(const ASTNode* node);
@@ -165,7 +224,12 @@ private:
     void register_enum(const ASTNode* node);
     void register_interface(const ASTNode* node);
     bool is_user_type(const std::string& name) const;
-    AuroraType resolve_type_name(const std::string& name) const;
+    AuroraType resolve_type_name(const std::string& name);
+
+    /* Generic type param scope helpers */
+    void push_generic_params(const ASTNode* template_params);
+    void pop_generic_params(const ASTNode* template_params);
+    bool is_generic_param(const std::string& name) const;
 
     bool is_numeric(AuroraType type) const;
     bool is_boolish(AuroraType type) const;
@@ -175,4 +239,10 @@ private:
     /* Lambda capture tracking */
     std::unordered_set<std::string> var_refs_;
     bool tracking_var_refs_ = false;
+
+    /* Concrete generic instantiations: mangled_name → info (for codegen) */
+    std::unordered_map<std::string, ConcreteGenericInfo> concrete_generics_;
+
+    /* Active generic type parameter names (for body analysis of generic functions/structs) */
+    std::unordered_set<std::string> active_generic_params_;
 };

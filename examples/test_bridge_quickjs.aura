@@ -1,0 +1,12 @@
+## Test: QuickJS Bridge Integration
+## Verifies extern "quickjs" declarations generate valid IR
+
+extern "quickjs" "moment" function format_date(ts: i64) -> string
+extern "quickjs" "lodash" function chunk(arr: pointer, size: i64) -> pointer
+extern "quickjs" function eval_math(expr: string) -> Float
+extern "quickjs" "fs" function read_file(path: string) -> string
+
+function main():
+  outputln("QuickJS bridge loaded")
+  result = eval_math("2 + 2")
+  outputln(result)

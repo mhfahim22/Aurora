@@ -41,7 +41,7 @@ static int run_process(const std::string& exe, const std::vector<std::string>& a
     GetExitCodeProcess(pi.hProcess, &exit_code);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    return (int)exit_code;
+    return static_cast<int>(exit_code);
 #else
     pid_t pid = fork();
     if (pid == 0) {
@@ -226,6 +226,36 @@ static int cmd_package_build() {
         "/SUBSYSTEM:CONSOLE"
     };
     ret = run_process("lld-link", link_args);
+
+    if (ret != 0) {
+#ifdef _WIN32
+        std::cerr << "package: lld-link failed, trying MSVC link.exe...\n";
+        std::vector<std::string> candidates;
+        const char* vs_dir = std::getenv("VSINSTALLDIR");
+        if (vs_dir) {
+            std::string base = std::string(vs_dir) + "\\VC\\Tools\\MSVC";
+            if (fs::exists(base)) {
+                std::string best_ver;
+                for (auto& entry : fs::directory_iterator(base))
+                    if (entry.is_directory()) {
+                        std::string v = entry.path().filename().string();
+                        if (v > best_ver) best_ver = v;
+                    }
+                if (!best_ver.empty()) {
+                    candidates.push_back(base + "\\" + best_ver + "\\bin\\Hostx64\\x64\\link.exe");
+                    candidates.push_back(base + "\\" + best_ver + "\\bin\\Hostx86\\x64\\link.exe");
+                }
+            }
+        }
+        candidates.push_back("link.exe");
+        for (auto& linker : candidates) {
+            if (linker.find('\\') != std::string::npos && !fs::exists(linker))
+                continue;
+            ret = run_process(linker, link_args);
+            if (ret == 0) break;
+        }
+#endif
+    }
 
     if (ret == 0)
         std::cout << "package: built '" << exe_path << "'\n";

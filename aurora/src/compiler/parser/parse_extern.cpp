@@ -5,15 +5,15 @@
 /* ── Helper: parse struct/union fields from a token list ── */
 static void parse_extern_fields(const std::vector<Token>& ftoks, ASTNode* stmt, int ln) {
     ASTNode* ftail = nullptr;
-    for (int fi = 0; fi < (int)ftoks.size(); ) {
+    for (int fi = 0; fi < static_cast<int>(ftoks.size()); ) {
         if (ftoks[fi].is_operator(',') || ftoks[fi].is_operator(';')) { fi++; continue; }
         if (!ftoks[fi].is_identifier())
             throw std::runtime_error("Line " + std::to_string(ln) + ": expected field name in struct/union");
         auto field = make_node(NodeType::Var, ftoks[fi].value, ln);
         fi++;
-        if (fi < (int)ftoks.size() && ftoks[fi].is_operator(':')) {
+        if (fi < static_cast<int>(ftoks.size()) && ftoks[fi].is_operator(':')) {
             fi++;
-            if (fi < (int)ftoks.size() && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenType::Keyword))) {
+            if (fi < static_cast<int>(ftoks.size()) && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenType::Keyword))) {
                 field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
                 fi++;
             }
@@ -36,7 +36,7 @@ static std::vector<Token> collect_braced_tokens(Parser& parser, const std::vecto
         parser.advance();
         if (parser.at_end()) break;
         const auto& nt = parser.cur_line().tokens;
-        for (int i = 0; i < (int)nt.size(); i++) {
+        for (int i = 0; i < static_cast<int>(nt.size()); i++) {
             if (nt[i].is_operator('}')) { idx = cnt; return ftoks; }
             ftoks.push_back(nt[i]);
         }
@@ -47,7 +47,7 @@ static std::vector<Token> collect_braced_tokens(Parser& parser, const std::vecto
 ASTNode::Ptr Parser::parse_extern() {
     auto& toks = cur_line().tokens;
     int ln = cur_line().line_no;
-    int cnt = (int)toks.size();
+    int cnt = static_cast<int>(toks.size());
     auto& t0 = toks[0];
 
     /* ── @cost(zero|alloc|indirection) — FFI cost annotation ── */
@@ -88,11 +88,21 @@ ASTNode::Ptr Parser::parse_extern() {
         std::string lib_name;
         std::string call_conv = "c";
         int idx = 1;
-        /* optional library name or calling convention string */
+        /* optional library name, calling convention, or ecosystem string */
         if (idx < cnt && toks[idx].is_string()) {
             std::string sval = toks[idx].value;
-            /* Detect if this is a known calling convention */
-            if (sval == "c" || sval == "stdcall" || sval == "fastcall" ||
+            /* Detect cross-ecosystem bridge identifiers */
+            if (sval == "python" || sval == "quickjs" || sval == "rust") {
+                /* Ecosystem bridge — store for codegen dispatch */
+                /* Will be set on the stmt node after creation */
+                pending_ecosystem_ = sval;
+                idx++;
+                /* Optional second string: module/package name within the ecosystem */
+                if (idx < cnt && toks[idx].is_string()) {
+                    lib_name = toks[idx].value;
+                    idx++;
+                }
+            } else if (sval == "c" || sval == "stdcall" || sval == "fastcall" ||
                 sval == "thiscall" || sval == "vectorcall" ||
                 sval == "win64" || sval == "sysv64") {
                 call_conv = sval;
@@ -122,6 +132,10 @@ ASTNode::Ptr Parser::parse_extern() {
             if (!lib_name.empty())
                 stmt->right = make_node(NodeType::Str, lib_name, ln);
             if (!stmt_cost.empty()) stmt->cost_level = stmt_cost;
+            if (!pending_ecosystem_.empty()) {
+                stmt->ecosystem = pending_ecosystem_;
+                pending_ecosystem_.clear();
+            }
 
             /* Parse fields: { field1: type1, field2: type2 } or multi-line */
             if (idx < cnt && toks[idx].is_operator('{')) {
@@ -147,6 +161,10 @@ ASTNode::Ptr Parser::parse_extern() {
             if (!lib_name.empty())
                 stmt->right = make_node(NodeType::Str, lib_name, ln);
             if (!stmt_cost.empty()) stmt->cost_level = stmt_cost;
+            if (!pending_ecosystem_.empty()) {
+                stmt->ecosystem = pending_ecosystem_;
+                pending_ecosystem_.clear();
+            }
 
             /* Parse fields: { field1: type1, field2: type2 } — may span multiple lines */
             if (idx < cnt && toks[idx].is_operator('{')) {
@@ -170,6 +188,10 @@ ASTNode::Ptr Parser::parse_extern() {
         auto stmt = make_node(NodeType::ExternFn, fname, ln);
         stmt->calling_conv = call_conv;
         if (!stmt_cost.empty()) stmt->cost_level = stmt_cost;
+        if (!pending_ecosystem_.empty()) {
+            stmt->ecosystem = pending_ecosystem_;
+            pending_ecosystem_.clear();
+        }
         idx++;
 
         /* Parse params: (param1: type1, param2: callback(p: type) -> ret, ...) */
@@ -253,4 +275,5 @@ ASTNode::Ptr Parser::parse_extern() {
         return stmt;
     }
 
+    return nullptr;
 }

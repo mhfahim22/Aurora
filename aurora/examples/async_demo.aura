@@ -1,12 +1,9 @@
 # Async & Concurrency Demo
 # Demonstrates async/await, spawn, channels, fibers
 
-extern function http_get(url: cstring) -> cstring
-
-async function fetch_data(url)
+function fetch_data(url)
     output("Fetching: " + url)
-    result = http_get(url)
-    return result
+    return "mock data for " + url
 
 function producer(ch)
     for i in 5

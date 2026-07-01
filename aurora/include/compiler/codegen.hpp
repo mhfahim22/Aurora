@@ -166,6 +166,14 @@ public:
        emits LLVM IR into the module passed to the constructor. */
     void generate(const ASTNode* root);
 
+    /* ── Emit a concrete generic function instance ──
+       Creates an LLVM function with the mangled name and
+       the resolved param type kinds from the concrete instantiation. */
+    void gen_generic_instance(const std::string& mangled_name,
+                              const ASTNode* generic_node,
+                              const std::vector<AstTypeKind>& param_kinds,
+                              AstTypeKind result_kind);
+
     /* Pre-scan: identify functions whose return value is a capturing
        lambda (closure), so callers can mark variables accordingly. */
     void scan_closure_returning_fns(const ASTNode* root);
@@ -431,6 +439,16 @@ private:
     void gen_extern_union(const ASTNode* node);
     llvm::Type* extern_type_to_llvm(const std::string& type_name);
 
+    /* ── Cross-Ecosystem Bridge Codegen ── */
+    bool is_ecosystem_extern(const ASTNode* node) const;
+    void gen_bridge_fn(const ASTNode* node);
+    void gen_bridge_python_fn(const ASTNode* node);
+    void gen_bridge_quickjs_fn(const ASTNode* node);
+    void gen_bridge_rust_fn(const ASTNode* node);
+    void gen_bridge_register_lazy(void* handle, const std::string& name,
+                                  const std::string& mod_name);
+    void* gen_bridge_lookup_lazy(const std::string& name);
+
     /* Callback param info: for extern function 'name', param at index 'i' has this signature */
     struct CallbackSig {
         int index;
@@ -489,7 +507,8 @@ private:
 
     void        declare_var(const std::string& name,
                             llvm::Value*       alloca_ptr,
-                            OwnershipState     state);
+                            OwnershipState     state,
+                            AstTypeKind        type_kind = AstTypeKind::Unknown);
 
     VarRecord*  lookup_var(const std::string& name);
 

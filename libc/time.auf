@@ -1,0 +1,82 @@
+## Aurora Standard Library — DateTime
+## Usage:  import "time"
+##
+## Time, sleep, and formatting utilities.
+##
+## Example:
+##   import "time"
+##   now = time_now()
+##   output(now)                    # epoch seconds
+##   output(time_format(now, "%c")) # human-readable
+##   sleep_ms(1000)                 # sleep 1s
+## ════════════════════════════════════════════════════════════
+
+## ── Core time functions ──
+extern function aurora_time() -> i64
+extern function aurora_time_ns() -> i64
+extern function aurora_sleep(ms: i64)
+
+## ── Time formatting (strftime-style) ──
+extern function aurora_time_format(t: i64, fmt: cstring, buf: cstring, size: i32) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Get current time in epoch seconds ──
+function time_now():
+    return aurora_time()
+end
+
+## ── Get current time in nanoseconds (high-resolution) ──
+function time_now_ns():
+    return aurora_time_ns()
+end
+
+## ── Sleep for N milliseconds ──
+function sleep_ms(ms):
+    aurora_sleep(ms)
+end
+
+## ── Sleep for N seconds ──
+function sleep(secs):
+    aurora_sleep(secs * 1000)
+end
+
+## ── Format time as string using strftime format ──
+## Common format strings:
+##   "%c"  — locale-dependent date+time
+##   "%Y"  — 4-digit year
+##   "%m"  — month (01-12)
+##   "%d"  — day (01-31)
+##   "%H"  — hour (00-23)
+##   "%M"  — minute (00-59)
+##   "%S"  — second (00-59)
+##   "%Y-%m-%d" — ISO date
+function time_format(t, fmt):
+    buf = cstring_repeat(256)
+    n = aurora_time_format(t, fmt, buf, 256)
+    if n <= 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+## ── Format current time ──
+function time_format_now(fmt):
+    return time_format(time_now(), fmt)
+end
+
+## ── Measure elapsed seconds between two calls ──
+## Usage:
+##   start = time_now()
+##   # ... work ...
+##   elapsed = time_since(start)
+function time_since(start):
+    return time_now() - start
+end
+
+## ── Measure elapsed nanoseconds (high-resolution) ──
+function time_since_ns(start_ns):
+    return time_now_ns() - start_ns
+end

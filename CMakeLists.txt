@@ -19,23 +19,26 @@ configure_file(
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ── Force Release to match LLVM libs (built with MD) ──────────
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# ── AddressSanitizer (optional, off by default) ───────────────
+option(ENABLE_ASAN "Enable AddressSanitizer for test targets" OFF)
+if(ENABLE_ASAN)
+    if(MSVC)
+        set(ASAN_FLAGS "/fsanitize=address" "/Oy-" "/Zi")
+        set(ASAN_LINK_FLAGS "/DEBUG")
+    else()
+        set(ASAN_FLAGS "-fsanitize=address" "-fno-omit-frame-pointer")
+        set(ASAN_LINK_FLAGS "-fsanitize=address")
+    endif()
 endif()
 
+# ── Force Release CRT (/MD) for all configs to match LLVM libs ──
+# LLVM 18.1.8 at C:\LLVM was built with /MD (Release CRT).
+# Mixing /MDd with LLVM's /MD causes LNK2038 RuntimeLibrary mismatch.
+# Consequence: Debug builds lose CRT debug checks; to restore them,
+# LLVM must be rebuilt from source with /MDd.
 if(MSVC)
-    # Force all configurations to use /MD (Release CRT) because LLVM was
-    # built with /MD.  Mixing /MDd (Debug CRT) with /MD LLVM libs causes
-    # LNK2038 RuntimeLibrary mismatch errors.
-    #
-    # Consequence: Debug builds lose CRT debug checks, debug heap, debug
-    # allocators, and STL iterator bounds checking.  To restore full debug
-    # capability, LLVM must be built from source with /MDd.
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-    # _ITERATOR_DEBUG_LEVEL must be 0 when using /MD in Debug mode;
-    # the Debug STL headers default to _ITERATOR_DEBUG_LEVEL=2, which is
-    # incompatible with the release CRT.
+    cmake_policy(SET CMP0091 NEW)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "")
     add_compile_definitions($<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)
 endif()
 
@@ -84,6 +87,10 @@ add_executable(aurorac
     aurora/src/compiler/codegen/codegen_runtime.cpp
     aurora/src/compiler/codegen/codegen_stmt.cpp
     aurora/src/compiler/codegen/codegen_ffi.cpp
+    aurora/src/compiler/bridge/bridge_codegen.cpp
+    aurora/src/compiler/bridge/bridge_python.cpp
+    aurora/src/compiler/bridge/bridge_quickjs.cpp
+    aurora/src/compiler/bridge/bridge_rust.cpp
     aurora/src/compiler/codegen/codegen_expr.cpp
     aurora/src/compiler/codegen/codegen_try.cpp
     aurora/src/compiler/codegen/codegen_function.cpp
@@ -132,6 +139,10 @@ target_link_libraries(aurorac PRIVATE ${LLVM_LIBS})
 
 target_include_directories(aurorac PRIVATE "${CMAKE_BINARY_DIR}/include")
 
+if(MSVC)
+    target_compile_definitions(aurorac PRIVATE NOMINMAX)
+endif()
+
 if(UNIX)
     target_link_options(aurorac PRIVATE -rdynamic)
 endif()
@@ -156,6 +167,9 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/interop/type_mapping.cpp
     aurora/src/runtime/interop/type_mapping_langs.cpp
     aurora/src/runtime/interop/type_serializer.cpp
+    aurora/src/runtime/interop/bridge_python_runtime.cpp
+    aurora/src/runtime/interop/bridge_quickjs_runtime.cpp
+    aurora/src/runtime/interop/bridge_rust_runtime.cpp
     aurora/src/runtime/builtins/builtins.cpp
     aurora/src/runtime/builtins/io_builtins.cpp
     aurora/src/runtime/builtins/std_builtins.cpp
@@ -199,6 +213,8 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/gfx/audio_helper.cpp
     aurora/src/runtime/gfx/sprite2d.cpp
     aurora/src/runtime/backend/server.cpp
+    aurora/src/runtime/backend/tls.cpp
+    aurora/src/runtime/backend/websocket.cpp
     aurora/src/runtime/backend/database.cpp
     aurora/src/runtime/backend/miniz.c
     aurora/src/runtime/backend/miniz_tdef.c
@@ -207,6 +223,7 @@ add_library(aurora_runtime STATIC
     aurora/src/std/fs.cpp
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
+    aurora/src/std/crypto.cpp
 )
 
 if(WIN32)
@@ -249,11 +266,15 @@ else()
     endif()
 endif()
 
+# ── AddressSanitizer for runtime library ──
+if(ENABLE_ASAN)
+    target_compile_options(aurora_runtime PRIVATE ${ASAN_FLAGS})
+    target_link_options(aurora_runtime PRIVATE ${ASAN_LINK_FLAGS})
+endif()
+
 # ── LTO (Link-Time Optimization) for runtime library ──
 # Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
-# TODO(#<issue>): Re-enable after function pointer / test development is complete
-# set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 # ── Link runtime to compiler ────────────────
 target_link_libraries(aurorac PRIVATE aurora_runtime)
@@ -559,7 +580,7 @@ if(Clang_FOUND)
         aurora/tools/bindgen/bindgen.cpp
     )
     target_include_directories(aurora_bindgen PRIVATE ${CLANG_INCLUDE_DIRS})
-    target_link_libraries(aurora_bindgen PRIVATE ${CLANG_LIBRARIES})
+    target_link_libraries(aurora_bindgen PRIVATE libclang)
 else()
     message(STATUS "Clang not found — skipping aurora-bindgen")
 endif()
@@ -573,8 +594,36 @@ if(Clang_FOUND)
         aurora/tools/cppwrap/cppwrap.cpp
     )
     target_include_directories(aurora_cppwrap PRIVATE ${CLANG_INCLUDE_DIRS})
-    target_link_libraries(aurora_cppwrap PRIVATE ${CLANG_LIBRARIES})
+    target_link_libraries(aurora_cppwrap PRIVATE libclang)
 endif()
+
+# ═══════════════════════════════════════════════════════════════
+# Fiber Engine Tests
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_fiber
+    aurora/tests/runtime/test_fiber.cpp
+)
+target_link_libraries(test_fiber PRIVATE aurora_runtime)
+target_include_directories(test_fiber PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+if(ENABLE_ASAN)
+    target_compile_options(test_fiber PRIVATE ${ASAN_FLAGS})
+    target_link_options(test_fiber PRIVATE ${ASAN_LINK_FLAGS})
+endif()
+add_test(NAME test_fiber COMMAND test_fiber)
+
+# ═══════════════════════════════════════════════════════════════
+# Autograd Engine Tests
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_autograd
+    aurora/tests/runtime/test_autograd.cpp
+)
+target_link_libraries(test_autograd PRIVATE aurora_runtime)
+target_include_directories(test_autograd PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+if(ENABLE_ASAN)
+    target_compile_options(test_autograd PRIVATE ${ASAN_FLAGS})
+    target_link_options(test_autograd PRIVATE ${ASAN_LINK_FLAGS})
+endif()
+add_test(NAME test_autograd COMMAND test_autograd)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 4: AI Benchmark

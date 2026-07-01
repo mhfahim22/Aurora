@@ -1,0 +1,124 @@
+## Aurora Standard Library — Filesystem
+## Usage:  import "fs"
+##
+## File I/O, directory operations, and path utilities.
+##
+## Example:
+##   import "fs"
+##   content = read_file("hello.txt")
+##   write_file("copy.txt", content)
+##   if exists("data")
+##     entries = listdir("data")
+##     output(entries)
+##   end
+## ════════════════════════════════════════════════════════════
+
+## ── File operations ──
+extern function aurora_fs_read_file(path: cstring) -> cstring
+extern function aurora_fs_write_file(path: cstring, content: cstring) -> i32
+extern function aurora_fs_append_file(path: cstring, content: cstring) -> i32
+extern function aurora_fs_exists(path: cstring) -> i32
+extern function aurora_fs_copy(src: cstring, dst: cstring) -> i32
+extern function aurora_fs_remove(path: cstring) -> i32
+extern function aurora_fs_rename(old: cstring, newname: cstring) -> i32
+extern function aurora_fs_size(path: cstring) -> i64
+extern function aurora_fs_mkdir(path: cstring) -> i32
+extern function aurora_fs_rmdir(path: cstring) -> i32
+extern function aurora_fs_is_dir(path: cstring) -> i32
+
+## ── Directory listing ──
+extern function aurora_fs_listdir(path: cstring) -> cstring
+
+## ── Path utilities ──
+extern function aurora_fs_dirname(path: cstring) -> cstring
+extern function aurora_fs_basename(path: cstring) -> cstring
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Read file (returns empty string on failure) ──
+function read_file(path):
+    result = aurora_fs_read_file(path)
+    if result == nil
+        return ""
+    end
+    return result
+end
+
+## ── Write file ──
+function write_file(path, content):
+    return aurora_fs_write_file(path, content) == 1
+end
+
+## ── Append to file ──
+function append_file(path, content):
+    return aurora_fs_append_file(path, content) == 1
+end
+
+## ── Check if path exists ──
+function exists(path):
+    return aurora_fs_exists(path) == 1
+end
+
+## ── Copy file ──
+function copy_file(src, dst):
+    return aurora_fs_copy(src, dst) == 1
+end
+
+## ── Delete file ──
+function delete_file(path):
+    return aurora_fs_remove(path) == 1
+end
+
+## ── Move/rename file ──
+function move_file(old, newname):
+    return aurora_fs_rename(old, newname) == 1
+end
+
+## ── Get file size (returns -1 on error) ──
+function file_size(path):
+    return aurora_fs_size(path)
+end
+
+## ── Create directory ──
+function mkdir(path):
+    return aurora_fs_mkdir(path) == 1
+end
+
+## ── Remove empty directory ──
+function rmdir(path):
+    return aurora_fs_rmdir(path) == 1
+end
+
+## ── Check if path is a directory ──
+function is_dir(path):
+    return aurora_fs_is_dir(path) == 1
+end
+
+## ── List directory entries (one per line) ──
+function listdir(path):
+    result = aurora_fs_listdir(path)
+    if result == nil
+        return ""
+    end
+    return result
+end
+
+## ── Get parent directory path ──
+function dirname(path):
+    result = aurora_fs_dirname(path)
+    if result == nil
+        return ""
+    end
+    return result
+end
+
+## ── Get file name from path ──
+function basename(path):
+    result = aurora_fs_basename(path)
+    if result == nil
+        return ""
+    end
+    return result
+end

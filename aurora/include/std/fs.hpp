@@ -18,6 +18,7 @@ int     aurora_fs_rename(const char* old, const char* newname);
 int     aurora_fs_is_dir(const char* path);
 char*   aurora_fs_dirname(const char* path);
 char*   aurora_fs_basename(const char* path);
+char*   aurora_fs_listdir(const char* path);
 
 #ifdef __cplusplus
 }

@@ -40,8 +40,11 @@ else:
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vert_str, 12)
         glEnableVertexAttribArray(1)
 
-        pos_x = 0.0; pos_y = 1.0; pos_z = 5.0
-        yaw = 0.0; pitch = 0.0
+        pos_x = 0.0
+        pos_y = 1.0
+        pos_z = 5.0
+        yaw = 0.0
+        pitch = 0.0
         score = 0
 
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
@@ -59,18 +62,27 @@ else:
         enemies = list()
         list_push(enemies, map())
         e = list_get(enemies, 0)
-        map_set(e, "x", 0.0); map_set(e, "y", 0.5); map_set(e, "z", -8.0)
-        map_set(e, "type", 1); map_set(e, "health", 1)
+        map_set(e, "x", 0.0)
+        map_set(e, "y", 0.5)
+        map_set(e, "z", -8.0)
+        map_set(e, "type", 1)
+        map_set(e, "health", 1)
 
         list_push(enemies, map())
         e = list_get(enemies, 1)
-        map_set(e, "x", 3.0); map_set(e, "y", 0.5); map_set(e, "z", -6.0)
-        map_set(e, "type", 1); map_set(e, "health", 1)
+        map_set(e, "x", 3.0)
+        map_set(e, "y", 0.5)
+        map_set(e, "z", -6.0)
+        map_set(e, "type", 1)
+        map_set(e, "health", 1)
 
         list_push(enemies, map())
         e = list_get(enemies, 2)
-        map_set(e, "x", -3.0); map_set(e, "y", 0.5); map_set(e, "z", -7.0)
-        map_set(e, "type", 1); map_set(e, "health", 1)
+        map_set(e, "x", -3.0)
+        map_set(e, "y", 0.5)
+        map_set(e, "z", -7.0)
+        map_set(e, "type", 1)
+        map_set(e, "health", 1)
 
         output("Shooter started! WASD to move, mouse to look, SPACE to shoot")
         output("Score: " + str(score))
@@ -81,8 +93,12 @@ else:
             if dx != 0.0 or dy != 0.0:
                 yaw = yaw + dx * 0.08
                 pitch = pitch - dy * 0.08
-                if pitch > 89.0: pitch = 89.0 end
-                if pitch < -89.0: pitch = -89.0 end
+                if pitch > 89.0:
+                    pitch = 89.0
+                end
+                if pitch < -89.0:
+                    pitch = -89.0
+                end
             end
 
             rad_yaw = yaw * pi() / 180.0
@@ -134,7 +150,9 @@ else:
             glUseProgram(prog)
             glBindVertexArray(vao)
 
-            enemy_colors = {"1": "1.0,0.3,0.3", "2": "0.3,1.0,0.3"}
+            enemy_colors = map()
+            map_set(enemy_colors, "1", "1.0,0.3,0.3")
+            map_set(enemy_colors, "2", "0.3,1.0,0.3")
 
             num_enemies = list_len(enemies)
             i = 0

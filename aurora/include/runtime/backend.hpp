@@ -9,6 +9,7 @@ extern "C" {
 /* ── Forward declarations ── */
 struct AuroraStaticRoute;
 struct AuroraFileWatchState;
+struct AuroraTLSContext;
 
 /* ── Server ── */
 typedef struct AuroraServer {
@@ -21,6 +22,7 @@ typedef struct AuroraServer {
     AuroraStaticRoute* static_routes;
     int       static_count;
     int       static_cap;
+    struct AuroraTLSContext* tls_ctx;  /* NULL = plain HTTP */
 } AuroraServer;
 
 AuroraServer* aurora_server_init(int64_t port);
@@ -60,6 +62,7 @@ typedef struct AuroraHttpResponse {
     char*    body;
     size_t   body_len;
     int      sent;
+    int64_t  tls_handle;  /* 0 = raw socket, >0 = TLS connection handle */
 } AuroraHttpResponse;
 
 /* ── HTTP Router entry ── */
@@ -177,6 +180,18 @@ struct AuroraFileWatchState {
     int      count;
     int      cap;
 };
+
+/* ── TLS support ── */
+struct AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* key_path);
+void aurora_tls_ctx_free(struct AuroraTLSContext* ctx);
+int  aurora_server_enable_tls(AuroraServer* srv, const char* cert_path, const char* key_path);
+
+/* ── WebSocket support (tls_handle = 0 for raw, >0 for TLS) ── */
+int  aurora_ws_is_upgrade(const char* raw_request);
+int  aurora_ws_upgrade(const char* key, int64_t sock, int64_t tls_handle);
+int  aurora_ws_read_frame(int64_t sock, int64_t tls_handle, uint8_t** out_payload, int* opcode);
+int  aurora_ws_write_frame(int64_t sock, int64_t tls_handle, int opcode, const uint8_t* data, int len);
+void aurora_ws_close(int64_t sock, int64_t tls_handle);
 
 /* ── Server accept + handle (with middleware + static routes) ── */
 void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router);

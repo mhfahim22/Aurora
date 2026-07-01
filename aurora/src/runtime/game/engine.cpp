@@ -1,8 +1,13 @@
 #include "runtime/game.hpp"
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <cmath>
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#else
+#include <unistd.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -390,7 +395,12 @@ void aurora_engine_render() {
     FillConsoleOutputCharacterA(hConsole, ' ', info.dwSize.X * info.dwSize.Y, origin, &wrote);
     SetConsoleCursorPosition(hConsole, origin);
 #else
-    printf("\033[2J\033[H");
+#ifdef _WIN32
+    if (_isatty(_fileno(stdout)))
+#else
+    if (isatty(fileno(stdout)))
+#endif
+        printf("\033[2J\033[H");
 #endif
 
     /* Draw each sprite as ASCII art at its entity position */
@@ -416,7 +426,12 @@ void aurora_engine_render() {
                 putchar(ch);
             }
 #else
-            printf("\033[%d;%dH", sy + row + 1, sx + 1);
+#ifdef _WIN32
+            if (_isatty(_fileno(stdout)))
+#else
+            if (isatty(fileno(stdout)))
+#endif
+                printf("\033[%d;%dH", sy + row + 1, sx + 1);
             for (int col = 0; col < w; col++) {
                 putchar(ch);
             }

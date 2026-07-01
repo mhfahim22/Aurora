@@ -526,7 +526,7 @@ void EscapeAnalyzer::pop_scope() {
 }
 
 bool EscapeAnalyzer::is_local_var(const std::string& name) const {
-    for (int i = (int)scope_stack_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scope_stack_.size()) - 1; i >= 0; i--) {
         if (scope_stack_[i].local_vars.count(name) > 0) {
             return true;
         }

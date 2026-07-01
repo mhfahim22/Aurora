@@ -578,7 +578,7 @@ void OptimizedCodegen::gen_assign(const ASTNode* node) {
 }
 
 void OptimizedCodegen::gen_return(const ASTNode* node) {
-    (void)node;
+    static_cast<void>(node);
     /* If returning a variable with refcount, decrement */
     if (node->left && node->left->type == NodeType::Var) {
         const std::string& name = node->left->value;
@@ -716,6 +716,27 @@ llvm::Value* OptimizedCodegen::gen_binop(const ASTNode* node) {
         else if (rhs->getType()->isPointerTy() && lhs->getType()->isIntegerTy())
             rhs = builder_->CreatePtrToInt(rhs, llvm::Type::getInt64Ty(ctx_), "r_ptoi");
     }
+
+    /* Float detection: if either operand is double, promote and use float ops */
+    if (lhs->getType()->isDoubleTy() || rhs->getType()->isDoubleTy()) {
+        auto* dbl = llvm::Type::getDoubleTy(ctx_);
+        if (!lhs->getType()->isDoubleTy())
+            lhs = builder_->CreateSIToFP(lhs, dbl, "itof");
+        if (!rhs->getType()->isDoubleTy())
+            rhs = builder_->CreateSIToFP(rhs, dbl, "itof");
+        if (op == "+")  return builder_->CreateFAdd(lhs, rhs, "fadd");
+        if (op == "-")  return builder_->CreateFSub(lhs, rhs, "fsub");
+        if (op == "*")  return builder_->CreateFMul(lhs, rhs, "fmul");
+        if (op == "/")  return builder_->CreateFDiv(lhs, rhs, "fdiv");
+        if (op == "==") return builder_->CreateFCmpOEQ(lhs, rhs, "feq");
+        if (op == "!=") return builder_->CreateFCmpONE(lhs, rhs, "fne");
+        if (op == "<")  return builder_->CreateFCmpOLT(lhs, rhs, "flt");
+        if (op == ">")  return builder_->CreateFCmpOGT(lhs, rhs, "fgt");
+        if (op == "<=") return builder_->CreateFCmpOLE(lhs, rhs, "fle");
+        if (op == ">=") return builder_->CreateFCmpOGE(lhs, rhs, "fge");
+        return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+    }
+
     if (op == "+")  return builder_->CreateAdd(lhs, rhs, "add");
     if (op == "-")  return builder_->CreateSub(lhs, rhs, "sub");
     if (op == "*")  return builder_->CreateMul(lhs, rhs, "mul");
@@ -726,12 +747,12 @@ llvm::Value* OptimizedCodegen::gen_binop(const ASTNode* node) {
     if (op == "^")  return builder_->CreateXor(lhs, rhs, "xor");
     if (op == "<<") return builder_->CreateShl(lhs, rhs, "shl");
     if (op == ">>") return builder_->CreateAShr(lhs, rhs, "ashr");
-    if (op == "==") return builder_->CreateICmpEQ(lhs, rhs, "eq");
-    if (op == "!=") return builder_->CreateICmpNE(lhs, rhs, "ne");
-    if (op == "<")  return builder_->CreateICmpSLT(lhs, rhs, "lt");
-    if (op == ">")  return builder_->CreateICmpSGT(lhs, rhs, "gt");
-    if (op == "<=") return builder_->CreateICmpSLE(lhs, rhs, "le");
-    if (op == ">=") return builder_->CreateICmpSGE(lhs, rhs, "ge");
+    if (op == "==") return builder_->CreateZExt(builder_->CreateICmpEQ(lhs, rhs, "eq"), llvm::Type::getInt64Ty(ctx_));
+    if (op == "!=") return builder_->CreateZExt(builder_->CreateICmpNE(lhs, rhs, "ne"), llvm::Type::getInt64Ty(ctx_));
+    if (op == "<")  return builder_->CreateZExt(builder_->CreateICmpSLT(lhs, rhs, "lt"), llvm::Type::getInt64Ty(ctx_));
+    if (op == ">")  return builder_->CreateZExt(builder_->CreateICmpSGT(lhs, rhs, "gt"), llvm::Type::getInt64Ty(ctx_));
+    if (op == "<=") return builder_->CreateZExt(builder_->CreateICmpSLE(lhs, rhs, "le"), llvm::Type::getInt64Ty(ctx_));
+    if (op == ">=") return builder_->CreateZExt(builder_->CreateICmpSGE(lhs, rhs, "ge"), llvm::Type::getInt64Ty(ctx_));
 
     return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
 }

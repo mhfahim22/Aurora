@@ -98,12 +98,12 @@ void AllocationProfiler::calculate_stats() {
 
     /* Calculate percentages */
     if (stats_.total_count > 0) {
-        stats_.stack_percent = (double)stats_.stack_count / stats_.total_count * 100.0;
-        stats_.arena_percent = (double)stats_.arena_count / stats_.total_count * 100.0;
-        stats_.raii_percent = (double)stats_.raii_count / stats_.total_count * 100.0;
-        stats_.arc_percent = (double)stats_.arc_count / stats_.total_count * 100.0;
-        stats_.gc_percent = (double)stats_.gc_count / stats_.total_count * 100.0;
-        stats_.heap_percent = (double)stats_.heap_count / stats_.total_count * 100.0;
+        stats_.stack_percent = static_cast<double>(stats_.stack_count) / stats_.total_count * 100.0;
+        stats_.arena_percent = static_cast<double>(stats_.arena_count) / stats_.total_count * 100.0;
+        stats_.raii_percent = static_cast<double>(stats_.raii_count) / stats_.total_count * 100.0;
+        stats_.arc_percent = static_cast<double>(stats_.arc_count) / stats_.total_count * 100.0;
+        stats_.gc_percent = static_cast<double>(stats_.gc_count) / stats_.total_count * 100.0;
+        stats_.heap_percent = static_cast<double>(stats_.heap_count) / stats_.total_count * 100.0;
     }
 }
 
@@ -152,35 +152,35 @@ void AllocationProfiler::print_percentage_report() const {
         std::cerr << "║                                                          ║\n";
 
         /* Stack bar */
-        int stack_bar = (int)(stats_.stack_percent / 5);
+        int stack_bar = static_cast<int>(stats_.stack_percent / 5);
         fprintf(stderr, "║  Stack : %5.1f%% ", stats_.stack_percent);
         for (int i = 0; i < stack_bar; i++) std::cerr << "█";
         for (int i = stack_bar; i < 20; i++) std::cerr << " ";
         fprintf(stderr, "║\n");
 
         /* Arena bar */
-        int arena_bar = (int)(stats_.arena_percent / 5);
+        int arena_bar = static_cast<int>(stats_.arena_percent / 5);
         fprintf(stderr, "║  Arena : %5.1f%% ", stats_.arena_percent);
         for (int i = 0; i < arena_bar; i++) std::cerr << "█";
         for (int i = arena_bar; i < 20; i++) std::cerr << " ";
         fprintf(stderr, "║\n");
 
         /* RAII bar */
-        int raii_bar = (int)(stats_.raii_percent / 5);
+        int raii_bar = static_cast<int>(stats_.raii_percent / 5);
         fprintf(stderr, "║  RAII  : %5.1f%% ", stats_.raii_percent);
         for (int i = 0; i < raii_bar; i++) std::cerr << "█";
         for (int i = raii_bar; i < 20; i++) std::cerr << " ";
         fprintf(stderr, "║\n");
 
         /* ARC bar */
-        int arc_bar = (int)(stats_.arc_percent / 5);
+        int arc_bar = static_cast<int>(stats_.arc_percent / 5);
         fprintf(stderr, "║  ARC   : %5.1f%% ", stats_.arc_percent);
         for (int i = 0; i < arc_bar; i++) std::cerr << "█";
         for (int i = arc_bar; i < 20; i++) std::cerr << " ";
         fprintf(stderr, "║\n");
 
         /* GC bar */
-        int gc_bar = (int)(stats_.gc_percent / 5);
+        int gc_bar = static_cast<int>(stats_.gc_percent / 5);
         fprintf(stderr, "║  GC    : %5.1f%% ", stats_.gc_percent);
         for (int i = 0; i < gc_bar; i++) std::cerr << "█";
         for (int i = gc_bar; i < 20; i++) std::cerr << " ";

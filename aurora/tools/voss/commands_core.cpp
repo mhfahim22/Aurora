@@ -369,7 +369,7 @@ int cmd_build(bool verbose, bool auto_yes) {
     PackageInfo info = read_manifest(".");
     if (info.name.empty()) { std::cerr << "error: no aurora.pkg\n"; return 1; }
     if (!fs::exists("build")) fs::create_directories("build");
-    std::vector<std::string> c = {"aurorac", info.entry, "-o", "build/" + info.name};
+    std::vector<std::string> c = {"aurorac", info.entry, "-o", "build/" + info.name, "--incremental"};
     if (verbose) c.push_back("-v");
     return run_cmd(c);
 }

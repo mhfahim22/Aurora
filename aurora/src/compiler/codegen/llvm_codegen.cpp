@@ -238,8 +238,8 @@ llvm::Module* LLVMCodegen::module() { return module_.get(); }
 extern "C" void aurora_http_response_set_body_n(void*, const char*, size_t);
 extern "C" void aurora_server_static(void*, const char*, const char*);
 static void* _jit_dummy_server_syms[2] = {
-    (void*)(void*)&aurora_http_response_set_body_n,
-    (void*)(void*)&aurora_server_static
+    reinterpret_cast<void*>(&aurora_http_response_set_body_n),
+    reinterpret_cast<void*>(&aurora_server_static)
 };
 #include <llvm/Support/DynamicLibrary.h>
 
@@ -275,25 +275,25 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
         sm[intern("aurora_http_response_set_body_n")] =
             llvm::orc::ExecutorSymbolDef(
                 llvm::orc::ExecutorAddr::fromPtr(
-                    (void*)(void*)&aurora_http_response_set_body_n),
+                    reinterpret_cast<void*>(&aurora_http_response_set_body_n)),
                 llvm::JITSymbolFlags::Exported);
         sm[intern("aurora_server_static")] =
             llvm::orc::ExecutorSymbolDef(
                 llvm::orc::ExecutorAddr::fromPtr(
-                    (void*)(void*)&aurora_server_static),
+                    reinterpret_cast<void*>(&aurora_server_static)),
                 llvm::JITSymbolFlags::Exported);
         if (auto err = JD.define(llvm::orc::absoluteSymbols(std::move(sm))))
             log_error(std::move(err));
     }
     /* Use dummy array to keep linker from discarding server.obj */
-    (void)_jit_dummy_server_syms[0];
-    (void)_jit_dummy_server_syms[1];
+    static_cast<void>(_jit_dummy_server_syms[0]);
+    static_cast<void>(_jit_dummy_server_syms[1]);
 
     /* Add current process symbols */
     auto gen = DynamicLibrarySearchGenerator::GetForCurrentProcess(
         jit->getDataLayout().getGlobalPrefix());
     if (gen)
-        (void)jit->getMainJITDylib().addGenerator(std::move(*gen));
+        static_cast<void>(jit->getMainJITDylib().addGenerator(std::move(*gen)));
 
     module->setTargetTriple(jit->getTargetTriple().getTriple());
     module->setDataLayout(jit->getDataLayout());

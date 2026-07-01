@@ -1,0 +1,151 @@
+## Aurora Standard Library — HTTP Server, TLS & WebSocket
+## Usage:  import "server"
+##
+## Example:
+##   import "server"
+##   srv = server_init(8080)
+##   server_enable_tls(srv, "cert.pem", "key.pem")
+##   route_add(srv, "GET", "/hello", handler)
+##   server_run(srv)
+## ════════════════════════════════════════════════════════════
+
+# ── Server lifecycle ──
+extern function aurora_server_init(port: i64) -> pointer
+extern function aurora_server_start(srv: pointer)
+extern function aurora_server_stop(srv: pointer)
+extern function aurora_server_enable_tls(srv: pointer, cert_path: cstring, key_path: cstring) -> i32
+
+# ── Routing ──
+extern function aurora_route_add(router: pointer, method: cstring, path_pattern: cstring, handler: pointer)
+extern function aurora_route_register(method: cstring, path: cstring, handler: pointer)
+
+# ── Run server ──
+extern function aurora_server_accept_and_handle(srv: pointer, router: pointer)
+extern function aurora_server_accept_loop(srv: pointer, router: pointer)
+
+# ── Static file serving ──
+extern function aurora_server_static(srv: pointer, prefix: cstring, directory: cstring)
+
+# ── Simplified startup ──
+extern function aurora_server_set_router(srv: pointer, router: pointer)
+extern function aurora_server_run(srv: pointer)
+extern function aurora_dev_server(port: i64, src_dir: cstring)
+
+# ── WebSocket ──
+extern function aurora_ws_is_upgrade(raw: cstring) -> i32
+extern function aurora_ws_get_key(raw: cstring) -> cstring
+extern function aurora_ws_upgrade(key: cstring, sock: i64, tls_handle: i64) -> i32
+extern function aurora_ws_read_frame(sock: i64, tls_handle: i64, out_payload: pointer, out_opcode: pointer) -> i32
+extern function aurora_ws_write_frame(sock: i64, tls_handle: i64, opcode: i32, data: pointer, len: i32) -> i32
+extern function aurora_ws_close(sock: i64, tls_handle: i64)
+
+# ── Raw TLS contexts (advanced) ──
+extern function aurora_tls_server_ctx_new(cert_path: cstring, key_path: cstring) -> pointer
+extern function aurora_tls_ctx_free(ctx: pointer)
+extern function aurora_tls_accept(sock: i64, ctx: pointer) -> i64
+extern function aurora_tls_read(tls_handle: i64, buf: pointer, size: i32) -> i32
+extern function aurora_tls_write(tls_handle: i64, data: pointer, len: i32) -> i32
+extern function aurora_tls_close(tls_handle: i64)
+
+# ════════════════════════════════════════════════════════════
+# Aurora-level convenience wrappers
+# ════════════════════════════════════════════════════════════
+
+function server_init(port):
+    return aurora_server_init(port)
+end
+
+function server_start(srv):
+    aurora_server_start(srv)
+end
+
+function server_stop(srv):
+    aurora_server_stop(srv)
+end
+
+function server_enable_tls(srv, cert_path, key_path):
+    aurora_server_enable_tls(srv, cert_path, key_path)
+end
+
+function route_add(router, method, path, handler):
+    aurora_route_add(router, method, path, handler)
+end
+
+function route_register(method, path, handler):
+    aurora_route_register(method, path, handler)
+end
+
+function server_set_router(srv, router):
+    aurora_server_set_router(srv, router)
+end
+
+function server_accept_and_handle(srv, router):
+    aurora_server_accept_and_handle(srv, router)
+end
+
+function server_accept_loop(srv, router):
+    aurora_server_accept_loop(srv, router)
+end
+
+function server_run(srv):
+    aurora_server_run(srv)
+end
+
+function server_static(srv, prefix, directory):
+    aurora_server_static(srv, prefix, directory)
+end
+
+function dev_server(port, src_dir):
+    aurora_dev_server(port, src_dir)
+end
+
+function ws_is_upgrade(raw):
+    return aurora_ws_is_upgrade(raw) != 0
+end
+
+function ws_get_key(raw):
+    return aurora_ws_get_key(raw)
+end
+
+function ws_upgrade(key, sock, tls_handle):
+    return aurora_ws_upgrade(key, sock, tls_handle) != 0
+end
+
+function ws_read_frame(sock, tls_handle):
+    payload_ptr = alloc(8)
+    opcode_ptr = alloc(4)
+    len = aurora_ws_read_frame(sock, tls_handle, payload_ptr, opcode_ptr)
+    return len, load(opcode_ptr, i32), load(payload_ptr, pointer)
+end
+
+function ws_write_frame(sock, tls_handle, opcode, data, len):
+    aurora_ws_write_frame(sock, tls_handle, opcode, data, len)
+end
+
+function ws_close(sock, tls_handle):
+    aurora_ws_close(sock, tls_handle)
+end
+
+function tls_server_ctx_new(cert_path, key_path):
+    return aurora_tls_server_ctx_new(cert_path, key_path)
+end
+
+function tls_ctx_free(ctx):
+    aurora_tls_ctx_free(ctx)
+end
+
+function tls_accept(ctx, sock):
+    return aurora_tls_accept(sock, ctx)
+end
+
+function tls_read(handle, buf, size):
+    return aurora_tls_read(handle, buf, size)
+end
+
+function tls_write(handle, data, len):
+    return aurora_tls_write(handle, data, len)
+end
+
+function tls_close(handle):
+    aurora_tls_close(handle)
+end

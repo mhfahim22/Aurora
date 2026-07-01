@@ -1,50 +1,25 @@
-## Full-stack Todo App — HTML+JS frontend, REST CRUD, PostgreSQL
+## Full-stack Todo App — HTML+JS frontend, REST CRUD
 ## Serves interactive todo list at http://localhost:8080
-## Uses todo_server.aura pattern for CRUD + HTML frontend
-import "template"
-
-html_page = "<!DOCTYPE html><html><head><title>Aurora Todo</title>"
-html_page = strcat(html_page, "<style>body{font-family:sans-serif;max-width:600px;margin:40px auto}")
-html_page = strcat(html_page, ".todo{display:flex;gap:8px;margin:8px 0}.todo input{flex:1}")
-html_page = strcat(html_page, "button{background:#4CAF50;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer}")
-html_page = strcat(html_page, "button.delete{background:#f44336}.item{padding:8px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between}")
-html_page = strcat(html_page, "h1{color:#333}#newForm{display:flex;gap:8px;margin:20px 0}#newInput{flex:1;padding:8px;font-size:16px}")
-html_page = strcat(html_page, "</style></head><body><h1>📋 Aurora Todo</h1>")
-html_page = strcat(html_page, "<div id='newForm'><input id='newInput' placeholder='Add a todo...'/><button onclick='addTodo()'>Add</button></div>")
-html_page = strcat(html_page, "<div id='list'></div>")
-html_page = strcat(html_page, "<script>function load(){fetch('/todos').then(r=>r.json()).then(data=>{let h='';data.forEach(t=>{h+='<div class=item><span>'+t.title+'</span><button class=delete onclick=del('+t.id+')>✕</button></div>'});document.getElementById('list').innerHTML=h})}")
-html_page = strcat(html_page, "function addTodo(){const v=document.getElementById('newInput').value;if(!v)return;fetch('/todos',{method:'POST',body:v}).then(()=>{document.getElementById('newInput').value='';load()})}")
-html_page = strcat(html_page, "function del(id){fetch('/todos/'+id,{method:'DELETE'}).then(()=>load())}")
-html_page = strcat(html_page, "load()</script></body></html>"
 
 outputln("Todo App running at http://localhost:8080")
 
 server app
-    route "GET" "/"
-        type("text/html")
-        send(html_page)
-
     route "GET" "/todos"
-        type("application/json")
         json(aurora_todo_list())
 
     route "POST" "/todos"
         title = request("body")
-        type("application/json")
         json(aurora_todo_create(title))
 
     route "GET" "/todos/:id"
         id = request.params.id
-        type("application/json")
         json(aurora_todo_get(id))
 
     route "PUT" "/todos/:id"
         id = request.params.id
         title = request("body")
-        type("application/json")
         json(aurora_todo_update(id, title, 0))
 
     route "DELETE" "/todos/:id"
         id = request.params.id
-        type("application/json")
         json(aurora_todo_delete(id))

@@ -1,3 +1,5 @@
+#include "common/errors.hpp"
+
 #include "compiler/codegen.hpp"
 #include "compiler/class_oop.hpp"
 #include "compiler/type_registry.hpp"
@@ -125,10 +127,8 @@ void Codegen::gen_assign(const ASTNode* node) {
             }
         }
         builder_->CreateStore(store_val, slot);
-        declare_var(name, slot, init_state);
-        auto* r = lookup_var(name);
-        r->type_kind = assign_kind;
-        rec = r;
+        declare_var(name, slot, init_state, assign_kind);
+        rec = lookup_var(name);
     } else {
         auto* slot_ptr = rec->alloca_ptr;
         if (auto* gv = llvm::dyn_cast<llvm::GlobalVariable>(slot_ptr)) {
@@ -164,6 +164,16 @@ void Codegen::gen_assign(const ASTNode* node) {
     /* Track struct type for struct literal variables */
     if (node->right && node->right->type == NodeType::StructLiteral)
         rec->struct_type = node->right->value;
+
+    /* Track struct type for generic struct construction: Box[Int](42) */
+    if (node->right && node->right->type == NodeType::Call && node->right->template_args) {
+        const ASTNode* ra = node->right.get();
+        std::string sname = ra->value;
+        const ASTNode* ta = ra->template_args.get();
+        while (ta) { sname += "__" + ta->value; ta = ta->next.get(); }
+        if (global_type_registry().has_struct(sname))
+            rec->struct_type = sname;
+    }
 
     /* Register with GC if forced or auto-detected */
     if (strat == AllocStrategy::ForcedGC || strat == AllocStrategy::GC) {
@@ -257,7 +267,7 @@ void Codegen::gen_weak_ref(const ASTNode* node) {
 /* ── borrow x (standalone) ── */
 void Codegen::gen_borrow(const ASTNode* node) {
     /* Borrow is a no-op in IR; the ownership tracker already validated it. */
-    (void)node;
+    static_cast<void>(node);
 }
 
 /* ── output expr ── */
@@ -289,9 +299,11 @@ void Codegen::gen_output(const ASTNode* node) {
                     builder_->CreateCall(fn_array_print_, { val });
                 else if (lk == AstTypeKind::String)
                     builder_->CreateCall(fn_print_str_, { val });
-                else if (lk == AstTypeKind::Float || alloc_ty->isDoubleTy())
+                else if (lk == AstTypeKind::Float || alloc_ty->isDoubleTy()) {
+                    if (val->getType()->isIntegerTy())
+                        val = builder_->CreateBitCast(val, llvm::Type::getDoubleTy(ctx_), "fp_val");
                     builder_->CreateCall(fn_print_float_, { val });
-                else
+                } else
                     builder_->CreateCall(fn_printf_, { val });
                 return;
             }
@@ -358,9 +370,11 @@ void Codegen::gen_output(const ASTNode* node) {
     /* H2 Phase C: prefer annotation, fall back to LLVM type */
     {
         auto lk = get_annotation_kind(node->left.get());
-        if (lk == AstTypeKind::Float || val->getType()->isDoubleTy())
+        if (lk == AstTypeKind::Float || val->getType()->isDoubleTy()) {
+            if (val->getType()->isIntegerTy())
+                val = builder_->CreateBitCast(val, llvm::Type::getDoubleTy(ctx_), "fp_val");
             builder_->CreateCall(fn_print_float_, { val });
-        else if (lk == AstTypeKind::String || val->getType()->isPointerTy())
+        } else if (lk == AstTypeKind::String || val->getType()->isPointerTy())
             builder_->CreateCall(fn_print_str_, { val });
         else
             builder_->CreateCall(fn_printf_, { val });
@@ -395,7 +409,7 @@ void Codegen::gen_return(const ASTNode* node) {
            the function return (stack allocas would be freed). */
         auto* struct_ty = llvm::cast<llvm::StructType>(val->getType());
         llvm::Value* heap_slot = builder_->CreateCall(
-            fn_arena_alloc_, { i64((int64_t)module_->getDataLayout().getTypeAllocSize(struct_ty)) },
+            fn_arena_alloc_, { i64(static_cast<int64_t>(module_->getDataLayout().getTypeAllocSize(struct_ty))) },
             "ret_closure_heap");
         builder_->CreateStore(val, heap_slot);
         val = heap_slot;
@@ -406,6 +420,13 @@ void Codegen::gen_return(const ASTNode* node) {
             val = builder_->CreateIntToPtr(val, ret_ty, "ret_cast");
         else if (val->getType()->isPointerTy() && ret_ty->isIntegerTy())
             val = builder_->CreatePtrToInt(val, ret_ty, "ret_unbox");
+        else if (val->getType()->isIntegerTy() && ret_ty->isIntegerTy() &&
+                 val->getType()->getIntegerBitWidth() != ret_ty->getIntegerBitWidth()) {
+            if (val->getType()->getIntegerBitWidth() > ret_ty->getIntegerBitWidth())
+                val = builder_->CreateTrunc(val, ret_ty, "ret_trunc");
+            else
+                val = builder_->CreateZExt(val, ret_ty, "ret_zext");
+        }
         else if (val->getType()->isIntegerTy() && ret_ty->isFloatingPointTy())
             val = builder_->CreateSIToFP(val, ret_ty, "ret_itof");
         else if (val->getType()->isFloatingPointTy() && ret_ty->isIntegerTy())
@@ -881,7 +902,7 @@ void Codegen::gen_lambda(const ASTNode* node) {
         llvm::Value* env = fn->getArg(0);
         llvm::Value* env_i64 = builder_->CreateBitCast(env, llvm::PointerType::get(i64_ty(), 0), "env_arr");
         for (size_t i = 0; i < node->captures.size(); i++) {
-            auto* gep = builder_->CreateGEP(i64_ty(), env_i64, i64((int64_t)i), node->captures[i] + "_gep");
+            auto* gep = builder_->CreateGEP(i64_ty(), env_i64, i64(static_cast<int64_t>(i)), node->captures[i] + "_gep");
             llvm::Value* val = builder_->CreateLoad(i64_ty(), gep, node->captures[i] + "_cap");
             auto* slot = create_entry_alloca(node->captures[i], i64_ty());
             builder_->CreateStore(val, slot);
@@ -891,7 +912,7 @@ void Codegen::gen_lambda(const ASTNode* node) {
 
     /* Allocate params (skip env if capturing) */
     int param_start = has_captures ? 1 : 0;
-    for (int i = param_start; i < (int)param_names.size(); i++) {
+    for (int i = param_start; i < static_cast<int>(param_names.size()); i++) {
         auto* slot = create_entry_alloca(param_names[i], i64_ty());
         llvm::Value* val = fn->getArg(i);
         if (val->getType() != i64_ty())
@@ -937,13 +958,13 @@ void Codegen::gen_lambda(const ASTNode* node) {
         size_t ncaptures = node->captures.size();
         size_t env_bytes = ncaptures * 8;
         auto* env_heap = builder_->CreateCall(
-            fn_arena_alloc_, { i64((int64_t)env_bytes) }, var_name + "_env_heap");
+            fn_arena_alloc_, { i64(static_cast<int64_t>(env_bytes)) }, var_name + "_env_heap");
         auto* env_as_i64 = builder_->CreateBitCast(env_heap, llvm::PointerType::get(i64_ty(), 0), var_name + "_env_i64");
         for (size_t i = 0; i < ncaptures; i++) {
             VarRecord* cap_rec = lookup_var(node->captures[i]);
             if (cap_rec && cap_rec->alloca_ptr) {
                 llvm::Value* cap_val = builder_->CreateLoad(i64_ty(), cap_rec->alloca_ptr, node->captures[i]);
-                auto* cap_gep = builder_->CreateGEP(i64_ty(), env_as_i64, i64((int64_t)i), node->captures[i] + "_cap_slot");
+                auto* cap_gep = builder_->CreateGEP(i64_ty(), env_as_i64, i64(static_cast<int64_t>(i)), node->captures[i] + "_cap_slot");
                 builder_->CreateStore(cap_val, cap_gep);
             }
         }
@@ -1208,7 +1229,7 @@ void Codegen::gen_new(const ASTNode* node) {
         node->args.get(), "", gen_expr_fn);
 
     if (!obj_ptr) {
-        std::cerr << "Warning: new " << class_name << "() failed - class not found\n";
+        global_diag().warn(node->src_line, "new " + class_name + "() failed - class not found");
     }
 }
 
@@ -1826,10 +1847,10 @@ void Codegen::gen_tensor_stmt(const ASTNode* node) {
             auto* gep = builder_->CreateInBoundsGEP(
                 llvm::ArrayType::get(i64_ty, dims.size()),
                 shape_alloca,
-                { i64(0), i64((int)i) });
+                { i64(0), i64(static_cast<int>(i)) });
             builder_->CreateStore(dims[i], gep);
         }
-        auto* ndim = i64((int64_t)dims.size());
+        auto* ndim = i64(static_cast<int64_t>(dims.size()));
         auto* shape_ptr = builder_->CreateBitCast(shape_alloca, ptr_ty);
         builder_->CreateCall(tensor_new_, { ndim, shape_ptr }, "tensor");
     }

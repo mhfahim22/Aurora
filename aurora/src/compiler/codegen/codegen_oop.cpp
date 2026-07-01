@@ -148,7 +148,7 @@ static int field_index_with_vtable(const std::string& class_name, int field_pos)
 
 /* Helper: get the total number of user fields (excluding vtable ptr) */
 static int count_user_fields(const std::string& class_name) {
-    return (int)global_class_registry().all_fields(class_name).size();
+    return static_cast<int>(global_class_registry().all_fields(class_name).size());
 }
 
 /* class এর জন্য LLVM StructType তৈরি করা */
@@ -237,7 +237,7 @@ llvm::Value* oop_gen_new_object(
     int vtable_offset = cls->has_vtable ? 1 : 0;
 
     /* fields initialize করা */
-    for (int i = 0; i < (int)all_fields.size(); i++) {
+    for (int i = 0; i < static_cast<int>(all_fields.size()); i++) {
         auto& field = all_fields[i];
 
         int storage_idx = i + vtable_offset;
@@ -248,7 +248,7 @@ llvm::Value* oop_gen_new_object(
 
         llvm::Value* val = nullptr;
 
-        if (i < (int)arg_vals.size()) {
+        if (i < static_cast<int>(arg_vals.size())) {
             /* argument থেকে value নাও */
             val = arg_vals[i];
         } else {
@@ -310,7 +310,7 @@ llvm::Value* oop_gen_field_get(
     const ClassInfo* cls = global_class_registry().get(class_name);
     int vtable_offset = (cls && cls->has_vtable) ? 1 : 0;
 
-    for (int i = 0; i < (int)all_fields.size(); i++) {
+    for (int i = 0; i < static_cast<int>(all_fields.size()); i++) {
         if (all_fields[i].name == field_name) {
             int storage_idx = i + vtable_offset;
             llvm::Value* field_ptr = builder.CreateStructGEP(
@@ -351,7 +351,7 @@ void oop_gen_field_set(
     const ClassInfo* cls = global_class_registry().get(class_name);
     int vtable_offset = (cls && cls->has_vtable) ? 1 : 0;
 
-    for (int i = 0; i < (int)all_fields.size(); i++) {
+    for (int i = 0; i < static_cast<int>(all_fields.size()); i++) {
         if (all_fields[i].name == field_name) {
             int storage_idx = i + vtable_offset;
             llvm::Value* field_ptr = builder.CreateStructGEP(
@@ -486,7 +486,7 @@ static llvm::Value* oop_gen_method_call_impl(
     if (!fn) {
         std::vector<llvm::Type*> param_types;
         param_types.push_back(llvm::PointerType::getUnqual(ctx)); /* self */
-        for (int i = 0; i < (int)method->params.size(); i++)
+        for (int i = 0; i < static_cast<int>(method->params.size()); i++)
             param_types.push_back(llvm::PointerType::getUnqual(ctx));
 
         auto* dir_ret_ty = ast_kind_to_abi_type(ctx, method->return_kind,
@@ -566,7 +566,7 @@ llvm::Value* oop_gen_self_field_get(
     const ClassInfo* cls = global_class_registry().get(class_name);
     int vtable_offset = (cls && cls->has_vtable) ? 1 : 0;
 
-    for (int i = 0; i < (int)all_fields.size(); i++) {
+    for (int i = 0; i < static_cast<int>(all_fields.size()); i++) {
         if (all_fields[i].name == field_name) {
             int storage_idx = i + vtable_offset;
             llvm::Value* gep = builder.CreateStructGEP(
@@ -625,7 +625,7 @@ void oop_gen_self_field_set(
     const ClassInfo* cls = global_class_registry().get(class_name);
     int vtable_offset = (cls && cls->has_vtable) ? 1 : 0;
 
-    for (int i = 0; i < (int)all_fields.size(); i++) {
+    for (int i = 0; i < static_cast<int>(all_fields.size()); i++) {
         if (all_fields[i].name == field_name) {
             int storage_idx = i + vtable_offset;
             llvm::Value* gep = builder.CreateStructGEP(

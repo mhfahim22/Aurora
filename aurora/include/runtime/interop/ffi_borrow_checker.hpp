@@ -13,6 +13,10 @@
    Static analysis across language boundaries.
    Ensures no use-after-free, no double-free, no dangling
    references across FFI calls — all at compile time.
+   
+   ⚠ WIP — Architecture complete, not yet integrated into the
+   compiler pipeline. The analysis logic is implemented but
+   not wired into the semantic pass.
    ════════════════════════════════════════════════════════════ */
 
 /* ── Direction of FFI call ── */

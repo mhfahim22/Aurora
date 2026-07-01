@@ -46,7 +46,7 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
         if (end) {
             block_comment_continue_ = false;
             p = end + 2;
-            col = (int)(p - line.c_str());
+            col = static_cast<int>(p - line.c_str());
         } else {
             return result;
         }
@@ -209,7 +209,7 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
             auto lexed = lex_line(line, line_no);
 
             int close_idx = -1;
-            for (int i = 0; i < (int)lexed.tokens.size(); ++i) {
+            for (int i = 0; i < static_cast<int>(lexed.tokens.size()); ++i) {
                 if (lexed.tokens[i].value == ">>") { close_idx = i; break; }
             }
 
@@ -230,7 +230,7 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
 
         auto lexed = lex_line(line, line_no);
 
-        for (int i = 0; i < (int)lexed.tokens.size(); ++i) {
+        for (int i = 0; i < static_cast<int>(lexed.tokens.size()); ++i) {
             if (lexed.tokens[i].value == "<<") {
                 /* ── heuristic: treat << as multi-line bracket only at line start or after =
                    This is a best-effort heuristic. It may mis-classify << as a bracket
@@ -244,7 +244,7 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
                 if (!is_ml_bracket) continue;
 
                 int close_idx = -1;
-                for (int j = i + 1; j < (int)lexed.tokens.size(); ++j) {
+                for (int j = i + 1; j < static_cast<int>(lexed.tokens.size()); ++j) {
                     if (lexed.tokens[j].value == ">>") { close_idx = j; break; }
                 }
 
@@ -253,7 +253,7 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
                     lexed.tokens[close_idx].value = "]";
                 } else {
                     lexed.tokens[i].value = "[";
-                    ml_line = (int)result.size();
+                    ml_line = static_cast<int>(result.size());
                     ml_tok  = i;
                 }
                 break;

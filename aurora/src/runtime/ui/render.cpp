@@ -2,6 +2,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#else
+#include <unistd.h>
+#endif
 
 extern "C" {
 
@@ -33,7 +39,13 @@ void aurora_ui_shutdown() {
 
 void aurora_ui_render() {
     if (!initialized) ensure_init();
-    printf("\033[H"); /* move cursor home */
+    if (isatty(fileno(stdout)))
+#ifdef _WIN32
+    if (_isatty(_fileno(stdout)))
+#else
+    if (isatty(fileno(stdout)))
+#endif
+        printf("\033[H"); /* move cursor home */
     for (int y = 0; y < render_height; y++) {
         render_buffer[y][render_width] = '\0';
         printf("%s\n", render_buffer[y]);

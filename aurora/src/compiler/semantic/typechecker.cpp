@@ -2,8 +2,11 @@
 #include "compiler/class_oop.hpp"
 #include "compiler/type_registry.hpp"
 
+#include "common/errors.hpp"
+
 #include <sstream>
 #include <iostream>
+#include <set>
 
 /* ── FFI helper: parse type name string → AuroraType ── */
 static AuroraType parse_extern_type(const std::string& name) {
@@ -49,32 +52,7 @@ static AuroraType ast_kind_to_type(AstTypeKind k) {
 }
 
 /* ── AuroraType → AstTypeKind conversion (H2 Phase B) ── */
-static AstTypeKind to_ast_type_kind(AuroraType t) {
-    switch (t) {
-        case AuroraType::Unknown:  return AstTypeKind::Unknown;
-        case AuroraType::Void:     return AstTypeKind::Void;
-        case AuroraType::Int:      return AstTypeKind::Int;
-        case AuroraType::Float:    return AstTypeKind::Float;
-        case AuroraType::String:   return AstTypeKind::String;
-        case AuroraType::Bool:     return AstTypeKind::Bool;
-        case AuroraType::Array:    return AstTypeKind::Array;
-        case AuroraType::Struct:   return AstTypeKind::Struct;
-        case AuroraType::Function: return AstTypeKind::Function;
-        case AuroraType::Class:    return AstTypeKind::Class;
-        case AuroraType::Enum:      return AstTypeKind::Enum;
-        case AuroraType::Interface: return AstTypeKind::Interface;
-        case AuroraType::Tuple:    return AstTypeKind::Tuple;
-        case AuroraType::Pointer:  return AstTypeKind::Pointer;
-        case AuroraType::List:     return AstTypeKind::List;
-        case AuroraType::Map:       return AstTypeKind::Map;
-        case AuroraType::Set:       return AstTypeKind::Set;
-        case AuroraType::Vector:   return AstTypeKind::Vector;
-        case AuroraType::Stack:    return AstTypeKind::Stack;
-        case AuroraType::Queue:    return AstTypeKind::Queue;
-        case AuroraType::Json:     return AstTypeKind::Json;
-    }
-    return AstTypeKind::Unknown;
-}
+/* (defined inline in typechecker.hpp) */
 
 /* ── Write resolved type annotation onto an AST node (H2 Phase B) ── */
 /*   element_kind_val: for compound types (Array, List, etc.), the element type.
@@ -176,7 +154,7 @@ void TypeChecker::define_match_pattern_vars(const ASTNode* pattern) {
 void TypeChecker::define_var(const std::string& name, AuroraType type) {
     if (scopes_.empty()) push_scope();
 
-    for (int i = (int)scopes_.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
         auto it = scopes_[i].find(name);
         if (it != scopes_[i].end()) {
             it->second = type;
@@ -204,7 +182,7 @@ AstTypeKind TypeChecker::lookup_var_elem(const std::string& name) const {
 }
 
 AuroraType TypeChecker::lookup_var(const std::string& name, int line) const {
-    for (int i = (int)scopes_.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
         auto it = scopes_[i].find(name);
         if (it != scopes_[i].end()) return it->second;
     }
@@ -215,7 +193,7 @@ AuroraType TypeChecker::lookup_var(const std::string& name, int line) const {
 }
 
 AuroraType TypeChecker::get_type(const std::string& var_name) const {
-    for (int i = (int)scopes_.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
         auto it = scopes_[i].find(var_name);
         if (it != scopes_[i].end()) return it->second;
     }
@@ -223,10 +201,16 @@ AuroraType TypeChecker::get_type(const std::string& var_name) const {
 }
 
 bool TypeChecker::has_type(const std::string& var_name) const {
-    for (int i = (int)scopes_.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
         if (scopes_[i].find(var_name) != scopes_[i].end()) return true;
     }
     return false;
+}
+
+std::string TypeChecker::lookup_var_enum(const std::string& name) const {
+    auto it = var_enum_types_.find(name);
+    if (it != var_enum_types_.end()) return it->second;
+    return "";
 }
 
 std::string TypeChecker::type_describe(const std::string& var_name) const {
@@ -280,6 +264,11 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["pow"]           = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Float};
     functions_["clamp"]         = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Float};
     functions_["rand"]          = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["pi"]            = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["file_exists"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Bool};
+    functions_["sin"]           = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
+    functions_["cos"]           = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
+    functions_["tan"]           = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
 
     /* ── Number conversion builtins ── */
     functions_["str"]           = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::String};
@@ -1040,6 +1029,18 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                 : AstTypeKind::Unknown;
             define_var_elem(node->left->value, value_type, rhs_elem);
             annotate_node(node, value_type, "", rhs_elem);
+
+            /* Track type name for struct/enum-typed variables */
+            if (value_type == AuroraType::Struct && node->right) {
+                const std::string& rname = node->right->type_annotation.type_name;
+                if (!rname.empty())
+                    var_struct_types_[node->left->value] = rname;
+            }
+            if (value_type == AuroraType::Enum && node->right) {
+                const std::string& rname = node->right->type_annotation.type_name;
+                if (!rname.empty())
+                    var_enum_types_[node->left->value] = rname;
+            }
             break;
         }
 
@@ -1068,7 +1069,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                 if (current_return_type_ == AuroraType::Unknown) {
                     current_return_type_ = value_type;
                     auto it = functions_.find("");
-                    (void)it;
+                    static_cast<void>(it);
                 } else {
                     expect_assignable(current_return_type_, value_type, node->src_line);
                 }
@@ -1135,7 +1136,68 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
 
         case NodeType::Match: {
             AuroraType match_type = infer_expr(node->left.get());
-            (void)match_type; /* Allow any type for pattern matching */
+            static_cast<void>(match_type); /* Allow any type for pattern matching */
+
+            /* ── Pattern exhaustiveness & unreachable checking ── */
+            bool has_default = false;
+            bool has_wildcard = false;
+            bool unreachable = false;
+            std::set<std::string> covered;
+            const ASTNode* cp = node->args.get();
+            while (cp) {
+                if (unreachable) {
+                    global_diag().warn(cp->src_line, "unreachable case");
+                }
+                if (cp->value == "default") {
+                    has_default = true;
+                    unreachable = true;
+                } else if (cp->args && cp->args->type == NodeType::Var) {
+                    if (cp->args->value == "_") {
+                        has_wildcard = true;
+                        unreachable = true;
+                    } else {
+                        covered.insert("var:" + cp->args->value);
+                    }
+                } else if (cp->args && cp->args->type == NodeType::Num) {
+                    std::string key = "num:" + cp->args->value;
+                    if (covered.count(key))
+                        global_diag().warn(cp->src_line, "duplicate literal pattern " + cp->args->value);
+                    covered.insert(key);
+                } else if (cp->args && cp->args->type == NodeType::Call) {
+                    covered.insert("struct:" + cp->args->value);
+                } else if (cp->args && cp->args->type == NodeType::Array) {
+                    covered.insert("(array)");
+                } else if (!cp->value.empty() && cp->value != "default") {
+                    if (covered.count("lit:" + cp->value))
+                        global_diag().warn(cp->src_line, "duplicate case value " + cp->value);
+                    covered.insert("lit:" + cp->value);
+                }
+                cp = cp->next.get();
+            }
+
+            /* ── Enum exhaustiveness: if matching on an enum type ── */
+            if (match_type == AuroraType::Enum && !has_default && !has_wildcard) {
+                std::string enum_name = node->left->type_annotation.type_name;
+                if (enum_name.empty() && node->left)
+                    enum_name = lookup_var_enum(node->left->value);
+                if (enum_name.empty()) {
+                    global_diag().warn(node->src_line, "match on enum type without default case — consider adding 'default:' or wildcard '_'");
+                } else {
+                    const EnumInfo* einfo = global_type_registry().get_enum(enum_name);
+                    if (einfo) {
+                        for (const auto& v : einfo->variants) {
+                            if (covered.count("var:" + v.name) == 0 &&
+                                covered.count("struct:" + v.name) == 0 &&
+                                covered.count("num:" + std::to_string(v.value)) == 0 &&
+                                covered.count("lit:" + std::to_string(v.value)) == 0) {
+                                global_diag().warn(node->src_line, "match does not cover enum variant '" + v.name + "' (value " + std::to_string(v.value) + ")");
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* ── Process case bodies ── */
             const ASTNode* case_ptr = node->args.get();
             while (case_ptr) {
                 if (case_ptr->value != "default" && case_ptr->args) {
@@ -1179,6 +1241,9 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             current_return_type_ = AuroraType::Unknown;
             push_scope();
 
+            /* Push generic type params into scope before body analysis */
+            push_generic_params(node->template_params.get());
+
             const ASTNode* param = node->args.get();
             while (param) {
                 define_var(param->value, AuroraType::Unknown);
@@ -1204,7 +1269,7 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                         p = p->next.get();
                     }
                     if (!is_param) {
-                        for (int i = (int)scopes_.size() - 2; i >= 0; --i) {
+                        for (int i = static_cast<int>(scopes_.size()) - 2; i >= 0; --i) {
                             auto it = scopes_[i].find(ref);
                             if (it != scopes_[i].end()) {
                                 const_cast<ASTNode*>(node)->captures.push_back(ref);
@@ -1224,19 +1289,27 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
             {
                 const ASTNode* pp = node->args.get();
                 while (pp) {
-                    fn.params.push_back(AuroraType::Unknown);
+                    AuroraType ptype = AuroraType::Unknown;
+                    if (pp->right && !pp->right->value.empty())
+                        ptype = resolve_type_name(pp->right->value);
+                    fn.params.push_back(ptype);
                     pp = pp->next.get();
                 }
             }
-            fn.result = current_return_type_ == AuroraType::Unknown
-                ? AuroraType::Int
-                : current_return_type_;
+            if (node->left && !node->left->value.empty()) {
+                fn.result = resolve_type_name(node->left->value);
+            } else {
+                fn.result = current_return_type_ == AuroraType::Unknown
+                    ? AuroraType::Int
+                    : current_return_type_;
+            }
             fn.is_generic = saved_is_generic;
             fn.generic_params = std::move(saved_generic_params);
             fn.generic_ast_node = saved_generic_ast;
             annotate_node(node, fn.result);  /* H2 Phase D */
 
             pop_scope();
+            pop_generic_params(node->template_params.get());
             current_return_type_ = saved_return;
             inside_function_ = saved_inside;
             break;
@@ -1257,21 +1330,27 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                 param = param->next.get();
             }
 
+            push_generic_params(node->template_params.get());
             walk_block(node->body.get());
             auto& fn = functions_[node->value];
             /* Preserve generic info if set during registration */
             bool saved_is_generic = fn.is_generic;
             auto saved_generic_params = fn.generic_params;
             const ASTNode* saved_generic_ast = fn.generic_ast_node;
-            fn.result = current_return_type_ == AuroraType::Unknown
-                ? AuroraType::Int
-                : current_return_type_;
+            if (node->left && !node->left->value.empty()) {
+                fn.result = resolve_type_name(node->left->value);
+            } else {
+                fn.result = current_return_type_ == AuroraType::Unknown
+                    ? AuroraType::Int
+                    : current_return_type_;
+            }
             fn.is_generic = saved_is_generic;
             fn.generic_params = std::move(saved_generic_params);
             fn.generic_ast_node = saved_generic_ast;
             annotate_node(node, fn.result);  /* H2 Phase D */
 
             pop_scope();
+            pop_generic_params(node->template_params.get());
             current_return_type_ = saved_return;
             inside_function_ = saved_inside;
             break;
@@ -1385,6 +1464,8 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
             } catch (const TypeError&) {
                 if (functions_.count(node->value))
                     return annotate_ret(node, AuroraType::Unknown);
+                if (is_generic_param(node->value))
+                    return annotate_ret(node, AuroraType::Generic);
                 throw;
             }
         }
@@ -1425,6 +1506,40 @@ AuroraType TypeChecker::infer_expr(const ASTNode* node) {
                     if (field && field->type_kind != AstTypeKind::Unknown)
                         return annotate_ret(node, ast_kind_to_type(field->type_kind), "",
                             field->element_kind);
+                }
+                /* Look up field type from struct type registry */
+                auto st_it = var_struct_types_.find(obj_name);
+                if (st_it != var_struct_types_.end()) {
+                    const StructInfo* sinfo = global_type_registry().get_struct(st_it->second);
+                    if (sinfo) {
+                        int idx = sinfo->field_index(field_name);
+                        if (idx >= 0 && static_cast<size_t>(idx) < sinfo->fields.size()) {
+                            const StructFieldInfo& fi = sinfo->fields[idx];
+                            if (fi.type_kind != AstTypeKind::Unknown)
+                                return annotate_ret(node, ast_kind_to_type(fi.type_kind), st_it->second, fi.element_kind);
+                        }
+                    }
+                }
+                /* Enum variant access: Color.Red */
+                if (global_type_registry().has_enum(obj_name)) {
+                    const EnumInfo* einfo = global_type_registry().get_enum(obj_name);
+                    if (einfo) {
+                        for (const auto& v : einfo->variants) {
+                            if (v.name == field_name)
+                                return annotate_ret(node, AuroraType::Enum, obj_name);
+                        }
+                    }
+                }
+                /* Enum variant access from enum-typed variable: col.Red */
+                auto en_it = var_enum_types_.find(obj_name);
+                if (en_it != var_enum_types_.end()) {
+                    const EnumInfo* einfo = global_type_registry().get_enum(en_it->second);
+                    if (einfo) {
+                        for (const auto& v : einfo->variants) {
+                            if (v.name == field_name)
+                                return annotate_ret(node, AuroraType::Enum, en_it->second);
+                        }
+                    }
                 }
             }
             return annotate_ret(node, AuroraType::Unknown);
@@ -1572,8 +1687,45 @@ AuroraType TypeChecker::infer_unary(const ASTNode* node) {
 }
 
 AuroraType TypeChecker::infer_call(const ASTNode* node) {
-    /* ── Generic function call: foo[Int, Float](x, y) ── */
+    /* ── Generic struct construction or generic function call: Box[Int](42) or foo[Int, Float](x, y) ── */
     if (node->template_args) {
+        bool is_struct = global_type_registry().has_struct(node->value)
+                      || user_types_.count(node->value) > 0;
+        if (is_struct) {
+            std::string mangled = instantiate_generic_struct(node->value, node->template_args.get());
+            if (mangled.empty()) {
+                std::ostringstream msg;
+                msg << "cannot instantiate generic struct '" << node->value << "'";
+                throw TypeError(msg.str(), node->src_line);
+            }
+            const StructInfo* sinfo = global_type_registry().get_struct(mangled);
+            if (!sinfo) {
+                std::ostringstream msg;
+                msg << "internal error: struct '" << mangled << "' not registered";
+                throw TypeError(msg.str(), node->src_line);
+            }
+            /* Check args match field count */
+            int arg_count = 0;
+            const ASTNode* arg = node->args.get();
+            while (arg) { arg_count++; arg = arg->next.get(); }
+            if (static_cast<size_t>(arg_count) != sinfo->fields.size()) {
+                std::ostringstream msg;
+                msg << "struct '" << node->value << "' expects " << sinfo->fields.size()
+                    << " field(s), got " << arg_count;
+                throw TypeError(msg.str(), node->src_line);
+            }
+            arg = node->args.get();
+            size_t fi = 0;
+            while (arg && fi < sinfo->fields.size()) {
+                AuroraType arg_type = infer_expr(arg);
+                AuroraType field_type = ast_kind_to_type(sinfo->fields[fi].type_kind);
+                if (field_type != AuroraType::Unknown && arg_type != AuroraType::Unknown)
+                    expect_assignable(field_type, arg_type, node->src_line);
+                arg = arg->next.get();
+                fi++;
+            }
+            return annotate_ret(node, AuroraType::Struct, mangled);
+        }
         auto it = functions_.find(node->value);
         if (it == functions_.end()) {
             std::ostringstream msg;
@@ -1592,21 +1744,111 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
             mangled += "__" + ta->value;
             ta = ta->next.get();
         }
+        /* Count template params and args for validation */
+        int tp_count = 0, ta_count = 0;
+        {
+            const ASTNode* tp = it->second.generic_ast_node
+                ? it->second.generic_ast_node->template_params.get() : nullptr;
+            for (; tp; tp = tp->next.get()) tp_count++;
+            ta = node->template_args.get();
+            for (; ta; ta = ta->next.get()) ta_count++;
+        }
+        if (tp_count != ta_count) {
+            std::ostringstream msg;
+            msg << "generic function '" << node->value << "' expects "
+                << tp_count << " type argument(s), got " << ta_count;
+            throw TypeError(msg.str(), node->src_line);
+        }
+        /* Build type param → concrete type map from template_args */
+        std::unordered_map<std::string, AuroraType> type_map;
+        {
+            const ASTNode* tp = it->second.generic_ast_node
+                ? it->second.generic_ast_node->template_params.get() : nullptr;
+            ta = node->template_args.get();
+            while (tp && ta) {
+                type_map[tp->value] = resolve_type_name(ta->value);
+                tp = tp->next.get();
+                ta = ta->next.get();
+            }
+        }
         /* Instantiate concrete version if not already */
         if (functions_.count(mangled) == 0) {
             FunctionTypeInfo concrete = it->second;
             concrete.is_generic = false;
             concrete.generic_params.clear();
-            concrete.generic_ast_node = nullptr;
+
+            /* Substitute type params in param types using AST annotations */
+            const ASTNode* gen_node = concrete.generic_ast_node;
+            if (gen_node) {
+                const ASTNode* gen_param = gen_node->args.get();
+                for (size_t i = 0; i < concrete.params.size() && gen_param; i++) {
+                    if (gen_param->right) {
+                        const std::string& type_name = gen_param->right->value;
+                        auto tm = type_map.find(type_name);
+                        if (tm != type_map.end())
+                            concrete.params[i] = tm->second;
+                    }
+                    gen_param = gen_param->next.get();
+                }
+            }
+            /* Substitute result type: Generic → concrete type from type_map */
+            if (gen_node && gen_node->left && !gen_node->left->value.empty()) {
+                auto tm = type_map.find(gen_node->left->value);
+                if (tm != type_map.end())
+                    concrete.result = tm->second;
+            }
             functions_[mangled] = concrete;
+
+            /* Store concrete generic info for codegen monomorphization */
+            ConcreteGenericInfo cgi;
+            cgi.generic_node = concrete.generic_ast_node;
+            if (gen_node) {
+                const ASTNode* gen_param = gen_node->args.get();
+                for (size_t i = 0; i < concrete.params.size() && gen_param; i++) {
+                    if (gen_param->right) {
+                        const std::string& type_name = gen_param->right->value;
+                        auto tm = type_map.find(type_name);
+                        if (tm != type_map.end())
+                            cgi.param_kinds.push_back(to_ast_type_kind(tm->second));
+                        else
+                            cgi.param_kinds.push_back(AstTypeKind::Unknown);
+                    } else {
+                        cgi.param_kinds.push_back(AstTypeKind::Unknown);
+                    }
+                    gen_param = gen_param->next.get();
+                }
+                /* Determine result type kind from concrete instantiation */
+                if (node->type_annotation.kind != AstTypeKind::Unknown) {
+                    cgi.result_kind = node->type_annotation.kind;
+                } else {
+                    /* Try to resolve from the generic node's return type annotation */
+                    const ASTNode* ret_ann = gen_node->left.get();
+                    if (ret_ann && !ret_ann->value.empty()) {
+                        auto tm = type_map.find(ret_ann->value);
+                        if (tm != type_map.end())
+                            cgi.result_kind = to_ast_type_kind(tm->second);
+                        else
+                            cgi.result_kind = to_ast_type_kind(resolve_type_name(ret_ann->value));
+                    }
+                }
+            }
+            concrete_generics_[mangled] = cgi;
         }
-        /* Type-check args */
-        size_t count = 0;
-        const ASTNode* arg = node->args.get();
-        while (arg) {
-            infer_expr(arg);
-            count++;
-            arg = arg->next.get();
+        /* Type-check args against substituted param types */
+        {
+            auto& concrete = functions_[mangled];
+            size_t idx = 0;
+            const ASTNode* arg = node->args.get();
+            while (arg) {
+                AuroraType arg_type = infer_expr(arg);
+                if (idx < concrete.params.size()) {
+                    AuroraType expected = concrete.params[idx];
+                    if (expected != AuroraType::Unknown && arg_type != AuroraType::Unknown)
+                        expect_assignable(expected, arg_type, node->src_line);
+                }
+                idx++;
+                arg = arg->next.get();
+            }
         }
         return annotate_ret(node, functions_[mangled].result);
     }
@@ -1796,13 +2038,15 @@ bool TypeChecker::is_numeric(AuroraType type) const {
     return type == AuroraType::Int ||
            type == AuroraType::Float ||
            type == AuroraType::Bool ||
-           type == AuroraType::Unknown;
+           type == AuroraType::Unknown ||
+           type == AuroraType::Generic;
 }
 
 bool TypeChecker::is_boolish(AuroraType type) const {
     return type == AuroraType::Int ||
            type == AuroraType::Bool ||
-           type == AuroraType::Unknown;
+           type == AuroraType::Unknown ||
+           type == AuroraType::Generic;
 }
 
 AuroraType TypeChecker::common_numeric(AuroraType left, AuroraType right, int line) const {
@@ -1814,17 +2058,13 @@ AuroraType TypeChecker::common_numeric(AuroraType left, AuroraType right, int li
     }
     if (left == AuroraType::Float || right == AuroraType::Float) return AuroraType::Float;
     if (left == AuroraType::Unknown || right == AuroraType::Unknown) return AuroraType::Unknown;
+    if (left == AuroraType::Generic || right == AuroraType::Generic) return AuroraType::Generic;
     return AuroraType::Int;
 }
 
 void TypeChecker::expect_assignable(AuroraType target, AuroraType value, int line) const {
-    if (target == AuroraType::Unknown || value == AuroraType::Unknown) {
-        /* Log diagnostic when Unknown propagates through a type check */
-        if (target != AuroraType::Unknown && value == AuroraType::Unknown) {
-            std::cerr << "[typecheck] warning at line " << line
-                      << ": expected '" << aurora_type_name(target)
-                      << "' but value type is unknown\n";
-        }
+    if (target == AuroraType::Unknown || value == AuroraType::Unknown ||
+        target == AuroraType::Generic || value == AuroraType::Generic) {
         return;
     }
     if (target == value) return;
@@ -1834,4 +2074,29 @@ void TypeChecker::expect_assignable(AuroraType target, AuroraType value, int lin
     msg << "expected " << aurora_type_name(target)
         << ", got " << aurora_type_name(value);
     throw TypeError(msg.str(), line);
+}
+
+/* ── Generic type parameter scope helpers ── */
+void TypeChecker::push_generic_params(const ASTNode* template_params) {
+    if (!template_params) return;
+    const ASTNode* tp = template_params;
+    while (tp) {
+        if (tp->type == NodeType::TypeParam && !tp->value.empty())
+            active_generic_params_.insert(tp->value);
+        tp = tp->next.get();
+    }
+}
+
+void TypeChecker::pop_generic_params(const ASTNode* template_params) {
+    if (!template_params) return;
+    const ASTNode* tp = template_params;
+    while (tp) {
+        if (tp->type == NodeType::TypeParam && !tp->value.empty())
+            active_generic_params_.erase(tp->value);
+        tp = tp->next.get();
+    }
+}
+
+bool TypeChecker::is_generic_param(const std::string& name) const {
+    return active_generic_params_.count(name) > 0;
 }

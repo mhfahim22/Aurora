@@ -1,0 +1,104 @@
+## Aurora Standard Library — Networking
+## Usage:  import "net"
+##
+## Low-level TCP sockets + HTTP client + DNS resolution.
+## All functions block the current fiber.
+##
+## Example:
+##   import "net"
+##   sock = tcp_connect("example.com", 80)
+##   tcp_send(sock, "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
+##   buf = cstring_repeat(4096)
+##   n = tcp_recv(sock, buf, 4096)
+##   output(substr(buf, 0, n))
+##   tcp_close(sock)
+## ════════════════════════════════════════════════════════════
+
+## ── HTTP ──
+extern function aurora_net_http_get(url: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_http_post(url: cstring, body: cstring, content_type: cstring, buffer: cstring, buffer_size: i32) -> i32
+
+## ── DNS ──
+extern function aurora_net_dns_lookup(hostname: cstring, buffer: cstring, buffer_size: i32) -> i32
+
+## ── TCP Socket (blocking) ──
+extern function aurora_net_tcp_connect(host: cstring, port: i32) -> i64
+extern function aurora_net_tcp_send(sock: i64, data: cstring, len: i32) -> i32
+extern function aurora_net_tcp_recv(sock: i64, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_tcp_close(sock: i64)
+
+## ── IP resolution ──
+extern function aurora_net_resolve_host(hostname: cstring, buffer: cstring, buffer_size: i32) -> i32
+
+## ── Send all bytes (retries partial writes) ──
+extern function aurora_send_all(sock: i64, data: cstring, len: i32) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── HTTP helpers ──
+function http_get(url):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_get(url, buf, 65536)
+    if n < 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+function http_post(url, body, content_type):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_post(url, body, content_type, buf, 65536)
+    if n < 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+## ── DNS ──
+function dns_lookup(hostname):
+    buf = cstring_repeat(256)
+    n = aurora_net_dns_lookup(hostname, buf, 256)
+    if n < 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+## ── TCP wrappers ──
+function tcp_connect(host, port):
+    return aurora_net_tcp_connect(host, port)
+end
+
+function tcp_send(sock, data):
+    return aurora_net_tcp_send(sock, data, strlen(data))
+end
+
+function tcp_recv(sock, bufsize):
+    buf = cstring_repeat(bufsize)
+    n = aurora_net_tcp_recv(sock, buf, bufsize)
+    if n < 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+function tcp_close(sock):
+    aurora_net_tcp_close(sock)
+end
+
+## ── Resolve hostname to IP string ──
+function resolve_host(hostname):
+    buf = cstring_repeat(256)
+    n = aurora_net_resolve_host(hostname, buf, 256)
+    if n < 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+## ── Send all bytes ──
+function send_all(sock, data):
+    return aurora_send_all(sock, data, strlen(data))
+end

@@ -55,7 +55,7 @@ ASTNode::Ptr Parser::parse_stmt() {
 
     const LexedLine& ll   = cur_line();
     const auto&      toks = ll.tokens;
-    int              cnt  = (int)toks.size();
+    int              cnt  = static_cast<int>(toks.size());
     int              ci   = ll.indent;
     int              ln   = ll.line_no;
 
@@ -163,7 +163,7 @@ ASTNode::Ptr Parser::parse_stmt() {
             if (!at_end()) {
                 const LexedLine& next_ll = cur_line();
                 const auto& next_toks = next_ll.tokens;
-                int next_cnt = (int)next_toks.size();
+                int next_cnt = static_cast<int>(next_toks.size());
                 if (next_cnt > 0 && next_toks[0].is_keyword("function") && next_cnt > 1) {
                     int idx = 1;
                     auto stmt = make_node(NodeType::PerformanceFn, "", next_ll.line_no);
@@ -638,7 +638,14 @@ ASTNode::Ptr Parser::parse_stmt() {
             if (idx < cnt) idx++;  /* ')' */
             else throw std::runtime_error("Line " + std::to_string(ln) + ": missing ')' in function parameters");
         }
-        if (idx < cnt && toks[idx].is_operator(':')) idx++;
+        /* ── Optional return type: function name(...): RetType ── */
+        if (idx < cnt && toks[idx].is_operator(':')) {
+            idx++;
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                stmt->left = make_node(NodeType::Var, toks[idx].value, ln);
+                idx++;
+            }
+        }
 
         bool fn_has_brace = (idx < cnt && toks[idx].is_operator('{'));
 
@@ -825,8 +832,8 @@ ASTNode::Ptr Parser::parse_stmt() {
     if (t0.is_keyword("interface"))
         return parse_interface();
 
-    /* ── type alias ── */
-    if (t0.is_keyword("type"))
+    /* ── type alias (but not type(...) function call) ── */
+    if (t0.is_keyword("type") && !(cnt > 1 && toks[1].is_operator('(')))
         return parse_type_alias();
 
     /* ── class ── */
@@ -869,12 +876,12 @@ ASTNode::Ptr Parser::parse_stmt() {
                 int eidx = 1;
                 auto elif  = make_node(NodeType::If, "elseif", cur_line().line_no);
                 elif->left = parse_expr(ctoks, eidx);
-                if (eidx < (int)ctoks.size() && ctoks[eidx].is_operator(':')) eidx++;
+                if (eidx < static_cast<int>(ctoks.size()) && ctoks[eidx].is_operator(':')) eidx++;
 
-                bool elif_has_brace = (eidx < (int)ctoks.size() && ctoks[eidx].is_operator('{'));
+                bool elif_has_brace = (eidx < static_cast<int>(ctoks.size()) && ctoks[eidx].is_operator('{'));
                 if (elif_has_brace) {
                     eidx++;
-                    if (eidx < (int)ctoks.size()) require_token_end(ctoks, eidx, "elseif condition");
+                    if (eidx < static_cast<int>(ctoks.size())) require_token_end(ctoks, eidx, "elseif condition");
                 } else {
                     require_token_end(ctoks, eidx, "elseif condition");
                 }
@@ -892,12 +899,12 @@ ASTNode::Ptr Parser::parse_stmt() {
             } else if (kw.is_keyword("else")) {
                 int else_ln = cur_line().line_no;
                 int eidx = 1;
-                if (eidx < (int)ctoks.size() && ctoks[eidx].is_operator(':')) eidx++;
+                if (eidx < static_cast<int>(ctoks.size()) && ctoks[eidx].is_operator(':')) eidx++;
 
-                bool else_has_brace = (eidx < (int)ctoks.size() && ctoks[eidx].is_operator('{'));
+                bool else_has_brace = (eidx < static_cast<int>(ctoks.size()) && ctoks[eidx].is_operator('{'));
                 if (else_has_brace) {
                     eidx++;
-                    if (eidx < (int)ctoks.size()) require_token_end(ctoks, eidx, "else statement");
+                    if (eidx < static_cast<int>(ctoks.size())) require_token_end(ctoks, eidx, "else statement");
                 } else {
                     require_token_end(ctoks, eidx, "else statement");
                 }
@@ -965,8 +972,8 @@ ASTNode::Ptr Parser::parse_stmt() {
         int match_indent = ci;
         advance();
 
-        /* Use stmt->body (cases list) instead of overloading stmt->args for case nodes */
-        ASTNode::Ptr* slot = &stmt->body;
+        /* Cases stored in stmt->args (case nodes linked via next) */
+        ASTNode::Ptr* slot = &stmt->args;
         bool seen_default = false;
         while (!at_end()) {
             if (!skip_blanks()) break;
@@ -984,7 +991,7 @@ ASTNode::Ptr Parser::parse_stmt() {
                 int cidx = 1;
                 ASTNode::Ptr pattern = nullptr;
                 /* Try to parse as a pattern (struct, array, variable, literal) */
-                if (cidx < (int)ctoks.size()) {
+                if (cidx < static_cast<int>(ctoks.size())) {
                     if (ctoks[cidx].is_operator('[')) {
                         /* Array pattern: [a, b, c] */
                         pattern = parse_pattern_from_tokens(ctoks, cidx, cln);
@@ -999,7 +1006,7 @@ ASTNode::Ptr Parser::parse_stmt() {
                         }
                     }
                 }
-                if (cidx < (int)ctoks.size() && ctoks[cidx].is_operator(':')) cidx++;
+                if (cidx < static_cast<int>(ctoks.size()) && ctoks[cidx].is_operator(':')) cidx++;
                 require_token_end(ctoks, cidx, "case value");
                 advance();
 
@@ -1017,7 +1024,7 @@ ASTNode::Ptr Parser::parse_stmt() {
                 slot = &raw->next;
             } else if (ctoks[0].is_keyword("default")) {
                 int didx = 1;
-                if (didx < (int)ctoks.size() && ctoks[didx].is_operator(':')) didx++;
+                if (didx < static_cast<int>(ctoks.size()) && ctoks[didx].is_operator(':')) didx++;
                 require_token_end(ctoks, didx, "default");
                 advance();
                 auto def_node = make_node(NodeType::Case, "default", cln);
@@ -1195,19 +1202,19 @@ ASTNode::Ptr Parser::parse_stmt() {
             std::string catch_var = "";
 
             /* Support catch(err) or catch err: syntax */
-            if (cidx < (int)catch_toks.size() && catch_toks[cidx].is_operator('(')) {
+            if (cidx < static_cast<int>(catch_toks.size()) && catch_toks[cidx].is_operator('(')) {
                 cidx++;
-                if (cidx < (int)catch_toks.size() && catch_toks[cidx].is_identifier()) {
+                if (cidx < static_cast<int>(catch_toks.size()) && catch_toks[cidx].is_identifier()) {
                     catch_var = catch_toks[cidx].value;
                     cidx++;
                 }
-                if (cidx < (int)catch_toks.size() && catch_toks[cidx].is_operator(')')) cidx++;
-            } else if (cidx < (int)catch_toks.size() && catch_toks[cidx].is_identifier()) {
+                if (cidx < static_cast<int>(catch_toks.size()) && catch_toks[cidx].is_operator(')')) cidx++;
+            } else if (cidx < static_cast<int>(catch_toks.size()) && catch_toks[cidx].is_identifier()) {
                 catch_var = catch_toks[cidx].value;
                 cidx++;
             }
 
-            if (cidx < (int)catch_toks.size() && catch_toks[cidx].is_operator(':')) cidx++;
+            if (cidx < static_cast<int>(catch_toks.size()) && catch_toks[cidx].is_operator(':')) cidx++;
             require_token_end(catch_toks, cidx, "catch clause");
 
             /* Store catch variable name in stmt->value if present */
@@ -1223,7 +1230,7 @@ ASTNode::Ptr Parser::parse_stmt() {
              cur_line().tokens[0].is_keyword("ensure"))) {
             const auto& fin_toks = cur_line().tokens;
             int fidx = 1;
-            if (fidx < (int)fin_toks.size() && fin_toks[fidx].is_operator(':')) fidx++;
+            if (fidx < static_cast<int>(fin_toks.size()) && fin_toks[fidx].is_operator(':')) fidx++;
             require_token_end(fin_toks, fidx, "finally clause");
             advance();
             /* Store finally body in stmt->right (Ensure node) */
@@ -1338,7 +1345,20 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── array index assign: name[expr] = expr ── */
-    if (t0.is(TokenType::Identifier) && cnt > 3 && toks[1].is_operator('[')) {
+    /* But first check if it's a generic call name[Type1, Type2](args) — if so, fall through */
+    bool is_generic_call = false;
+    if (t0.is(TokenType::Identifier) && cnt > 4 && toks[1].is_operator('[')) {
+        int ci = 2;
+        is_generic_call = true;
+        while (ci < cnt && !toks[ci].is_operator(']')) {
+            if (toks[ci].is_operator(',')) { ci++; continue; }
+            if (!toks[ci].is_identifier() && !toks[ci].is(TokenType::Keyword)) { is_generic_call = false; break; }
+            ci++;
+        }
+        if (is_generic_call)
+            is_generic_call = (ci < cnt && toks[ci].is_operator(']') && ci + 1 < cnt && toks[ci + 1].is_operator('('));
+    }
+    if (!is_generic_call && t0.is(TokenType::Identifier) && cnt > 3 && toks[1].is_operator('[')) {
         auto stmt  = make_node(NodeType::IndexAssign, t0.value, ln);
         int idx = 2;
         stmt->left = parse_expr(toks, idx);
@@ -1351,7 +1371,6 @@ ASTNode::Ptr Parser::parse_stmt() {
         advance();
         return stmt;
     }
-
     /* ── shared y = x / weak y = x (assignment form) ── */
     if ((t0.is_keyword("shared") || t0.is_keyword("weak")) && cnt > 3
         && toks[1].is(TokenType::Identifier) && toks[2].is_operator('=')) {
@@ -1430,6 +1449,24 @@ ASTNode::Ptr Parser::parse_stmt() {
             require_token_end(toks, idx, "new statement");
             advance();
             return stmt;
+        }
+    }
+
+    /* ── generic call as statement: name[Type1, Type2](args) ── */
+    if (t0.is(TokenType::Identifier) && cnt > 4 && toks[1].is_operator('[')) {
+        int ci = 2;
+        bool looks_like_generic = true;
+        while (ci < cnt && !toks[ci].is_operator(']')) {
+            if (toks[ci].is_operator(',')) { ci++; continue; }
+            if (!toks[ci].is_identifier() && !toks[ci].is(TokenType::Keyword)) { looks_like_generic = false; break; }
+            ci++;
+        }
+        if (looks_like_generic && ci < cnt && toks[ci].is_operator(']') && ci + 1 < cnt && toks[ci + 1].is_operator('(')) {
+            int idx = 0;
+            auto call = parse_factor(toks, idx);
+            require_token_end(toks, idx, "generic function call");
+            advance();
+            return call;
         }
     }
 
@@ -1558,7 +1595,7 @@ ASTNode::Ptr Parser::parse_stmt() {
         [...]        → NodeType::Array (array pattern with element patterns in args)
       Updates idx to point past the pattern.                                      ── */
 static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln) {
-    if (idx >= (int)toks.size()) return nullptr;
+    if (idx >= static_cast<int>(toks.size())) return nullptr;
 
     const Token& t = toks[idx];
 
@@ -1574,11 +1611,11 @@ static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, in
         idx++;
 
         /* Struct pattern: Name(...) */
-        if (idx < (int)toks.size() && toks[idx].is_operator('(')) {
+        if (idx < static_cast<int>(toks.size()) && toks[idx].is_operator('(')) {
             idx++;
             auto struct_pat = make_node(NodeType::Call, name, ln);
             ASTNode* tail = nullptr;
-            while (idx < (int)toks.size() && !toks[idx].is_operator(')')) {
+            while (idx < static_cast<int>(toks.size()) && !toks[idx].is_operator(')')) {
                 if (toks[idx].is_operator(',')) { idx++; continue; }
                 auto fp = parse_pattern_from_tokens(toks, idx, ln);
                 if (fp) {
@@ -1587,7 +1624,7 @@ static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, in
                     else                   { tail->next = std::move(fp); tail = raw; }
                 }
             }
-            if (idx < (int)toks.size() && toks[idx].is_operator(')')) idx++;
+            if (idx < static_cast<int>(toks.size()) && toks[idx].is_operator(')')) idx++;
             return struct_pat;
         }
 
@@ -1600,7 +1637,7 @@ static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, in
         idx++;
         auto arr_pat = make_node(NodeType::Array, "", ln);
         ASTNode* tail = nullptr;
-        while (idx < (int)toks.size() && !toks[idx].is_operator(']')) {
+        while (idx < static_cast<int>(toks.size()) && !toks[idx].is_operator(']')) {
             if (toks[idx].is_operator(',')) { idx++; continue; }
             auto ep = parse_pattern_from_tokens(toks, idx, ln);
             if (ep) {
@@ -1609,7 +1646,7 @@ static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, in
                 else                { tail->next = std::move(ep); tail = raw; }
             }
         }
-        if (idx < (int)toks.size() && toks[idx].is_operator(']')) idx++;
+        if (idx < static_cast<int>(toks.size()) && toks[idx].is_operator(']')) idx++;
         return arr_pat;
     }
 

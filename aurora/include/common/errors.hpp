@@ -3,6 +3,21 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#else
+#include <unistd.h>
+#endif
+
+/* ── Terminal color helper: returns true if output is a real terminal ── */
+inline bool color_enabled(FILE* f) {
+#ifdef _WIN32
+    return _isatty(_fileno(f)) != 0;
+#else
+    return isatty(fileno(f)) != 0;
+#endif
+}
 #include <algorithm>
 #include <cstdarg>
 
@@ -76,11 +91,12 @@ struct Diagnostic {
     std::string  suggestion;
 
     void print(const std::vector<SourceLine>* source_lines = nullptr) const {
-        const char* color_red   = "\033[31m";
-        const char* color_yellow = "\033[33m";
-        const char* color_cyan  = "\033[36m";
-        const char* color_bold  = "\033[1m";
-        const char* color_reset = "\033[0m";
+        bool color = color_enabled(stderr);
+        const char* color_red    = color ? "\033[31m" : "";
+        const char* color_yellow = color ? "\033[33m" : "";
+        const char* color_cyan   = color ? "\033[36m" : "";
+        const char* color_bold   = color ? "\033[1m" : "";
+        const char* color_reset  = color ? "\033[0m" : "";
 
         const char* prefix = "";
         const char* tag = "";
@@ -141,7 +157,7 @@ public:
                                 current_file_, msg, suggestion});
         if (level == DiagLevel::Fatal) {
             diagnostics_.back().print(&source_lines_);
-            std::cerr << "\033[1;31mcompilation terminated.\033[0m\n";
+            std::cerr << (color_enabled(stderr) ? "\033[1;31mcompilation terminated.\033[0m\n" : "compilation terminated.\n");
             exit(1);
         }
     }

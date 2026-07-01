@@ -26,6 +26,10 @@ void  aurora_callback_destroy(void* trampoline);
    - Type-safe function pointer resolution via template
    - Runtime call trampolines with platform ABI
    - Connects generated .au bindings to native DLL resolution
+   
+   ⚠ WIP — Architecture complete, not yet integrated into the
+   compiler pipeline. The runtime FFI dispatch is functional
+   but not wired into the codegen IR.
    ════════════════════════════════════════════════════════════ */
 
 /* ── Low-level FFI library handle ── */

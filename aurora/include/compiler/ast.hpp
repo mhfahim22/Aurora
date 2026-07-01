@@ -184,6 +184,7 @@ struct ASTNode {
     Ptr template_args   {};
 
     int src_line { 0 };
+    int src_col  { 0 };
 
     /* Memory metadata — populated during analysis phases */
     MemoryMetadata memory_meta {};
@@ -199,6 +200,8 @@ struct ASTNode {
     std::string calling_conv { "c" };
     /* FFI cost annotation: "zero", "alloc", "indirection", or "" (unannotated) */
     std::string cost_level {};
+    /* Cross-ecosystem bridge type: "python", "quickjs", "rust", or "" (native/dynamic loading) */
+    std::string ecosystem {};
 
     /* Whether this Call node's arguments are consumed (moved) by the callee */
     bool consumes_args { false };
@@ -219,8 +222,8 @@ struct ASTNode {
        The raw pointer patterns (left, right, body, orelse, next, args) are
        intentional — they point to nodes owned by unique_ptrs elsewhere in
        the tree, avoiding circular ownership. */
-    explicit ASTNode(NodeType t, std::string v = "", int ln = 0)
-        : type(t), value(std::move(v)), src_line(ln) {}
+    explicit ASTNode(NodeType t, std::string v = "", int ln = 0, int col = 0)
+        : type(t), value(std::move(v)), src_line(ln), src_col(col) {}
 
     ASTNode(const ASTNode&)            = delete;
     ASTNode& operator=(const ASTNode&) = delete;
@@ -228,6 +231,6 @@ struct ASTNode {
     ASTNode& operator=(ASTNode&&)      = default;
 };
 
-inline ASTNode::Ptr make_node(NodeType t, std::string v = "", int ln = 0) {
-    return std::make_unique<ASTNode>(t, std::move(v), ln);
+inline ASTNode::Ptr make_node(NodeType t, std::string v = "", int ln = 0, int col = 0) {
+    return std::make_unique<ASTNode>(t, std::move(v), ln, col);
 }

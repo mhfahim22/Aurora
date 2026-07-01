@@ -10,6 +10,10 @@
    ════════════════════════════════════════════════════════════
    Auto-generates C++ RAII wrappers that manage Aurora object
    lifetimes via extern "C" FFI thunks.
+   
+   ⚠ WIP — Architecture complete, not yet integrated into the
+   compiler pipeline. The generator produces valid C++ wrappers
+   calling `thunk_ClassName_methodName(...)` extern "C" symbols.
    ════════════════════════════════════════════════════════════ */
 
 struct RAIIGuardConfig {
@@ -121,7 +125,17 @@ private:
             }
             h << ")";
             if (m.is_const) h << " const";
-            h << " { /* call thunk */ }\n";
+            h << " {\n";
+            if (m.ret.type_kind != InteropTypeKind::Void)
+                h << "        return ";
+            h << "        thunk_" << cls.name << "_" << m.name << "(";
+            if (!m.is_static) h << "this";
+            for (size_t i = 0; i < m.params.size(); i++) {
+                if (i > 0 || !m.is_static) h << ", ";
+                h << m.params[i].name;
+            }
+            h << ");\n";
+            h << "    }\n";
         }
 
         h << "};\n";
@@ -172,7 +186,16 @@ private:
                     if (i > 0) h << ", ";
                     h << interop_type_to_c(m.params[i].type_kind) << " " << m.params[i].name;
                 }
-                h << ") { /* call static thunk */ }\n\n";
+                h << ") {\n";
+                if (m.ret.type_kind != InteropTypeKind::Void)
+                    h << "        return ";
+                h << "        thunk_" << cls.name << "_" << m.name << "(";
+                for (size_t i = 0; i < m.params.size(); i++) {
+                    if (i > 0) h << ", ";
+                    h << m.params[i].name;
+                }
+                h << ");\n";
+                h << "    }\n\n";
             } else {
                 h << "    " << interop_type_to_c(m.ret.type_kind) << " "
                   << m.name << "(";
@@ -182,7 +205,15 @@ private:
                 }
                 h << ")";
                 if (m.is_const) h << " const";
-                h << " { /* call instance thunk */ }\n\n";
+                h << " {\n";
+                if (m.ret.type_kind != InteropTypeKind::Void)
+                    h << "        return ";
+                h << "        thunk_" << cls.name << "_" << m.name << "(handle_.get()";
+                for (size_t i = 0; i < m.params.size(); i++) {
+                    h << ", " << m.params[i].name;
+                }
+                h << ");\n";
+                h << "    }\n\n";
             }
         }
 

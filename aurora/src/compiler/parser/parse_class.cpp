@@ -24,7 +24,7 @@
 ASTNode::Ptr Parser::parse_class() {
     const LexedLine& ll   = cur_line();
     const auto&      toks = ll.tokens;
-    int              cnt  = (int)toks.size();
+    int              cnt  = static_cast<int>(toks.size());
     int              ci   = ll.indent;
     int              ln   = ll.line_no;
 

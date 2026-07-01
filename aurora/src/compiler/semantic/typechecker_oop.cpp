@@ -160,7 +160,7 @@ void oop_register_class(const ASTNode* node) {
                But check if the class is abstract because it has abstract methods that aren't overridden */
             /* Count existing virtual methods in parent for vtable continuity */
             auto parent_vtable = global_class_registry().compute_vtable(info.parent_name);
-            next_vtable_idx = (int)parent_vtable.size();
+            next_vtable_idx = static_cast<int>(parent_vtable.size());
         }
     }
 
@@ -298,7 +298,7 @@ void oop_check_new_object(const std::string& class_name,
     }
 
     auto all_fields = global_class_registry().all_fields(class_name);
-    int  field_count = (int)all_fields.size();
+    int  field_count = static_cast<int>(all_fields.size());
 
     int arg_count = 0;
     const ASTNode* arg = args_node;

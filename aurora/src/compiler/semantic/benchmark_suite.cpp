@@ -94,7 +94,7 @@ void BenchmarkSuite::benchmark_stack_alloc() {
     /* Simulate stack allocation (alloca in entry block) */
     auto bench = [this]() {
         volatile int x = 0;
-        (void)x;
+        static_cast<void>(x);
     };
 
     double time = measure_time(bench, config_.iterations);
@@ -105,7 +105,7 @@ void BenchmarkSuite::benchmark_stack_alloc() {
 void BenchmarkSuite::benchmark_arena_alloc() {
     auto bench = [this]() {
         void* ptr = aurora_arena_alloc(config_.data_size);
-        (void)ptr;
+        static_cast<void>(ptr);
     };
 
     /* Warmup */
@@ -266,7 +266,7 @@ void BenchmarkSuite::benchmark_arc_overhead() {
     auto bench_raw = [this]() {
         for (size_t i = 0; i < 10000; i++) {
             volatile void* ptr = aurora_arena_alloc(64);
-            (void)ptr;
+            static_cast<void>(ptr);
         }
     };
 
@@ -334,7 +334,7 @@ double BenchmarkSuite::measure_time(std::function<void()> func, size_t iteration
 
 void BenchmarkSuite::calculate_summary() {
     summary_.results = results_;
-    summary_.total_benchmarks = (int)results_.size();
+    summary_.total_benchmarks = static_cast<int>(results_.size());
     summary_.passed = summary_.total_benchmarks;
     summary_.failed = 0;
 

@@ -391,7 +391,7 @@ void LifetimeAnalyzer::detect_global_lifetime(const std::string& name, int line)
 
 void LifetimeAnalyzer::create_region(LifetimeScope scope_type, int start_line) {
     RegionInfo region;
-    region.region_id = (int)regions_.size();
+    region.region_id = static_cast<int>(regions_.size());
     region.scope_type = scope_type;
     region.start_line = start_line;
     regions_.push_back(region);
@@ -587,7 +587,7 @@ LifetimeScope LifetimeAnalyzer::determine_lifetime(const std::string& name) cons
     if (in_loop_) {
         return LifetimeScope::Loop;
     }
-    for (int i = (int)scopes_.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; i--) {
         if (scopes_[i].scope_type == LifetimeScope::Function) {
             return LifetimeScope::Function;
         }
@@ -664,7 +664,7 @@ int LifetimeAnalyzer::count_global_lifetime() const {
 }
 
 int LifetimeAnalyzer::count_regions() const {
-    return (int)regions_.size();
+    return static_cast<int>(regions_.size());
 }
 
 /* ════════════════════════════════════════════════════════════
