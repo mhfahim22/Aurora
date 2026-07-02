@@ -183,6 +183,7 @@ struct AuroraFileWatchState {
 
 /* ── TLS support ── */
 struct AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* key_path);
+int  aurora_tls_set_ca_chain(struct AuroraTLSContext* ctx, const char* ca_pem_path);
 void aurora_tls_ctx_free(struct AuroraTLSContext* ctx);
 int  aurora_server_enable_tls(AuroraServer* srv, const char* cert_path, const char* key_path);
 
@@ -192,6 +193,15 @@ int  aurora_ws_upgrade(const char* key, int64_t sock, int64_t tls_handle);
 int  aurora_ws_read_frame(int64_t sock, int64_t tls_handle, uint8_t** out_payload, int* opcode);
 int  aurora_ws_write_frame(int64_t sock, int64_t tls_handle, int opcode, const uint8_t* data, int len);
 void aurora_ws_close(int64_t sock, int64_t tls_handle);
+
+/* ── WebSocket broadcast registry ── */
+void aurora_ws_registry_init(void);
+void aurora_ws_registry_add(int64_t sock, int64_t tls_handle);
+void aurora_ws_registry_remove(int64_t sock);
+int  aurora_ws_broadcast(int opcode, const uint8_t* data, int len);
+
+/* ── HTTP/2 detection (h2c upgrade) ── */
+int  aurora_h2_is_upgrade(const char* raw_request);
 
 /* ── Server accept + handle (with middleware + static routes) ── */
 void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router);

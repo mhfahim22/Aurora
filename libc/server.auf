@@ -41,11 +41,21 @@ extern function aurora_ws_close(sock: i64, tls_handle: i64)
 
 # ── Raw TLS contexts (advanced) ──
 extern function aurora_tls_server_ctx_new(cert_path: cstring, key_path: cstring) -> pointer
+extern function aurora_tls_set_ca_chain(ctx: pointer, ca_path: cstring) -> i32
 extern function aurora_tls_ctx_free(ctx: pointer)
 extern function aurora_tls_accept(sock: i64, ctx: pointer) -> i64
 extern function aurora_tls_read(tls_handle: i64, buf: pointer, size: i32) -> i32
 extern function aurora_tls_write(tls_handle: i64, data: pointer, len: i32) -> i32
 extern function aurora_tls_close(tls_handle: i64)
+
+# ── WebSocket broadcast ──
+extern function aurora_ws_registry_init()
+extern function aurora_ws_registry_add(sock: i64, tls_handle: i64)
+extern function aurora_ws_registry_remove(sock: i64)
+extern function aurora_ws_broadcast(opcode: i32, data: pointer, len: i32) -> i32
+
+# ── HTTP/2 ──
+extern function aurora_h2_is_upgrade(raw: cstring) -> i32
 
 # ════════════════════════════════════════════════════════════
 # Aurora-level convenience wrappers
@@ -148,4 +158,20 @@ end
 
 function tls_close(handle):
     aurora_tls_close(handle)
+end
+
+function tls_set_ca_chain(ctx, ca_path):
+    return aurora_tls_set_ca_chain(ctx, ca_path) != 0
+end
+
+function ws_registry_init():
+    aurora_ws_registry_init()
+end
+
+function ws_broadcast_text(msg: cstring):
+    return aurora_ws_broadcast(1, pointer_from_cstring(msg), len_cstring(msg))
+end
+
+function h2_is_upgrade(raw):
+    return aurora_h2_is_upgrade(raw) != 0
 end

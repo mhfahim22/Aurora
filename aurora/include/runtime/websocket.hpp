@@ -21,6 +21,12 @@ int  aurora_ws_read_frame(int64_t sock, int64_t tls_handle, uint8_t** out_payloa
 int  aurora_ws_write_frame(int64_t sock, int64_t tls_handle, int opcode, const uint8_t* data, int len);
 void aurora_ws_close(int64_t sock, int64_t tls_handle);
 
+/* ── WebSocket broadcast registry (thread-safe) ── */
+void aurora_ws_registry_init(void);
+void aurora_ws_registry_add(int64_t sock, int64_t tls_handle);
+void aurora_ws_registry_remove(int64_t sock);
+int  aurora_ws_broadcast(int opcode, const uint8_t* data, int len);
+
 #ifdef __cplusplus
 }
 #endif

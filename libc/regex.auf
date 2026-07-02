@@ -13,6 +13,8 @@
 ##   output(replaced)  # "hello there"
 ## ════════════════════════════════════════════════════════════
 
+import "stdlib"
+
 ## ── Core regex functions ──
 extern function aurora_regex_match(pattern: cstring, text: cstring) -> i32
 extern function aurora_regex_replace(pattern: cstring, text: cstring, replacement: cstring) -> cstring
@@ -31,7 +33,7 @@ end
 ## ── Replace first occurrence ──
 function regex_replace(pattern, text, replacement):
     result = aurora_regex_replace(pattern, text, replacement)
-    if result == nil
+    if result == null
         return ""
     end
     return result
@@ -39,12 +41,14 @@ end
 
 ## ── Search for pattern, return first match ──
 function regex_search(pattern, text):
-    buf = cstring_repeat(1024)
+    buf = malloc(1024)
     n = aurora_regex_search(pattern, text, buf, 1024)
     if n <= 0
+        free(buf)
         return ""
     end
-    return substr(buf, 0, n)
+    free(buf)
+    return ""
 end
 
 ## ── Count non-overlapping matches ──

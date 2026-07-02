@@ -17,11 +17,13 @@
 #pragma comment(lib, "secur32.lib")
 #pragma comment(lib, "crypt32.lib")
 
-/* ── TLS context (holds server credential) ── */
+/* ── TLS context (holds server credential + CA chain) ── */
 struct AuroraTLSContext {
     CredHandle hCred;
     bool hasCred;
     PCCERT_CONTEXT certCtx;
+    HCERTSTORE caStore;      /* additional CA certificates for chain building */
+    char* caPath;            /* path to CA chain PEM file (for lazy loading) */
 };
 
 /* ── Per-connection TLS state ── */
@@ -141,12 +143,80 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
     return ctx;
 }
 
+int aurora_tls_set_ca_chain(AuroraTLSContext* ctx, const char* ca_pem_path) {
+    if (!ctx || !ca_pem_path) return -1;
+    /* Load CA certs from PEM into a memory certificate store */
+    HANDLE hFile = CreateFileA(ca_pem_path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return -1;
+    DWORD fileSize = GetFileSize(hFile, NULL);
+    if (fileSize == INVALID_FILE_SIZE || fileSize == 0) { CloseHandle(hFile); return -1; }
+    char* pem = (char*)malloc((size_t)fileSize + 1);
+    if (!pem) { CloseHandle(hFile); return -1; }
+    DWORD read = 0;
+    if (!ReadFile(hFile, pem, fileSize, &read, NULL)) { free(pem); CloseHandle(hFile); return -1; }
+    pem[read] = '\0';
+    CloseHandle(hFile);
+    /* Create a memory store and add certs from this PEM blob */
+    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, NULL, 0, NULL);
+    if (!store) { free(pem); return -1; }
+    /* Decode PKCS7 / PEM blob into the store */
+    CRYPT_DATA_BLOB derBlob = {0, NULL};
+    char* pos = pem;
+    int certCount = 0;
+    while (*pos) {
+        char* certStart = strstr(pos, "-----BEGIN CERTIFICATE-----");
+        if (!certStart) break;
+        char* certEnd = strstr(certStart, "-----END CERTIFICATE-----");
+        if (!certEnd) break;
+        certEnd += 25;
+        /* Temporarily null-terminate at certEnd for decoding */
+        char saved = *certEnd;
+        *certEnd = '\0';
+        if (CryptStringToBinaryA(certStart, 0, CRYPT_STRING_BASE64HEADER,
+                                 NULL, &derBlob.cbData, NULL, NULL)) {
+            derBlob.pbData = (BYTE*)malloc(derBlob.cbData);
+            if (derBlob.pbData && CryptStringToBinaryA(certStart, 0, CRYPT_STRING_BASE64HEADER,
+                    derBlob.pbData, &derBlob.cbData, NULL, NULL)) {
+                PCCERT_CONTEXT certCtx = CertCreateCertificateContext(
+                    X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                    derBlob.pbData, derBlob.cbData);
+                if (certCtx) {
+                    CertAddCertificateContextToStore(store, certCtx,
+                        CERT_STORE_ADD_ALWAYS, NULL);
+                    CertFreeCertificateContext(certCtx);
+                    certCount++;
+                }
+            }
+            if (derBlob.pbData) free(derBlob.pbData);
+        }
+        *certEnd = saved;
+        pos = certEnd;
+    }
+    free(pem);
+    if (certCount > 0) {
+        if (ctx->caStore) CertCloseStore(ctx->caStore, 0);
+        ctx->caStore = store;
+        /* Store the path for future use */
+        if (ctx->caPath) free(ctx->caPath);
+        ctx->caPath = _strdup(ca_pem_path);
+        printf("[tls] loaded %d CA cert(s) from %s\n", certCount, ca_pem_path);
+        return 0;
+    }
+    CertCloseStore(store, 0);
+    return -1;
+}
+
 void aurora_tls_ctx_free(AuroraTLSContext* ctx) {
     if (!ctx) return;
     if (ctx->hasCred)
         FreeCredentialsHandle(&ctx->hCred);
     if (ctx->certCtx)
         CertFreeCertificateContext(ctx->certCtx);
+    if (ctx->caStore)
+        CertCloseStore(ctx->caStore, 0);
+    if (ctx->caPath)
+        free(ctx->caPath);
     free(ctx);
 }
 
@@ -577,6 +647,27 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
         printf("[tls] warning: no cert/key provided, connections may fail\n");
     }
     return ctx;
+}
+
+int aurora_tls_set_ca_chain(AuroraTLSContext* ctx, const char* ca_pem_path) {
+    if (!ctx || !ctx->ssl_ctx || !ca_pem_path) return -1;
+    /* Load the CA file for peer certificate verification */
+    typedef int (*load_verify_fn)(void*, const char*, const char*);
+    load_verify_fn load_verify = (load_verify_fn)dlsym(ctx->ssl.libssl, "SSL_CTX_load_verify_locations");
+    if (!load_verify) return -1;
+    int result = load_verify(ctx->ssl_ctx, ca_pem_path, NULL);
+    if (result <= 0) {
+        printf("[tls] warning: failed to load CA chain %s\n", ca_pem_path);
+        return -1;
+    }
+    /* Enable peer certificate verification (mutual TLS) */
+    typedef void (*set_verify_fn)(void*, int, void*);
+    set_verify_fn set_verify = (set_verify_fn)dlsym(ctx->ssl.libssl, "SSL_CTX_set_verify");
+    if (set_verify) {
+        set_verify(ctx->ssl_ctx, 1, NULL); /* SSL_VERIFY_PEER */
+    }
+    printf("[tls] CA chain loaded from %s\n", ca_pem_path);
+    return 0;
 }
 
 void aurora_tls_ctx_free(AuroraTLSContext* ctx) {

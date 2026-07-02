@@ -1,0 +1,8 @@
+import "regex"
+output("match: ")
+outputln(regex_match("hello", "he.*"))
+output("count: ")
+outputln(regex_count("a,b,c", ","))
+output("replace: ")
+outputln(regex_replace("hello", "l", "x"))
+outputln("")

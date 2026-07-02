@@ -57,6 +57,7 @@ static int64_t now_ms() {
 /* ── Server ── */
 AuroraServer* aurora_server_init(int64_t port) {
     setbuf(stdout, NULL);
+    aurora_ws_registry_init();
     AuroraServer* srv = (AuroraServer*)calloc(1, sizeof(AuroraServer));
     srv->port = (int)port;
     srv->running = 0;
@@ -829,6 +830,17 @@ static void set_recv_timeout(int64_t client_sock, int timeout_sec) {
 static unsigned int gzip_crc32(const unsigned char* buf, size_t len);
 static unsigned char* gzip_compress(const unsigned char* input, size_t input_len, size_t* out_len);
 
+/* ── HTTP/2 cleartext (h2c) upgrade detection ── */
+/* Returns 1 if the client sent an HTTP/2 upgrade request */
+int aurora_h2_is_upgrade(const char* raw_request) {
+    if (!raw_request) return 0;
+    /* Check for h2c upgrade: "Upgrade: h2c" header */
+    const char* upgrade = strstr(raw_request, "Upgrade:");
+    if (!upgrade) upgrade = strstr(raw_request, "upgrade:");
+    if (!upgrade) return 0;
+    return (strstr(upgrade, "h2c") != NULL) ? 1 : 0;
+}
+
 /* ── Per-client request handling (runs in its own thread) ── */
 static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer* srv, AuroraRouter* router) {
 #ifdef _WIN32
@@ -857,12 +869,119 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
         if (n <= 0) break;
         raw[n] = '\0';
 
+        /* ── Check for HTTP/2 (h2c) upgrade ── */
+        if (aurora_h2_is_upgrade(raw)) {
+            /* Accept h2c upgrade, then speak minimal HTTP/2 frames */
+            const char* resp = "HTTP/1.1 101 Switching Protocols\r\n"
+                               "Upgrade: h2c\r\n"
+                               "Connection: Upgrade\r\n"
+                               "\r\n";
+            {
+                const char* p = resp;
+                int remaining = (int)strlen(resp);
+                while (remaining > 0) {
+                    int n = tls_handle > 0
+                        ? aurora_tls_write(tls_handle, p, remaining)
+#ifdef _WIN32
+                        : send((SOCKET)(intptr_t)client_sock, p, remaining, 0);
+#else
+                        : (int)send((int)client_sock, p, (size_t)remaining, MSG_NOSIGNAL);
+#endif
+                    if (n <= 0) break;
+                    p += n;
+                    remaining -= n;
+                }
+            }
+            fprintf(stderr, "[h2c] upgrade accepted, reading HTTP/2 frames\n");
+            /* After upgrade, read HTTP/2 connection preface + SETTINGS frame
+               (minimal frame reader, emits a basic response via GOAWAY) */
+            uint8_t frame[64];
+            int fn = tls_handle > 0
+                ? aurora_tls_read(tls_handle, (char*)frame, 24)
+#ifdef _WIN32
+                : recv((SOCKET)(intptr_t)client_sock, (char*)frame, 24, 0);
+#else
+                : (int)recv((int)client_sock, (char*)frame, 24, 0);
+#endif
+            if (fn == 24) {
+                /* Send a minimal SETTINGS frame (empty = use defaults) */
+                uint8_t settings[9] = {0x00,0x00,0x00, 0x04, 0x00,0x00,0x00,0x00,0x00};
+                if (tls_handle > 0)
+                    aurora_tls_write(tls_handle, (char*)settings, 9);
+                else {
+#ifdef _WIN32
+                    send((SOCKET)(intptr_t)client_sock, (char*)settings, 9, 0);
+#else
+                    send((int)client_sock, (char*)settings, 9, MSG_NOSIGNAL);
+#endif
+                }
+                /* Read a few more frames (we skip full parsing) */
+                for (int i = 0; i < 5; i++) {
+                    fn = tls_handle > 0
+                        ? aurora_tls_read(tls_handle, (char*)frame, 9)
+#ifdef _WIN32
+                        : recv((SOCKET)(intptr_t)client_sock, (char*)frame, 9, 0);
+#else
+                        : (int)recv((int)client_sock, (char*)frame, 9, 0);
+#endif
+                    if (fn != 9) break;
+                    int payload_len = ((int)frame[0] << 16) | ((int)frame[1] << 8) | frame[2];
+                    int frame_type = frame[3];
+                    if (frame_type == 0x04) {
+                        /* SETTINGS — send SETTINGS ack */
+                        uint8_t ack[9] = {0x00,0x00,0x00, 0x04, 0x01,0x00,0x00,0x00,0x00};
+                        if (tls_handle > 0)
+                            aurora_tls_write(tls_handle, (char*)ack, 9);
+                        else {
+#ifdef _WIN32
+                            send((SOCKET)(intptr_t)client_sock, (char*)ack, 9, 0);
+#else
+                            send((int)client_sock, (char*)ack, 9, MSG_NOSIGNAL);
+#endif
+                        }
+                    }
+                    /* Drain payload */
+                    uint8_t drain[4096];
+                    while (payload_len > 0) {
+                        int chunk = (payload_len > 4096) ? 4096 : payload_len;
+                        fn = tls_handle > 0
+                            ? aurora_tls_read(tls_handle, (char*)drain, chunk)
+#ifdef _WIN32
+                            : recv((SOCKET)(intptr_t)client_sock, (char*)drain, chunk, 0);
+#else
+                            : (int)recv((int)client_sock, (char*)drain, chunk, 0);
+#endif
+                        if (fn <= 0) break;
+                        payload_len -= fn;
+                    }
+                }
+                /* Send GOAWAY (no support for full HTTP/2 yet) */
+                uint8_t goaway[17] = {
+                    0x00,0x00,0x08, 0x07, 0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,  /* last stream ID = 0 */
+                    0x00,0x00,0x00,0x0C   /* error code = INTERNAL_ERROR */
+                };
+                if (tls_handle > 0)
+                    aurora_tls_write(tls_handle, (char*)goaway, 17);
+                else {
+#ifdef _WIN32
+                    send((SOCKET)(intptr_t)client_sock, (char*)goaway, 17, 0);
+#else
+                    send((int)client_sock, (char*)goaway, 17, MSG_NOSIGNAL);
+#endif
+                }
+                fprintf(stderr, "[h2c] minimal handshake done, closing\n");
+            }
+            break;
+        }
+
         /* ── Check for WebSocket upgrade ── */
         if (aurora_ws_is_upgrade(raw)) {
             const char* ws_key = aurora_ws_get_key(raw);
             if (ws_key) {
                 if (aurora_ws_upgrade(ws_key, client_sock, tls_handle) == 1) {
                     fprintf(stderr, "[ws] upgrade successful\n");
+                    aurora_ws_registry_add(client_sock, tls_handle);
                     uint8_t* payload = NULL;
                     int opcode = 0;
                     while (1) {
@@ -876,11 +995,13 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
                         if (opcode == WS_OPCODE_PING) {
                             aurora_ws_write_frame(client_sock, tls_handle, WS_OPCODE_PONG, payload, plen);
                         } else if (opcode == WS_OPCODE_TEXT || opcode == WS_OPCODE_BIN) {
+                            /* Echo back to sender */
                             aurora_ws_write_frame(client_sock, tls_handle, opcode, payload, plen);
                         }
                         aurora_free(payload);
                         payload = NULL;
                     }
+                    aurora_ws_registry_remove(client_sock);
                 }
             }
             break;

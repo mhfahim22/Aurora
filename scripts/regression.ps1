@@ -93,7 +93,10 @@ Pop-Location
 Write-Step "Stage 4: Stdlib compilation tests"
 $stdlibTests = @(
     @{ File = "test_math.aura";      Desc = "Stdlib math" },
-    @{ File = "test_generics.aura";  Desc = "Generics identity[T]" }
+    @{ File = "test_generics.aura";  Desc = "Generics identity[T]" },
+    @{ File = "test_crypto.aura";    Desc = "Stdlib crypto" },
+    @{ File = "test_regex.aura";     Desc = "Stdlib regex" },
+    @{ File = "test_json.aura";      Desc = "Stdlib JSON" }
 )
 
 Push-Location $Root
@@ -121,6 +124,32 @@ Push-Location $Root
 $jitOut = & $Compiler (Join-Path $ExamplesDir "simple_test.aura") --run 2>&1
 $jitOk = ($LASTEXITCODE -eq 0) -and ($jitOut -match "Hello from Aurora")
 Test-Result "JIT: simple_test.aura" $jitOk
+Pop-Location
+
+# Stage 6: Error-detection tests (expected compile failures)
+Write-Step "Stage 6: Error-detection tests"
+$errorTests = @(
+    @{ File = "err_type_mismatch.aura";    Desc = "Unexpected 'then' syntax error" },
+    @{ File = "err_undefined_var.aura";   Desc = "Undefined variable error" },
+    @{ File = "err_wrong_arg_count.aura"; Desc = "Wrong argument count error" },
+    @{ File = "err_bad_syntax.aura";       Desc = "Bad syntax error" }
+)
+
+Push-Location $Root
+foreach ($test in $errorTests) {
+    $src = Join-Path $TestSrcDir $test.File
+    if (-not (Test-Path $src)) { Test-Result "$($test.Desc) - source not found" $false; continue }
+
+    $outDir = Join-Path $Root "output/ir"
+    if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
+
+    $compOut = & $Compiler $src 2>&1
+    $expectFail = ($LASTEXITCODE -ne 0)
+    Test-Result $test.Desc $expectFail
+    if (-not $expectFail) {
+        Write-Host "  (expected compile failure, got success)" -ForegroundColor Yellow
+    }
+}
 Pop-Location
 
 # Cleanup

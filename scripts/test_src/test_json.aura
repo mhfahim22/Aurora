@@ -1,0 +1,8 @@
+import "json"
+output("parse: ")
+j = json_parse('{"a":1}')
+outputln(j)
+output("serialize: ")
+s = json_serialize(j)
+outputln(s)
+outputln("")

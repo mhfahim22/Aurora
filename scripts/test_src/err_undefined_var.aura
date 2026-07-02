@@ -1,0 +1,3 @@
+function test(): i32
+    return undefined_var
+end

@@ -11,6 +11,10 @@ typedef struct AuroraTLSContext AuroraTLSContext;
 /* ── Create TLS server context from PEM cert + key files ── */
 AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_pem_path, const char* key_pem_path);
 
+/* ── Set CA certificate chain for verifying peer certificates ── */
+/* Returns 0 on success, -1 on failure */
+int aurora_tls_set_ca_chain(AuroraTLSContext* ctx, const char* ca_pem_path);
+
 /* ── Free TLS context ── */
 void aurora_tls_ctx_free(AuroraTLSContext* ctx);
 

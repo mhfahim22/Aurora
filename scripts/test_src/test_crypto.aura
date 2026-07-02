@@ -1,0 +1,6 @@
+import "crypto"
+output("sha256: ")
+outputln(sha256("hello"))
+output("hmac: ")
+outputln(hmac_sha256("key", "msg"))
+outputln("")

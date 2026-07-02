@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
+#include <vector>
 
 #ifdef _WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
@@ -253,4 +255,58 @@ int aurora_ws_write_frame(int64_t sock, int64_t tls_handle, int opcode, const ui
 void aurora_ws_close(int64_t sock, int64_t tls_handle) {
     uint8_t close_payload[2] = {0x03, 0xE8};
     aurora_ws_write_frame(sock, tls_handle, WS_OPCODE_CLOSE, close_payload, 2);
+}
+
+/* ── WebSocket broadcast registry (thread-safe) ── */
+struct WSEntry {
+    int64_t sock;
+    int64_t tls_handle;
+};
+
+static std::vector<WSEntry>* g_ws_clients = nullptr;
+static std::mutex g_ws_mutex;
+
+void aurora_ws_registry_init(void) {
+    std::lock_guard<std::mutex> lock(g_ws_mutex);
+    if (!g_ws_clients)
+        g_ws_clients = new std::vector<WSEntry>();
+}
+
+void aurora_ws_registry_add(int64_t sock, int64_t tls_handle) {
+    std::lock_guard<std::mutex> lock(g_ws_mutex);
+    if (!g_ws_clients) return;
+    /* Don't add duplicate */
+    for (size_t i = 0; i < g_ws_clients->size(); i++) {
+        if ((*g_ws_clients)[i].sock == sock)
+            return;
+    }
+    WSEntry entry;
+    entry.sock = sock;
+    entry.tls_handle = tls_handle;
+    g_ws_clients->push_back(entry);
+}
+
+void aurora_ws_registry_remove(int64_t sock) {
+    std::lock_guard<std::mutex> lock(g_ws_mutex);
+    if (!g_ws_clients) return;
+    for (size_t i = 0; i < g_ws_clients->size(); i++) {
+        if ((*g_ws_clients)[i].sock == sock) {
+            g_ws_clients->erase(g_ws_clients->begin() + (int)i);
+            return;
+        }
+    }
+}
+
+int aurora_ws_broadcast(int opcode, const uint8_t* data, int len) {
+    std::lock_guard<std::mutex> lock(g_ws_mutex);
+    if (!g_ws_clients) return 0;
+    int sent_count = 0;
+    for (size_t i = 0; i < g_ws_clients->size(); i++) {
+        int r = aurora_ws_write_frame(
+            (*g_ws_clients)[i].sock,
+            (*g_ws_clients)[i].tls_handle,
+            opcode, data, len);
+        if (r > 0) sent_count++;
+    }
+    return sent_count;
 }
