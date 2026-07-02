@@ -364,9 +364,13 @@ static void test_http_basic() {
     tcp_send(sock, req, (int)strlen(req));
 
     char resp[4096];
-    int n = tcp_recv(sock, resp, (int)sizeof(resp) - 1);
-    assert(n > 0);
-    resp[n] = '\0';
+    int total = 0;
+    while (total < (int)sizeof(resp) - 1) {
+        int n = tcp_recv(sock, resp + total, (int)sizeof(resp) - 1 - total);
+        if (n <= 0) break;
+        total += n;
+    }
+    resp[total] = '\0';
     tcp_close(sock);
 
     assert(strstr(resp, "200 OK") != nullptr);
@@ -538,12 +542,41 @@ static void test_concurrent_connections() {
 }
 
 /* ── Test 5: Server static file serving ── */
+/* ── Find project root by walking up from CWD looking for CMakeLists.txt ── */
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+static int find_project_root(char* buf, int buf_size) {
+#ifdef _WIN32
+    DWORD n = GetCurrentDirectoryA((DWORD)buf_size, buf);
+    if (n == 0 || n >= (DWORD)buf_size) return -1;
+#else
+    if (!getcwd(buf, (size_t)buf_size)) return -1;
+#endif
+    char tmp[1024];
+    while (1) {
+        snprintf(tmp, sizeof(tmp), "%s/CMakeLists.txt", buf);
+        FILE* f = fopen(tmp, "r");
+        if (f) { fclose(f); return 0; }
+        /* Go up one directory */
+        char* last = strrchr(buf, '/');
+#ifdef _WIN32
+        if (!last) last = strrchr(buf, '\\');
+#endif
+        if (!last || last == buf) return -1;
+        *last = '\0';
+    }
+}
+
 static void test_static_file() {
     test_log("test_static_file...");
     AuroraServer* srv = aurora_server_init(TEST_PORT + 3);
     assert(srv != nullptr);
 
-    aurora_server_static(srv, "/", ".");
+    char root[1024];
+    int found = find_project_root(root, (int)sizeof(root));
+    assert(found == 0 && "project root must be found for static file test");
+    aurora_server_static(srv, "/", root);
     aurora_server_start(srv);
     assert(srv->running);
 
@@ -562,9 +595,13 @@ static void test_static_file() {
     tcp_send(sock, req, (int)strlen(req));
 
     char resp[8192];
-    int n = tcp_recv(sock, resp, (int)sizeof(resp) - 1);
-    assert(n > 0);
-    resp[n] = '\0';
+    int total = 0;
+    while (total < (int)sizeof(resp) - 1) {
+        int n = tcp_recv(sock, resp + total, (int)sizeof(resp) - 1 - total);
+        if (n <= 0) break;
+        total += n;
+    }
+    resp[total] = '\0';
     tcp_close(sock);
 
     assert(strstr(resp, "200 OK") != nullptr);
@@ -609,9 +646,13 @@ static void test_http_404() {
     tcp_send(sock, req, (int)strlen(req));
 
     char resp[4096];
-    int n = tcp_recv(sock, resp, (int)sizeof(resp) - 1);
-    assert(n > 0);
-    resp[n] = '\0';
+    int total2 = 0;
+    while (total2 < (int)sizeof(resp) - 1) {
+        int n = tcp_recv(sock, resp + total2, (int)sizeof(resp) - 1 - total2);
+        if (n <= 0) break;
+        total2 += n;
+    }
+    resp[total2] = '\0';
     tcp_close(sock);
 
     assert(strstr(resp, "404 Not Found") != nullptr);

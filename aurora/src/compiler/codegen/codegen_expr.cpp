@@ -533,13 +533,15 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
                     builder_->CreateCall(fn_printf_, { val });
             }
         } else {
-            llvm::Value* val = to_float_val(gen_expr(arg), arg);
+            llvm::Value* val = gen_expr(arg);
             if (!val) val = i64(0);
-            /* H2 Phase C: prefer annotation, fall back to LLVM type */
             auto ak = get_annotation_kind(arg);
-            if (ak == AstTypeKind::Float || val->getType()->isDoubleTy())
+            if (ak == AstTypeKind::Float || val->getType()->isDoubleTy()) {
+                if (val->getType()->isIntegerTy())
+                    val = builder_->CreateBitCast(val, llvm::Type::getDoubleTy(ctx_), "fp_val");
                 builder_->CreateCall(fn_print_float_, { val });
-            else if (ak == AstTypeKind::String || val->getType()->isPointerTy())
+            } else if (get_annotation_kind(arg) == AstTypeKind::String ||
+                       val->getType()->isPointerTy())
                 builder_->CreateCall(fn_print_str_, { val });
             else
                 builder_->CreateCall(fn_printf_, { val });

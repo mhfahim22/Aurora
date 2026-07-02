@@ -108,9 +108,13 @@ llvm::Value* codegen_builtin_section1(
     if (name == "outputln" && node->args) {
         llvm::Value* val = gen_expr(node->args.get());
         if (!val) return llvm::ConstantInt::get(i64, 0);
-        if (val->getType()->isDoubleTy())
+        /* Check type annotation (set by typechecker) and LLVM type */
+        auto ak = get_annotation_kind(node->args.get());
+        if (ak == AstTypeKind::Float || val->getType()->isDoubleTy()) {
+            if (val->getType()->isIntegerTy())
+                val = builder.CreateBitCast(val, llvm::Type::getDoubleTy(ctx), "fp_val");
             builder.CreateCall(builtins.outputln_float, { val });
-        else if (val->getType()->isPointerTy())
+        } else if (ak == AstTypeKind::String || val->getType()->isPointerTy())
             builder.CreateCall(builtins.outputln_str, { val });
         else
             builder.CreateCall(builtins.outputln_int, { val });

@@ -196,7 +196,25 @@ void Codegen::generate(const ASTNode* root) {
     if (!current_block_terminated())
         safe_ret(llvm::ConstantInt::get(i32_ty, 0));
 
-    /* Step 8 — if the user defined "function main():", rename the user's
+    /* Step 8 — forward-declare concrete generic function instances so they
+       are visible during main() codegen. */
+    {
+        auto& concrete_generics = type_checker.get_concrete_generics();
+        for (auto& [mangled, info] : concrete_generics) {
+            if (!info.generic_node) continue;
+            if (module_->getFunction(mangled)) continue;
+            std::vector<llvm::Type*> param_types;
+            for (auto k : info.param_kinds)
+                param_types.push_back(ast_kind_to_abi_type(ctx_, k, i64_ty()));
+            auto* ret_ty = ast_kind_to_abi_type(ctx_, info.result_kind, i8ptr_ty());
+            auto* fn_type = llvm::FunctionType::get(ret_ty, param_types, false);
+            llvm::Function::Create(
+                fn_type, llvm::Function::ExternalLinkage,
+                mangled, module_.get());
+        }
+    }
+
+    /* Step 9 — if the user defined "function main():", rename the user's
        function to "main_user" and create a real @main(i32, ptr) entry point
        matching the CRT's expected main(argc, argv) signature. */
     if (user_has_main) {
