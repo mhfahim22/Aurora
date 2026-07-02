@@ -19,24 +19,45 @@
  *   3. Result<T,E> → T or error code (tagged union unwrap)
  *   4. Slice access (pointer + length pair)
  *   5. Struct field extraction at byte offset
+ *   SAFETY: Crate names are validated against a strict alphanumeric +
+ *           dash/underscore pattern to prevent path traversal and DLL hijacking.
  */
 
 extern "C" {
+
+/* ── Validate that crate_name contains only safe characters ──
+ *   Returns 1 if valid, 0 if rejected. */
+static int is_valid_crate_name(const char* name) {
+    if (!name || !name[0]) return 0;
+    for (const char* p = name; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') ||
+              (*p >= 'A' && *p <= 'Z') ||
+              (*p >= '0' && *p <= '9') ||
+              *p == '-' || *p == '_')) {
+            return 0;
+        }
+    }
+    return 1;
+}
 
 /* ════════════════════════════════════════════════════════════
    1. Library Loading
    ════════════════════════════════════════════════════════════ */
 int aurora_bridge_rust_try_load(const char* crate_name, void** out_handle) {
     if (!crate_name || !out_handle) return -1;
+    if (!is_valid_crate_name(crate_name)) {
+        std::fprintf(stderr, "[bridge:rust] ERROR: invalid crate name '%s'\n", crate_name);
+        return -1;
+    }
     void* handle = nullptr;
 
 #ifdef _WIN32
     char buf[512];
     std::snprintf(buf, sizeof(buf), "%s.dll", crate_name);
-    handle = (void*)::LoadLibraryA(buf);
+    handle = (void*)::LoadLibraryExA(buf, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!handle) {
         std::snprintf(buf, sizeof(buf), "lib%s.dll", crate_name);
-        handle = (void*)::LoadLibraryA(buf);
+        handle = (void*)::LoadLibraryExA(buf, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     }
     if (!handle) {
         /* Rust adds hash suffix: name-<hash>.dll — use FindFirstFile to locate */
@@ -45,7 +66,7 @@ int aurora_bridge_rust_try_load(const char* crate_name, void** out_handle) {
         HANDLE hFind = ::FindFirstFileA(buf, &ffd);
         if (hFind != INVALID_HANDLE_VALUE) {
             std::snprintf(buf, sizeof(buf), "%s", ffd.cFileName);
-            handle = (void*)::LoadLibraryA(buf);
+            handle = (void*)::LoadLibraryExA(buf, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
             ::FindClose(hFind);
         }
     }

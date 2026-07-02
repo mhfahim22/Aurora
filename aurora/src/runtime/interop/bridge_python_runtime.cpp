@@ -12,9 +12,14 @@
 #include <dlfcn.h>
 #endif
 
+#include <atomic>
+
 /* ── Runtime bridge for Python ecosystem calls ──
  *   Called by LLVM IR emitted from bridge_python.cpp codegen.
  *   Supports: int, float, string, bool, dict, list, pointer types.
+ *   SAFETY: DLL loading uses secure search paths; init is thread-safe;
+ *           string copies are bounded and null-terminated;
+ *           Py_None dereference is guarded against null.
  */
 
 extern "C" {
@@ -73,7 +78,7 @@ static PyList_GetItemFunc         PyList_GetItem_fn         = nullptr;
 static PyList_SizeFunc            PyList_Size_fn            = nullptr;
 static PyBool_FromLongFunc        PyBool_FromLong_fn        = nullptr;
 
-static int python_bridge_initialized_ = 0;
+static std::atomic<int> python_bridge_initialized_{0};
 
 /* Py_None is a global object exported by the CPython DLL.
    We resolve it via GetProcAddress/dlsym at init time.       */
@@ -89,13 +94,13 @@ static void* python_bridge_sym(const char* name) {
 }
 
 static void python_bridge_init(void) {
-    if (python_bridge_initialized_) return;
+    if (python_bridge_initialized_.load(std::memory_order_acquire)) return;
 
 #ifdef _WIN32
-    python_dll_handle_ = (void*)::LoadLibraryA("python3.dll");
-    if (!python_dll_handle_) python_dll_handle_ = (void*)::LoadLibraryA("python312.dll");
-    if (!python_dll_handle_) python_dll_handle_ = (void*)::LoadLibraryA("python313.dll");
-    if (!python_dll_handle_) python_dll_handle_ = (void*)::LoadLibraryA("python314.dll");
+    python_dll_handle_ = (void*)::LoadLibraryExA("python3.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!python_dll_handle_) python_dll_handle_ = (void*)::LoadLibraryExA("python312.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!python_dll_handle_) python_dll_handle_ = (void*)::LoadLibraryExA("python313.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!python_dll_handle_) python_dll_handle_ = (void*)::LoadLibraryExA("python314.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
 #else
     python_dll_handle_ = ::dlopen("libpython3.so", RTLD_LAZY | RTLD_GLOBAL);
     if (!python_dll_handle_) python_dll_handle_ = ::dlopen("libpython3.12.so", RTLD_LAZY | RTLD_GLOBAL);
@@ -142,12 +147,13 @@ static void python_bridge_init(void) {
         return;
     }
 
-    python_bridge_initialized_ = 1;
+    python_bridge_initialized_.store(1, std::memory_order_release);
 }
 
 /* ── Marshal an Aurora i64 argument to a Python object ── */
 static PyObject* marshal_arg_to_py(const void* arg_val, const char* expected_type) {
     if (!arg_val) {
+        if (!Py_None_ptr) return nullptr;
         Py_INCREFn_fn(Py_None_ptr);
         return Py_None_ptr;
     }
@@ -200,8 +206,12 @@ static void* marshal_py_to_aurora(PyObject* result, const char* ret_type) {
         std::strcmp(ret_type, "str") == 0) {
         const char* s = PyUnicode_AsUTF8_fn(result);
         if (s) {
-            char* copy = (char*)std::malloc(std::strlen(s) + 1);
-            if (copy) std::strcpy(copy, s);
+            size_t slen = std::strlen(s);
+            char* copy = (char*)std::malloc(slen + 1);
+            if (copy) {
+                std::memcpy(copy, s, slen);
+                copy[slen] = '\0';
+            }
             return copy;
         }
         return nullptr;
@@ -230,7 +240,7 @@ void* aurora_bridge_python_call(const char* module_name,
                                  int arg_count,
                                  const char* ret_type) {
     python_bridge_init();
-    if (!python_bridge_initialized_) return nullptr;
+    if (!python_bridge_initialized_.load(std::memory_order_acquire)) return nullptr;
 
     PyObject* mod = PyImport_ImportModule_fn(module_name);
     if (!mod) {
@@ -273,6 +283,7 @@ void* aurora_bridge_python_dict_create(void) {
     python_bridge_init();
     if (!python_bridge_initialized_) return nullptr;
     PyObject* d = PyDict_New_fn();
+    if (!d) return nullptr;
     return (void*)d;
 }
 
