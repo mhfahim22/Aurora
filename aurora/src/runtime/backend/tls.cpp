@@ -120,13 +120,15 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
         return nullptr;
     }
 
-    /* Acquire server credential handle */
+    /* Acquire server credential handle with revocation checking */
     SCHANNEL_CRED schCred = {0};
     schCred.dwVersion = SCHANNEL_CRED_VERSION;
     schCred.cCreds = 1;
     schCred.paCred = &ctx->certCtx;
     schCred.grbitEnabledProtocols = SP_PROT_TLS1_2_SERVER | SP_PROT_TLS1_3_SERVER;
-    schCred.dwFlags = SCH_CRED_NO_SYSTEM_MAPPER | SCH_CRED_NO_SERVERNAME_CHECK;
+    schCred.dwFlags = SCH_CRED_NO_SYSTEM_MAPPER | SCH_CRED_NO_SERVERNAME_CHECK
+                      | SCH_CRED_REVOCATION_CHECK_CHAIN;
+    schCred.dwCredFormat = 0;
 
     TimeStamp tsExpiry;
     SECURITY_STATUS status = AcquireCredentialsHandleA(
@@ -566,6 +568,8 @@ struct OpenSSLFuncs {
     void  (*SSL_CTX_free)(void*);
     int   (*SSL_CTX_use_certificate_file)(void*, const char*, int);
     int   (*SSL_CTX_use_PrivateKey_file)(void*, const char*, int);
+    void* (*SSL_CTX_get0_param)(void*);
+    int   (*X509_VERIFY_PARAM_set_flags)(void*, unsigned long);
 };
 
 struct AuroraTLSContext {
@@ -622,7 +626,17 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
     LOAD(CTX_free);
     LOAD(CTX_use_certificate_file);
     LOAD(CTX_use_PrivateKey_file);
+    LOAD(CTX_get0_param);
 #undef LOAD
+
+    /* Load X509_VERIFY_PARAM_set_flags from libcrypto */
+    ctx->ssl.X509_VERIFY_PARAM_set_flags =
+        (decltype(ctx->ssl.X509_VERIFY_PARAM_set_flags))dlsym(
+            ctx->ssl.libcrypto ? ctx->ssl.libcrypto : ctx->ssl.libssl,
+            "X509_VERIFY_PARAM_set_flags");
+    if (!ctx->ssl.X509_VERIFY_PARAM_set_flags) {
+        printf("[tls] warning: X509_VERIFY_PARAM_set_flags not found, CRL checking disabled\n");
+    }
 
     ctx->ssl_ctx = ctx->ssl.SSL_CTX_new(NULL);
     if (!ctx->ssl_ctx) {
@@ -636,6 +650,16 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
     tls_method_t method_fn = (tls_method_t)dlsym(ctx->ssl.libssl, "TLS_server_method");
     if (method_fn) {
         ctx->ssl_ctx = ctx->ssl.SSL_CTX_new(method_fn());
+    }
+
+    /* Enable CRL checking if X509_VERIFY_PARAM_set_flags is available */
+    if (ctx->ssl.X509_VERIFY_PARAM_set_flags && ctx->ssl.SSL_CTX_get0_param) {
+        void* param = ctx->ssl.SSL_CTX_get0_param(ctx->ssl_ctx);
+        if (param) {
+            /* X509_V_FLAG_CRL_CHECK = 0x4, X509_V_FLAG_CRL_CHECK_ALL = 0x8 */
+            ctx->ssl.X509_VERIFY_PARAM_set_flags(param, 0x4 | 0x8);
+            printf("[tls] CRL checking enabled\n");
+        }
     }
 
     if (cert_path && key_path) {
