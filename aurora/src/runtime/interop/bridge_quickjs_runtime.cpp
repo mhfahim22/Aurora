@@ -32,6 +32,10 @@ static void* quickjs_dll_handle_ = nullptr;
 #include <atomic>
 static std::atomic<int> quickjs_bridge_initialized_{0};
 
+/* ── Global QuickJS runtime and context (singleton, lazily created) ── */
+static QJSRuntime* qjs_rt_ = nullptr;
+static QJSContext* qjs_ctx_ = nullptr;
+
 typedef QJSRuntime* (*JS_NewRuntimeFunc)(void);
 typedef void (*JS_FreeRuntimeFunc)(QJSRuntime*);
 typedef QJSContext* (*JS_NewContextFunc)(QJSRuntime*);
