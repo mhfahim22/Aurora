@@ -1,0 +1,16 @@
+## Math-heavy benchmark — stresses sin/cos/sqrt codegen and math.auf bindings
+outputln("Benchmark: math heavy")
+pi = 3.141592653589793
+n = 0
+while n < 100:
+    a = sin(pi * n / 100.0)
+    b = cos(pi * n / 50.0)
+    c = sqrt(a * a + b * b)
+    d = abs(a) + abs(b) + c
+    e = floor(d * 100.0) / 100.0
+    f = ceil(d * 100.0) / 100.0
+    g = round(d * 100.0) / 100.0
+    if g > 1.0 and g < 2.0:
+        outputln(g)
+    n = n + 1
+outputln("Done math")

@@ -83,6 +83,7 @@ jobs:
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j2
         cmake --build build --config Release --target aurora_bindgen -j2 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  bindgen skipped" }; $LASTEXITCODE=0
         cmake --build build --config Release --target aurora_cppwrap -j2 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  cppwrap skipped" }; $LASTEXITCODE=0
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j2
 
     - name: Verify Build Output
       run: |
@@ -107,12 +108,17 @@ jobs:
         }
         if (-not $ok) { throw "Missing build artifacts" }
 
+    - name: Run Regression Tests
+      run: |
+        powershell -ExecutionPolicy Bypass -File scripts/regression.ps1
+
     - name: Verify Docs
       run: |
         $docs = @(
           "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md",
           "VERSION", "RELEASE.md",
-          "aurora/docs/language.md"
+          "aurora/docs/language.md",
+          "docs/index.md"
         )
         $ok = $true
         foreach ($f in $docs) {
@@ -170,20 +176,14 @@ jobs:
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
 
-    - name: Build Core Targets
+    - name: Build All Targets
       run: |
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc)
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j$(nproc) 2>&1 || echo "Test targets optional — continuing"
 
-    - name: Build Test Targets
+    - name: Run Regression Tests
       run: |
-        cmake --build build --config Release --target test_fuzz_parser --target bench_compiler -j$(nproc) 2>&1 || echo "Test targets optional — continuing"
-
-    - name: Run C++ Tests
-      run: |
-        echo "--- test_fuzz_parser ---"
-        build/test_fuzz_parser 1000 || true
-        echo "--- bench_compiler ---"
-        build/bench_compiler || true
+        pwsh -File scripts/regression.ps1 2>&1 || true
 
     - name: Verify Build Output
       run: |
@@ -227,20 +227,14 @@ jobs:
         cmake -B build -DCMAKE_BUILD_TYPE=Release \
           -DLLVM_DIR="$LLVM_DIR"
 
-    - name: Build Core Targets
+    - name: Build All Targets
       run: |
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(sysctl -n hw.ncpu)
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j$(sysctl -n hw.ncpu) 2>&1 || echo "Test targets optional — continuing"
 
-    - name: Build Test Targets
+    - name: Run Regression Tests
       run: |
-        cmake --build build --config Release --target test_fuzz_parser --target bench_compiler -j$(sysctl -n hw.ncpu) 2>&1 || echo "Test targets optional — continuing"
-
-    - name: Run Compiler Tests
-      run: |
-        echo "--- test_fuzz_parser ---"
-        if [ -f build/test_fuzz_parser ]; then build/test_fuzz_parser 1000 || true; else echo "skipped"; fi
-        echo "--- bench_compiler ---"
-        if [ -f build/bench_compiler ]; then build/bench_compiler || true; else echo "skipped"; fi
+        pwsh -File scripts/regression.ps1 2>&1 || true
 
     - name: Verify Build Output
       run: |

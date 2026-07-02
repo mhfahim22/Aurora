@@ -29,6 +29,7 @@ struct GuiWidget {
     NSTextField* nslabel;
     NSTextField* nstextbox;
     NSTableView* nstableview;
+    AuroraListDataSource* listDataSource;
     bool visible;
 };
 
@@ -46,6 +47,14 @@ static bool g_app_inited = false;
 
 @interface AuroraButtonTarget : NSObject
 - (void)buttonClicked:(id)sender;
+@end
+
+/* ── NSTableView data source for listbox ── */
+@interface AuroraListDataSource : NSObject <NSTableViewDataSource> {
+    GuiWidget* _widget;
+}
+- (instancetype)initWithWidget:(GuiWidget*)w;
+- (void)setWidget:(GuiWidget*)w;
 @end
 
 /* ── Globals for delegates ── */
@@ -67,6 +76,7 @@ static GuiWidget* widget_new(int type, GuiWidget* parent) {
     w->nslabel = nil;
     w->nstextbox = nil;
     w->nstableview = nil;
+    w->listDataSource = nil;
     w->visible = false;
     g_widgets.push_back(w);
     g_id_map[w->id] = w;
@@ -129,6 +139,25 @@ static void ensure_app() {
             return;
         }
     }
+}
+@end
+
+@implementation AuroraListDataSource
+- (instancetype)initWithWidget:(GuiWidget*)w {
+    self = [super init];
+    if (self) _widget = w;
+    return self;
+}
+- (void)setWidget:(GuiWidget*)w { _widget = w; }
+- (NSInteger)numberOfRowsInTableView:(NSTableView*)tv {
+    (void)tv;
+    return _widget ? (NSInteger)_widget->items.size() : 0;
+}
+- (id)tableView:(NSTableView*)tv objectValueForTableColumn:(NSTableColumn*)col row:(NSInteger)row {
+    (void)tv; (void)col;
+    if (!_widget || row < 0 || row >= (NSInteger)_widget->items.size())
+        return nil;
+    return [NSString stringWithUTF8String:_widget->items[(size_t)row].c_str()];
 }
 @end
 
@@ -331,6 +360,8 @@ AuroraWidget aurora_gui_listbox_new(AuroraWidget parent, int x, int y, int w_, i
     w->nstableview = tv;
     w->nsview = sv;
     w->x = x; w->y = y; w->w = w_; w->h = h_;
+    w->listDataSource = [[AuroraListDataSource alloc] initWithWidget:w];
+    [tv setDataSource:w->listDataSource];
     return (AuroraWidget)w;
 }
 

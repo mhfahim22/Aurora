@@ -13,32 +13,138 @@
 ##   function on_click(id, evt, p1, p2):
 ##     gui_quit()
 
-extern function gui_window_new(title: cstring, width: int, height: int) -> pointer
-extern function gui_window_set_title(win: pointer, title: cstring)
-extern function gui_window_resize(win: pointer, w: int, h: int)
-extern function gui_window_show(win: pointer)
-extern function gui_window_hide(win: pointer)
-extern function gui_window_destroy(win: pointer)
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_set_title(win: pointer, title: cstring)
+extern function aurora_gui_window_resize(win: pointer, w: int, h: int)
+extern function aurora_gui_window_show(win: pointer)
+extern function aurora_gui_window_hide(win: pointer)
+extern function aurora_gui_window_destroy(win: pointer)
 
-extern function gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
-extern function gui_button_set_text(btn: pointer, text: cstring)
-extern function gui_button_get_text(btn: pointer) -> cstring
+extern function aurora_gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_button_set_text(btn: pointer, text: cstring)
+extern function aurora_gui_button_get_text(btn: pointer) -> cstring
 
-extern function gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
-extern function gui_label_set_text(lbl: pointer, text: cstring)
-extern function gui_label_get_text(lbl: pointer) -> cstring
+extern function aurora_gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_label_set_text(lbl: pointer, text: cstring)
+extern function aurora_gui_label_get_text(lbl: pointer) -> cstring
 
-extern function gui_textbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
-extern function gui_textbox_set_text(tb: pointer, text: cstring)
-extern function gui_textbox_get_text(tb: pointer) -> cstring
+extern function aurora_gui_textbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_textbox_set_text(tb: pointer, text: cstring)
+extern function aurora_gui_textbox_get_text(tb: pointer) -> cstring
 
-extern function gui_listbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
-extern function gui_listbox_add_item(lb: pointer, item: cstring)
-extern function gui_listbox_clear(lb: pointer)
-extern function gui_listbox_get_selected(lb: pointer) -> int
-extern function gui_listbox_get_item(lb: pointer, idx: int) -> cstring
-extern function gui_listbox_count(lb: pointer) -> int
+extern function aurora_gui_listbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_listbox_add_item(lb: pointer, item: cstring)
+extern function aurora_gui_listbox_clear(lb: pointer)
+extern function aurora_gui_listbox_get_selected(lb: pointer) -> int
+extern function aurora_gui_listbox_get_item(lb: pointer, idx: int) -> cstring
+extern function aurora_gui_listbox_count(lb: pointer) -> int
 
-extern function gui_run()
-extern function gui_quit()
-extern function gui_set_callback(widget: pointer, cb: callback(int, int, int, int))
+extern function aurora_gui_run()
+extern function aurora_gui_quit()
+extern function aurora_gui_set_callback(widget: pointer, cb: callback(int, int, int, int))
+extern function aurora_gui_layout_horizontal(parent: pointer, margin: int)
+extern function aurora_gui_layout_vertical(parent: pointer, margin: int)
+
+function gui_window_new(title, width, height):
+    return aurora_gui_window_new(title, width, height)
+end
+
+function gui_window_set_title(win, title):
+    aurora_gui_window_set_title(win, title)
+end
+
+function gui_window_resize(win, w, h):
+    aurora_gui_window_resize(win, w, h)
+end
+
+function gui_window_show(win):
+    aurora_gui_window_show(win)
+end
+
+function gui_window_hide(win):
+    aurora_gui_window_hide(win)
+end
+
+function gui_window_destroy(win):
+    aurora_gui_window_destroy(win)
+end
+
+function gui_button_new(parent, text, x, y, w, h):
+    return aurora_gui_button_new(parent, text, x, y, w, h)
+end
+
+function gui_button_set_text(btn, text):
+    aurora_gui_button_set_text(btn, text)
+end
+
+function gui_button_get_text(btn):
+    return aurora_gui_button_get_text(btn)
+end
+
+function gui_label_new(parent, text, x, y, w, h):
+    return aurora_gui_label_new(parent, text, x, y, w, h)
+end
+
+function gui_label_set_text(lbl, text):
+    aurora_gui_label_set_text(lbl, text)
+end
+
+function gui_label_get_text(lbl):
+    return aurora_gui_label_get_text(lbl)
+end
+
+function gui_textbox_new(parent, x, y, w, h):
+    return aurora_gui_textbox_new(parent, x, y, w, h)
+end
+
+function gui_textbox_set_text(tb, text):
+    aurora_gui_textbox_set_text(tb, text)
+end
+
+function gui_textbox_get_text(tb):
+    return aurora_gui_textbox_get_text(tb)
+end
+
+function gui_listbox_new(parent, x, y, w, h):
+    return aurora_gui_listbox_new(parent, x, y, w, h)
+end
+
+function gui_listbox_add_item(lb, item):
+    aurora_gui_listbox_add_item(lb, item)
+end
+
+function gui_listbox_clear(lb):
+    aurora_gui_listbox_clear(lb)
+end
+
+function gui_listbox_get_selected(lb):
+    return aurora_gui_listbox_get_selected(lb)
+end
+
+function gui_listbox_get_item(lb, idx):
+    return aurora_gui_listbox_get_item(lb, idx)
+end
+
+function gui_listbox_count(lb):
+    return aurora_gui_listbox_count(lb)
+end
+
+function gui_run():
+    aurora_gui_run()
+end
+
+function gui_quit():
+    aurora_gui_quit()
+end
+
+function gui_set_callback(widget, cb):
+    aurora_gui_set_callback(widget, cb)
+end
+
+function gui_layout_horizontal(parent, margin):
+    aurora_gui_layout_horizontal(parent, margin)
+end
+
+function gui_layout_vertical(parent, margin):
+    aurora_gui_layout_vertical(parent, margin)
+end

@@ -512,7 +512,6 @@ int aurora_http_response_send(AuroraHttpResponse* res, int64_t sock) {
         }
     }
     res->sent = 1;
-    fprintf(stderr, "[http] response %d sent (body_len=%zu, content_length_set=%d)\n", res->status_code, body_len, content_length_set);
     return 0;
 }
 
@@ -587,7 +586,6 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
     }
 
     res->sent = 1;
-    fprintf(stderr, "[http] chunked response %d sent (chunk_size=%d)\n", res->status_code, chunk_size);
     return 0;
 }
 
@@ -784,14 +782,9 @@ static int has_header_value(const char* raw, const char* header_name, const char
         }
         p++;
     }
-    if (!hdr) {
-        fprintf(stderr, "[gzip-debug] hdr NOT found in raw for '%s'\n", header_name);
-        fprintf(stderr, "[gzip-debug] raw=%.200s\n", raw);
-        return 0;
-    }
+    if (!hdr) return 0;
     hdr += hdr_len;
     while (*hdr == ' ') hdr++;
-    /* Search for expected_val as a token in comma-separated list */
     size_t ev_len = strlen(expected_val);
     int ret = 0;
     p = hdr;
@@ -806,7 +799,6 @@ static int has_header_value(const char* raw, const char* header_name, const char
         }
         while (*p && *p != ',') p++;
     }
-    fprintf(stderr, "[gzip-debug] hdr found, value='%.30s' searching for '%s' => %d\n", hdr, expected_val, ret);
     return ret;
 }
 
@@ -817,21 +809,7 @@ static int has_keep_alive(const char* raw) {
 
 /* ── Check if raw request accepts gzip ── */
 static int accepts_gzip(const char* raw) {
-    int ret = has_header_value(raw, "Accept-Encoding:", "gzip");
-    fprintf(stderr, "[gzip-debug] accepts_gzip returning %d\n", ret);
-    if (!ret && raw) {
-        const char* ae = strstr(raw, "Accept");
-        if (ae) {
-            const char* newline = strstr(ae, "\r\n");
-            if (!newline) newline = ae + 80;
-            int len = (int)(newline - ae);
-            if (len > 80) len = 80;
-            fprintf(stderr, "[gzip-debug] Accept header near match: %.*s\n", len, ae);
-        } else {
-            fprintf(stderr, "[gzip-debug] No 'Accept' in raw request\n");
-        }
-    }
-    return ret;
+    return has_header_value(raw, "Accept-Encoding:", "gzip");
 }
 
 /* ── Set socket receive timeout ── */

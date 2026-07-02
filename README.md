@@ -427,6 +427,7 @@ voss run
 
 | Resource | Description |
 |----------|-------------|
+| [Documentation Index](docs/index.md) | Entry point to all docs — tutorials, reference, frameworks |
 | [Language Reference](aurora/docs/reference/01-syntax-basics.md) | Complete language specification (17 chapters) |
 | [Tutorial](aurora/docs/tutorial.md) | Step-by-step from Hello World to bridges |
 | [API Reference](aurora/docs/api_reference.md) | 250+ built-in functions |
@@ -463,7 +464,7 @@ ctest --test-dir build --config Release
 ```
 
 ### Project Status
-Current version: **1.0.0** — The masterpiece is here. Battle-tested, production-ready, feature-complete.
+Current version: **1.0.0-rc.1** — Release Candidate 1. All features complete, regression-tested, and packaged.
 
 ---
 

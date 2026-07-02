@@ -41,6 +41,8 @@
 #include <filesystem>
 #include <cstdlib>
 #include <array>
+#include <chrono>
+#include <iomanip>
 #ifdef _WIN32
 #  include <windows.h>
 #else
@@ -52,8 +54,79 @@
 namespace fs = std::filesystem;
 
 static bool verbose = false;
+static bool show_timing = false;
 
-static const char* AURORA_VERSION = "0.3.3";
+static const char* AURORA_VERSION = "1.0.0-rc.1";
+
+/* ── Compiler stage timing instrumentation ── */
+struct CompilerTimer {
+    using clock = std::chrono::high_resolution_clock;
+    struct Phase {
+        std::string name;
+        clock::duration elapsed;
+        int count{0};
+    };
+    std::vector<Phase> phases;
+    clock::time_point current_start;
+    std::string current_name;
+    bool running{false};
+
+    void start(const std::string& name) {
+        if (!show_timing) return;
+        if (running) stop();
+        current_name = name;
+        current_start = clock::now();
+        running = true;
+    }
+
+    void stop() {
+        if (!show_timing || !running) return;
+        auto now = clock::now();
+        auto elapsed = now - current_start;
+        for (auto& p : phases) {
+            if (p.name == current_name) {
+                p.elapsed += elapsed;
+                p.count++;
+                running = false;
+                return;
+            }
+        }
+        phases.push_back({current_name, elapsed, 1});
+        running = false;
+    }
+
+    void report() const {
+        if (!show_timing || phases.empty()) return;
+        auto total = clock::duration::zero();
+        for (auto& p : phases) total += p.elapsed;
+
+        std::cerr << "\n" << (color_enabled(stderr) ? "\033[1;36m" : "")
+                  << "=== Compiler Stage Timings ==="
+                  << (color_enabled(stderr) ? "\033[0m" : "") << "\n";
+        std::cerr << std::left << std::setw(30) << "Stage"
+                  << std::right << std::setw(14) << "Time (ms)"
+                  << std::setw(10) << "Count"
+                  << std::setw(12) << "Total (ms)" << "\n";
+        std::cerr << std::string(66, '-') << "\n";
+        for (auto& p : phases) {
+            double ms = std::chrono::duration<double, std::milli>(p.elapsed).count();
+            double total_ms = std::chrono::duration<double, std::milli>(total).count();
+            double pct = total_ms > 0 ? (ms / total_ms * 100.0) : 0.0;
+            std::cerr << std::left << std::setw(30) << p.name
+                      << std::right << std::fixed << std::setprecision(2)
+                      << std::setw(14) << ms
+                      << std::setw(10) << p.count
+                      << std::setw(8) << std::setprecision(1) << pct << "%\n";
+        }
+        double total_ms = std::chrono::duration<double, std::milli>(total).count();
+        std::cerr << std::string(66, '-') << "\n";
+        std::cerr << std::left << std::setw(30) << "TOTAL"
+                  << std::right << std::fixed << std::setprecision(2)
+                  << std::setw(14) << total_ms << "\n";
+    }
+};
+
+static CompilerTimer g_timer;
 
 /* ── Check if a trimmed line ends with a block-starting colon ── */
 static bool line_needs_continuation(const std::string& line) {
@@ -108,6 +181,7 @@ static void print_usage() {
     std::cerr << "  --coverage      Enable code coverage tracing\n";
     std::cerr << "  --debug, -g     Emit DWARF debug info for debugging\n";
     std::cerr << "  --verbose, -v   Show verbose stage/trace output for debugging\n";
+    std::cerr << "  --timing        Show per-stage compilation timings\n";
 }
 
 /* ── Safe process execution helper (no shell) ── */
@@ -1347,6 +1421,7 @@ auto get_output_path = [&]() -> std::string {
         else if (arg == "--incremental") incremental = true;
         else if (arg == "--debug" || arg == "-g") enable_debug = true;
         else if (arg == "--verbose" || arg == "-v") verbose = true;
+        else if (arg == "--timing")   show_timing = true;
         else if (arg == "--run")      run_jit = true;
         else if (arg == "--repl") {} /* already handled */
         else if (arg == "--doc") {} /* already handled */
@@ -1540,15 +1615,19 @@ auto get_output_path = [&]() -> std::string {
 
     try {
         /* ── Stage 1: Lex ── */
+        g_timer.start("Lex");
         if (verbose) std::cerr << "STAGE1: Lex\n" << std::flush;
         std::string source = read_file(source_path);
         Lexer lexer;
         auto lines = lexer.lex(source);
+        g_timer.stop();
 
         /* ── Stage 2: Parse ── */
+        g_timer.start("Parse");
         if (verbose) std::cerr << "STAGE2: Parse\n" << std::flush;
         Parser parser(lines);
         ASTNode::Ptr ast = parser.parse();
+        g_timer.stop();
 
         if (parser.had_error()) {
             for (const auto& err : parser.errors())
@@ -1558,6 +1637,7 @@ auto get_output_path = [&]() -> std::string {
         }
 
         /* ── Stage 2b: Resolve imports ── */
+        g_timer.start("Import Resolve");
         std::vector<std::string> source_files;
         source_files.push_back(fs::absolute(source_path).string());
         {
@@ -1565,6 +1645,7 @@ auto get_output_path = [&]() -> std::string {
             std::string source_dir = (sep == std::string::npos) ? "." : source_path.substr(0, sep);
             ast = resolve_imports(std::move(ast), source_path, source_dir, exe_dir, &source_files);
         }
+        g_timer.stop();
 
         /* ── Incremental compilation check (post-import-resolution) ── */
         if (incremental && !cache_out.empty()) {
@@ -1577,10 +1658,12 @@ auto get_output_path = [&]() -> std::string {
         }
 
         /* ── Stage 3: Memory Analysis (Phase 1-8) ── */
+        g_timer.start("Memory Analysis");
         if (verbose) std::cerr << "STAGE3: MemoryAnalysis\n" << std::flush;
         MemoryAnalyzer memory_analyzer;
         memory_analyzer.analyse(ast.get());
         memory_analyzer.apply_to_ast(ast.get());
+        g_timer.stop();
 
         /* Show reports if requested */
         if (show_memory_report) {
@@ -1633,6 +1716,7 @@ auto get_output_path = [&]() -> std::string {
         }
 
         /* ── Stage 4: Code Generation ── */
+        g_timer.start("CodeGen");
         if (verbose) std::cerr << "STAGE4: CodeGen\n" << std::flush;
         auto ctx = std::make_unique<llvm::LLVMContext>();
         std::unique_ptr<llvm::Module> module;
@@ -1688,6 +1772,7 @@ auto get_output_path = [&]() -> std::string {
             codegen.generate(ast.get());
         }
         if (verbose) std::cerr << "STAGE4: Done\n" << std::flush;
+        g_timer.stop();
 
         /* ── Stage 4b: LLVM IR verification ── */
         if (enable_debug || verbose) {
@@ -1701,6 +1786,7 @@ auto get_output_path = [&]() -> std::string {
         }
 
         /* ── Stage 5: Aurora custom optimizations (LLVM IR level) ── */
+        g_timer.start("Aurora Optimizer");
         if (!use_aurora_ir) {
             if (verbose) std::cerr << "STAGE5: BeforeOpt: " << module->size() << " functions\n" << std::flush;
             try {
@@ -1712,8 +1798,10 @@ auto get_output_path = [&]() -> std::string {
             }
             if (verbose) std::cerr << "STAGE5: AfterOpt: " << module->size() << " functions\n" << std::flush;
         }
+        g_timer.stop();
 
         /* ── Stage 6: LLVM optimization + native CPU ── */
+        g_timer.start("LLVM Optimizer");
         if (verbose) std::cerr << "STAGE6: init\n" << std::flush;
         std::string cpu = llvm::sys::getHostCPUName().str();
         if (verbose) std::cerr << "STAGE6: cpu=" << cpu << "\n" << std::flush;
@@ -1787,15 +1875,21 @@ auto get_output_path = [&]() -> std::string {
             }
         }
         if (verbose) std::cerr << "STAGE6: opt" << opt_level << " done (cpu=" << cpu << ")\n" << std::flush;
+        g_timer.stop();
 
         if (run_jit) {
             /* JIT-execute main function */
+            g_timer.start("JIT");
             if (verbose) std::cerr << "JIT: Starting execution\n" << std::flush;
             int exit_code = jit_execute_main(std::move(ctx), std::move(module));
+            g_timer.stop();
+            g_timer.report();
             if (exit_code != 0 && exit_code != -1)
                 if (verbose) std::cerr << "JIT exit code: " << exit_code << "\n" << std::flush;
             return exit_code == -1 ? 1 : 0;
         }
+
+        g_timer.start("Output");
 
         bool compile_success = false;
         if (emit_ir) {
@@ -1852,6 +1946,11 @@ auto get_output_path = [&]() -> std::string {
             if (verbose) std::cerr << "File written: " << out_path << "\n" << std::flush;
             compile_success = true;
         }
+
+        g_timer.stop();
+
+        /* ── Report timing ── */
+        g_timer.report();
 
         /* ── Stage 7: Update build cache (with flags hash) ── */
         if (incremental && compile_success && !cache_out.empty()) {

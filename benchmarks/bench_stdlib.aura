@@ -1,0 +1,14 @@
+## Stdlib stress test — exercises string builtins
+outputln("Benchmark: stdlib stress")
+s = "Aurora Benchmark String"
+n = 0
+while n < 50:
+    a = len(s)
+    b = substr(s, 0, 5)
+    c = index(s, "Bench")
+    d = upper(s)
+    e = lower(s)
+    if a > 0 and c >= 0:
+        outputln(d)
+    n = n + 1
+outputln("Done stdlib")

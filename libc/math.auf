@@ -11,6 +11,12 @@ extern function aurora_math_exp(x: f64) -> f64
 extern function aurora_math_log(x: f64) -> f64
 extern function aurora_math_log10(x: f64) -> f64
 extern function aurora_math_e() -> f64
+extern function aurora_math_abs(x: f64) -> f64
+extern function aurora_math_floor(x: f64) -> f64
+extern function aurora_math_ceil(x: f64) -> f64
+extern function aurora_math_round(x: f64) -> f64
+extern function aurora_math_random() -> f64
+extern function aurora_math_random_int(min: i64, max: i64) -> i64
 
 function pi():
     return aurora_math_pi()
@@ -44,4 +50,22 @@ function log10(x):
 end
 function e_val():
     return aurora_math_e()
+end
+function abs(x):
+    return aurora_math_abs(x)
+end
+function floor(x):
+    return aurora_math_floor(x)
+end
+function ceil(x):
+    return aurora_math_ceil(x)
+end
+function round(x):
+    return aurora_math_round(x)
+end
+function random():
+    return aurora_math_random()
+end
+function random_int(min, max):
+    return aurora_math_random_int(min, max)
 end

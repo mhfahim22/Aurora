@@ -1,0 +1,26 @@
+## Deep control flow benchmark
+outputln("Benchmark: control flow")
+x = 0
+i = 0
+while i < 32:
+    j = 0
+    while j < 32:
+        if i > 0 and j > 0:
+            if i < 31 and j < 31:
+                s = i + j
+                p = i * j
+                if s - (s / 3) * 3 == 0:
+                    x = x + 1
+                else:
+                    if p - (p / 5) * 5 == 0:
+                        x = x + 2
+                    else:
+                        x = x + 3
+            else:
+                x = x + 4
+        else:
+            x = x + 5
+        j = j + 1
+    i = i + 1
+outputln(x)
+outputln("Done control")

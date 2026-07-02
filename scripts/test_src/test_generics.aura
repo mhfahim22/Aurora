@@ -1,0 +1,7 @@
+function identity[T](x: T): T
+    return x
+end
+output("int: ")
+output(identity[Int](42))
+output(" float: ")
+outputln(identity[Float](3.14))

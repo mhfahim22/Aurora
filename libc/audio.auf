@@ -5,4 +5,26 @@
 
 extern function aurora_audio_init() -> i32
 extern function aurora_audio_play_file(path: cstring) -> i32
+extern function aurora_audio_play(path: cstring)
+extern function aurora_audio_play_tone(freq: i32, duration_ms: i32)
+extern function aurora_audio_stop_all()
 extern function aurora_audio_shutdown()
+
+function audio_init():
+    return aurora_audio_init()
+end
+function audio_play_file(path):
+    return aurora_audio_play_file(path)
+end
+function audio_play(path):
+    aurora_audio_play(path)
+end
+function audio_play_tone(freq, duration_ms):
+    aurora_audio_play_tone(freq, duration_ms)
+end
+function audio_stop_all():
+    aurora_audio_stop_all()
+end
+function audio_shutdown():
+    aurora_audio_shutdown()
+end

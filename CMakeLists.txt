@@ -626,6 +626,23 @@ endif()
 add_test(NAME test_autograd COMMAND test_autograd)
 
 # ═══════════════════════════════════════════════════════════════
+# Server Integration Tests (TLS, HTTP, WebSocket, Concurrent)
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_server
+    aurora/tests/runtime/test_server.cpp
+)
+target_link_libraries(test_server PRIVATE aurora_runtime)
+target_include_directories(test_server PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+if(WIN32)
+    target_link_libraries(test_server PRIVATE ws2_32.lib crypt32.lib)
+endif()
+if(ENABLE_ASAN)
+    target_compile_options(test_server PRIVATE ${ASAN_FLAGS})
+    target_link_options(test_server PRIVATE ${ASAN_LINK_FLAGS})
+endif()
+add_test(NAME test_server COMMAND test_server)
+
+# ═══════════════════════════════════════════════════════════════
 # Phase 4: AI Benchmark
 # ═══════════════════════════════════════════════════════════════
 add_executable(bench_ai

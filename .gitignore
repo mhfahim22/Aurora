@@ -85,6 +85,9 @@ release/*.zip
 # ── Generated PyPI stubs ──
 *_pypi/
 
+# ── Profiling artifacts (regenerated each run) ──
+profile_results/
+
 # ── Session / internal notes ──
 SESSION_SUMMARY.md
 

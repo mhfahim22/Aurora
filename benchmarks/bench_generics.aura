@@ -1,0 +1,23 @@
+## Generics monomorphization benchmark
+outputln("Benchmark: generics")
+
+function identity[T](x: T): T
+    return x
+end
+
+function twice[T](a: T, b: T): T
+    if a > b:
+        return a
+    else:
+        return b
+end
+
+i = 0
+while i < 50:
+    a = identity[Int](42)
+    b = identity[Float](3.14)
+    c = identity[Int](100 + i)
+    d = twice[Int](a, c)
+    e = twice[Float](b, 2.71)
+    i = i + 1
+outputln("Done generics")
