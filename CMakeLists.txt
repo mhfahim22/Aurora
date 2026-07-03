@@ -46,7 +46,7 @@ endif()
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 
-include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
 # ── Global include path ───────────────────────────────────────
@@ -111,6 +111,7 @@ add_executable(aurorac
     aurora/src/compiler/optimizer/strength_reduce.cpp
     aurora/src/compiler/runtime_exports_init.cpp
     aurora/src/compiler/package_manager.cpp
+    aurora/src/compiler/build_system.cpp
     aurora/src/compiler/doc_generator.cpp
 )
 
@@ -141,6 +142,8 @@ target_include_directories(aurorac PRIVATE "${CMAKE_BINARY_DIR}/include")
 
 if(MSVC)
     target_compile_definitions(aurorac PRIVATE NOMINMAX)
+    # Suppress noisy STL warnings and mark external headers
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /external:W0 /external:anglebrackets /wd4244 /wd4624")
 endif()
 
 if(UNIX)
@@ -208,7 +211,6 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/game/engine.cpp
     aurora/src/runtime/gfx/gl_helper.cpp
     aurora/src/runtime/gfx/matrix.cpp
-    aurora/src/runtime/gfx/image_helper.cpp
     aurora/src/runtime/gfx/obj_helper.cpp
     aurora/src/runtime/gfx/audio_helper.cpp
     aurora/src/runtime/gfx/sprite2d.cpp
@@ -224,6 +226,28 @@ add_library(aurora_runtime STATIC
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
     aurora/src/std/crypto.cpp
+    aurora/src/std/security.cpp
+    aurora/src/std/process.cpp
+    aurora/src/std/thread.cpp
+    aurora/src/std/async.cpp
+    aurora/src/std/reactive.cpp
+    aurora/src/std/canvas.cpp
+    aurora/src/std/image.cpp
+    aurora/src/std/animation.cpp
+    aurora/src/std/audio.cpp
+    aurora/src/std/video.cpp
+    aurora/src/std/serial.cpp
+    aurora/src/std/db.cpp
+    aurora/src/std/desktop.cpp
+    aurora/src/std/game.cpp
+    aurora/src/std/plugin.cpp
+    aurora/src/std/pkg.cpp
+    aurora/src/std/hotreload.cpp
+    aurora/src/std/test.cpp
+    aurora/src/std/dev.cpp
+    aurora/src/mobile/widgets.cpp
+    aurora/src/std/mobile_stubs.cpp
+    third_party/sqlite3/sqlite3.c
 )
 
 if(WIN32)
@@ -237,6 +261,11 @@ if(APPLE)
     target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
     set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
         COMPILE_FLAGS "-x objective-c++")
+elseif(ANDROID)
+    target_sources(aurora_runtime PRIVATE
+        aurora/src/mobile/android/android_runtime.cpp)
+    target_link_libraries(aurora_runtime PRIVATE
+        android EGL GLESv2 log z)
 else()
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp)
     if(WIN32)
@@ -244,8 +273,23 @@ else()
     endif()
 endif()
 
+# ── iOS mobile runtime (Objective-C++) ──
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_sources(aurora_runtime PRIVATE
+        aurora/src/mobile/ios/ios_runtime.mm
+        aurora/src/mobile/ios/ios_renderer.mm)
+    target_link_libraries(aurora_runtime PRIVATE
+        "-framework UIKit" "-framework Metal" "-framework QuartzCore")
+    set_source_files_properties(
+        aurora/src/mobile/ios/ios_runtime.mm
+        aurora/src/mobile/ios/ios_renderer.mm
+        PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x objective-c++")
+endif()
+
 target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include
+    ${CMAKE_SOURCE_DIR}/aurora/third_party
     ${CMAKE_SOURCE_DIR}/aurora/src/runtime/backend
+    ${CMAKE_SOURCE_DIR}/third_party
     "${CMAKE_BINARY_DIR}/include")
 
 # ── OpenGL / 3D Graphics support (optional) ──
@@ -273,8 +317,25 @@ if(ENABLE_ASAN)
 endif()
 
 # ── LTO (Link-Time Optimization) for runtime library ──
-# Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
 set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+
+# ── Phase 28: Binary size reduction ──
+# Function/data sections + dead code stripping
+if(MSVC)
+    target_compile_options(aurora_runtime PRIVATE /Gy)
+    target_link_options(aurora_runtime PRIVATE /OPT:REF /OPT:ICF)
+elseif(APPLE)
+    target_compile_options(aurora_runtime PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(aurora_runtime PRIVATE -Wl,-dead_strip)
+else()
+    target_compile_options(aurora_runtime PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(aurora_runtime PRIVATE -Wl,--gc-sections -Wl,--icf=safe)
+endif()
+
+# ── Symbol visibility ──
+if(NOT MSVC)
+    target_compile_options(aurora_runtime PRIVATE -fvisibility=hidden)
+endif()
 
 # ── Link runtime to compiler ────────────────
 target_link_libraries(aurorac PRIVATE aurora_runtime)
@@ -641,6 +702,16 @@ if(ENABLE_ASAN)
     target_link_options(test_server PRIVATE ${ASAN_LINK_FLAGS})
 endif()
 add_test(NAME test_server COMMAND test_server)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 29: Cross-Platform Validation
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_crossplatform
+    aurora/tests/crossplatform/validate.cpp
+)
+target_link_libraries(test_crossplatform PRIVATE aurora_runtime)
+target_include_directories(test_crossplatform PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+add_test(NAME test_crossplatform COMMAND test_crossplatform)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 4: AI Benchmark

@@ -212,6 +212,7 @@ jobs:
     - name: Install LLVM
       run: |
         brew install llvm@19
+        brew link --overwrite llvm@19 2>/dev/null || true
         LLVM_PREFIX=$(brew --prefix llvm@19)
         echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
         echo "LLVM_PREFIX=$LLVM_PREFIX" >> $GITHUB_ENV
