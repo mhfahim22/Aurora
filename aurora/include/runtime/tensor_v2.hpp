@@ -1,16 +1,10 @@
 #pragma once
 
 /* ════════════════════════════════════════════════════════════
-   DEPRECATED — Tensor v2 API has been merged into v1.
-   Use "runtime/tensor.hpp" instead (aurora_tensor_* API).
-   This header is retained for compatibility only.
+   DEPRECATED — Tensor v2 API merged into v1 (AuroraTensor).
+   Use "runtime/tensor.hpp" directly with the aurora_tensor_* API.
+   This header will be removed in Aurora 2.0.
    ════════════════════════════════════════════════════════════ */
-
-#if defined(_MSC_VER)
-#pragma message(__FILE__ ": warning: tensor_v2.hpp is deprecated. Include runtime/tensor.hpp instead.")
-#elif defined(__GNUC__) || defined(__clang__)
-#warning "tensor_v2.hpp is deprecated. Include runtime/tensor.hpp instead."
-#endif
 
 #include "runtime/tensor.hpp"
 #include <cstdint>
@@ -28,7 +22,7 @@ extern "C" {
 #define TENSOR_F32 1
 #endif
 
-/* Deprecated alias — use AuroraTensor instead */
+/* Deprecated alias — use AuroraTensor directly */
 typedef AuroraTensor AuroraTensorV2;
 
 /* ── Deprecated compatibility wrappers (forward to v1 API) ── */

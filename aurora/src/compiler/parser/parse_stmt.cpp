@@ -13,7 +13,7 @@ static ASTNode::Ptr parse_attributed_fn_body(Parser& parser, ASTNode::Ptr stmt,
                                               const std::vector<Token>& toks, int& idx,
                                               int cnt, int ln, int ci) {
     /* Parse function name */
-    if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+    if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
         throw std::runtime_error("Line " + std::to_string(ln) + ": expected function name");
     stmt->value = toks[idx].value;
     idx++;
@@ -78,7 +78,7 @@ ASTNode::Ptr Parser::parse_stmt() {
         /* modifier function name(...):  — method with modifier */
         if (cnt > 2 && toks[1].is_keyword("function")) {
             int idx = 2;
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                 std::string fname = toks[idx].value;
                 auto stmt = make_node(NodeType::Function, fname, ln);
                 /* Store visibility/abstract/final modifier */
@@ -192,7 +192,7 @@ ASTNode::Ptr Parser::parse_stmt() {
         else                               { alloc_node_type = NodeType::GCAlloc;    forced = AllocStrategy::ForcedGC; }
 
         /* Next must be an assignment: @stack x = expr */
-        if (cnt > 1 && toks[1].is(TokenType::Identifier) && cnt > 3 && toks[2].is_operator('=')) {
+        if (cnt > 1 && toks[1].is(TokenKind::Identifier) && cnt > 3 && toks[2].is_operator('=')) {
             auto stmt = make_node(NodeType::Assign, "", ln);
             stmt->left = make_node(NodeType::Var, toks[1].value, ln);
             int idx = 3;
@@ -474,7 +474,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     if ((t0.is_keyword("scene") || t0.is_keyword("entity") || t0.is_keyword("object") ||
          t0.is_keyword("sprite") || t0.is_keyword("camera") || t0.is_keyword("physics") ||
          t0.is_keyword("collision") || t0.is_keyword("audio") || t0.is_keyword("animation")) &&
-        cnt > 1 && (toks[1].is_identifier() || toks[1].is(TokenType::Keyword))) {
+        cnt > 1 && (toks[1].is_identifier() || toks[1].is(TokenKind::Keyword))) {
         NodeType nt;
         if (t0.is_keyword("scene"))      nt = NodeType::Scene;
         else if (t0.is_keyword("entity"))    nt = NodeType::Entity;
@@ -522,7 +522,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     /* ── Phase 9: AI/ML & Time/Util ── */
     if ((t0.is_keyword("ai") || t0.is_keyword("train") || t0.is_keyword("predict") ||
          t0.is_keyword("tensor") || t0.is_keyword("neural")) && cnt > 1 &&
-        (toks[1].is_identifier() || toks[1].is(TokenType::Keyword))) {
+        (toks[1].is_identifier() || toks[1].is(TokenKind::Keyword))) {
         NodeType nt;
         if (t0.is_keyword("ai"))       nt = NodeType::Ai;
         else if (t0.is_keyword("train"))    nt = NodeType::Train;
@@ -605,7 +605,7 @@ ASTNode::Ptr Parser::parse_stmt() {
             ASTNode* tp_tail = nullptr;
             while (idx < cnt && !toks[idx].is_operator(']')) {
                 if (toks[idx].is_operator(',')) { idx++; continue; }
-                if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                     auto tp = make_node(NodeType::TypeParam, toks[idx].value, ln);
                     ASTNode* raw = tp.get();
                     if (!stmt->template_params) { stmt->template_params = std::move(tp); tp_tail = raw; }
@@ -626,7 +626,7 @@ ASTNode::Ptr Parser::parse_stmt() {
                 /* optional : type annotation (e.g., a: Int, b: T) */
                 if (idx < cnt && toks[idx].is_operator(':')) {
                     idx++;
-                    if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                    if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                         p->right = make_node(NodeType::Var, toks[idx].value, ln);
                         idx++;
                     }
@@ -641,7 +641,7 @@ ASTNode::Ptr Parser::parse_stmt() {
         /* ── Optional return type: function name(...): RetType ── */
         if (idx < cnt && toks[idx].is_operator(':')) {
             idx++;
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                 stmt->left = make_node(NodeType::Var, toks[idx].value, ln);
                 idx++;
             }
@@ -794,7 +794,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     if (t0.is_keyword("global") && cnt > 2 && toks[1].is_operator(':')) {
         int idx = 2;
         if (idx < cnt && toks[idx].is_operator(':')) idx++;
-        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
             auto stmt = make_node(NodeType::Var, "global::" + toks[idx].value, ln);
             idx++;
             require_token_end(toks, idx, "global access");
@@ -809,7 +809,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     if (t0.is_keyword("outer") && cnt > 2 && toks[1].is_operator(':')) {
         int idx = 2;
         if (idx < cnt && toks[idx].is_operator(':')) idx++;
-        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
             auto stmt = make_node(NodeType::Var, "outer::" + toks[idx].value, ln);
             idx++;
             require_token_end(toks, idx, "outer access");
@@ -995,7 +995,7 @@ ASTNode::Ptr Parser::parse_stmt() {
                     if (ctoks[cidx].is_operator('[')) {
                         /* Array pattern: [a, b, c] */
                         pattern = parse_pattern_from_tokens(ctoks, cidx, cln);
-                    } else if (ctoks[cidx].is_identifier() || ctoks[cidx].is(TokenType::Keyword) || ctoks[cidx].is_number()) {
+                    } else if (ctoks[cidx].is_identifier() || ctoks[cidx].is(TokenKind::Keyword) || ctoks[cidx].is_number()) {
                         /* Check if it's a struct pattern: Name(...) or a simple literal/variable */
                         if (ctoks[cidx].is_number()) {
                             pattern = make_node(NodeType::Num, ctoks[cidx].value, cln);
@@ -1140,7 +1140,7 @@ ASTNode::Ptr Parser::parse_stmt() {
         if (cnt > 1 && toks[1].is_keyword("function")) {
             auto stmt = make_node(NodeType::Async, "", ln);
             int idx = 2;
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                 std::string fname = toks[idx].value;
                 auto fn = make_node(NodeType::Function, fname, ln);
                 idx++;
@@ -1347,18 +1347,18 @@ ASTNode::Ptr Parser::parse_stmt() {
     /* ── array index assign: name[expr] = expr ── */
     /* But first check if it's a generic call name[Type1, Type2](args) — if so, fall through */
     bool is_generic_call = false;
-    if (t0.is(TokenType::Identifier) && cnt > 4 && toks[1].is_operator('[')) {
+    if (t0.is(TokenKind::Identifier) && cnt > 4 && toks[1].is_operator('[')) {
         int ci = 2;
         is_generic_call = true;
         while (ci < cnt && !toks[ci].is_operator(']')) {
             if (toks[ci].is_operator(',')) { ci++; continue; }
-            if (!toks[ci].is_identifier() && !toks[ci].is(TokenType::Keyword)) { is_generic_call = false; break; }
+            if (!toks[ci].is_identifier() && !toks[ci].is(TokenKind::Keyword)) { is_generic_call = false; break; }
             ci++;
         }
         if (is_generic_call)
             is_generic_call = (ci < cnt && toks[ci].is_operator(']') && ci + 1 < cnt && toks[ci + 1].is_operator('('));
     }
-    if (!is_generic_call && t0.is(TokenType::Identifier) && cnt > 3 && toks[1].is_operator('[')) {
+    if (!is_generic_call && t0.is(TokenKind::Identifier) && cnt > 3 && toks[1].is_operator('[')) {
         auto stmt  = make_node(NodeType::IndexAssign, t0.value, ln);
         int idx = 2;
         stmt->left = parse_expr(toks, idx);
@@ -1373,7 +1373,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
     /* ── shared y = x / weak y = x (assignment form) ── */
     if ((t0.is_keyword("shared") || t0.is_keyword("weak")) && cnt > 3
-        && toks[1].is(TokenType::Identifier) && toks[2].is_operator('=')) {
+        && toks[1].is(TokenKind::Identifier) && toks[2].is_operator('=')) {
         auto stmt = make_node(NodeType::Assign, "", ln);
         stmt->left = make_node(NodeType::Var, toks[1].value, ln);
         int idx = 3;
@@ -1387,7 +1387,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── compound assignment: x += expr, x -= expr, x *= expr, x /= expr ── */
-    if (t0.is(TokenType::Identifier) && cnt > 3 && toks[1].is(TokenType::Operator)) {
+    if (t0.is(TokenKind::Identifier) && cnt > 3 && toks[1].is(TokenKind::Operator)) {
         const std::string& op1 = toks[1].value;
         std::string binop = "";
         int idx = 2;
@@ -1416,7 +1416,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── assignment: name = expr ── */
-    if ((t0.is(TokenType::Identifier) || t0.is(TokenType::Keyword)) &&
+    if ((t0.is(TokenKind::Identifier) || t0.is(TokenKind::Keyword)) &&
         cnt > 2 && toks[1].is_operator('=') && (cnt < 3 || !toks[2].is_operator('='))) {
         auto stmt  = make_node(NodeType::Assign, "", ln);
         stmt->left = make_node(NodeType::Var, t0.value, ln);
@@ -1430,7 +1430,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     /* ── new ClassName(args) as statement ── */
     if (t0.is_keyword("new")) {
         int idx = 1;
-        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
             auto stmt = make_node(NodeType::New, toks[idx].value, ln);
             idx++;
             if (idx < cnt && toks[idx].is_operator('(')) {
@@ -1453,12 +1453,12 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── generic call as statement: name[Type1, Type2](args) ── */
-    if (t0.is(TokenType::Identifier) && cnt > 4 && toks[1].is_operator('[')) {
+    if (t0.is(TokenKind::Identifier) && cnt > 4 && toks[1].is_operator('[')) {
         int ci = 2;
         bool looks_like_generic = true;
         while (ci < cnt && !toks[ci].is_operator(']')) {
             if (toks[ci].is_operator(',')) { ci++; continue; }
-            if (!toks[ci].is_identifier() && !toks[ci].is(TokenType::Keyword)) { looks_like_generic = false; break; }
+            if (!toks[ci].is_identifier() && !toks[ci].is(TokenKind::Keyword)) { looks_like_generic = false; break; }
             ci++;
         }
         if (looks_like_generic && ci < cnt && toks[ci].is_operator(']') && ci + 1 < cnt && toks[ci + 1].is_operator('(')) {
@@ -1471,7 +1471,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── function call as statement ── */
-    if ((t0.is(TokenType::Identifier) || t0.is(TokenType::Keyword)) && cnt > 1 && toks[1].is_operator('(')) {
+    if ((t0.is(TokenKind::Identifier) || t0.is(TokenKind::Keyword)) && cnt > 1 && toks[1].is_operator('(')) {
         int idx = 0;
         auto call = parse_factor(toks, idx);
         require_token_end(toks, idx, "function call statement");
@@ -1480,9 +1480,9 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── obj.field = expr  (field assignment) ── */
-    if (t0.is(TokenType::Identifier) && cnt > 3
+    if (t0.is(TokenKind::Identifier) && cnt > 3
         && toks[1].is_operator('.')
-        && (toks[2].is_identifier() || toks[2].is(TokenType::Keyword))
+        && (toks[2].is_identifier() || toks[2].is(TokenKind::Keyword))
         && toks[3].is_operator('=')
         && (cnt < 5 || !toks[4].is_operator('='))) {
         /* build:  Assign{ left=Attribute{obj,field}, right=expr } */
@@ -1498,7 +1498,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── obj.method(args)  (method call as statement) ── */
-    if (t0.is(TokenType::Identifier) && cnt > 3
+    if (t0.is(TokenKind::Identifier) && cnt > 3
         && toks[1].is_operator('.')
         && toks[2].is_identifier()
         && toks[3].is_operator('(')) {
@@ -1606,7 +1606,7 @@ static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, in
     }
 
     /* Identifier or keyword */
-    if (t.is_identifier() || t.is(TokenType::Keyword)) {
+    if (t.is_identifier() || t.is(TokenKind::Keyword)) {
         std::string name = t.value;
         idx++;
 

@@ -2,9 +2,9 @@
 
 ## Versioning
 
-Current version: **1.0.0-rc.1** — Release Candidate 1
+Current version: **1.0.0** — Stable Release
 
-Version format: `MAJOR.MINOR.PATCH[-PRERELEASE]` (semver)
+Version format: `MAJOR.MINOR.PATCH` (semver)
 
 ## Creating a Release
 
@@ -18,26 +18,31 @@ Version format: `MAJOR.MINOR.PATCH[-PRERELEASE]` (semver)
    ```bash
    powershell -ExecutionPolicy Bypass -File scripts/regression.ps1
    ```
-5. **Run profiling benchmark:**
+5. **Run release readiness check:**
    ```bash
-   powershell -ExecutionPolicy Bypass -File scripts/profile.ps1
+   powershell -ExecutionPolicy Bypass -File scripts/check_release_readiness.ps1
    ```
-6. **Tag the release:**
+6. **Run cross-platform validation:**
+   ```bash
+   ctest -R test_crossplatform -V
+   ```
+7. **Tag the release:**
    ```bash
    git tag -a v$(cat VERSION) -m "Release v$(cat VERSION)"
    git push origin v$(cat VERSION)
    ```
-7. **GitHub Actions** automatically builds, packages, and uploads artifacts for all platforms.
+8. **GitHub Actions** automatically builds, packages, and uploads artifacts for all platforms.
 
 ## Pre-Release Checklist
 
-- [x] All Phases 0-3 complete
-- [x] Phase 4.1: Regression test suite automated
-- [x] Phase 4.2: Performance profiling & optimization
-- [x] Phase 4.3: Documentation & release packaging
-- [x] 20/20 profiling benchmarks PASS
+- [x] All 30 phases complete
+- [x] 23/23 build targets pass (zero errors)
+- [x] 9/9 cross-platform validation tests PASS
 - [x] 9/9 regression stages PASS
 - [x] 49/49 IR verification tests PASS
 - [x] 3/3 CTest runtime tests PASS
+- [x] Inno Setup installer builds
+- [x] GitHub Actions release workflow verified
+- [x] Install scripts for Windows/macOS/Linux
 - [x] No known critical or high-severity issues
 - [x] CI/CD pipeline verified on all 3 platforms

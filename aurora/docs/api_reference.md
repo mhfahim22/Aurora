@@ -606,3 +606,257 @@ result = predict(model, x_test)
 | `translate` | `translate(text, target_lang)` | Translation |
 | `summarize` | `summarize(text)` | Text summarization |
 | `code` | `code(prompt)` | Code generation |
+
+---
+
+## Serialization (Phase 14)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `serial_json_encode` | `serial_json_encode(val) -> string` | Encode to JSON |
+| `serial_json_decode` | `serial_json_decode(str) -> any` | Decode from JSON |
+| `serial_binary_encode` | `serial_binary_encode(val) -> bytes` | Encode to binary |
+| `serial_binary_decode` | `serial_binary_decode(data) -> any` | Decode from binary |
+| `serial_write_json` | `serial_write_json(path, val)` | Write JSON to file |
+| `serial_read_json` | `serial_read_json(path) -> any` | Read JSON from file |
+| `serial_write_binary` | `serial_write_binary(path, val)` | Write binary to file |
+| `serial_read_binary` | `serial_read_binary(path) -> any` | Read binary from file |
+| `serial_detect_format` | `serial_detect_format(path) -> int` | Auto-detect format |
+
+## Database (Phase 15)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `db_open` | `db_open(path) -> ptr` | Open SQLite connection |
+| `db_close` | `db_close(db)` | Close connection |
+| `db_exec` | `db_exec(db, sql)` | Execute SQL |
+| `db_query` | `db_query(db, sql) -> array` | Query rows |
+| `db_prepare` | `db_prepare(db, sql) -> ptr` | Prepare statement |
+| `db_bind_int` | `db_bind_int(stmt, idx, val)` | Bind int |
+| `db_bind_float` | `db_bind_float(stmt, idx, val)` | Bind float |
+| `db_bind_text` | `db_bind_text(stmt, idx, val)` | Bind text |
+| `db_bind_null` | `db_bind_null(stmt, idx)` | Bind null |
+| `db_step` | `db_step(stmt) -> int` | Step statement |
+| `db_column_count` | `db_column_count(stmt) -> int` | Column count |
+| `db_column_type` | `db_column_type(stmt, idx) -> int` | Column type |
+| `db_column_int` | `db_column_int(stmt, idx) -> int` | Column as int |
+| `db_column_float` | `db_column_float(stmt, idx) -> float` | Column as float |
+| `db_column_text` | `db_column_text(stmt, idx) -> string` | Column as text |
+| `db_finalize` | `db_finalize(stmt)` | Finalize statement |
+| `db_last_id` | `db_last_id(db) -> int` | Last insert row ID |
+| `db_changes` | `db_changes(db) -> int` | Rows changed |
+| `db_begin` | `db_begin(db)` | Begin transaction |
+| `db_commit` | `db_commit(db)` | Commit transaction |
+| `db_rollback` | `db_rollback(db)` | Rollback transaction |
+| `db_escape` | `db_escape(str) -> string` | Escape SQL string |
+| `db_error` | `db_error(db) -> string` | Last error message |
+
+## Desktop Integration (Phase 18)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `desktop_tray_init` | `desktop_tray_init(wnd, icon, tip)` | Init system tray |
+| `desktop_tray_set_icon` | `desktop_tray_set_icon(icon)` | Set tray icon |
+| `desktop_tray_set_tip` | `desktop_tray_set_tip(tip)` | Set tray tooltip |
+| `desktop_tray_add_menu` | `desktop_tray_add_menu(text, id)` | Add menu item |
+| `desktop_tray_show_balloon` | `desktop_tray_show_balloon(title, msg, icon, timeout)` | Show balloon |
+| `desktop_tray_remove` | `desktop_tray_remove()` | Remove tray |
+| `desktop_notify` | `desktop_notify(title, msg)` | Show notification |
+| `desktop_clipboard_get_text` | `desktop_clipboard_get_text() -> string` | Get clipboard |
+| `desktop_clipboard_set_text` | `desktop_clipboard_set_text(text)` | Set clipboard |
+| `desktop_dnd_enable` | `desktop_dnd_enable(wnd)` | Enable D&D |
+| `desktop_assoc_set` | `desktop_assoc_set(ext, prog_id, desc, cmd)` | File association |
+| `desktop_assoc_remove` | `desktop_assoc_remove(ext)` | Remove assoc |
+| `desktop_startup_set` | `desktop_startup_set(name, path)` | Startup app |
+| `desktop_startup_remove` | `desktop_startup_remove(name)` | Remove startup |
+| `desktop_effects_acrylic` | `desktop_effects_acrylic(wnd, color)` | Acrylic effect |
+| `desktop_effects_mica` | `desktop_effects_mica(wnd)` | Mica effect |
+| `desktop_effects_blur` | `desktop_effects_blur(wnd)` | Blur behind |
+| `desktop_effects_dark_mode` | `desktop_effects_dark_mode(wnd, enable)` | Dark title bar |
+| `desktop_effects_rounded` | `desktop_effects_rounded(wnd, enable)` | Rounded corners |
+| `desktop_hotkey_register` | `desktop_hotkey_register(id, mod, key) -> bool` | Register hotkey |
+| `desktop_hotkey_unregister` | `desktop_hotkey_unregister(id)` | Unregister hotkey |
+
+## Game Engine (Phase 19)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `light_create` | `light_create(r, g, b) -> int` | Create light |
+| `light_destroy` | `light_destroy(id)` | Destroy light |
+| `light_set_position` | `light_set_position(id, x, y, z)` | Set position |
+| `light_set_direction` | `light_set_direction(id, x, y, z)` | Set direction |
+| `light_set_color` | `light_set_color(id, r, g, b)` | Set color |
+| `light_set_intensity` | `light_set_intensity(id, intensity)` | Set intensity |
+| `light_set_range` | `light_set_range(id, range)` | Set range |
+| `light_set_spot_angle` | `light_set_spot_angle(id, angle)` | Spot angle |
+| `light_get_count` | `light_get_count() -> int` | Light count |
+| `light_get` | `light_get(index) -> string` | Get light info |
+| `tilemap_create` | `tilemap_create(rows, cols, layers) -> ptr` | Create tilemap |
+| `tilemap_destroy` | `tilemap_destroy(tm)` | Destroy tilemap |
+| `tilemap_set_tile` | `tilemap_set_tile(tm, r, c, layer, val)` | Set tile |
+| `tilemap_get_tile` | `tilemap_get_tile(tm, r, c, layer) -> int` | Get tile |
+| `tilemap_get_width` | `tilemap_get_width(tm) -> int` | Width |
+| `tilemap_get_height` | `tilemap_get_height(tm) -> int` | Height |
+| `tilemap_is_solid` | `tilemap_is_solid(tm, r, c) -> bool` | Is solid |
+| `mesh_create_plane` | `mesh_create_plane() -> ptr` | Plane mesh |
+| `mesh_create_sphere` | `mesh_create_sphere(lat, lon) -> ptr` | Sphere mesh |
+| `mesh_create_cylinder` | `mesh_create_cylinder(seg) -> ptr` | Cylinder mesh |
+| `mesh_create_capsule` | `mesh_create_capsule(seg) -> ptr` | Capsule mesh |
+| `mesh_get_vertex_count` | `mesh_get_vertex_count(m) -> int` | Vertex count |
+| `mesh_get_vertex_data` | `mesh_get_vertex_data(m) -> ptr` | Vertex data |
+| `mesh_get_index_count` | `mesh_get_index_count(m) -> int` | Index count |
+| `mesh_get_index_data` | `mesh_get_index_data(m) -> ptr` | Index data |
+| `mesh_destroy` | `mesh_destroy(m)` | Destroy mesh |
+
+## Plugin System (Phase 20)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `plugin_load` | `plugin_load(path) -> int` | Load plugin |
+| `plugin_unload` | `plugin_unload(id)` | Unload plugin |
+| `plugin_scan` | `plugin_scan(dir) -> string` | Scan directory |
+| `plugin_count` | `plugin_count() -> int` | Plugin count |
+| `plugin_name` | `plugin_name(id) -> string` | Get name |
+| `plugin_version` | `plugin_version(id) -> string` | Get version |
+| `plugin_author` | `plugin_author(id) -> string` | Get author |
+| `plugin_description` | `plugin_description(id) -> string` | Get description |
+| `plugin_call_init` | `plugin_call_init(id) -> int` | Call init |
+| `plugin_call_shutdown` | `plugin_call_shutdown(id)` | Call shutdown |
+| `plugin_abi_version` | `plugin_abi_version(id) -> int` | ABI version |
+
+## Package Manager (Phase 21)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `pkg_install` | `pkg_install(name) -> int` | Install package |
+| `pkg_remove` | `pkg_remove(name) -> int` | Remove package |
+| `pkg_update` | `pkg_update(name) -> int` | Update package |
+| `pkg_publish` | `pkg_publish(path) -> int` | Publish package |
+| `pkg_search` | `pkg_search(query) -> string` | Search packages |
+| `pkg_list_installed` | `pkg_list_installed() -> string` | List installed |
+| `pkg_set_registry` | `pkg_set_registry(url)` | Set registry |
+| `pkg_registry_url` | `pkg_registry_url() -> string` | Get registry URL |
+| `pkg_login` | `pkg_login(token) -> int` | Login |
+| `pkg_logout` | `pkg_logout()` | Logout |
+| `pkg_lock_init` | `pkg_lock_init()` | Init lock file |
+| `pkg_lock_save` | `pkg_lock_save() -> int` | Save lock |
+| `pkg_lock_load` | `pkg_lock_load() -> int` | Load lock |
+| `pkg_resolve` | `pkg_resolve(name) -> int` | Resolve dep |
+| `pkg_resolve_count` | `pkg_resolve_count() -> int` | Dep count |
+| `pkg_resolve_name` | `pkg_resolve_name(idx) -> string` | Dep name |
+| `pkg_cache_list` | `pkg_cache_list() -> string` | Cache list |
+| `pkg_cache_clear` | `pkg_cache_clear()` | Clear cache |
+
+## Hot Reload (Phase 23)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `hr_watch` | `hr_watch(path)` | Watch path |
+| `hr_unwatch` | `hr_unwatch(path)` | Stop watching |
+| `hr_on_ui_change` | `hr_on_ui_change(callback)` | UI reload cb |
+| `hr_on_code_change` | `hr_on_code_change(callback)` | Code reload cb |
+| `hr_on_asset_change` | `hr_on_asset_change(callback)` | Asset reload cb |
+| `hr_code_reload` | `hr_code_reload()` | Reload code |
+| `hr_code_version` | `hr_code_version() -> int` | Code version |
+| `hr_code_stale` | `hr_code_stale() -> bool` | Is stale |
+| `hr_asset_reload` | `hr_asset_reload(path)` | Reload asset |
+| `hr_asset_is_dirty` | `hr_asset_is_dirty(path) -> bool` | Is dirty |
+| `hr_state_set` | `hr_state_set(key, val)` | Save state |
+| `hr_state_get` | `hr_state_get(key) -> string` | Load state |
+| `hr_console_log` | `hr_console_log(msg)` | Console log |
+| `hr_console_clear` | `hr_console_clear()` | Clear console |
+| `hr_console_get` | `hr_console_get(count) -> string` | Recent logs |
+| `hr_console_exec` | `hr_console_exec(cmd) -> string` | Exec command |
+
+## Testing (Phase 24)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `test_suite` | `test_suite(name)` | Register suite |
+| `test_case` | `test_case(name)` | Register case |
+| `test_run` | `test_run(results)` | Run tests |
+| `assert_true` | `assert_true(cond)` | Assert true |
+| `assert_false` | `assert_false(cond)` | Assert false |
+| `assert_eq` | `assert_eq(a, b)` | Assert equal |
+| `assert_neq` | `assert_neq(a, b)` | Assert not equal |
+| `assert_gt` | `assert_gt(a, b)` | Assert greater |
+| `assert_lt` | `assert_lt(a, b)` | Assert less |
+| `assert_null` | `assert_null(val)` | Assert null |
+| `integration_setup` | `integration_setup(cb)` | Setup callback |
+| `integration_teardown` | `integration_teardown(cb)` | Teardown callback |
+| `integration_test` | `integration_test(name, cb)` | Integration test |
+| `widget_test` | `widget_test(name, cb)` | Widget test |
+| `widget_click` | `widget_click(x, y)` | Simulate click |
+| `bench_start` | `bench_start(suite)` | Start benchmark |
+| `bench_end` | `bench_end(suite)` | End benchmark |
+| `bench_report` | `bench_report(suite) -> string` | Report |
+| `snap_shot` | `snap_shot(name, value)` | Capture snapshot |
+| `snap_assert` | `snap_assert(name)` | Assert snapshot |
+| `coverage_start` | `coverage_start()` | Start coverage |
+| `coverage_stop` | `coverage_stop()` | Stop coverage |
+| `coverage_report` | `coverage_report() -> string` | Coverage report |
+| `test_pass_count` | `test_pass_count() -> int` | Pass count |
+| `test_fail_count` | `test_fail_count() -> int` | Fail count |
+| `test_total_count` | `test_total_count() -> int` | Total count |
+| `test_results` | `test_results() -> string` | Results summary |
+
+## Developer Tools (Phase 25)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `format_code` | `format_code(code) -> string` | Format code |
+| `format_file` | `format_file(path) -> int` | Format file |
+| `lint` | `lint(code) -> string` | Lint code |
+| `lint_file` | `lint_file(path) -> string` | Lint file |
+| `lsp_start` | `lsp_start(port) -> int` | Start LSP |
+| `lsp_stop` | `lsp_stop() -> int` | Stop LSP |
+| `complete` | `complete(code, line, col) -> string` | Completions |
+| `profiler_start` | `profiler_start() -> int` | Start profiler |
+| `profiler_stop` | `profiler_stop() -> int` | Stop profiler |
+| `profiler_report` | `profiler_report() -> string` | Profile report |
+| `inspector_tree` | `inspector_tree() -> string` | Widget tree |
+| `memory_stats` | `memory_stats() -> string` | Memory stats |
+| `memory_snapshot` | `memory_snapshot() -> string` | Memory snapshot |
+| `memory_leak_check` | `memory_leak_check() -> int` | Leak check |
+| `perf_start` | `perf_start() -> int` | Start perf monitor |
+| `perf_stop` | `perf_stop() -> int` | Stop perf monitor |
+| `perf_fps` | `perf_fps() -> float` | Get FPS |
+| `perf_frame_time` | `perf_frame_time() -> float` | Frame time |
+| `perf_report` | `perf_report() -> string` | Perf report |
+
+---
+
+## Security (Phase 27)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `sandbox_init` | `sandbox_init() -> int` | Init sandbox |
+| `sandbox_allow_path` | `sandbox_allow_path(path) -> int` | Allow path in sandbox |
+| `sandbox_check_path` | `sandbox_check_path(path) -> int` | Check if path is allowed |
+| `sandbox_destroy` | `sandbox_destroy()` | Destroy sandbox |
+| `permission_check` | `permission_check(perm) -> int` | Check permission |
+| `permission_request` | `permission_request(perm) -> int` | Request permission |
+| `permission_list` | `permission_list() -> string` | List permissions |
+| `permission_revoke` | `permission_revoke(perm) -> int` | Revoke permission |
+| `storage_open` | `storage_open(path, key, key_len) -> ptr` | Open secure store |
+| `storage_set` | `storage_set(store, key, value) -> int` | Set encrypted value |
+| `storage_get` | `storage_get(store, key) -> string` | Get decrypted value |
+| `storage_remove` | `storage_remove(store, key) -> int` | Remove key |
+| `storage_close` | `storage_close(store)` | Close store |
+| `generate_key` | `generate_key(out, len) -> int` | Generate random key |
+| `generate_iv` | `generate_iv(out, len) -> int` | Generate random IV |
+| `encrypt` | `encrypt(key, key_len, iv, input, in_len, output, out_len) -> int` | AES-CBC encrypt |
+| `decrypt` | `decrypt(key, key_len, iv, input, in_len, output, out_len) -> int` | AES-CBC decrypt |
+| `pbkdf2` | `pbkdf2(password, salt, salt_len, iter, out, out_len) -> int` | PBKDF2 key derivation |
+| `cert_load` | `cert_load(path) -> ptr` | Load certificate |
+| `cert_info` | `cert_info(cert) -> string` | Get cert info |
+| `cert_verify` | `cert_verify(cert, ca_path) -> int` | Verify cert |
+| `cert_free` | `cert_free(cert)` | Free cert |
+| `sha256` | `sha256(data, len) -> string` | SHA-256 hash (hex) |
+| `hmac_sha256` | `hmac_sha256(key, key_len, data, data_len) -> string` | HMAC-SHA256 (hex) |
+| `hash_password` | `hash_password(password) -> string` | Hash password with salt |
+| `verify_password` | `verify_password(password, hash) -> int` | Verify password |
+| `token_generate` | `token_generate(payload, secret) -> string` | Generate auth token |
+| `token_verify` | `token_verify(token, secret) -> int` | Verify auth token |
+| `basic_auth` | `basic_auth(user, pass) -> string` | Basic auth header |
+| `bearer_auth` | `bearer_auth(token) -> string` | Bearer auth header |

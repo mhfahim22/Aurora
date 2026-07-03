@@ -1591,6 +1591,8 @@ void aurora_dev_server(int64_t port, const char* src_dir) {
     printf("[dev] dev server stopped\n");
 }
 
+} /* end extern "C" (reopens before aurora_db_connect) */
+
 /* ── In-memory database engine ── */
 
 static std::mutex g_db_mutex;
@@ -1862,6 +1864,8 @@ static std::string exec_sql(const char* query) {
     printf("[db] unsupported query: %s\n", q.c_str());
     return std::string();
 }
+
+extern "C" {
 
 AuroraDB* aurora_db_connect(const char* conn_str) {
     if (!conn_str) return nullptr;

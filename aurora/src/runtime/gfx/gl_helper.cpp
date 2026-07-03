@@ -19,7 +19,9 @@ typedef unsigned int  GLenum;
 typedef int           GLint;
 typedef int           GLsizei;
 typedef char          GLchar;
+#ifndef APIENTRY
 #define APIENTRY __stdcall
+#endif
 #else
 #include <dlfcn.h>
 /* Use actual GL types from system headers if available, otherwise define our own */

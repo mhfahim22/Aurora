@@ -698,10 +698,624 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["aurora_obj_vertex_data"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
     functions_["aurora_obj_free"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
 
-    /* ── Audio helpers ── */
-    functions_["aurora_audio_init"]       = FunctionTypeInfo{{}, AuroraType::Int};
-    functions_["aurora_audio_play_file"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
-    functions_["aurora_audio_shutdown"]    = FunctionTypeInfo{{}, AuroraType::Void};
+    /* ── Phase 19: OpenGL & Game Support ── */
+
+    /* Lighting (10) */
+    functions_["aurora_light_create"]        = FunctionTypeInfo{{AuroraType::Int, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Pointer};
+    functions_["aurora_light_destroy"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_light_set_position"]  = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_light_set_direction"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_light_set_color"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_light_set_intensity"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_light_set_range"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_light_set_spot_angle"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_light_get_count"]     = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_light_get"]           = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Pointer};
+
+    /* Tilemap (10) */
+    functions_["aurora_tilemap_create"]      = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_tilemap_destroy"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_tilemap_set_tile"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_tilemap_get_tile"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_tilemap_get_width"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_tilemap_get_height"]  = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_tilemap_get_cols"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_tilemap_get_rows"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_tilemap_is_solid"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_tilemap_set_property"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String, AuroraType::String}, AuroraType::Void};
+
+    /* Mesh primitives (9) */
+    functions_["aurora_mesh_create_plane"]    = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float}, AuroraType::Pointer};
+    functions_["aurora_mesh_create_sphere"]   = FunctionTypeInfo{{AuroraType::Float, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_mesh_create_cylinder"] = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_mesh_create_capsule"]  = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_mesh_get_vertex_count"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_mesh_get_vertex_data"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_mesh_get_index_count"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_mesh_get_index_data"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_mesh_destroy"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* Game Engine (21) */
+    functions_["aurora_scene_init"]          = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_scene_shutdown"]      = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_entity_create"]       = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_entity_destroy"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_entity_set_pos"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_entity_get_pos"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_entity_set_velocity"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_entity_get_velocity"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_sprite_create"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Pointer};
+    functions_["aurora_camera_create"]       = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Pointer};
+    functions_["aurora_physics_init"]        = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_physics_step"]        = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_physics_set_gravity"] = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_collision_check"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_engine_frame_start"]  = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_engine_frame_end"]    = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_engine_render"]       = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_engine_is_key_down"]  = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_engine_delta_time"]   = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_engine_poll_input"]   = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_animation_play"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+
+    /* Animation (43 easing + tween + seq + ctrl + kf) */
+    functions_["aurora_anim_ease_linear"]      = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_quad"]     = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_out_quad"]    = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_out_quad"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_cubic"]    = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_out_cubic"]   = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_out_cubic"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_quart"]    = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_out_quart"]   = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_out_quart"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_elastic"]  = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_out_elastic"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_out_elastic"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_bounce"]   = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_out_bounce"]  = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_out_bounce"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_back"]     = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_out_back"]    = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_in_out_back"] = FunctionTypeInfo{{AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_ease_apply"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_tween_new"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Pointer};
+    functions_["aurora_anim_tween_on_update"]  = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_tween_on_done"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_tween_update"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_anim_tween_is_done"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_anim_tween_value"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_anim_tween_free"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_seq_new"]          = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_anim_seq_add"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_seq_on_update"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_seq_on_done"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_seq_update"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_anim_seq_is_done"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_anim_seq_free"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_ctrl_new"]         = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_anim_ctrl_add"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_ctrl_update"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_anim_ctrl_is_done"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_anim_ctrl_free"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_anim_kf_new"]           = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_anim_kf_set_key"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_anim_kf_evaluate"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Float};
+    functions_["aurora_anim_kf_free"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_animation_create"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int, AuroraType::Float}, AuroraType::Pointer};
+    functions_["aurora_animation_update"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+
+    /* GL shader helpers (15) */
+    functions_["aurora_gl_shader_source"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_gl_compile_shader"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_gl_create_shader"]     = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_gl_create_program"]    = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_gl_attach_shader"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_gl_link_program"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_gl_use_program"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_gl_delete_shader"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_gl_delete_program"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_gl_get_shader_iv"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_gl_get_program_iv"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_gl_get_shader_info_log"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::String};
+    functions_["aurora_gl_get_program_info_log"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::String};
+    functions_["aurora_gl_compile_program"]   = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Pointer};
+    functions_["aurora_gl_free_string"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* Sprite2D (9) */
+    functions_["aurora_sprite2d_init"]         = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_sprite2d_set_viewport"] = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_sprite2d_load_texture"] = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sprite2d_create_texture"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_sprite2d_draw"]         = FunctionTypeInfo{{AuroraType::Int, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_sprite2d_flush"]        = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_sprite2d_clear"]        = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_sprite2d_delete_texture"] = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_sprite2d_shutdown"]     = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* ── Phase 20: Plugin System ── */
+
+    /* Plugin Management (7) */
+    functions_["aurora_plugin_load"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_plugin_unload"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_plugin_unload_all"]  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_plugin_get_count"]   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_plugin_get_name"]    = FunctionTypeInfo{{AuroraType::Int}, AuroraType::String};
+    functions_["aurora_plugin_is_loaded"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_plugin_scan"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* Plugin Metadata (3) */
+    functions_["aurora_plugin_get_info"]    = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::String};
+    functions_["aurora_plugin_get_abi"]     = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_plugin_get_function"] = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Pointer};
+
+    /* Reflection Query (8) */
+    functions_["aurora_reflection_get_type_count"]     = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_reflection_get_type_name"]      = FunctionTypeInfo{{AuroraType::Int}, AuroraType::String};
+    functions_["aurora_reflection_get_field_count"]     = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_reflection_get_field_info"]     = FunctionTypeInfo{{AuroraType::String, AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_reflection_get_method_count"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_reflection_get_method_info"]    = FunctionTypeInfo{{AuroraType::String, AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_reflection_get_method_pointer"] = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Pointer};
+
+    /* Version (2) */
+    functions_["aurora_version_abi"]        = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_version_string"]     = FunctionTypeInfo{{}, AuroraType::String};
+
+    /* ── Phase 21: Package Manager ── */
+
+    /* Package Management (6) */
+    functions_["aurora_pkg_install"]        = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_pkg_remove"]         = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_pkg_update"]         = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_pkg_publish"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_pkg_search"]         = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_pkg_list_installed"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+
+    /* Registry (2) */
+    functions_["aurora_pkg_set_registry"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Void};
+    functions_["aurora_pkg_get_registry"]   = FunctionTypeInfo{{}, AuroraType::String};
+
+    /* Authentication (1) */
+    functions_["aurora_pkg_login"]          = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* Lock File (3) */
+    functions_["aurora_pkg_lock_init"]      = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_pkg_lock_save"]      = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_pkg_lock_load"]      = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* Dependency Resolution (3) */
+    functions_["aurora_pkg_dep_resolve"]    = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_pkg_dep_get_count"]  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_pkg_dep_get_name"]   = FunctionTypeInfo{{AuroraType::Int}, AuroraType::String};
+
+    /* Offline Cache (3) */
+    functions_["aurora_pkg_cache_list"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_pkg_cache_clear"]    = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_pkg_cache_path"]     = FunctionTypeInfo{{}, AuroraType::String};
+
+    /* ── Phase 23: Hot Reload (22) ── */
+
+    /* File Watching (4) */
+    functions_["aurora_hotreload_watch"]            = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_hotreload_unwatch"]           = FunctionTypeInfo{{AuroraType::String}, AuroraType::Void};
+    functions_["aurora_hotreload_poll"]              = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_hotreload_clear"]             = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* UI Reload (4) */
+    functions_["aurora_hotreload_ui_set_rebuild_fn"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_hotreload_ui_rebuild"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Void};
+    functions_["aurora_hotreload_ui_preserve_state"] = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_hotreload_ui_get_state"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+
+    /* Code Reload (4) */
+    functions_["aurora_hotreload_code_reload"]       = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_hotreload_code_is_stale"]     = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_hotreload_code_set_reload_fn"]= FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_hotreload_code_get_version"]  = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+
+    /* Asset Reload (3) */
+    functions_["aurora_hotreload_asset_reload"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::Void};
+    functions_["aurora_hotreload_asset_set_reload_fn"]= FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_hotreload_asset_is_dirty"]    = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* State Preservation (3) */
+    functions_["aurora_hotreload_state_save"]        = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_hotreload_state_load"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_hotreload_state_clear"]       = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* Developer Console (4) */
+    functions_["aurora_hotreload_console_open"]      = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_hotreload_console_close"]     = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_hotreload_console_log"]       = FunctionTypeInfo{{AuroraType::String}, AuroraType::Void};
+    functions_["aurora_hotreload_console_exec"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+
+    /* ── Phase 24: Testing Framework (30) ── */
+
+    /* Test Registration (3) */
+    functions_["aurora_test_describe"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_test_it"]            = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_test_run"]           = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* Assertions (7) */
+    functions_["aurora_test_assert"]        = FunctionTypeInfo{{AuroraType::Int, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_test_assert_eq_int"] = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_test_assert_eq_float"] = FunctionTypeInfo{{AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_test_assert_eq_str"] = FunctionTypeInfo{{AuroraType::String, AuroraType::String, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_test_assert_true"]   = FunctionTypeInfo{{AuroraType::Int, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_test_assert_false"]  = FunctionTypeInfo{{AuroraType::Int, AuroraType::String}, AuroraType::Void};
+    functions_["aurora_test_assert_null"]   = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Void};
+
+    /* Integration Tests (3) */
+    functions_["aurora_test_setup"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_test_teardown"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_test_integration"]   = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer}, AuroraType::Int};
+
+    /* Widget Tests (3) */
+    functions_["aurora_test_widget"]        = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_test_find_widget"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Pointer};
+    functions_["aurora_test_click"]         = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* Benchmark Tests (4) */
+    functions_["aurora_test_bench"]         = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_test_bench_start"]   = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_test_bench_end"]     = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_test_bench_result"]  = FunctionTypeInfo{{}, AuroraType::Float};
+
+    /* Snapshot Tests (3) */
+    functions_["aurora_test_snapshot"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_test_snapshot_update"] = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_test_snapshot_delete"] = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* Coverage (3) */
+    functions_["aurora_test_coverage_start"] = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_test_coverage_stop"] = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_test_coverage_report"] = FunctionTypeInfo{{}, AuroraType::String};
+
+    /* Results (4) */
+    functions_["aurora_test_pass_count"]    = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_test_fail_count"]    = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_test_total_count"]   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_test_results"]       = FunctionTypeInfo{{}, AuroraType::String};
+
+    /* ── Phase 25: Developer Tools (34) ── */
+
+    /* Formatting (4) */
+    functions_["aurora_dev_format"]             = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_dev_format_file"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_dev_format_set_tab_size"] = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_dev_format_set_spaces"]  = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+
+    /* Linting (3) */
+    functions_["aurora_dev_lint"]               = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_dev_lint_file"]          = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_dev_lint_set_rule"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::Int}, AuroraType::Int};
+
+    /* LSP (4) */
+    functions_["aurora_dev_lsp_start"]          = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_dev_lsp_stop"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_lsp_is_running"]     = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_lsp_set_root"]       = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* Completions (3) */
+    functions_["aurora_dev_complete"]           = FunctionTypeInfo{{AuroraType::String, AuroraType::Int, AuroraType::Int}, AuroraType::String};
+    functions_["aurora_dev_complete_file"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::Int, AuroraType::Int}, AuroraType::String};
+    functions_["aurora_dev_complete_detail"]    = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+
+    /* Debugger (4) */
+    functions_["aurora_dev_debug_attach"]       = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_dev_debug_break"]        = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_debug_continue"]     = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_debug_step_over"]    = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* Profiler (4) */
+    functions_["aurora_dev_profiler_start"]     = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_profiler_stop"]      = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_profiler_report"]    = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_dev_profiler_reset"]     = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* Inspector (3) */
+    functions_["aurora_dev_inspector_tree"]     = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_dev_inspector_select"]   = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::String};
+    functions_["aurora_dev_inspector_refresh"]  = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* Memory Viewer (3) */
+    functions_["aurora_dev_memory_stats"]       = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_dev_memory_snapshot"]    = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_dev_memory_leak_check"]  = FunctionTypeInfo{{}, AuroraType::Int};
+
+    /* Performance Monitor (5) */
+    functions_["aurora_dev_perf_start"]         = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_perf_stop"]          = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_dev_perf_fps"]           = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_dev_perf_frame_time"]    = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_dev_perf_report"]        = FunctionTypeInfo{{}, AuroraType::String};
+
+    /* ── Phase 27: Security Module (30) ── */
+
+    /* Sandbox (4) */
+    functions_["aurora_sec_sandbox_init"]       = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_sec_sandbox_allow_path"] = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_sandbox_check_path"] = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_sandbox_destroy"]    = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* Permission Model (4) */
+    functions_["aurora_sec_permission_check"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_permission_request"] = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_permission_list"]    = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_sec_permission_revoke"]  = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* Secure Storage (5) */
+    functions_["aurora_sec_storage_open"]       = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_sec_storage_set"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_storage_get"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::String};
+    functions_["aurora_sec_storage_remove"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_storage_close"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* Encryption (5) */
+    functions_["aurora_sec_generate_key"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_sec_generate_iv"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_sec_encrypt"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_sec_decrypt"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_sec_pbkdf2"]             = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Int, AuroraType::Int, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+
+    /* Certificates (4) */
+    functions_["aurora_sec_cert_load"]          = FunctionTypeInfo{{AuroraType::String}, AuroraType::Pointer};
+    functions_["aurora_sec_cert_info"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::String};
+    functions_["aurora_sec_cert_verify"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_cert_free"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* Hashing (4) */
+    functions_["aurora_sec_sha256"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::String};
+    functions_["aurora_sec_hmac_sha256"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Int}, AuroraType::String};
+    functions_["aurora_sec_hash_password"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_sec_verify_password"]    = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+
+    /* Authentication (4) */
+    functions_["aurora_sec_token_generate"]     = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::String};
+    functions_["aurora_sec_token_verify"]       = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_sec_basic_auth"]         = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::String};
+    functions_["aurora_sec_bearer_auth"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_audio_src_new"]      = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_audio_src_load_file"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_audio_src_load_mem"]  = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_audio_src_play"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_src_stop"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_src_pause"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_src_resume"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_src_is_playing"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_audio_src_free"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_src_set_volume"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_get_volume"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_audio_src_set_pitch"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_get_pitch"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_audio_src_set_looping"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_audio_src_get_looping"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_audio_src_set_time"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_get_time"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_audio_src_get_duration"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_audio_src_set_reverb"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_set_echo"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_set_lowpass"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_set_highpass"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_audio_src_clear_effects"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_rec_new"]      = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_audio_rec_start"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_rec_read"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_audio_rec_stop"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_rec_free"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    /* ── Legacy compat ── */
+    functions_["aurora_audio_play_file"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_audio_play"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_audio_play_tone"]    = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_audio_stop_all"]     = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* ── Phase 12: Video helpers ── */
+    functions_["aurora_video_init"]                    = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_video_shutdown"]                 = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_video_player_new"]               = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_video_player_open"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_play"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_video_player_pause"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_video_player_resume"]           = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_video_player_stop"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_video_player_is_playing"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_has_ended"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_free"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_video_player_set_time"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_video_player_get_time"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_video_player_get_duration"]     = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_video_player_get_width"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_get_height"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_get_fps"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_video_player_set_volume"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_video_player_get_volume"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["aurora_video_player_set_looping"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_video_player_get_looping"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_subtitle_load"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_video_player_subtitle_get_text"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_video_player_read_frame"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_video_player_decode"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+
+    /* ── Phase 13: Networking helpers ── */
+    functions_["aurora_net_http_get"]              = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_post"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_put"]              = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_delete"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_patch"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_head"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_get_ex"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_post_ex"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_http_status"]           = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_net_url_encode"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_url_decode"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_dns_lookup"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_tcp_connect"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_tcp_send"]              = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_tcp_recv"]              = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_tcp_close"]             = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_net_udp_socket"]            = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_net_udp_sendto"]            = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_udp_recvfrom"]          = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_net_udp_close"]             = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_net_ws_connect"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_ws_send"]               = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_net_ws_recv"]               = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_net_ws_close"]              = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_net_multipart_begin"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_net_multipart_add_field"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_net_multipart_add_file"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_net_multipart_end"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_net_download"]               = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_net_auth_basic"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_net_auth_bearer"]            = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_net_resolve_host"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_send_all"]                   = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+
+    /* ── Phase 14: Serialization helpers ── */
+    functions_["aurora_serialize_json"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_deserialize_json"]           = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_serialize_binary"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_deserialize_binary"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_serialize"]                  = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_deserialize"]                = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_serialize_to_file"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_deserialize_from_file"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_serial_detect_format"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+
+    /* ── Phase 15: Database / SQLite ── */
+    functions_["aurora_db_sqlite_open"]              = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_close"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_db_sqlite_exec"]              = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_query_json"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_execute"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_prepare"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_bind_int"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_db_sqlite_bind_double"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Float}, AuroraType::Void};
+    functions_["aurora_db_sqlite_bind_text"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_db_sqlite_bind_null"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_db_sqlite_step"]              = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_column_count"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_column_name"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_column_type"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_db_sqlite_column_text"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_column_int"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_db_sqlite_column_double"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Float};
+    functions_["aurora_db_sqlite_reset"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_db_sqlite_finalize"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_db_sqlite_begin"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_commit"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_rollback"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_last_insert_rowid"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_changes"]           = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_errcode"]           = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_db_sqlite_errmsg"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_db_sqlite_prep_query_json"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+
+    /* ── Phase 18: Desktop Integration ── */
+    functions_["aurora_desktop_init"]                = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_desktop_shutdown"]             = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_desktop_tray_create"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_desktop_tray_destroy"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_tray_set_tooltip"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_tray_set_icon"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_tray_add_menu_item"]   = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_tray_add_menu_separator"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_tray_show_balloon"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_desktop_tray_set_callback"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_tray_set_visible"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_desktop_notification_show"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_notification_hide"]    = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_desktop_clipboard_set_text"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_clipboard_get_text"]   = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_desktop_drop_target_create"]   = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_desktop_drop_target_destroy"]  = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_desktop_assoc_register"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_assoc_unregister"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_assoc_is_registered"]  = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_startup_set"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_desktop_startup_is_enabled"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_window_set_effect"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_desktop_window_set_dark_mode"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_desktop_window_set_round_corners"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_desktop_hotkey_register"]      = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Int, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_desktop_hotkey_unregister"]    = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+
+    /* ── Phase 17: Mobile Widgets ── */
+    functions_["mw_init"]              = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["mw_shutdown"]          = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["mw_create"]            = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Pointer};
+    functions_["mw_destroy"]           = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_add_child"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_remove_child"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_set_pos"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_size"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_get_width"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["mw_get_height"]        = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Float};
+    functions_["mw_layout"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_set_align"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_set_spacing"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_padding"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_margin"]        = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_bg_color"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_text_color"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_font_size"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_text"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_get_text"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["mw_set_enabled"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_set_visible"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_set_image"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_set_value"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_set_selected"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_get_type"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["mw_add_item"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_remove_item"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_clear_items"]       = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_set_callback"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_handle_touch"]      = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Int}, AuroraType::Int};
+    functions_["mw_set_scroll_pos"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_get_scroll_pos"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_render"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* ── Phase 16: Mobile Runtime ── */
+
+    /* Android */
+    functions_["aurora_android_screen_width"]          = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_android_screen_height"]         = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_android_orientation"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_android_set_orientation"]       = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_android_touch_count"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_android_touch_get"]             = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_android_touch_clear"]           = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_android_key_pressed"]           = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_android_ime_text"]              = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_android_sensors_enable"]        = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_android_sensors_disable"]       = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_android_sensor_data"]           = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_android_check_permission"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_android_toast"]                 = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_android_device_model"]          = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_android_device_manufacturer"]   = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_android_os_version"]            = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_android_density"]               = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_android_dp_to_px"]              = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_android_px_to_dp"]              = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+
+    /* iOS */
+    functions_["aurora_ios_screen_width"]              = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_ios_screen_height"]             = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_ios_screen_scale"]              = FunctionTypeInfo{{}, AuroraType::Float};
+    functions_["aurora_ios_orientation"]               = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_ios_set_orientation"]           = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_ios_touch_count"]               = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_ios_touch_get"]                 = FunctionTypeInfo{{AuroraType::Int, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_ios_path_for_resource"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["aurora_ios_documents_path"]            = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_ios_cache_path"]                = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_ios_device_model"]              = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_ios_os_version"]                = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_ios_is_ipad"]                   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_ios_haptic"]                    = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
 
     while (node) {
         if (node->type == NodeType::Function || node->type == NodeType::PerformanceFn) {

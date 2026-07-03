@@ -67,8 +67,8 @@ std::vector<SemanticToken> LspServer::get_semantic_tokens(DocumentState& doc) {
             st.tokenModifiers = 0;
 
             /* Determine token type based on token kind and AST info */
-            switch (t.type) {
-                case TokenType::Keyword: {
+            switch (t.kind) {
+                case TokenKind::Keyword: {
                     st.tokenType = ST_Keyword;
                     std::string kw = t.value;
 
@@ -95,7 +95,7 @@ std::vector<SemanticToken> LspServer::get_semantic_tokens(DocumentState& doc) {
 
                     break;
                 }
-                case TokenType::Identifier: {
+                case TokenKind::Identifier: {
                     st.tokenType = ST_Variable;
 
                     /* Check if known function/class from AST */
@@ -123,17 +123,17 @@ std::vector<SemanticToken> LspServer::get_semantic_tokens(DocumentState& doc) {
                     /* Don't reset modifiers — merge them; currently no identifier-specific modifiers set */
                     break;
                 }
-                case TokenType::Number:
-                case TokenType::Float:
+                case TokenKind::Number:
+                case TokenKind::Float:
                     st.tokenType = ST_Number;
                     break;
-                case TokenType::String:
+                case TokenKind::String:
                     st.tokenType = ST_String;
                     break;
-                case TokenType::Operator:
+                case TokenKind::Operator:
                     st.tokenType = ST_Operator;
                     break;
-                case TokenType::Attribute:
+                case TokenKind::Attribute:
                     st.tokenType = ST_Decorator;
                     break;
                 default:

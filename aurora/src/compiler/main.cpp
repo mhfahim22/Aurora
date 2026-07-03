@@ -9,6 +9,7 @@
 #include "compiler/codegen.hpp"
 #include "compiler/aurora_optimizer.hpp"
 #include "compiler/package_and_doc.hpp"
+#include "compiler/build_system.hpp"
 #include "compiler/ir/ast_to_ir.hpp"
 #include "compiler/ir/ir_lowering.hpp"
 #include "compiler/ir/ir_optimizer.hpp"
@@ -29,6 +30,10 @@
 #include <llvm/Transforms/Scalar/IndVarSimplify.h>
 #include <llvm/Transforms/Scalar/LoopUnrollPass.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar/MemCpyOptimizer.h>
+#include <llvm/Transforms/Scalar/SCCP.h>
+#include <llvm/Transforms/Scalar/InferAddressSpaces.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 
 #include <fstream>
@@ -182,6 +187,8 @@ static void print_usage() {
     std::cerr << "  --debug, -g     Emit DWARF debug info for debugging\n";
     std::cerr << "  --verbose, -v   Show verbose stage/trace output for debugging\n";
     std::cerr << "  --timing        Show per-stage compilation timings\n";
+    std::cerr << "  --jobs <N>      Parallel compilation threads (default: 1)\n";
+    std::cerr << "  --target <triple> Cross-compilation target triple\n";
 }
 
 /* ── Safe process execution helper (no shell) ── */
@@ -677,9 +684,10 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
             resolving.push_back(norm_path);
             if (collected_files) collected_files->push_back(norm_path);
 
-            /* TODO: support namespace/module scoping for imports —
-               e.g., import com.example.foo should resolve within a
-               module com.example { ... } scope, not the global scope. */
+            /* NOTE: namespace/module scoping for imports (e.g.,
+               import com.example.foo resolving within
+               module com.example { ... }) is not yet implemented;
+               all imports resolve in the global scope for now. */
             std::string src = read_file(found);
             Lexer lexer;
             auto lines = lexer.lex(src);
@@ -743,11 +751,14 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
 
 /* ── Emit object file using LLVM TargetMachine ── */
 static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
-                             bool fast_math = false, bool use_lto = false) {
+                             bool fast_math = false, bool use_lto = false,
+                             const std::string& cross_target = "") {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
 
-    std::string target_triple = llvm::sys::getProcessTriple();
+    std::string target_triple = cross_target.empty()
+        ? llvm::sys::getProcessTriple()
+        : cross_target;
     module->setTargetTriple(target_triple);
 
     std::string error;
@@ -1301,6 +1312,8 @@ int main(int argc, char** argv) {
     bool enable_coverage = false;  /* --coverage: enable code coverage tracing */
     bool enable_debug = false;     /* --debug / -g: enable DWARF debug info */
     bool incremental = false;      /* --incremental: skip compilation if unchanged */
+    int jobs = 1;                  /* --jobs N: parallel compilation threads */
+    std::string target_triple;     /* --target triple: cross-compilation target */
 
 /* ── Compute hash of all compiler flags that affect output ── */
 auto compute_flags_hash = [&]() -> std::string {
@@ -1316,7 +1329,9 @@ auto compute_flags_hash = [&]() -> std::string {
        << ",optimized_codegen=" << use_optimized_codegen
        << ",emit_ir=" << emit_ir
        << ",emit_obj=" << emit_obj
-       << ",run_jit=" << run_jit;
+       << ",run_jit=" << run_jit
+       << ",target=" << target_triple
+       << ",jobs=" << jobs;
     return BuildCache::sha256_hex(ss.str());
 };
 
@@ -1381,7 +1396,7 @@ auto get_output_path = [&]() -> std::string {
         if (arg[0] == '-') {
             doc_state = 0;
             /* Skip next arg for flags that take a value */
-            if ((arg == "-o" || arg == "-l" || arg == "-L") && i + 1 < argc) i++;
+            if ((arg == "-o" || arg == "-l" || arg == "-L" || arg == "--jobs" || arg == "--target") && i + 1 < argc) i++;
             continue;
         }
         source_path = arg;
@@ -1423,6 +1438,12 @@ auto get_output_path = [&]() -> std::string {
         else if (arg == "--verbose" || arg == "-v") verbose = true;
         else if (arg == "--timing")   show_timing = true;
         else if (arg == "--run")      run_jit = true;
+        else if (arg == "--jobs" && i + 1 < argc) {
+            jobs = std::max(1, atoi(argv[++i]));
+        }
+        else if (arg == "--target" && i + 1 < argc) {
+            target_triple = argv[++i];
+        }
         else if (arg == "--repl") {} /* already handled */
         else if (arg == "--doc") {} /* already handled */
         else if (arg == "--package") {} /* already handled */
@@ -1590,6 +1611,35 @@ auto get_output_path = [&]() -> std::string {
     if (source_path.empty() && !repl_mode) {
         std::cerr << "Usage: aurorac <source.aura> [options]\n";
         return 1;
+    }
+
+    /* ── Parallel build dispatch ── */
+    if (jobs > 1) {
+        BuildConfig bcfg;
+        bcfg.jobs = jobs;
+        bcfg.target_triple = target_triple;
+        bcfg.output_path = output_path;
+        bcfg.link_libs = link_libs;
+        bcfg.lib_paths = lib_paths;
+        bcfg.emit_obj = emit_obj;
+        bcfg.emit_ir = emit_ir;
+        bcfg.run_jit = run_jit;
+        bcfg.use_lto = use_lto;
+        bcfg.enable_debug = enable_debug;
+        bcfg.enable_coverage = enable_coverage;
+        bcfg.incremental = incremental;
+        bcfg.fast_math = fast_math;
+        bcfg.verbose = verbose;
+        bcfg.use_aurora_ir = use_aurora_ir;
+        bcfg.use_optimized_codegen = use_optimized_codegen;
+        bcfg.opt_level = opt_level;
+        bcfg.opt_size = opt_size;
+        bcfg.opt_size_aggressive = opt_size_aggressive;
+        bcfg.exe_dir = exe_dir;
+        bcfg.source_path = source_path;
+
+        std::vector<std::string> files = { source_path };
+        return build_parallel(files, bcfg);
     }
 
     /* ── Pre-check: cache lookup before lex/parse ──
@@ -1827,7 +1877,9 @@ auto get_output_path = [&]() -> std::string {
             }
 #endif
             if (verbose) std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
-            module->setTargetTriple(llvm::sys::getProcessTriple());
+            module->setTargetTriple(target_triple.empty()
+                ? llvm::sys::getProcessTriple()
+                : target_triple);
             if (verbose) std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;
 
             if (verbose) std::cerr << "STAGE6: creating managers\n" << std::flush;
@@ -1856,17 +1908,24 @@ auto get_output_path = [&]() -> std::string {
             if (verbose) std::cerr << "STAGE6: opt_level=" << opt_level << " ol_type=" << (opt_level == 0 ? "O0" : "O1+") << "\n" << std::flush;
             if (opt_level > 0) {
                 if (verbose) std::cerr << "STAGE6: building pipeline\n" << std::flush;
-                llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(ol);
-                MPM.run(*module, MAM);
 
-                /* Post-optimization cleanup passes */
+                /* Phase 28: ThinLTO pipeline when LTO is enabled */
+                if (use_lto) {
+                    llvm::ModulePassManager MPM = PB.buildThinLTODefaultPipeline(ol, {});
+                    MPM.run(*module, MAM);
+                } else {
+                    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(ol);
+                    MPM.run(*module, MAM);
+                }
+
+                /* Post-optimization cleanup passes with Phase 28 additions */
                 {
-                    llvm::LoopPassManager LPM;
-                    LPM.addPass(llvm::IndVarSimplifyPass());
-
                     llvm::FunctionPassManager FPM;
-                    FPM.addPass(llvm::createFunctionToLoopPassAdaptor(std::move(LPM)));
                     FPM.addPass(llvm::SimplifyCFGPass());
+                    FPM.addPass(llvm::GVNPass());
+                    FPM.addPass(llvm::MemCpyOptPass());
+                    FPM.addPass(llvm::SCCPPass());
+                    FPM.addPass(llvm::InferAddressSpacesPass());
 
                     llvm::ModulePassManager MPM2;
                     MPM2.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
@@ -1907,7 +1966,7 @@ auto get_output_path = [&]() -> std::string {
                 exe_path = obj_path;
                 obj_path = obj_path.substr(0, obj_path.size() - 4) + ".obj";
             }
-            if (emit_object_file(module.get(), obj_path, fast_math, use_lto)) {
+            if (emit_object_file(module.get(), obj_path, fast_math, use_lto, target_triple)) {
                 std::cout << "aurora: object written to " << obj_path << "\n";
                 compile_success = true;
             } else {

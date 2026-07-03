@@ -283,10 +283,18 @@ double lr_scheduler_step(int64_t model_ptr) {
 /* ════════════════════════════════════════════════════════════
    4. Regularization
    ════════════════════════════════════════════════════════════ */
+#ifndef REG_NONE
 #define REG_NONE 0
+#endif
+#ifndef REG_L1
 #define REG_L1   1
+#endif
+#ifndef REG_L2
 #define REG_L2   2
+#endif
+#ifndef REG_ELASTIC
 #define REG_ELASTIC 3
+#endif
 
 static struct { int type; double lambda; double lambda2; } g_reg = { REG_NONE, 0.0, 0.0 };
 

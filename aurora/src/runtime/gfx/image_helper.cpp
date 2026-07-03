@@ -11,7 +11,9 @@ typedef unsigned int  GLenum;
 typedef int           GLint;
 typedef int           GLsizei;
 typedef char          GLchar;
+#ifndef APIENTRY
 #define APIENTRY __stdcall
+#endif
 #else
 #include <dlfcn.h>
 #if defined(__APPLE__)

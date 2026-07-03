@@ -572,6 +572,51 @@ void aurora_memory_set_diagnostics(int enabled) {
 
 } /* extern "C" diagnostics */
 
+/* ═══════════════════════════════════════════════════════════════
+   Phase 28 — Pool Allocator (small object cache)
+   Per-bucket free lists for sizes 8/16/32/64/128 bytes.
+   ═══════════════════════════════════════════════════════════════ */
+
+struct PoolBlock { PoolBlock* next; };
+struct PoolBucket { PoolBlock* free_list{nullptr}; };
+
+static thread_local PoolBucket tls_pool[POOL_BUCKET_COUNT];
+static const size_t POOL_BUCKET_SIZES[POOL_BUCKET_COUNT] = { 8, 16, 32, 64, 128 };
+
+static int pool_bucket_index(size_t size) {
+    if (size <= 8)   return 0;
+    if (size <= 16)  return 1;
+    if (size <= 32)  return 2;
+    if (size <= 64)  return 3;
+    if (size <= 128) return 4;
+    return -1;
+}
+
+void* aurora_pool_alloc(size_t size) {
+    int idx = pool_bucket_index(size);
+    if (idx < 0) return malloc(size);
+    PoolBlock* block = tls_pool[idx].free_list;
+    if (block) { tls_pool[idx].free_list = block->next; return block; }
+    return malloc(POOL_BUCKET_SIZES[idx]);
+}
+
+void aurora_pool_free(void* ptr, size_t size) {
+    if (!ptr) return;
+    int idx = pool_bucket_index(size);
+    if (idx < 0) { free(ptr); return; }
+    auto* block = static_cast<PoolBlock*>(ptr);
+    block->next = tls_pool[idx].free_list;
+    tls_pool[idx].free_list = block;
+}
+
+void aurora_pool_cleanup(void) {
+    for (int i = 0; i < POOL_BUCKET_COUNT; i++) {
+        PoolBlock* b = tls_pool[i].free_list;
+        while (b) { PoolBlock* n = b->next; free(b); b = n; }
+        tls_pool[i].free_list = nullptr;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Heap Allocator (aurora_alloc / aurora_free)
 // ═══════════════════════════════════════════════════════════════
@@ -579,7 +624,13 @@ void aurora_memory_set_diagnostics(int enabled) {
 extern "C" {
 
 void* aurora_alloc(size_t size) {
-    void* ptr = malloc(size);
+    void* ptr;
+    int idx = pool_bucket_index(size);
+    if (idx >= 0) {
+        ptr = aurora_pool_alloc(size);
+    } else {
+        ptr = malloc(size);
+    }
     if (!ptr && size) {
         aurora_panic("out of memory");
     }
@@ -588,6 +639,7 @@ void* aurora_alloc(size_t size) {
 }
 
 void aurora_free(void* ptr) {
+    if (!ptr) return;
     aurora_leak_untrack(ptr);
     update_stats_free();
     free(ptr);
@@ -794,15 +846,19 @@ static void gc_collect_impl(void) {
     gc_collected.fetch_add(freed, std::memory_order_relaxed);
 }
 
-/* POD lock for GC (no destructor issues) */
+/* Phase 28: SRWLock with shared read mode for GC */
 #ifdef _WIN32
 static SRWLOCK gc_lock = SRWLOCK_INIT;
-#define LOCK_GC() AcquireSRWLockExclusive(&gc_lock)
-#define UNLOCK_GC() ReleaseSRWLockExclusive(&gc_lock)
+#define LOCK_GC()      AcquireSRWLockExclusive(&gc_lock)
+#define UNLOCK_GC()    ReleaseSRWLockExclusive(&gc_lock)
+#define LOCK_GC_READ()  AcquireSRWLockShared(&gc_lock)
+#define UNLOCK_GC_READ() ReleaseSRWLockShared(&gc_lock)
 #else
-static pthread_mutex_t gc_lock = PTHREAD_MUTEX_INITIALIZER;
-#define LOCK_GC() pthread_mutex_lock(&gc_lock)
-#define UNLOCK_GC() pthread_mutex_unlock(&gc_lock)
+static pthread_rwlock_t gc_lock = PTHREAD_RWLOCK_INITIALIZER;
+#define LOCK_GC()      pthread_rwlock_wrlock(&gc_lock)
+#define UNLOCK_GC()    pthread_rwlock_unlock(&gc_lock)
+#define LOCK_GC_READ()  pthread_rwlock_rdlock(&gc_lock)
+#define UNLOCK_GC_READ() pthread_rwlock_unlock(&gc_lock)
 #endif
 
 extern "C" {
@@ -955,9 +1011,7 @@ void aurora_throw(int64_t val, int64_t /*has*/) {
 
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Phase 3: GC / Arena Coordination
-   ═══════════════════════════════════════════════════════════════ */
+/* ── Phase 3: GC / Arena Coordination ── */
 
 /* GC root set for arena-scanned objects */
 /* POD lock (no destructor) to avoid static destruction order issues */

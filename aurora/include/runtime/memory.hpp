@@ -37,6 +37,24 @@ struct SharedBox {
     void*                data;
     void               (*destructor)(void*);
 };
+
+/* Phase 28 — Pool Allocator (small object cache) */
+
+/* Pool buckets for common sizes: 8, 16, 32, 64, 128 bytes */
+#define POOL_BUCKET_COUNT 5
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void* aurora_pool_alloc(size_t size);
+void  aurora_pool_free(void* ptr, size_t size);
+void  aurora_pool_cleanup(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

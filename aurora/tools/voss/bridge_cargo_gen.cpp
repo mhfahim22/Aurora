@@ -680,7 +680,7 @@ void gen_cargo_manual_scaffold(const std::string& pkg, const std::string& ver,
         rs << "    let age: i32 = serde_json::from_value(args.get(1).ok_or(\"arg1 missing\")?.clone())\n";
         rs << "        .map_err(|e| e.to_string())?;\n";
 
-        rs << "    // TODO: call " << pkg << "::some_function(name, age);\n";
+        rs << "    // NOTE: replace with actual call to " << pkg << "::some_function(name, age);\n";
         rs << "    // For now, return a placeholder:\n";
         rs << "    Ok(serde_json::json!({\"id\": 1, \"name\": name, \"age\": age}))\n";
         rs << "}\n\n";
@@ -694,7 +694,7 @@ void gen_cargo_manual_scaffold(const std::string& pkg, const std::string& ver,
         rs << "    let vargs = if args.is_null() { Vec::new() } else { unsafe { retrieve(args) }.as_array().cloned().unwrap_or_default() };\n";
         rs << "    let result: Result<serde_json::Value, String> = match fname {\n";
         rs << "        \"add_user\" => " << pkg << "_add_user(vargs),\n";
-        rs << "        // TODO: add more function name -> handler mappings\n";
+        rs << "        // NOTE: add more function name -> handler mappings as needed\n";
         rs << "        _ => Err(format!(\"unknown function: {}\", fname)),\n";
         rs << "    };\n";
         rs << "    match result {\n";

@@ -15,6 +15,8 @@
 #include <sys/mman.h>
 #endif
 
+#include "common/platform.hpp"
+
 #ifdef _WIN32
 #define AURORA_DL_PREFIX "lib"
 #define AURORA_DL_SUFFIX ".dll"
@@ -749,11 +751,7 @@ static void py_lock_init(void) {}
 
 /* Initialize Python once per process. Returns 1 on success, 0 on failure.
    Thread-safe: subsequent calls return cached status. */
-#if defined(_MSC_VER)
-extern "C" __declspec(dllexport) int aurora_py_ensure_initialized(void) {
-#else
-extern "C" int aurora_py_ensure_initialized(void) {
-#endif
+extern "C" AURORA_EXPORT int aurora_py_ensure_initialized(void) {
     py_lock_init();
 #ifdef _WIN32
     EnterCriticalSection(&s_py_lock);
@@ -849,11 +847,7 @@ extern "C" int aurora_py_ensure_initialized(void) {
 }
 
 /* Get Python C API function pointer. Thread-safe. Returns NULL on failure. */
-#if defined(_MSC_VER)
-extern "C" __declspec(dllexport) void* aurora_py_get_api(const char* name) {
-#else
-extern "C" void* aurora_py_get_api(const char* name) {
-#endif
+extern "C" AURORA_EXPORT void* aurora_py_get_api(const char* name) {
     if (!s_python_dll) {
         if (!aurora_py_ensure_initialized()) return NULL;
     }

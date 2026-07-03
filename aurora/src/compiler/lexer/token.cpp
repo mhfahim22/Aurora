@@ -1,30 +1,30 @@
 #include "compiler/token.hpp"
 #include <unordered_map>
 
-static const std::unordered_map<TokenType, const char*>& token_type_names() {
-    static const std::unordered_map<TokenType, const char*> names = {
-        {TokenType::Keyword,    "keyword"},
-        {TokenType::Identifier, "identifier"},
-        {TokenType::Number,     "number"},
-        {TokenType::Float,      "float"},
-        {TokenType::Operator,   "operator"},
-        {TokenType::String,     "string"},
-        {TokenType::Attribute,  "attribute"},
-        {TokenType::Newline,    "newline"},
-        {TokenType::Indent,     "indent"},
-        {TokenType::Dedent,     "dedent"},
-        {TokenType::Unknown,    "unknown"},
+static const std::unordered_map<TokenKind, const char*>& token_type_names() {
+    static const std::unordered_map<TokenKind, const char*> names = {
+        {TokenKind::Keyword,    "keyword"},
+        {TokenKind::Identifier, "identifier"},
+        {TokenKind::Number,     "number"},
+        {TokenKind::Float,      "float"},
+        {TokenKind::Operator,   "operator"},
+        {TokenKind::String,     "string"},
+        {TokenKind::Attribute,  "attribute"},
+        {TokenKind::Newline,    "newline"},
+        {TokenKind::Indent,     "indent"},
+        {TokenKind::Dedent,     "dedent"},
+        {TokenKind::Unknown,    "unknown"},
     };
     return names;
 }
 
-const char* token_type_name(TokenType type) {
+const char* token_type_name(TokenKind type) {
     auto it = token_type_names().find(type);
     return (it != token_type_names().end()) ? it->second : "???";
 }
 
 std::string token_debug_string(const Token& t) {
-    std::string result = token_type_name(t.type);
+    std::string result = token_type_name(t.kind);
     result += "(\"";
     result += t.value;
     result += "\"";

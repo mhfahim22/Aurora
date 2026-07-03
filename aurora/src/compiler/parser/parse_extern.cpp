@@ -13,7 +13,7 @@ static void parse_extern_fields(const std::vector<Token>& ftoks, ASTNode* stmt, 
         fi++;
         if (fi < static_cast<int>(ftoks.size()) && ftoks[fi].is_operator(':')) {
             fi++;
-            if (fi < static_cast<int>(ftoks.size()) && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenType::Keyword))) {
+            if (fi < static_cast<int>(ftoks.size()) && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenKind::Keyword))) {
                 field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
                 fi++;
             }
@@ -182,7 +182,7 @@ ASTNode::Ptr Parser::parse_extern() {
         if (idx >= cnt || !toks[idx].is_keyword("function"))
             throw std::runtime_error("Line " + std::to_string(ln) + ": 'extern' must be followed by 'struct', 'function', or 'string'");
         idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
             throw std::runtime_error("Line " + std::to_string(ln) + ": extern function needs a name");
         std::string fname = toks[idx].value;
         auto stmt = make_node(NodeType::ExternFn, fname, ln);
@@ -207,7 +207,7 @@ ASTNode::Ptr Parser::parse_extern() {
                     break;
                 }
                 /* param name — can be identifier or keyword (e.g. `type`, `string`) */
-                if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+                if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
                     throw std::runtime_error("Line " + std::to_string(ln) + ": expected parameter name");
                 auto param = make_node(NodeType::Var, toks[idx].value, ln);
                 idx++;
@@ -223,7 +223,7 @@ ASTNode::Ptr Parser::parse_extern() {
                             ASTNode* ct_tail = nullptr;
                             while (idx < cnt && !toks[idx].is_operator(')')) {
                                 if (toks[idx].is_operator(',')) { idx++; continue; }
-                                if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                                if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                                     auto ct = make_node(NodeType::Var, toks[idx].value, ln);
                                     idx++;
                                     ASTNode* raw_ct = ct.get();
@@ -236,7 +236,7 @@ ASTNode::Ptr Parser::parse_extern() {
                         /* Parse optional -> return_type for callback */
                         if (idx < cnt && toks[idx].is_operator("->")) {
                             idx++;
-                            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                                 fn_type->left = make_node(NodeType::Var, toks[idx].value, ln);
                                 idx++;
                             }
@@ -244,7 +244,7 @@ ASTNode::Ptr Parser::parse_extern() {
                             fn_type->left = make_node(NodeType::Var, "void", ln);
                         }
                         param->right = std::move(fn_type);
-                    } else if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                    } else if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                         param->right = make_node(NodeType::Var, toks[idx].value, ln);
                         idx++;
                     }
@@ -259,7 +259,7 @@ ASTNode::Ptr Parser::parse_extern() {
         /* Parse optional -> return_type */
         if (idx < cnt && toks[idx].is_operator("->")) {
             idx++;
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
                 stmt->left = make_node(NodeType::Var, toks[idx].value, ln);
             idx++;
         } else {

@@ -65,25 +65,7 @@ extern "C"
         return (s2 << 16) + s1;
     }
 
-/* Karl Malbrain's compact CRC-32. See "A compact CCITT crc16 and crc32 C implementation that balances processor cache usage against speed": http://www.geocities.com/malbrain/ */
-#if 0
-    mz_ulong mz_crc32(mz_ulong crc, const mz_uint8 *ptr, size_t buf_len)
-    {
-        static const mz_uint32 s_crc32[16] = { 0, 0x1db71064, 0x3b6e20c8, 0x26d930ac, 0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-                                               0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c, 0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c };
-        mz_uint32 crcu32 = (mz_uint32)crc;
-        if (!ptr)
-            return MZ_CRC32_INIT;
-        crcu32 = ~crcu32;
-        while (buf_len--)
-        {
-            mz_uint8 b = *ptr++;
-            crcu32 = (crcu32 >> 4) ^ s_crc32[(crcu32 & 0xF) ^ (b & 0xF)];
-            crcu32 = (crcu32 >> 4) ^ s_crc32[(crcu32 & 0xF) ^ (b >> 4)];
-        }
-        return ~crcu32;
-    }
-#elif defined(USE_EXTERNAL_MZCRC)
+#if defined(USE_EXTERNAL_MZCRC)
 /* If USE_EXTERNAL_CRC is defined, an external module will export the
  * mz_crc32() symbol for us to use, e.g. an SSE-accelerated version.
  * Depending on the impl, it may be necessary to ~ the input/output crc values.

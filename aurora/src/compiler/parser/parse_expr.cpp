@@ -28,7 +28,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
         /* ── .field or .method(args) ── */
         if (toks[idx].is_operator('.')) {
             idx++;
-            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                 std::ostringstream msg;
                 msg << "Line " << toks[idx-1].line << ": attribute access needs a field name";
                 throw std::runtime_error(msg.str());
@@ -163,7 +163,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     if (t.is_string()) { idx++; return make_node(NodeType::Str, t.value, t.line); }
 
     /* float */
-    if (t.is(TokenType::Float)) { idx++; return make_node(NodeType::Float, t.value, t.line); }
+    if (t.is(TokenKind::Float)) { idx++; return make_node(NodeType::Float, t.value, t.line); }
 
     /* number */
     if (t.is_number()) { idx++; return make_node(NodeType::Num, t.value, t.line); }
@@ -176,7 +176,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     /* ── new Constructor(args) ── */
     if (t.is_keyword("new")) {
         int src_ln = t.line; idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
             std::ostringstream msg;
             msg << "Line " << src_ln << ": expected class name after 'new'";
             throw std::runtime_error(msg.str());
@@ -218,7 +218,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             ; /* treat as function call, fall through to phase 3 */
         else {
             int src_ln = t.line; idx++;
-            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
                 throw std::runtime_error("Line " + std::to_string(src_ln) + ": move needs a variable name");
             std::string var = toks[idx++].value;
             return make_node(NodeType::Move, var, src_ln);
@@ -226,21 +226,21 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     }
     if (t.is_keyword("shared")) {
         int src_ln = t.line; idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
             throw std::runtime_error("Line " + std::to_string(src_ln) + ": shared needs a variable name");
         std::string var = toks[idx++].value;
         return make_node(NodeType::SharedRef, var, src_ln);
     }
     if (t.is_keyword("weak")) {
         int src_ln = t.line; idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
             throw std::runtime_error("Line " + std::to_string(src_ln) + ": weak needs a variable name");
         std::string var = toks[idx++].value;
         return make_node(NodeType::WeakRef, var, src_ln);
     }
     if (t.is_keyword("borrow")) {
         int src_ln = t.line; idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
             throw std::runtime_error("Line " + std::to_string(src_ln) + ": borrow needs a variable name");
         std::string var = toks[idx++].value;
         return make_node(NodeType::Borrow, var, src_ln);
@@ -250,7 +250,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             ; /* treat as function call, fall through to phase 3 */
         else {
             int src_ln = t.line; idx++;
-            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
                 throw std::runtime_error("Line " + std::to_string(src_ln) + ": copy needs a variable name");
             std::string var = toks[idx++].value;
             return make_node(NodeType::Copy, var, src_ln);
@@ -258,14 +258,14 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     }
     if (t.is_keyword("reference")) {
         int src_ln = t.line; idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
             throw std::runtime_error("Line " + std::to_string(src_ln) + ": reference needs a variable name");
         std::string var = toks[idx++].value;
         return make_node(NodeType::Reference, var, src_ln);
     }
     if (t.is_keyword("pointer")) {
         int src_ln = t.line; idx++;
-        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+        if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
             throw std::runtime_error("Line " + std::to_string(src_ln) + ": pointer needs a variable name");
         std::string var = toks[idx++].value;
         return make_node(NodeType::Pointer, var, src_ln);
@@ -310,7 +310,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     }
 
     /* identifier: call / index / attribute / plain var */
-    if (t.is(TokenType::Identifier) || t.is(TokenType::Keyword)) {
+    if (t.is(TokenKind::Identifier) || t.is(TokenKind::Keyword)) {
         std::string name = t.value;
         int src_ln = t.line;
         idx++;
@@ -345,7 +345,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             int check_idx = idx;
             while (check_idx < cnt && !toks[check_idx].is_operator(']')) {
                 if (toks[check_idx].is_operator(',')) { check_idx++; continue; }
-                if (!(toks[check_idx].is_identifier() || toks[check_idx].is(TokenType::Keyword))) {
+                if (!(toks[check_idx].is_identifier() || toks[check_idx].is(TokenKind::Keyword))) {
                     looks_like_type_args = false; break;
                 }
                 check_idx++;
@@ -359,7 +359,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
                     ASTNode* ta_tail = nullptr;
                     while (idx < cnt && !toks[idx].is_operator(']')) {
                         if (toks[idx].is_operator(',')) { idx++; continue; }
-                        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+                        if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                             auto ta = make_node(NodeType::TypeArg, toks[idx].value, src_ln);
                             ASTNode* raw = ta.get();
                             if (!call->template_args) { call->template_args = std::move(ta); ta_tail = raw; }
@@ -409,7 +409,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
             ASTNode* ftail = nullptr;
             while (idx < cnt && !toks[idx].is_operator('}')) {
                 if (toks[idx].is_operator(',') || toks[idx].is_operator(';')) { idx++; continue; }
-                if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword)))
+                if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
                     throw std::runtime_error("Line " + std::to_string(src_ln) + ": expected field name in struct literal");
                 auto field = make_node(NodeType::Var, toks[idx].value, src_ln);
                 idx++;
@@ -428,7 +428,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
         /* attribute access or method call: obj.field  /  obj.method(args) */
         if (idx < cnt && toks[idx].is_operator('.')) {
             idx++;
-            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenType::Keyword))) {
+            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                 std::ostringstream msg;
                 msg << "Line " << src_ln << ": attribute access needs a field name";
                 throw std::runtime_error(msg.str());
@@ -498,7 +498,7 @@ ASTNode::Ptr Parser::parse_unary(const std::vector<Token>& toks, int& idx) {
 ASTNode::Ptr Parser::parse_term(const std::vector<Token>& toks, int& idx) {
     auto left = parse_unary(toks, idx);
     int  cnt  = static_cast<int>(toks.size());
-    while (idx < cnt && toks[idx].is(TokenType::Operator)) {
+    while (idx < cnt && toks[idx].is(TokenKind::Operator)) {
         const std::string& v = toks[idx].value;
         if (v != "*" && v != "/" && v != "//" && v != "%" && v != "**") break;
         auto op  = make_node(NodeType::BinOp, v, toks[idx].line);
@@ -513,7 +513,7 @@ ASTNode::Ptr Parser::parse_term(const std::vector<Token>& toks, int& idx) {
 ASTNode::Ptr Parser::parse_add(const std::vector<Token>& toks, int& idx) {
     auto left = parse_term(toks, idx);
     int  cnt  = static_cast<int>(toks.size());
-    while (idx < cnt && toks[idx].is(TokenType::Operator) &&
+    while (idx < cnt && toks[idx].is(TokenKind::Operator) &&
            (toks[idx].value == "+" || toks[idx].value == "-")) {
         auto op  = make_node(NodeType::BinOp, toks[idx].value, toks[idx].line);
         idx++;
@@ -528,7 +528,7 @@ ASTNode::Ptr Parser::parse_range(const std::vector<Token>& toks, int& idx) {
     auto left = parse_add(toks, idx);
     int  cnt  = static_cast<int>(toks.size());
     /* range operator: a..b (exclusive), a..=b (inclusive) */
-    if (idx < cnt && toks[idx].is(TokenType::Operator) &&
+    if (idx < cnt && toks[idx].is(TokenKind::Operator) &&
         (toks[idx].value == ".." || toks[idx].value == "..=")) {
         bool inclusive = (toks[idx].value == "..=");
         auto op  = make_node(NodeType::BinOp, inclusive ? "..=" : "..", toks[idx].line);
@@ -544,10 +544,10 @@ ASTNode::Ptr Parser::parse_bitwise(const std::vector<Token>& toks, int& idx) {
     auto left = parse_range(toks, idx);
     int  cnt  = static_cast<int>(toks.size());
     while (idx < cnt) {
-        bool is_xor_op = toks[idx].is(TokenType::Operator) && toks[idx].value == "^";
+        bool is_xor_op = toks[idx].is(TokenKind::Operator) && toks[idx].value == "^";
         bool is_xor_kw = toks[idx].is_keyword("xor");
-        bool is_and_op = toks[idx].is(TokenType::Operator) && toks[idx].value == "&";
-        bool is_or_op  = toks[idx].is(TokenType::Operator) && toks[idx].value == "|";
+        bool is_and_op = toks[idx].is(TokenKind::Operator) && toks[idx].value == "&";
+        bool is_or_op  = toks[idx].is(TokenKind::Operator) && toks[idx].value == "|";
         if (!is_xor_op && !is_xor_kw && !is_and_op && !is_or_op) break;
 
         std::string op_name;
@@ -570,7 +570,7 @@ ASTNode::Ptr Parser::parse_cmp(const std::vector<Token>& toks, int& idx) {
     if (idx >= cnt) return left;
 
     /* Symbol comparisons: ==, !=, <, >, <=, >= */
-    if (toks[idx].is(TokenType::Operator)) {
+    if (toks[idx].is(TokenKind::Operator)) {
         const std::string& op = toks[idx].value;
         if (op=="==" || op=="!=" || op=="<" || op==">" || op=="<=" || op==">=") {
             auto node  = make_node(NodeType::BinOp, op, toks[idx].line);
@@ -582,7 +582,7 @@ ASTNode::Ptr Parser::parse_cmp(const std::vector<Token>& toks, int& idx) {
     }
 
     /* Keyword operators: equals, and, or (left-associative, allow chaining) */
-    while (idx < cnt && toks[idx].is(TokenType::Keyword)) {
+    while (idx < cnt && toks[idx].is(TokenKind::Keyword)) {
         const std::string& kw = toks[idx].value;
         if (kw == "equals") {
             auto node  = make_node(NodeType::BinOp, "==", toks[idx].line);

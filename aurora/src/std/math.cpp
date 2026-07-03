@@ -28,5 +28,21 @@ int64_t aurora_math_random_int(int64_t min, int64_t max) {
 }
 double aurora_math_pi() { return 3.14159265358979323846; }
 double aurora_math_e() { return 2.71828182845904523536; }
+double aurora_math_asin(double x) { return asin(x); }
+double aurora_math_acos(double x) { return acos(x); }
+double aurora_math_atan(double x) { return atan(x); }
+double aurora_math_atan2(double y, double x) { return atan2(y, x); }
+double aurora_math_sinh(double x) { return sinh(x); }
+double aurora_math_cosh(double x) { return cosh(x); }
+double aurora_math_tanh(double x) { return tanh(x); }
+double aurora_math_log2(double x) { return log2(x); }
+double aurora_math_cbrt(double x) { return cbrt(x); }
+double aurora_math_hypot(double x, double y) { return hypot(x, y); }
+double aurora_math_erf(double x) { return erf(x); }
+double aurora_math_tgamma(double x) { return tgamma(x); }
+double aurora_math_fmod(double x, double y) { return fmod(x, y); }
+double aurora_math_remainder(double x, double y) { return remainder(x, y); }
+double aurora_math_copysign(double x, double y) { return copysign(x, y); }
+double aurora_math_nextafter(double x, double y) { return nextafter(x, y); }
 
 }

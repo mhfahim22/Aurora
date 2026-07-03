@@ -63,19 +63,19 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
 
         /* ── three-char operators ── */
         if (p[0]=='.' && p[1]=='.' && p[2]=='.') {
-            t.type  = TokenType::Operator;
+            t.kind  = TokenKind::Operator;
             t.value = "...";
             p += 3; col += 3;
             goto push_token;
         }
         if (p[0]=='.' && p[1]=='.' && p[2]=='=') {
-            t.type  = TokenType::Operator;
+            t.kind  = TokenKind::Operator;
             t.value = "..=";
             p += 3; col += 3;
             goto push_token;
         }
         if (p[0]=='<' && p[1]=='=' && p[2]=='>') {
-            t.type  = TokenType::Operator;
+            t.kind  = TokenKind::Operator;
             t.value = "<=>";
             p += 3; col += 3;
             goto push_token;
@@ -87,7 +87,7 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
             (p[0]=='/' && p[1]=='/') || (p[0]=='.' && p[1]=='.') ||
             (p[0]=='<' && p[1]=='<') || (p[0]=='>' && p[1]=='>') ||
             (p[0]=='&' && p[1]=='&') || (p[0]=='|' && p[1]=='|')) {
-            t.type  = TokenType::Operator;
+            t.kind  = TokenKind::Operator;
             t.value = std::string(p, 2);
             p += 2; col += 2;
         }
@@ -95,12 +95,12 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
         else if (*p == '@') {
             p++; col++;
             if (std::isalpha((unsigned char)*p) || *p == '_') {
-                t.type = TokenType::Attribute;
+                t.kind = TokenKind::Attribute;
                 while (std::isalnum((unsigned char)*p) || *p == '_') {
                     t.value += *p++; col++;
                 }
             } else {
-                t.type  = TokenType::Operator;
+                t.kind  = TokenKind::Operator;
                 t.value = "@";
             }
         }
@@ -116,7 +116,7 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
         }
         /* ── single-char operators ── */
         else if (std::strchr("+-*/=()[]{}:;<>,.@!%&|^~?", *p)) {
-            t.type  = TokenType::Operator;
+            t.kind  = TokenKind::Operator;
             t.value = std::string(1, *p);
             p++; col++;
         }
@@ -136,12 +136,12 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
                     while (std::isdigit((unsigned char)*p)) { t.value += *p++; col++; }
                 }
             }
-            t.type = is_float ? TokenType::Float : TokenType::Number;
+            t.kind = is_float ? TokenKind::Float : TokenKind::Number;
         }
         /* ── string: single or double quote, with escapes ── */
         else if (*p == '"' || *p == '\'') {
             char quote = *p++;  col++;
-            t.type = TokenType::String;
+            t.kind = TokenKind::String;
             while (*p && *p != quote) {
                 if (*p == '\\' && *(p+1)) {
                     p++; col++;
@@ -168,14 +168,14 @@ LexedLine Lexer::lex_line(const std::string& raw, int line_no) {
             }
             std::string lowered = ascii_lower(t.value);
             if (is_aurora_keyword(lowered)) {
-                t.type  = TokenType::Keyword;
+                t.kind  = TokenKind::Keyword;
             } else {
-                t.type = TokenType::Identifier;
+                t.kind = TokenKind::Identifier;
             }
         }
         /* ── unknown ── */
         else {
-            t.type  = TokenType::Unknown;
+            t.kind  = TokenKind::Unknown;
             t.value = std::string(1, *p++);
             col++;
         }
@@ -199,9 +199,9 @@ std::vector<LexedLine> Lexer::lex(const std::string& source) {
     /* multi-line bracket state: << acts like ( across lines, closed by >> */
     int ml_line = -1;
     int ml_tok  = -1;
-    /* TODO: lex() currently mutates tokens of previously lexed lines (ml_line)
-       by pushing tokens into them. This is fragile. A better approach would
-       use multi-token lookahead or a proper token stream that supports
+    /* NOTE: lex() mutates tokens of previously lexed lines (ml_line)
+       by pushing tokens into them. A better approach would use
+       multi-token lookahead or a proper token stream that supports
        insertion. */
 
     while (std::getline(ss, line)) {

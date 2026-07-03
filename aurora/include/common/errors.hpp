@@ -87,6 +87,7 @@ struct Diagnostic {
     int          column;
     int          end_column;
     std::string  file;
+    std::string  code;
     std::string  message;
     std::string  suggestion;
 
@@ -108,6 +109,8 @@ struct Diagnostic {
         }
 
         std::cerr << prefix << color_bold << tag << color_reset;
+        if (!code.empty())
+            std::cerr << " [" << code << "]";
         if (!file.empty())
             std::cerr << " in " << file;
         if (line > 0) {
@@ -152,9 +155,10 @@ public:
     }
 
     void report(DiagLevel level, int line, int column, int end_column,
-                const std::string& msg, const std::string& suggestion = "") {
+                const std::string& msg, const std::string& suggestion = "",
+                const std::string& code = "") {
         diagnostics_.push_back({level, line, column, end_column,
-                                current_file_, msg, suggestion});
+                                current_file_, code, msg, suggestion});
         if (level == DiagLevel::Fatal) {
             diagnostics_.back().print(&source_lines_);
             std::cerr << (color_enabled(stderr) ? "\033[1;31mcompilation terminated.\033[0m\n" : "compilation terminated.\n");
@@ -163,25 +167,27 @@ public:
     }
 
     void report(DiagLevel level, int line, const std::string& msg,
-                const std::string& suggestion = "") {
-        report(level, line, 0, 0, msg, suggestion);
+                const std::string& suggestion = "", const std::string& code = "") {
+        report(level, line, 0, 0, msg, suggestion, code);
     }
 
-    void error(int line, const std::string& msg, const std::string& suggestion = "") {
-        report(DiagLevel::Error, line, 0, 0, msg, suggestion);
+    void error(int line, const std::string& msg, const std::string& suggestion = "",
+               const std::string& code = "") {
+        report(DiagLevel::Error, line, 0, 0, msg, suggestion, code);
     }
 
     void error_at(int line, int col, const std::string& msg,
-                  const std::string& suggestion = "") {
-        report(DiagLevel::Error, line, col, col + 1, msg, suggestion);
+                  const std::string& suggestion = "", const std::string& code = "") {
+        report(DiagLevel::Error, line, col, col + 1, msg, suggestion, code);
     }
 
-    void warn(int line, const std::string& msg, const std::string& suggestion = "") {
-        report(DiagLevel::Warning, line, 0, 0, msg, suggestion);
+    void warn(int line, const std::string& msg, const std::string& suggestion = "",
+              const std::string& code = "") {
+        report(DiagLevel::Warning, line, 0, 0, msg, suggestion, code);
     }
 
-    void note(int line, const std::string& msg) {
-        report(DiagLevel::Note, line, 0, 0, msg);
+    void note(int line, const std::string& msg, const std::string& code = "") {
+        report(DiagLevel::Note, line, 0, 0, msg, "", code);
     }
 
     void set_file(const std::string& file) { current_file_ = file; }

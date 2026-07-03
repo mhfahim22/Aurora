@@ -31,18 +31,41 @@
     #define AURORA_PLATFORM_WINDOWS 1
     #define AURORA_PLATFORM_LINUX   0
     #define AURORA_PLATFORM_MACOS   0
+    #define AURORA_PLATFORM_ANDROID 0
+    #define AURORA_PLATFORM_IOS     0
 #elif defined(__APPLE__)
+    #include <TargetConditionals.h>
+    #if TARGET_OS_IPHONE
+        #define AURORA_PLATFORM_WINDOWS 0
+        #define AURORA_PLATFORM_LINUX   0
+        #define AURORA_PLATFORM_MACOS   0
+        #define AURORA_PLATFORM_ANDROID 0
+        #define AURORA_PLATFORM_IOS     1
+    #else
+        #define AURORA_PLATFORM_WINDOWS 0
+        #define AURORA_PLATFORM_LINUX   0
+        #define AURORA_PLATFORM_MACOS   1
+        #define AURORA_PLATFORM_ANDROID 0
+        #define AURORA_PLATFORM_IOS     0
+    #endif
+#elif defined(__ANDROID__)
     #define AURORA_PLATFORM_WINDOWS 0
     #define AURORA_PLATFORM_LINUX   0
-    #define AURORA_PLATFORM_MACOS   1
+    #define AURORA_PLATFORM_MACOS   0
+    #define AURORA_PLATFORM_ANDROID 1
+    #define AURORA_PLATFORM_IOS     0
 #elif defined(__linux__)
     #define AURORA_PLATFORM_WINDOWS 0
     #define AURORA_PLATFORM_LINUX   1
     #define AURORA_PLATFORM_MACOS   0
+    #define AURORA_PLATFORM_ANDROID 0
+    #define AURORA_PLATFORM_IOS     0
 #else
     #define AURORA_PLATFORM_WINDOWS 0
     #define AURORA_PLATFORM_LINUX   0
     #define AURORA_PLATFORM_MACOS   0
+    #define AURORA_PLATFORM_ANDROID 0
+    #define AURORA_PLATFORM_IOS     0
 #endif
 
 /* ── Architecture Detection ── */

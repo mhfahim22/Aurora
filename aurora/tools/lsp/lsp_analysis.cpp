@@ -298,11 +298,11 @@ std::vector<LspCompletionItem> LspServer::get_completions(DocumentState& doc, in
     }
 
     /* Identifiers from lexed tokens across all open documents */
-    /* TODO: cache this — rebuilding on every keystroke is O(N) across all docs */
+    /* OPTIMIZE: cache this — rebuilding on every keystroke is O(N) across all docs */
     for (auto& [uri, d] : documents_) {
         for (auto& ll : d.lines) {
             for (auto& t : ll.tokens) {
-                if (t.type == TokenType::Identifier) {
+                if (t.kind == TokenKind::Identifier) {
                     if (seen.count(t.value)) continue;
                     seen.insert(t.value);
                     LspCompletionItem ci;
@@ -539,7 +539,7 @@ std::vector<LspLocation> LspServer::get_all_references(DocumentState& doc, int l
     for (auto& [uri, d] : documents_) {
         for (auto& ll : d.lines) {
             for (auto& t : ll.tokens) {
-                if (t.type == TokenType::Identifier && t.value == word) {
+                if (t.kind == TokenKind::Identifier && t.value == word) {
                     LspLocation loc;
                     loc.uri = uri;
                     loc.range.start = {(uint32_t)(ll.line_no - 1), (uint32_t)t.col};
@@ -643,7 +643,7 @@ std::string LspServer::get_signature_info(DocumentState& doc, int line, int col)
                         if (toks[j].is_operator('(')) continue;
                         if (toks[j].is_operator(')')) break;
                         if (toks[j].is_operator(',')) continue;
-                        if (toks[j].type == TokenType::Identifier) {
+                        if (toks[j].kind == TokenKind::Identifier) {
                             params.push_back(toks[j].value);
                             if (label.back() != '(') label += ", ";
                             label += toks[j].value;

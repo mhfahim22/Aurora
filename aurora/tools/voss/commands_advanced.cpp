@@ -160,9 +160,9 @@ int cmd_ai_scan(const std::string& spec) {
     if (to_ver.empty()) to_ver = "latest";
 
     std::cout << "AI Compatibility Scanner\n";
-    std::cout << "\u251c\u2500\u2500 Package:  " << name << "\n";
-    std::cout << "\u251c\u2500\u2500 From:     " << (from_ver.empty() ? "(not installed)" : from_ver) << "\n";
-    std::cout << "\u2514\u2500\u2500 To:       " << to_ver << "\n\n";
+    std::cout << "|-- Package:  " << name << "\n";
+    std::cout << "|-- From:     " << (from_ver.empty() ? "(not installed)" : from_ver) << "\n";
+    std::cout << "|-- To:       " << to_ver << "\n\n";
 
     auto result = ai_scan_package(name, from_ver, to_ver);
 
@@ -172,14 +172,14 @@ int cmd_ai_scan(const std::string& spec) {
     if (!result.breaking_changes.empty()) {
         std::cout << "Breaking Changes (" << result.breaking_changes.size() << "):\n";
         for (auto& change : result.breaking_changes)
-            std::cout << "  \u26a0  " << change << "\n";
+            std::cout << "  [!] " << change << "\n";
         std::cout << "\n";
     }
 
     if (!result.impacted_files.empty()) {
         std::cout << "Impacted Files (" << result.impacted_files.size() << "):\n";
         for (auto& file : result.impacted_files)
-            std::cout << "  \U0001f4c4 " << file << "\n";
+            std::cout << "  [*] " << file << "\n";
         std::cout << "\n";
     }
 
@@ -895,9 +895,9 @@ void print_eco_health() {
     health_score -= dead_count * 10;
     if (health_score < 0) health_score = 0;
 
-    std::cout << "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n";
-    std::cout << "\u2551     VOSS Ecosystem Health Dashboard    \u2551\n";
-    std::cout << "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n";
+    std::cout << "+=============================================+\n";
+    std::cout << "|     VOSS Ecosystem Health Dashboard         |\n";
+    std::cout << "+=============================================+\n\n";
     std::cout << "Project:      " << info.name << "@" << info.version << "\n";
     std::cout << "Dependencies: " << total_deps << "\n";
     std::cout << "Locked:       " << lf.packages.size() << "\n";
@@ -908,7 +908,7 @@ void print_eco_health() {
 
     std::cout << "             ";
     int bar_len = health_score / 5;
-    for (int i = 0; i < 20; i++) std::cout << (i < bar_len ? "\u2588" : "\u2591");
+    for (int i = 0; i < 20; i++) std::cout << (i < bar_len ? "#" : ".");
     std::cout << " " << health_score << "%\n";
 }
 
