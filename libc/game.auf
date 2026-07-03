@@ -1,0 +1,237 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 19 — OpenGL & Game Support
+//  Lighting, Tilemap, Mesh Primitives, and Game Engine
+// ═══════════════════════════════════════════════════════════════════
+
+module "game"
+
+// ── Light Constants ──
+const LIGHT_DIRECTIONAL := 0
+const LIGHT_POINT       := 1
+const LIGHT_SPOT        := 2
+const LIGHT_AMBIENT     := 3
+
+// ── Extern Functions (Lighting, 10) ──
+extern function aurora_light_create(type: int, r: float, g: float, b: float, intensity: float): ptr
+extern function aurora_light_destroy(light: ptr)
+extern function aurora_light_set_position(light: ptr, x: float, y: float, z: float)
+extern function aurora_light_set_direction(light: ptr, x: float, y: float, z: float)
+extern function aurora_light_set_color(light: ptr, r: float, g: float, b: float)
+extern function aurora_light_set_intensity(light: ptr, intensity: float)
+extern function aurora_light_set_range(light: ptr, range: float)
+extern function aurora_light_set_spot_angle(light: ptr, inner: float, outer: float)
+extern function aurora_light_get_count(): int
+extern function aurora_light_get(index: int): ptr
+
+// ── Extern Functions (Tilemap, 10) ──
+extern function aurora_tilemap_create(cols: int, rows: int, tile_w: int, tile_h: int, layers: int): ptr
+extern function aurora_tilemap_destroy(tm: ptr)
+extern function aurora_tilemap_set_tile(tm: ptr, col: int, row: int, layer: int, tile_id: int)
+extern function aurora_tilemap_get_tile(tm: ptr, col: int, row: int, layer: int): int
+extern function aurora_tilemap_get_width(tm: ptr): int
+extern function aurora_tilemap_get_height(tm: ptr): int
+extern function aurora_tilemap_get_cols(tm: ptr): int
+extern function aurora_tilemap_get_rows(tm: ptr): int
+extern function aurora_tilemap_is_solid(tm: ptr, col: int, row: int, layer: int): int
+extern function aurora_tilemap_set_property(tm: ptr, key: str, value: str)
+
+// ── Extern Functions (Mesh Primitives, 9) ──
+extern function aurora_mesh_create_plane(width: float, depth: float): ptr
+extern function aurora_mesh_create_sphere(radius: float, segments: int): ptr
+extern function aurora_mesh_create_cylinder(radius: float, height: float, segments: int): ptr
+extern function aurora_mesh_create_capsule(radius: float, height: float, segments: int): ptr
+extern function aurora_mesh_get_vertex_count(mesh: ptr): int
+extern function aurora_mesh_get_vertex_data(mesh: ptr): ptr
+extern function aurora_mesh_get_index_count(mesh: ptr): int
+extern function aurora_mesh_get_index_data(mesh: ptr): ptr
+extern function aurora_mesh_destroy(mesh: ptr)
+
+// ── Extern Functions (Game Engine, 21) ──
+extern function aurora_scene_init()
+extern function aurora_scene_shutdown()
+extern function aurora_entity_create(type: int): ptr
+extern function aurora_entity_destroy(e: ptr)
+extern function aurora_entity_set_pos(e: ptr, x: float, y: float, z: float)
+extern function aurora_entity_get_pos(e: ptr, x: ptr, y: ptr, z: ptr)
+extern function aurora_entity_set_velocity(e: ptr, vx: float, vy: float, vz: float)
+extern function aurora_entity_get_velocity(e: ptr, vx: ptr, vy: ptr, vz: ptr)
+extern function aurora_sprite_create(entity: ptr, w: float, h: float): ptr
+extern function aurora_camera_create(x: float, y: float, z: float): ptr
+extern function aurora_physics_init()
+extern function aurora_physics_step(dt: float)
+extern function aurora_physics_set_gravity(gx: float, gy: float, gz: float)
+extern function aurora_collision_check(a: ptr, b: ptr): int
+extern function aurora_engine_frame_start()
+extern function aurora_engine_frame_end()
+extern function aurora_engine_render()
+extern function aurora_engine_is_key_down(key_code: int): int
+extern function aurora_engine_delta_time(): float
+extern function aurora_engine_poll_input()
+extern function aurora_animation_play(name: str, frame_cb: ptr, duration_ms: int)
+
+// ── Extern Functions (OpenGL Shader Helpers, 15) ──
+extern function aurora_gl_shader_source(shader: ptr, source: str)
+extern function aurora_gl_compile_shader(shader: ptr): int
+extern function aurora_gl_create_shader(type: int): ptr
+extern function aurora_gl_create_program(): ptr
+extern function aurora_gl_attach_shader(program: ptr, shader: ptr)
+extern function aurora_gl_link_program(program: ptr): int
+extern function aurora_gl_use_program(program: ptr)
+extern function aurora_gl_delete_shader(shader: ptr)
+extern function aurora_gl_delete_program(program: ptr)
+extern function aurora_gl_get_shader_iv(shader: ptr, pname: int, params: ptr)
+extern function aurora_gl_get_program_iv(program: ptr, pname: int, params: ptr)
+extern function aurora_gl_get_shader_info_log(shader: ptr): str
+extern function aurora_gl_get_program_info_log(program: ptr): str
+extern function aurora_gl_compile_program(vert_src: str, frag_src: str): ptr
+extern function aurora_gl_free_string(s: ptr)
+
+// ── Extern Functions (Sprite2D, 9) ──
+extern function aurora_sprite2d_init()
+extern function aurora_sprite2d_set_viewport(w: int, h: int)
+extern function aurora_sprite2d_load_texture(path: str): int
+extern function aurora_sprite2d_create_texture(data: ptr, w: int, h: int): int
+extern function aurora_sprite2d_draw(tex: int, x: float, y: float, w: float, h: float)
+extern function aurora_sprite2d_flush()
+extern function aurora_sprite2d_clear(r: float, g: float, b: float, a: float)
+extern function aurora_sprite2d_delete_texture(tex: int)
+extern function aurora_sprite2d_shutdown()
+
+// ── Extern Functions (Animation, 43) ──
+extern function aurora_anim_ease_linear(t: float): float
+extern function aurora_anim_ease_in_quad(t: float): float
+extern function aurora_anim_ease_out_quad(t: float): float
+extern function aurora_anim_ease_in_out_quad(t: float): float
+extern function aurora_anim_ease_in_cubic(t: float): float
+extern function aurora_anim_ease_out_cubic(t: float): float
+extern function aurora_anim_ease_in_out_cubic(t: float): float
+extern function aurora_anim_ease_in_quart(t: float): float
+extern function aurora_anim_ease_out_quart(t: float): float
+extern function aurora_anim_ease_in_out_quart(t: float): float
+extern function aurora_anim_ease_in_elastic(t: float): float
+extern function aurora_anim_ease_out_elastic(t: float): float
+extern function aurora_anim_ease_in_out_elastic(t: float): float
+extern function aurora_anim_ease_in_bounce(t: float): float
+extern function aurora_anim_ease_out_bounce(t: float): float
+extern function aurora_anim_ease_in_out_bounce(t: float): float
+extern function aurora_anim_ease_in_back(t: float): float
+extern function aurora_anim_ease_out_back(t: float): float
+extern function aurora_anim_ease_in_out_back(t: float): float
+extern function aurora_anim_ease_apply(ease_fn: ptr, t: float): float
+extern function aurora_anim_tween_new(target: ptr, from: float, to: float, duration: float): ptr
+extern function aurora_anim_tween_on_update(tween: ptr, cb: ptr)
+extern function aurora_anim_tween_on_done(tween: ptr, cb: ptr)
+extern function aurora_anim_tween_update(tween: ptr, dt: float)
+extern function aurora_anim_tween_is_done(tween: ptr): int
+extern function aurora_anim_tween_value(tween: ptr): float
+extern function aurora_anim_tween_free(tween: ptr)
+extern function aurora_anim_seq_new(): ptr
+extern function aurora_anim_seq_add(seq: ptr, tween: ptr)
+extern function aurora_anim_seq_on_update(seq: ptr, cb: ptr)
+extern function aurora_anim_seq_on_done(seq: ptr, cb: ptr)
+extern function aurora_anim_seq_update(seq: ptr, dt: float)
+extern function aurora_anim_seq_is_done(seq: ptr): int
+extern function aurora_anim_seq_free(seq: ptr)
+extern function aurora_anim_ctrl_new(): ptr
+extern function aurora_anim_ctrl_add(ctrl: ptr, anim: ptr)
+extern function aurora_anim_ctrl_update(ctrl: ptr, dt: float)
+extern function aurora_anim_ctrl_is_done(ctrl: ptr): int
+extern function aurora_anim_ctrl_free(ctrl: ptr)
+extern function aurora_anim_kf_new(): ptr
+extern function aurora_anim_kf_set_key(kf: ptr, t: float, value: float)
+extern function aurora_anim_kf_evaluate(kf: ptr, t: float): float
+extern function aurora_anim_kf_free(kf: ptr)
+extern function aurora_animation_create(keyframes: ptr, values: ptr, num_frames: int, duration: float): ptr
+extern function aurora_animation_update(anim: ptr, dt: float)
+
+// ── Wrappers ──
+
+// Lighting
+pub fn light_create(type: int, r: float, g: float, b: float, intensity: float) -> ptr
+    aurora_light_create(type, r, g, b, intensity)
+
+pub fn light_destroy(light: ptr)
+    aurora_light_destroy(light)
+
+pub fn light_set_position(light: ptr, x: float, y: float, z: float)
+    aurora_light_set_position(light, x, y, z)
+
+pub fn light_set_direction(light: ptr, x: float, y: float, z: float)
+    aurora_light_set_direction(light, x, y, z)
+
+pub fn light_set_color(light: ptr, r: float, g: float, b: float)
+    aurora_light_set_color(light, r, g, b)
+
+pub fn light_set_intensity(light: ptr, intensity: float)
+    aurora_light_set_intensity(light, intensity)
+
+pub fn light_set_range(light: ptr, range: float)
+    aurora_light_set_range(light, range)
+
+pub fn light_set_spot_angle(light: ptr, inner: float, outer: float)
+    aurora_light_set_spot_angle(light, inner, outer)
+
+pub fn light_get_count() -> int
+    aurora_light_get_count()
+
+pub fn light_get(index: int) -> ptr
+    aurora_light_get(index)
+
+// Tilemap
+pub fn tilemap_create(cols: int, rows: int, tile_w: int, tile_h: int, layers: int) -> ptr
+    aurora_tilemap_create(cols, rows, tile_w, tile_h, layers)
+
+pub fn tilemap_destroy(tm: ptr)
+    aurora_tilemap_destroy(tm)
+
+pub fn tilemap_set_tile(tm: ptr, col: int, row: int, layer: int, tile_id: int)
+    aurora_tilemap_set_tile(tm, col, row, layer, tile_id)
+
+pub fn tilemap_get_tile(tm: ptr, col: int, row: int, layer: int) -> int
+    aurora_tilemap_get_tile(tm, col, row, layer)
+
+pub fn tilemap_get_width(tm: ptr) -> int
+    aurora_tilemap_get_width(tm)
+
+pub fn tilemap_get_height(tm: ptr) -> int
+    aurora_tilemap_get_height(tm)
+
+pub fn tilemap_get_cols(tm: ptr) -> int
+    aurora_tilemap_get_cols(tm)
+
+pub fn tilemap_get_rows(tm: ptr) -> int
+    aurora_tilemap_get_rows(tm)
+
+pub fn tilemap_is_solid(tm: ptr, col: int, row: int, layer: int) -> int
+    aurora_tilemap_is_solid(tm, col, row, layer)
+
+pub fn tilemap_set_property(tm: ptr, key: str, value: str)
+    aurora_tilemap_set_property(tm, key, value)
+
+// Mesh
+pub fn mesh_create_plane(width: float, depth: float) -> ptr
+    aurora_mesh_create_plane(width, depth)
+
+pub fn mesh_create_sphere(radius: float, segments: int) -> ptr
+    aurora_mesh_create_sphere(radius, segments)
+
+pub fn mesh_create_cylinder(radius: float, height: float, segments: int) -> ptr
+    aurora_mesh_create_cylinder(radius, height, segments)
+
+pub fn mesh_create_capsule(radius: float, height: float, segments: int) -> ptr
+    aurora_mesh_create_capsule(radius, height, segments)
+
+pub fn mesh_get_vertex_count(mesh: ptr) -> int
+    aurora_mesh_get_vertex_count(mesh)
+
+pub fn mesh_get_vertex_data(mesh: ptr) -> ptr
+    aurora_mesh_get_vertex_data(mesh)
+
+pub fn mesh_get_index_count(mesh: ptr) -> int
+    aurora_mesh_get_index_count(mesh)
+
+pub fn mesh_get_index_data(mesh: ptr) -> ptr
+    aurora_mesh_get_index_data(mesh)
+
+pub fn mesh_destroy(mesh: ptr)
+    aurora_mesh_destroy(mesh)

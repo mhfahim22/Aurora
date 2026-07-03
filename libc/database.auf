@@ -17,6 +17,7 @@ import "string"
 import "collections"
 import "pq"
 import "mysql"
+import "db"
 
 ## ── Connect ──
 function db_connect(url)
@@ -24,12 +25,14 @@ function db_connect(url)
         return pg_connect(url)
     elseif starts(url, "mysql://")
         return mysql_connect(url)
-    else
-        output("db_connect: unsupported URL: " + url)
-        info = map()
-        map_set(info, "error", "unsupported URL: " + url)
-        return info
+    elseif starts(url, "sqlite://")
+        path = substr(url, 9, len(url))
+        return sqlite_connect_map(path)
     end
+    output("db_connect: unsupported URL: " + url)
+    info = map()
+    map_set(info, "error", "unsupported URL: " + url)
+    return info
 end
 
 function db_close(db)
@@ -38,6 +41,8 @@ function db_close(db)
             PQfinish(db.handle)
         elseif db.driver == "mysql"
             mysql_close(db.handle)
+        elseif db.driver == "sqlite3"
+            sqlite_close(db.handle)
         end
     end
 end
@@ -48,6 +53,8 @@ function db_query(db, sql)
         return pg_query(db.handle, sql)
     elseif db.driver == "mysql"
         return mysql_query_wrap(db.handle, sql)
+    elseif db.driver == "sqlite3"
+        return sqlite_query(db.handle, sql)
     end
     return []
 end
@@ -58,6 +65,8 @@ function db_execute(db, sql)
         return pg_execute(db.handle, sql)
     elseif db.driver == "mysql"
         return mysql_exec_wrap(db.handle, sql)
+    elseif db.driver == "sqlite3"
+        return sqlite_execute(db.handle, sql)
     end
     return -1
 end

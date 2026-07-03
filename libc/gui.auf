@@ -1,17 +1,9 @@
-## Native GUI bindings
+## Native GUI bindings — all widgets
 ## Usage: import "gui"
-##
-## Example:
-##   import "gui"
-##   function main():
-##     win = gui_window_new("Hello", 400, 300)
-##     btn = gui_button_new(win, "Click Me", 10, 10, 100, 30)
-##     gui_set_callback(btn, on_click)
-##     gui_window_show(win)
-##     gui_run()
-##
-##   function on_click(id, evt, p1, p2):
-##     gui_quit()
+
+extern function aurora_gui_app_init() -> int
+extern function aurora_gui_app_run()
+extern function aurora_gui_app_quit()
 
 extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
 extern function aurora_gui_window_set_title(win: pointer, title: cstring)
@@ -19,18 +11,92 @@ extern function aurora_gui_window_resize(win: pointer, w: int, h: int)
 extern function aurora_gui_window_show(win: pointer)
 extern function aurora_gui_window_hide(win: pointer)
 extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_window_maximize(win: pointer)
+extern function aurora_gui_window_minimize(win: pointer)
+extern function aurora_gui_window_restore(win: pointer)
+extern function aurora_gui_window_get_width(win: pointer) -> int
+extern function aurora_gui_window_get_height(win: pointer) -> int
+extern function aurora_gui_window_set_min_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_max_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_resizable(win: pointer, resizable: int)
+
+extern function aurora_gui_set_enabled(widget: pointer, enabled: int)
+extern function aurora_gui_get_enabled(widget: pointer) -> int
+extern function aurora_gui_set_visible(widget: pointer, visible: int)
+extern function aurora_gui_get_visible(widget: pointer) -> int
+extern function aurora_gui_set_focus(widget: pointer)
+extern function aurora_gui_move(widget: pointer, x: int, y: int, w: int, h: int)
+extern function aurora_gui_get_native_handle(widget: pointer) -> pointer
+
+extern function aurora_gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_label_set_text(lbl: pointer, text: cstring)
+extern function aurora_gui_label_get_text(lbl: pointer) -> cstring
+extern function aurora_gui_label_set_font_size(lbl: pointer, size: int)
+extern function aurora_gui_label_set_color(lbl: pointer, color: int)
+extern function aurora_gui_label_set_align(lbl: pointer, align: int)
+
+extern function aurora_gui_text_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_text_set_text(txt: pointer, text: cstring)
+extern function aurora_gui_text_get_text(txt: pointer) -> cstring
 
 extern function aurora_gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
 extern function aurora_gui_button_set_text(btn: pointer, text: cstring)
 extern function aurora_gui_button_get_text(btn: pointer) -> cstring
 
-extern function aurora_gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
-extern function aurora_gui_label_set_text(lbl: pointer, text: cstring)
-extern function aurora_gui_label_get_text(lbl: pointer) -> cstring
+extern function aurora_gui_checkbox_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_checkbox_set_text(cb: pointer, text: cstring)
+extern function aurora_gui_checkbox_get_text(cb: pointer) -> cstring
+extern function aurora_gui_checkbox_is_checked(cb: pointer) -> int
+extern function aurora_gui_checkbox_set_checked(cb: pointer, checked: int)
+
+extern function aurora_gui_radiobutton_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int, group_id: int) -> pointer
+extern function aurora_gui_radiobutton_set_text(rb: pointer, text: cstring)
+extern function aurora_gui_radiobutton_get_text(rb: pointer) -> cstring
+extern function aurora_gui_radiobutton_is_checked(rb: pointer) -> int
+extern function aurora_gui_radiobutton_set_checked(rb: pointer, checked: int)
+
+extern function aurora_gui_switch_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_switch_is_on(sw: pointer) -> int
+extern function aurora_gui_switch_set_on(sw: pointer, on: int)
 
 extern function aurora_gui_textbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
 extern function aurora_gui_textbox_set_text(tb: pointer, text: cstring)
 extern function aurora_gui_textbox_get_text(tb: pointer) -> cstring
+extern function aurora_gui_textbox_set_readonly(tb: pointer, readonly: int)
+extern function aurora_gui_textbox_set_placeholder(tb: pointer, text: cstring)
+extern function aurora_gui_textbox_set_multiline(tb: pointer, multiline: int)
+extern function aurora_gui_textbox_get_line_count(tb: pointer) -> int
+
+extern function aurora_gui_passwordbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_passwordbox_set_text(pb: pointer, text: cstring)
+extern function aurora_gui_passwordbox_get_text(pb: pointer) -> cstring
+
+extern function aurora_gui_slider_new(parent: pointer, x: int, y: int, w: int, h: int, min: int, max: int) -> pointer
+extern function aurora_gui_slider_get_value(sl: pointer) -> int
+extern function aurora_gui_slider_set_value(sl: pointer, value: int)
+extern function aurora_gui_slider_set_range(sl: pointer, min: int, max: int)
+
+extern function aurora_gui_progressbar_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_progressbar_set_value(pb: pointer, value: int)
+extern function aurora_gui_progressbar_get_value(pb: pointer) -> int
+extern function aurora_gui_progressbar_set_range(pb: pointer, min: int, max: int)
+extern function aurora_gui_progressbar_set_marquee(pb: pointer, on: int)
+
+extern function aurora_gui_combobox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_combobox_add_item(cb: pointer, item: cstring)
+extern function aurora_gui_combobox_clear(cb: pointer)
+extern function aurora_gui_combobox_get_selected(cb: pointer) -> int
+extern function aurora_gui_combobox_set_selected(cb: pointer, idx: int)
+extern function aurora_gui_combobox_count(cb: pointer) -> int
+extern function aurora_gui_combobox_get_item(cb: pointer, idx: int) -> cstring
+
+extern function aurora_gui_dropdown_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_dropdown_add_item(dd: pointer, item: cstring)
+extern function aurora_gui_dropdown_clear(dd: pointer)
+extern function aurora_gui_dropdown_get_selected(dd: pointer) -> int
+extern function aurora_gui_dropdown_set_selected(dd: pointer, idx: int)
+extern function aurora_gui_dropdown_count(dd: pointer) -> int
+extern function aurora_gui_dropdown_get_item(dd: pointer, idx: int) -> cstring
 
 extern function aurora_gui_listbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
 extern function aurora_gui_listbox_add_item(lb: pointer, item: cstring)
@@ -39,112 +105,717 @@ extern function aurora_gui_listbox_get_selected(lb: pointer) -> int
 extern function aurora_gui_listbox_get_item(lb: pointer, idx: int) -> cstring
 extern function aurora_gui_listbox_count(lb: pointer) -> int
 
+extern function aurora_gui_treeview_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_treeview_add_item(tv: pointer, text: cstring, parent_item: pointer) -> pointer
+extern function aurora_gui_treeview_remove_item(tv: pointer, item: pointer)
+extern function aurora_gui_treeview_clear(tv: pointer)
+extern function aurora_gui_treeview_get_selected(tv: pointer) -> pointer
+extern function aurora_gui_treeview_expand(tv: pointer, item: pointer)
+extern function aurora_gui_treeview_collapse(tv: pointer, item: pointer)
+extern function aurora_gui_treeview_set_item_text(tv: pointer, item: pointer, text: cstring)
+
+extern function aurora_gui_table_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_table_add_column(tbl: pointer, title: cstring, width: int)
+extern function aurora_gui_table_column_count(tbl: pointer) -> int
+extern function aurora_gui_table_add_row(tbl: pointer) -> pointer
+extern function aurora_gui_table_set_cell(tbl: pointer, row: int, col: int, text: cstring)
+extern function aurora_gui_table_get_cell(tbl: pointer, row: int, col: int) -> cstring
+extern function aurora_gui_table_remove_row(tbl: pointer, row: int)
+extern function aurora_gui_table_clear(tbl: pointer)
+extern function aurora_gui_table_get_selected(tbl: pointer) -> int
+extern function aurora_gui_table_row_count(tbl: pointer) -> int
+
+extern function aurora_gui_tabview_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_tabview_add_page(tv: pointer, title: cstring) -> pointer
+extern function aurora_gui_tabview_get_selected(tv: pointer) -> int
+extern function aurora_gui_tabview_set_selected(tv: pointer, idx: int)
+extern function aurora_gui_tabview_page_count(tv: pointer) -> int
+
+extern function aurora_gui_scrollview_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_splitview_new(parent: pointer, x: int, y: int, w: int, h: int, orientation: int) -> pointer
+extern function aurora_gui_splitview_set_position(sv: pointer, pos: int)
+extern function aurora_gui_splitview_get_position(sv: pointer) -> int
+extern function aurora_gui_splitview_get_pane1(sv: pointer) -> pointer
+extern function aurora_gui_splitview_get_pane2(sv: pointer) -> pointer
+
+extern function aurora_gui_groupbox_new(parent: pointer, title: cstring, x: int, y: int, w: int, h: int) -> pointer
+
+extern function aurora_gui_image_new(parent: pointer, path: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_image_load(img: pointer, path: cstring)
+extern function aurora_gui_image_set_data(img: pointer, data: pointer, len: int)
+
+extern function aurora_gui_canvas_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_canvas_set_paint_callback(cv: pointer, cb: pointer, user_data: pointer)
+extern function aurora_gui_canvas_repaint(cv: pointer)
+
+extern function aurora_gui_menu_bar_new(parent: pointer) -> pointer
+extern function aurora_gui_menu_new(text: cstring) -> pointer
+extern function aurora_gui_menu_add_item(menu: pointer, text: cstring, id: int)
+extern function aurora_gui_menu_add_separator(menu: pointer)
+extern function aurora_gui_menu_add_submenu(menu: pointer, submenu: pointer)
+extern function aurora_gui_menu_bar_add_menu(menubar: pointer, menu: pointer)
+extern function aurora_gui_menu_set_checked(menu: pointer, id: int, checked: int)
+extern function aurora_gui_menu_set_enabled(menu: pointer, id: int, enabled: int)
+
+extern function aurora_gui_toolbar_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_toolbar_add_button(tb: pointer, text: cstring, id: int)
+extern function aurora_gui_toolbar_add_separator(tb: pointer)
+
+extern function aurora_gui_statusbar_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_statusbar_set_text(sb: pointer, text: cstring)
+extern function aurora_gui_statusbar_get_text(sb: pointer) -> cstring
+extern function aurora_gui_statusbar_set_parts(sb: pointer, widths: pointer, count: int)
+
+extern function aurora_gui_dialog_new(parent: pointer, title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_dialog_show_modal(dlg: pointer) -> int
+extern function aurora_gui_dialog_close(dlg: pointer)
+
+extern function aurora_gui_messagebox_show(parent: pointer, title: cstring, message: cstring, typ: int) -> int
+
+extern function aurora_gui_file_open_dialog(parent: pointer, title: cstring, filter: cstring) -> cstring
+extern function aurora_gui_file_save_dialog(parent: pointer, title: cstring, filter: cstring) -> cstring
+extern function aurora_gui_folder_select_dialog(parent: pointer, title: cstring) -> cstring
+
+extern function aurora_gui_color_picker_dialog(parent: pointer, initial_color: int) -> int
+extern function aurora_gui_font_picker_dialog(parent: pointer, font_info: pointer) -> int
+
+extern function aurora_gui_notification_show(parent: pointer, title: cstring, message: cstring, icon_type: int) -> int
+extern function aurora_gui_notification_remove(parent: pointer)
+
+extern function aurora_gui_clipboard_set_text(text: cstring) -> int
+extern function aurora_gui_clipboard_get_text() -> cstring
+
+extern function aurora_gui_cursor_set(cursor_type: int)
+extern function aurora_gui_cursor_get() -> int
+
+extern function aurora_gui_keyboard_is_key_down(virtual_key: int) -> int
+extern function aurora_gui_keyboard_get_modifiers() -> int
+
+extern function aurora_gui_mouse_get_x() -> int
+extern function aurora_gui_mouse_get_y() -> int
+extern function aurora_gui_mouse_button_down(button: int) -> int
+extern function aurora_gui_mouse_set_pos(x: int, y: int)
+
 extern function aurora_gui_run()
 extern function aurora_gui_quit()
 extern function aurora_gui_set_callback(widget: pointer, cb: callback(int, int, int, int))
 extern function aurora_gui_layout_horizontal(parent: pointer, margin: int)
 extern function aurora_gui_layout_vertical(parent: pointer, margin: int)
 
+/* ── Convenience wrappers ── */
+function gui_app_init():
+    return aurora_gui_app_init()
+end
+function gui_app_run():
+    aurora_gui_app_run()
+end
+function gui_app_quit():
+    aurora_gui_app_quit()
+end
 function gui_window_new(title, width, height):
     return aurora_gui_window_new(title, width, height)
 end
-
 function gui_window_set_title(win, title):
     aurora_gui_window_set_title(win, title)
 end
-
 function gui_window_resize(win, w, h):
     aurora_gui_window_resize(win, w, h)
 end
-
 function gui_window_show(win):
     aurora_gui_window_show(win)
 end
-
 function gui_window_hide(win):
     aurora_gui_window_hide(win)
 end
-
 function gui_window_destroy(win):
     aurora_gui_window_destroy(win)
 end
-
-function gui_button_new(parent, text, x, y, w, h):
-    return aurora_gui_button_new(parent, text, x, y, w, h)
+function gui_window_maximize(win):
+    aurora_gui_window_maximize(win)
 end
-
-function gui_button_set_text(btn, text):
-    aurora_gui_button_set_text(btn, text)
+function gui_window_minimize(win):
+    aurora_gui_window_minimize(win)
 end
-
-function gui_button_get_text(btn):
-    return aurora_gui_button_get_text(btn)
+function gui_window_restore(win):
+    aurora_gui_window_restore(win)
 end
-
+function gui_window_get_width(win):
+    return aurora_gui_window_get_width(win)
+end
+function gui_window_get_height(win):
+    return aurora_gui_window_get_height(win)
+end
+function gui_window_set_min_size(win, w, h):
+    aurora_gui_window_set_min_size(win, w, h)
+end
+function gui_window_set_max_size(win, w, h):
+    aurora_gui_window_set_max_size(win, w, h)
+end
+function gui_window_set_resizable(win, r):
+    aurora_gui_window_set_resizable(win, r)
+end
+function gui_set_enabled(widget, enabled):
+    aurora_gui_set_enabled(widget, enabled)
+end
+function gui_get_enabled(widget):
+    return aurora_gui_get_enabled(widget)
+end
+function gui_set_visible(widget, visible):
+    aurora_gui_set_visible(widget, visible)
+end
+function gui_get_visible(widget):
+    return aurora_gui_get_visible(widget)
+end
+function gui_set_focus(widget):
+    aurora_gui_set_focus(widget)
+end
+function gui_move(widget, x, y, w, h):
+    aurora_gui_move(widget, x, y, w, h)
+end
 function gui_label_new(parent, text, x, y, w, h):
     return aurora_gui_label_new(parent, text, x, y, w, h)
 end
-
 function gui_label_set_text(lbl, text):
     aurora_gui_label_set_text(lbl, text)
 end
-
 function gui_label_get_text(lbl):
     return aurora_gui_label_get_text(lbl)
 end
-
+function gui_label_set_font_size(lbl, size):
+    aurora_gui_label_set_font_size(lbl, size)
+end
+function gui_label_set_color(lbl, color):
+    aurora_gui_label_set_color(lbl, color)
+end
+function gui_label_set_align(lbl, align):
+    aurora_gui_label_set_align(lbl, align)
+end
+function gui_text_new(parent, text, x, y, w, h):
+    return aurora_gui_text_new(parent, text, x, y, w, h)
+end
+function gui_text_set_text(txt, text):
+    aurora_gui_text_set_text(txt, text)
+end
+function gui_text_get_text(txt):
+    return aurora_gui_text_get_text(txt)
+end
+function gui_button_new(parent, text, x, y, w, h):
+    return aurora_gui_button_new(parent, text, x, y, w, h)
+end
+function gui_button_set_text(btn, text):
+    aurora_gui_button_set_text(btn, text)
+end
+function gui_button_get_text(btn):
+    return aurora_gui_button_get_text(btn)
+end
+function gui_checkbox_new(parent, text, x, y, w, h):
+    return aurora_gui_checkbox_new(parent, text, x, y, w, h)
+end
+function gui_checkbox_set_text(cb, text):
+    aurora_gui_checkbox_set_text(cb, text)
+end
+function gui_checkbox_get_text(cb):
+    return aurora_gui_checkbox_get_text(cb)
+end
+function gui_checkbox_is_checked(cb):
+    return aurora_gui_checkbox_is_checked(cb)
+end
+function gui_checkbox_set_checked(cb, checked):
+    aurora_gui_checkbox_set_checked(cb, checked)
+end
+function gui_radiobutton_new(parent, text, x, y, w, h, group_id):
+    return aurora_gui_radiobutton_new(parent, text, x, y, w, h, group_id)
+end
+function gui_radiobutton_set_text(rb, text):
+    aurora_gui_radiobutton_set_text(rb, text)
+end
+function gui_radiobutton_get_text(rb):
+    return aurora_gui_radiobutton_get_text(rb)
+end
+function gui_radiobutton_is_checked(rb):
+    return aurora_gui_radiobutton_is_checked(rb)
+end
+function gui_radiobutton_set_checked(rb, checked):
+    aurora_gui_radiobutton_set_checked(rb, checked)
+end
+function gui_switch_new(parent, text, x, y, w, h):
+    return aurora_gui_switch_new(parent, text, x, y, w, h)
+end
+function gui_switch_is_on(sw):
+    return aurora_gui_switch_is_on(sw)
+end
+function gui_switch_set_on(sw, on):
+    aurora_gui_switch_set_on(sw, on)
+end
 function gui_textbox_new(parent, x, y, w, h):
     return aurora_gui_textbox_new(parent, x, y, w, h)
 end
-
 function gui_textbox_set_text(tb, text):
     aurora_gui_textbox_set_text(tb, text)
 end
-
 function gui_textbox_get_text(tb):
     return aurora_gui_textbox_get_text(tb)
 end
-
+function gui_textbox_set_readonly(tb, ro):
+    aurora_gui_textbox_set_readonly(tb, ro)
+end
+function gui_textbox_set_placeholder(tb, text):
+    aurora_gui_textbox_set_placeholder(tb, text)
+end
+function gui_textbox_set_multiline(tb, ml):
+    aurora_gui_textbox_set_multiline(tb, ml)
+end
+function gui_textbox_get_line_count(tb):
+    return aurora_gui_textbox_get_line_count(tb)
+end
+function gui_passwordbox_new(parent, x, y, w, h):
+    return aurora_gui_passwordbox_new(parent, x, y, w, h)
+end
+function gui_passwordbox_set_text(pb, text):
+    aurora_gui_passwordbox_set_text(pb, text)
+end
+function gui_passwordbox_get_text(pb):
+    return aurora_gui_passwordbox_get_text(pb)
+end
+function gui_slider_new(parent, x, y, w, h, min, max):
+    return aurora_gui_slider_new(parent, x, y, w, h, min, max)
+end
+function gui_slider_get_value(sl):
+    return aurora_gui_slider_get_value(sl)
+end
+function gui_slider_set_value(sl, value):
+    aurora_gui_slider_set_value(sl, value)
+end
+function gui_slider_set_range(sl, min, max):
+    aurora_gui_slider_set_range(sl, min, max)
+end
+function gui_progressbar_new(parent, x, y, w, h):
+    return aurora_gui_progressbar_new(parent, x, y, w, h)
+end
+function gui_progressbar_set_value(pb, value):
+    aurora_gui_progressbar_set_value(pb, value)
+end
+function gui_progressbar_get_value(pb):
+    return aurora_gui_progressbar_get_value(pb)
+end
+function gui_progressbar_set_range(pb, min, max):
+    aurora_gui_progressbar_set_range(pb, min, max)
+end
+function gui_progressbar_set_marquee(pb, on):
+    aurora_gui_progressbar_set_marquee(pb, on)
+end
+function gui_combobox_new(parent, x, y, w, h):
+    return aurora_gui_combobox_new(parent, x, y, w, h)
+end
+function gui_combobox_add_item(cb, item):
+    aurora_gui_combobox_add_item(cb, item)
+end
+function gui_combobox_clear(cb):
+    aurora_gui_combobox_clear(cb)
+end
+function gui_combobox_get_selected(cb):
+    return aurora_gui_combobox_get_selected(cb)
+end
+function gui_combobox_set_selected(cb, idx):
+    aurora_gui_combobox_set_selected(cb, idx)
+end
+function gui_combobox_count(cb):
+    return aurora_gui_combobox_count(cb)
+end
+function gui_combobox_get_item(cb, idx):
+    return aurora_gui_combobox_get_item(cb, idx)
+end
+function gui_dropdown_new(parent, x, y, w, h):
+    return aurora_gui_dropdown_new(parent, x, y, w, h)
+end
+function gui_dropdown_add_item(dd, item):
+    aurora_gui_dropdown_add_item(dd, item)
+end
+function gui_dropdown_clear(dd):
+    aurora_gui_dropdown_clear(dd)
+end
+function gui_dropdown_get_selected(dd):
+    return aurora_gui_dropdown_get_selected(dd)
+end
+function gui_dropdown_set_selected(dd, idx):
+    aurora_gui_dropdown_set_selected(dd, idx)
+end
+function gui_dropdown_count(dd):
+    return aurora_gui_dropdown_count(dd)
+end
+function gui_dropdown_get_item(dd, idx):
+    return aurora_gui_dropdown_get_item(dd, idx)
+end
 function gui_listbox_new(parent, x, y, w, h):
     return aurora_gui_listbox_new(parent, x, y, w, h)
 end
-
 function gui_listbox_add_item(lb, item):
     aurora_gui_listbox_add_item(lb, item)
 end
-
 function gui_listbox_clear(lb):
     aurora_gui_listbox_clear(lb)
 end
-
 function gui_listbox_get_selected(lb):
     return aurora_gui_listbox_get_selected(lb)
 end
-
 function gui_listbox_get_item(lb, idx):
     return aurora_gui_listbox_get_item(lb, idx)
 end
-
 function gui_listbox_count(lb):
     return aurora_gui_listbox_count(lb)
 end
-
+function gui_treeview_new(parent, x, y, w, h):
+    return aurora_gui_treeview_new(parent, x, y, w, h)
+end
+function gui_treeview_add_item(tv, text, parent_item):
+    return aurora_gui_treeview_add_item(tv, text, parent_item)
+end
+function gui_treeview_remove_item(tv, item):
+    aurora_gui_treeview_remove_item(tv, item)
+end
+function gui_treeview_clear(tv):
+    aurora_gui_treeview_clear(tv)
+end
+function gui_treeview_get_selected(tv):
+    return aurora_gui_treeview_get_selected(tv)
+end
+function gui_treeview_expand(tv, item):
+    aurora_gui_treeview_expand(tv, item)
+end
+function gui_treeview_collapse(tv, item):
+    aurora_gui_treeview_collapse(tv, item)
+end
+function gui_treeview_set_item_text(tv, item, text):
+    aurora_gui_treeview_set_item_text(tv, item, text)
+end
+function gui_table_new(parent, x, y, w, h):
+    return aurora_gui_table_new(parent, x, y, w, h)
+end
+function gui_table_add_column(tbl, title, width):
+    aurora_gui_table_add_column(tbl, title, width)
+end
+function gui_table_column_count(tbl):
+    return aurora_gui_table_column_count(tbl)
+end
+function gui_table_add_row(tbl):
+    return aurora_gui_table_add_row(tbl)
+end
+function gui_table_set_cell(tbl, row, col, text):
+    aurora_gui_table_set_cell(tbl, row, col, text)
+end
+function gui_table_get_cell(tbl, row, col):
+    return aurora_gui_table_get_cell(tbl, row, col)
+end
+function gui_table_remove_row(tbl, row):
+    aurora_gui_table_remove_row(tbl, row)
+end
+function gui_table_clear(tbl):
+    aurora_gui_table_clear(tbl)
+end
+function gui_table_get_selected(tbl):
+    return aurora_gui_table_get_selected(tbl)
+end
+function gui_table_row_count(tbl):
+    return aurora_gui_table_row_count(tbl)
+end
+function gui_tabview_new(parent, x, y, w, h):
+    return aurora_gui_tabview_new(parent, x, y, w, h)
+end
+function gui_tabview_add_page(tv, title):
+    return aurora_gui_tabview_add_page(tv, title)
+end
+function gui_tabview_get_selected(tv):
+    return aurora_gui_tabview_get_selected(tv)
+end
+function gui_tabview_set_selected(tv, idx):
+    aurora_gui_tabview_set_selected(tv, idx)
+end
+function gui_tabview_page_count(tv):
+    return aurora_gui_tabview_page_count(tv)
+end
+function gui_scrollview_new(parent, x, y, w, h):
+    return aurora_gui_scrollview_new(parent, x, y, w, h)
+end
+function gui_splitview_new(parent, x, y, w, h, orient):
+    return aurora_gui_splitview_new(parent, x, y, w, h, orient)
+end
+function gui_splitview_set_position(sv, pos):
+    aurora_gui_splitview_set_position(sv, pos)
+end
+function gui_splitview_get_position(sv):
+    return aurora_gui_splitview_get_position(sv)
+end
+function gui_splitview_get_pane1(sv):
+    return aurora_gui_splitview_get_pane1(sv)
+end
+function gui_splitview_get_pane2(sv):
+    return aurora_gui_splitview_get_pane2(sv)
+end
+function gui_groupbox_new(parent, title, x, y, w, h):
+    return aurora_gui_groupbox_new(parent, title, x, y, w, h)
+end
+function gui_image_new(parent, path, x, y, w, h):
+    return aurora_gui_image_new(parent, path, x, y, w, h)
+end
+function gui_image_load(img, path):
+    aurora_gui_image_load(img, path)
+end
+function gui_image_set_data(img, data, len):
+    aurora_gui_image_set_data(img, data, len)
+end
+function gui_canvas_new(parent, x, y, w, h):
+    return aurora_gui_canvas_new(parent, x, y, w, h)
+end
+function gui_canvas_set_paint_callback(cv, cb, user_data):
+    aurora_gui_canvas_set_paint_callback(cv, cb, user_data)
+end
+function gui_canvas_repaint(cv):
+    aurora_gui_canvas_repaint(cv)
+end
+function gui_menu_bar_new(parent):
+    return aurora_gui_menu_bar_new(parent)
+end
+function gui_menu_new(text):
+    return aurora_gui_menu_new(text)
+end
+function gui_menu_add_item(menu, text, id):
+    aurora_gui_menu_add_item(menu, text, id)
+end
+function gui_menu_add_separator(menu):
+    aurora_gui_menu_add_separator(menu)
+end
+function gui_menu_add_submenu(menu, submenu):
+    aurora_gui_menu_add_submenu(menu, submenu)
+end
+function gui_menu_bar_add_menu(menubar, menu):
+    aurora_gui_menu_bar_add_menu(menubar, menu)
+end
+function gui_menu_set_checked(menu, id, checked):
+    aurora_gui_menu_set_checked(menu, id, checked)
+end
+function gui_menu_set_enabled(menu, id, enabled):
+    aurora_gui_menu_set_enabled(menu, id, enabled)
+end
+function gui_toolbar_new(parent, x, y, w, h):
+    return aurora_gui_toolbar_new(parent, x, y, w, h)
+end
+function gui_toolbar_add_button(tb, text, id):
+    aurora_gui_toolbar_add_button(tb, text, id)
+end
+function gui_toolbar_add_separator(tb):
+    aurora_gui_toolbar_add_separator(tb)
+end
+function gui_statusbar_new(parent, x, y, w, h):
+    return aurora_gui_statusbar_new(parent, x, y, w, h)
+end
+function gui_statusbar_set_text(sb, text):
+    aurora_gui_statusbar_set_text(sb, text)
+end
+function gui_statusbar_get_text(sb):
+    return aurora_gui_statusbar_get_text(sb)
+end
+function gui_statusbar_set_parts(sb, widths, count):
+    aurora_gui_statusbar_set_parts(sb, widths, count)
+end
+function gui_dialog_new(parent, title, width, height):
+    return aurora_gui_dialog_new(parent, title, width, height)
+end
+function gui_dialog_show_modal(dlg):
+    return aurora_gui_dialog_show_modal(dlg)
+end
+function gui_dialog_close(dlg):
+    aurora_gui_dialog_close(dlg)
+end
+function gui_messagebox_show(parent, title, message, typ):
+    return aurora_gui_messagebox_show(parent, title, message, typ)
+end
+function gui_file_open_dialog(parent, title, filter):
+    return aurora_gui_file_open_dialog(parent, title, filter)
+end
+function gui_file_save_dialog(parent, title, filter):
+    return aurora_gui_file_save_dialog(parent, title, filter)
+end
+function gui_folder_select_dialog(parent, title):
+    return aurora_gui_folder_select_dialog(parent, title)
+end
+function gui_color_picker_dialog(parent, color):
+    return aurora_gui_color_picker_dialog(parent, color)
+end
+function gui_font_picker_dialog(parent, font_info):
+    return aurora_gui_font_picker_dialog(parent, font_info)
+end
+function gui_notification_show(parent, title, message, icon_type):
+    return aurora_gui_notification_show(parent, title, message, icon_type)
+end
+function gui_notification_remove(parent):
+    aurora_gui_notification_remove(parent)
+end
+function gui_clipboard_set_text(text):
+    return aurora_gui_clipboard_set_text(text)
+end
+function gui_clipboard_get_text():
+    return aurora_gui_clipboard_get_text()
+end
+function gui_cursor_set(typ):
+    aurora_gui_cursor_set(typ)
+end
+function gui_cursor_get():
+    return aurora_gui_cursor_get()
+end
+function gui_keyboard_is_key_down(key):
+    return aurora_gui_keyboard_is_key_down(key)
+end
+function gui_keyboard_get_modifiers():
+    return aurora_gui_keyboard_get_modifiers()
+end
+function gui_mouse_get_x():
+    return aurora_gui_mouse_get_x()
+end
+function gui_mouse_get_y():
+    return aurora_gui_mouse_get_y()
+end
+function gui_mouse_button_down(btn):
+    return aurora_gui_mouse_button_down(btn)
+end
+function gui_mouse_set_pos(x, y):
+    aurora_gui_mouse_set_pos(x, y)
+end
 function gui_run():
     aurora_gui_run()
 end
-
 function gui_quit():
     aurora_gui_quit()
 end
-
 function gui_set_callback(widget, cb):
     aurora_gui_set_callback(widget, cb)
 end
-
 function gui_layout_horizontal(parent, margin):
     aurora_gui_layout_horizontal(parent, margin)
 end
-
 function gui_layout_vertical(parent, margin):
     aurora_gui_layout_vertical(parent, margin)
+end
+
+/* ── Layout externs ── */
+extern function aurora_gui_row_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_column_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_stack_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_grid_new(parent: pointer, x: int, y: int, w: int, h: int, columns: int) -> pointer
+extern function aurora_gui_wrap_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_flow_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_layout_add_child(layout: pointer, child: pointer)
+extern function aurora_gui_layout_remove_child(layout: pointer, index: int)
+extern function aurora_gui_layout_clear(layout: pointer)
+extern function aurora_gui_layout_child_count(layout: pointer) -> int
+extern function aurora_gui_layout_recalc(layout: pointer)
+extern function aurora_gui_layout_set_main_align(layout: pointer, align: int)
+extern function aurora_gui_layout_set_cross_align(layout: pointer, align: int)
+extern function aurora_gui_layout_set_spacing(layout: pointer, spacing: int)
+extern function aurora_gui_layout_child_set_flex(layout: pointer, child: pointer, flex: int)
+extern function aurora_gui_layout_child_set_fit(layout: pointer, child: pointer, fit: int)
+extern function aurora_gui_grid_set_child_pos(grid: pointer, child: pointer, col: int, row: int, colspan: int, rowspan: int)
+extern function aurora_gui_spacer_new(parent: pointer, flex: int) -> pointer
+extern function aurora_gui_padding_new(parent: pointer, child: pointer, left: int, top: int, right: int, bottom: int) -> pointer
+extern function aurora_gui_margin_new(parent: pointer, child: pointer, left: int, top: int, right: int, bottom: int) -> pointer
+extern function aurora_gui_center_new(parent: pointer, child: pointer) -> pointer
+extern function aurora_gui_align_new(parent: pointer, child: pointer, align_x: int, align_y: int) -> pointer
+extern function aurora_gui_expand_new(parent: pointer, child: pointer, flex: int) -> pointer
+extern function aurora_gui_flexible_new(parent: pointer, child: pointer, flex: int) -> pointer
+extern function aurora_gui_container_new(parent: pointer, child: pointer) -> pointer
+extern function aurora_gui_container_set_padding(c: pointer, l: int, t: int, r: int, b: int)
+extern function aurora_gui_container_set_margin(c: pointer, l: int, t: int, r: int, b: int)
+extern function aurora_gui_container_set_bg(c: pointer, color: int)
+extern function aurora_gui_divider_new(parent: pointer, orientation: int, thickness: int, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_aspect_ratio_new(parent: pointer, child: pointer, ratio: float) -> pointer
+
+/* ── Layout convenience wrappers ── */
+function gui_row_new(parent, x, y, w, h):
+    return aurora_gui_row_new(parent, x, y, w, h)
+end
+function gui_column_new(parent, x, y, w, h):
+    return aurora_gui_column_new(parent, x, y, w, h)
+end
+function gui_stack_new(parent, x, y, w, h):
+    return aurora_gui_stack_new(parent, x, y, w, h)
+end
+function gui_grid_new(parent, x, y, w, h, cols):
+    return aurora_gui_grid_new(parent, x, y, w, h, cols)
+end
+function gui_wrap_new(parent, x, y, w, h):
+    return aurora_gui_wrap_new(parent, x, y, w, h)
+end
+function gui_flow_new(parent, x, y, w, h):
+    return aurora_gui_flow_new(parent, x, y, w, h)
+end
+function gui_layout_add_child(layout, child):
+    aurora_gui_layout_add_child(layout, child)
+end
+function gui_layout_remove_child(layout, index):
+    aurora_gui_layout_remove_child(layout, index)
+end
+function gui_layout_clear(layout):
+    aurora_gui_layout_clear(layout)
+end
+function gui_layout_child_count(layout):
+    return aurora_gui_layout_child_count(layout)
+end
+function gui_layout_recalc(layout):
+    aurora_gui_layout_recalc(layout)
+end
+function gui_layout_set_main_align(layout, align):
+    aurora_gui_layout_set_main_align(layout, align)
+end
+function gui_layout_set_cross_align(layout, align):
+    aurora_gui_layout_set_cross_align(layout, align)
+end
+function gui_layout_set_spacing(layout, spacing):
+    aurora_gui_layout_set_spacing(layout, spacing)
+end
+function gui_layout_child_set_flex(layout, child, flex):
+    aurora_gui_layout_child_set_flex(layout, child, flex)
+end
+function gui_layout_child_set_fit(layout, child, fit):
+    aurora_gui_layout_child_set_fit(layout, child, fit)
+end
+function gui_grid_set_child_pos(grid, child, col, row, colspan, rowspan):
+    aurora_gui_grid_set_child_pos(grid, child, col, row, colspan, rowspan)
+end
+function gui_spacer_new(parent, flex):
+    return aurora_gui_spacer_new(parent, flex)
+end
+function gui_padding_new(parent, child, left, top, right, bottom):
+    return aurora_gui_padding_new(parent, child, left, top, right, bottom)
+end
+function gui_margin_new(parent, child, left, top, right, bottom):
+    return aurora_gui_margin_new(parent, child, left, top, right, bottom)
+end
+function gui_center_new(parent, child):
+    return aurora_gui_center_new(parent, child)
+end
+function gui_align_new(parent, child, ax, ay):
+    return aurora_gui_align_new(parent, child, ax, ay)
+end
+function gui_expand_new(parent, child, flex):
+    return aurora_gui_expand_new(parent, child, flex)
+end
+function gui_flexible_new(parent, child, flex):
+    return aurora_gui_flexible_new(parent, child, flex)
+end
+function gui_container_new(parent, child):
+    return aurora_gui_container_new(parent, child)
+end
+function gui_container_set_padding(c, l, t, r, b):
+    aurora_gui_container_set_padding(c, l, t, r, b)
+end
+function gui_container_set_margin(c, l, t, r, b):
+    aurora_gui_container_set_margin(c, l, t, r, b)
+end
+function gui_container_set_bg(c, color):
+    aurora_gui_container_set_bg(c, color)
+end
+function gui_divider_new(parent, orient, thickness, x, y, w, h):
+    return aurora_gui_divider_new(parent, orient, thickness, x, y, w, h)
+end
+function gui_aspect_ratio_new(parent, child, ratio):
+    return aurora_gui_aspect_ratio_new(parent, child, ratio)
 end

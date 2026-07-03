@@ -1,0 +1,89 @@
+## Aurora Standard Library — Async Runtime
+## Usage:  import "async"
+##
+## Event loop with timers, idle callbacks, and dispatcher.
+##
+## Example:
+##   import "async"
+##   ev = async_create_loop()
+##   async_set_timeout(ev, 1000, fn, null)
+##   async_run(ev)
+##   async_destroy_loop(ev)
+## ════════════════════════════════════════════════════════════
+
+## ── Extern declarations ──
+
+## Event Loop
+extern function aurora_async_create_loop() -> i64
+extern function aurora_async_destroy_loop(h: i64)
+extern function aurora_async_run(h: i64)
+extern function aurora_async_run_once(h: i64)
+extern function aurora_async_stop(h: i64)
+
+## Timers
+extern function aurora_async_set_timeout(h: i64, delay_ms: i32, callback: pointer, arg: pointer) -> i64
+extern function aurora_async_set_interval(h: i64, interval_ms: i32, callback: pointer, arg: pointer) -> i64
+extern function aurora_async_clear_timer(h: i64, timer_id: i64)
+
+## Idle Callbacks
+extern function aurora_async_idle(h: i64, callback: pointer, arg: pointer) -> i64
+extern function aurora_async_remove_idle(h: i64, idle_id: i64)
+
+## Dispatcher (cross-thread safe)
+extern function aurora_async_dispatch(h: i64, callback: pointer, arg: pointer)
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Event Loop ──
+
+function async_create_loop():
+    return aurora_async_create_loop()
+end
+
+function async_destroy_loop(ev):
+    aurora_async_destroy_loop(ev)
+end
+
+function async_run(ev):
+    aurora_async_run(ev)
+end
+
+function async_run_once(ev):
+    aurora_async_run_once(ev)
+end
+
+function async_stop(ev):
+    aurora_async_stop(ev)
+end
+
+## ── Timers ──
+
+function async_set_timeout(ev, delay_ms, callback, arg):
+    return aurora_async_set_timeout(ev, delay_ms, callback, arg)
+end
+
+function async_set_interval(ev, interval_ms, callback, arg):
+    return aurora_async_set_interval(ev, interval_ms, callback, arg)
+end
+
+function async_clear_timer(ev, timer_id):
+    aurora_async_clear_timer(ev, timer_id)
+end
+
+## ── Idle Callbacks ──
+
+function async_idle(ev, callback, arg):
+    return aurora_async_idle(ev, callback, arg)
+end
+
+function async_remove_idle(ev, idle_id):
+    aurora_async_remove_idle(ev, idle_id)
+end
+
+## ── Dispatcher ──
+
+function async_dispatch(ev, callback, arg):
+    aurora_async_dispatch(ev, callback, arg)
+end

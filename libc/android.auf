@@ -1,0 +1,208 @@
+## Aurora Android Runtime API
+## Usage: import "android"  or  import libc:android
+##
+## Provides access to Android platform features: lifecycle, touch input,
+## sensors, permissions, display info, and toast notifications.
+##
+## Example:
+##   import "android"
+##
+##   w = android_screen_width()
+##   h = android_screen_height()
+##   output("Screen: " + str(w) + "x" + str(h))
+##
+##   # Touch input
+##   n = android_touch_count()
+##   if n > 0
+##       ev = map()
+##       android_touch_get(0, ev)
+##       output("Touch at " + str(ev.x) + ", " + str(ev.y))
+##   end
+##   android_touch_clear()
+##
+##   # Sensors
+##   android_sensors_enable(1)  # Accelerometer
+##   x = 0; y = 0; z = 0
+##   if android_sensor_data(1, x, y, z) == 0
+##       output("Accel: " + str(x) + ", " + str(y) + ", " + str(z))
+##   end
+##
+## ════════════════════════════════════════════════════════════
+
+import "collections"
+
+## ── Lifecycle ──
+
+extern function aurora_android_on_create()
+extern function aurora_android_on_start()
+extern function aurora_android_on_resume()
+extern function aurora_android_on_pause()
+extern function aurora_android_on_stop()
+extern function aurora_android_on_destroy()
+
+## ── Screen ──
+
+extern function aurora_android_screen_width() -> i32
+extern function aurora_android_screen_height() -> i32
+extern function aurora_android_orientation() -> i32
+extern function aurora_android_set_orientation(orient: i32)
+
+## ── Touch ──
+
+extern function aurora_android_touch_count() -> i32
+extern function aurora_android_touch_get(index: i32, out: pointer) -> i32
+extern function aurora_android_touch_clear()
+
+## ── Keyboard ──
+
+extern function aurora_android_key_pressed(key_code: i32) -> i32
+extern function aurora_android_ime_text() -> cstring
+
+## ── Sensor constants ──
+
+SENSOR_ACCELEROMETER = 1
+SENSOR_GYROSCOPE     = 2
+SENSOR_MAGNETOMETER  = 4
+SENSOR_LIGHT         = 8
+SENSOR_PROXIMITY     = 16
+
+## ── Sensors ──
+
+extern function aurora_android_sensors_enable(mask: i32)
+extern function aurora_android_sensors_disable(mask: i32)
+extern function aurora_android_sensor_data(type: i32, x: pointer, y: pointer, z: pointer) -> i32
+
+## ── Permissions ──
+
+extern function aurora_android_check_permission(permission: cstring) -> i32
+
+## ── Toast ──
+
+extern function aurora_android_toast(message: cstring, short_duration: i32)
+
+## ── Device info ──
+
+extern function aurora_android_device_model() -> cstring
+extern function aurora_android_device_manufacturer() -> cstring
+extern function aurora_android_os_version() -> cstring
+extern function aurora_android_density() -> f32
+extern function aurora_android_dp_to_px(dp: i32) -> i32
+extern function aurora_android_px_to_dp(px: i32) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Screen ──
+
+function android_screen_width():
+    return aurora_android_screen_width()
+end
+
+function android_screen_height():
+    return aurora_android_screen_height()
+end
+
+function android_orientation():
+    return aurora_android_orientation()
+end
+
+function android_set_orientation(orient):
+    aurora_android_set_orientation(orient)
+end
+
+## ── Touch ──
+
+function android_touch_count():
+    return aurora_android_touch_count()
+end
+
+function android_touch_get(index):
+    ev = map()
+    rc = aurora_android_touch_get(index, addr(ev))
+    if rc == 0
+        return ev
+    end
+    return null
+end
+
+function android_touch_clear():
+    aurora_android_touch_clear()
+end
+
+## ── Keyboard ──
+
+function android_key_pressed(key_code):
+    return aurora_android_key_pressed(key_code) != 0
+end
+
+function android_ime_text():
+    return aurora_android_ime_text()
+end
+
+## ── Sensors ──
+
+function android_sensors_enable(mask):
+    aurora_android_sensors_enable(mask)
+end
+
+function android_sensors_disable(mask):
+    aurora_android_sensors_disable(mask)
+end
+
+function android_sensor_data(type):
+    x = 0.0
+    y = 0.0
+    z = 0.0
+    rc = aurora_android_sensor_data(type, addr(x), addr(y), addr(z))
+    if rc == 0
+        result = map()
+        map_set(result, "x", x)
+        map_set(result, "y", y)
+        map_set(result, "z", z)
+        return result
+    end
+    return null
+end
+
+## ── Permissions ──
+
+function android_check_permission(perm):
+    return aurora_android_check_permission(perm) == 1
+end
+
+## ── Toast ──
+
+function android_toast(msg):
+    aurora_android_toast(msg, 1)
+end
+
+function android_toast_long(msg):
+    aurora_android_toast(msg, 0)
+end
+
+## ── Device info ──
+
+function android_device_model():
+    return aurora_android_device_model()
+end
+
+function android_device_manufacturer():
+    return aurora_android_device_manufacturer()
+end
+
+function android_os_version():
+    return aurora_android_os_version()
+end
+
+function android_density():
+    return aurora_android_density()
+end
+
+function android_dp_to_px(dp):
+    return aurora_android_dp_to_px(dp)
+end
+
+function android_px_to_dp(px):
+    return aurora_android_px_to_dp(px)
+end

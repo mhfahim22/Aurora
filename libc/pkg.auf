@@ -1,0 +1,118 @@
+## Aurora Package Manager Module (Phase 21)
+## Usage: import "pkg"  or  import libc:pkg
+##
+## Package management: install, remove, update, publish, search,
+## registry config, authentication, lock files, dependency resolution,
+## and offline cache management.
+##
+## ════════════════════════════════════════════════════════════
+
+// ── Extern Functions (Package Management, 6) ──
+extern function aurora_pkg_install(name: str, version: str) -> int
+extern function aurora_pkg_remove(name: str) -> int
+extern function aurora_pkg_update(name: str) -> int
+extern function aurora_pkg_publish(path: str) -> int
+extern function aurora_pkg_search(query: str, results: ptr, count: ptr) -> int
+extern function aurora_pkg_list_installed(names: ptr, count: ptr) -> int
+
+// ── Extern Functions (Registry, 2) ──
+extern function aurora_pkg_set_registry(url: str)
+extern function aurora_pkg_get_registry() -> str
+
+// ── Extern Functions (Authentication, 1) ──
+extern function aurora_pkg_login(token: str) -> int
+
+// ── Extern Functions (Lock File, 3) ──
+extern function aurora_pkg_lock_init() -> int
+extern function aurora_pkg_lock_save() -> int
+extern function aurora_pkg_lock_load() -> int
+
+// ── Extern Functions (Dependency Resolution, 3) ──
+extern function aurora_pkg_dep_resolve(name: str) -> int
+extern function aurora_pkg_dep_get_count() -> int
+extern function aurora_pkg_dep_get_name(index: int) -> str
+
+// ── Extern Functions (Offline Cache, 3) ──
+extern function aurora_pkg_cache_list(names: ptr, count: ptr) -> int
+extern function aurora_pkg_cache_clear()
+extern function aurora_pkg_cache_path() -> str
+
+// ── Wrappers ──
+
+// Package Management
+pub fn pkg_install(name: str, version: str = "") -> int
+    aurora_pkg_install(name, version)
+
+pub fn pkg_remove(name: str) -> int
+    aurora_pkg_remove(name)
+
+pub fn pkg_update(name: str = "") -> int
+    aurora_pkg_update(name)
+
+pub fn pkg_publish(path: str) -> int
+    aurora_pkg_publish(path)
+
+pub fn pkg_search(query: str) -> [str]
+    results: ptr; count: int = 0
+    if aurora_pkg_search(query, &results, &count) == 0
+        return []
+    arr: [str] = []
+    for i in range(count)
+        arr.append(results[i])
+    arr
+
+pub fn pkg_list_installed() -> [str]
+    names: ptr; count: int = 0
+    if aurora_pkg_list_installed(&names, &count) == 0
+        return []
+    arr: [str] = []
+    for i in range(count)
+        arr.append(names[i])
+    arr
+
+// Registry
+pub fn pkg_set_registry(url: str)
+    aurora_pkg_set_registry(url)
+
+pub fn pkg_get_registry() -> str
+    aurora_pkg_get_registry()
+
+// Authentication
+pub fn pkg_login(token: str) -> int
+    aurora_pkg_login(token)
+
+// Lock File
+pub fn pkg_lock_init() -> int
+    aurora_pkg_lock_init()
+
+pub fn pkg_lock_save() -> int
+    aurora_pkg_lock_save()
+
+pub fn pkg_lock_load() -> int
+    aurora_pkg_lock_load()
+
+// Dependency Resolution
+pub fn pkg_dep_resolve(name: str) -> int
+    aurora_pkg_dep_resolve(name)
+
+pub fn pkg_dep_get_count() -> int
+    aurora_pkg_dep_get_count()
+
+pub fn pkg_dep_get_name(index: int) -> str
+    aurora_pkg_dep_get_name(index)
+
+// Offline Cache
+pub fn pkg_cache_list() -> [str]
+    names: ptr; count: int = 0
+    if aurora_pkg_cache_list(&names, &count) == 0
+        return []
+    arr: [str] = []
+    for i in range(count)
+        arr.append(names[i])
+    arr
+
+pub fn pkg_cache_clear()
+    aurora_pkg_cache_clear()
+
+pub fn pkg_cache_path() -> str
+    aurora_pkg_cache_path()

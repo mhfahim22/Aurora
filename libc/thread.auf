@@ -1,0 +1,344 @@
+## Aurora Standard Library — Threading & Concurrency
+## Usage:  import "thread"
+##
+## Thread, Mutex, RWLock, ConditionVariable, Semaphore, Atomic,
+## Future/Promise, and ThreadPool for concurrent programming.
+##
+## Example:
+##   import "thread"
+##   m = mutex_create()
+##   mutex_lock(m)
+##   ## critical section
+##   mutex_unlock(m)
+##   mutex_destroy(m)
+## ════════════════════════════════════════════════════════════
+
+## ── Extern declarations ──
+
+## Thread
+extern function aurora_thread_create(func: pointer, arg: pointer) -> i64
+extern function aurora_thread_join(handle: i64)
+extern function aurora_thread_detach(handle: i64)
+extern function aurora_thread_self() -> i64
+extern function aurora_thread_sleep(ms: i32)
+
+## Mutex
+extern function aurora_mutex_create() -> i64
+extern function aurora_mutex_destroy(handle: i64)
+extern function aurora_mutex_lock(handle: i64)
+extern function aurora_mutex_unlock(handle: i64)
+extern function aurora_mutex_try_lock(handle: i64) -> i32
+
+## LockGuard (RAII)
+extern function aurora_lock_guard_create(mutex_handle: i64) -> i64
+extern function aurora_lock_guard_destroy(handle: i64)
+
+## RWLock
+extern function aurora_rwlock_create() -> i64
+extern function aurora_rwlock_destroy(handle: i64)
+extern function aurora_rwlock_read_lock(handle: i64)
+extern function aurora_rwlock_read_unlock(handle: i64)
+extern function aurora_rwlock_write_lock(handle: i64)
+extern function aurora_rwlock_write_unlock(handle: i64)
+
+## Condition Variable
+extern function aurora_condvar_create() -> i64
+extern function aurora_condvar_destroy(handle: i64)
+extern function aurora_condvar_wait(handle: i64, mutex_handle: i64)
+extern function aurora_condvar_signal(handle: i64)
+extern function aurora_condvar_broadcast(handle: i64)
+
+## Semaphore
+extern function aurora_semaphore_create(initial_count: i32) -> i64
+extern function aurora_semaphore_destroy(handle: i64)
+extern function aurora_semaphore_wait(handle: i64)
+extern function aurora_semaphore_post(handle: i64)
+extern function aurora_semaphore_try_wait(handle: i64) -> i32
+
+## Atomic (i64)
+extern function aurora_atomic_create(initial: i64) -> i64
+extern function aurora_atomic_destroy(handle: i64)
+extern function aurora_atomic_load(handle: i64) -> i64
+extern function aurora_atomic_store(handle: i64, val: i64)
+extern function aurora_atomic_fetch_add(handle: i64, val: i64) -> i64
+extern function aurora_atomic_fetch_sub(handle: i64, val: i64) -> i64
+extern function aurora_atomic_exchange(handle: i64, val: i64) -> i64
+extern function aurora_atomic_compare_exchange(handle: i64, expected: i64, desired: i64) -> i32
+
+## Future / Promise
+extern function aurora_future_create() -> i64
+extern function aurora_future_destroy(handle: i64)
+extern function aurora_future_is_ready(handle: i64) -> i32
+extern function aurora_future_get(handle: i64) -> i64
+extern function aurora_future_try_get(handle: i64) -> i64
+extern function aurora_promise_set_value(future_handle: i64, value: i64)
+extern function aurora_promise_set_exception(future_handle: i64)
+
+## Thread Pool
+extern function aurora_thread_pool_create(thread_count: i32) -> i64
+extern function aurora_thread_pool_destroy(handle: i64)
+extern function aurora_thread_pool_enqueue(handle: i64, func: pointer, arg: pointer) -> i64
+extern function aurora_thread_pool_pending(handle: i64) -> i32
+extern function aurora_thread_pool_worker_count(handle: i64) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Thread ──
+
+## Create a new thread running func(arg)
+function thread_create(func, arg):
+    return aurora_thread_create(func, arg)
+end
+
+## Join a thread (blocks until it exits)
+function thread_join(handle):
+    aurora_thread_join(handle)
+end
+
+## Detach a thread (runs independently)
+function thread_detach(handle):
+    aurora_thread_detach(handle)
+end
+
+## Get current thread ID
+function thread_self():
+    return aurora_thread_self()
+end
+
+## Sleep for ms milliseconds
+function thread_sleep(ms):
+    aurora_thread_sleep(ms)
+end
+
+## ── Mutex ──
+
+## Create a new mutex
+function mutex_create():
+    return aurora_mutex_create()
+end
+
+## Destroy a mutex
+function mutex_destroy(handle):
+    aurora_mutex_destroy(handle)
+end
+
+## Lock a mutex (blocks if already locked)
+function mutex_lock(handle):
+    aurora_mutex_lock(handle)
+end
+
+## Unlock a mutex
+function mutex_unlock(handle):
+    aurora_mutex_unlock(handle)
+end
+
+## Try to lock a mutex (non-blocking, returns true on success)
+function mutex_try_lock(handle):
+    return aurora_mutex_try_lock(handle) == 1
+end
+
+## ── LockGuard (RAII) ──
+
+## Create a lock guard that locks a mutex until destroyed
+function lock_guard_create(mutex_handle):
+    return aurora_lock_guard_create(mutex_handle)
+end
+
+## Destroy a lock guard (unlocks the mutex)
+function lock_guard_destroy(handle):
+    aurora_lock_guard_destroy(handle)
+end
+
+## ── RWLock ──
+
+## Create a new read-write lock
+function rwlock_create():
+    return aurora_rwlock_create()
+end
+
+## Destroy an RWLock
+function rwlock_destroy(handle):
+    aurora_rwlock_destroy(handle)
+end
+
+## Acquire shared (read) lock
+function rwlock_read_lock(handle):
+    aurora_rwlock_read_lock(handle)
+end
+
+## Release shared (read) lock
+function rwlock_read_unlock(handle):
+    aurora_rwlock_read_unlock(handle)
+end
+
+## Acquire exclusive (write) lock
+function rwlock_write_lock(handle):
+    aurora_rwlock_write_lock(handle)
+end
+
+## Release exclusive (write) lock
+function rwlock_write_unlock(handle):
+    aurora_rwlock_write_unlock(handle)
+end
+
+## ── Condition Variable ──
+
+## Create a condition variable
+function condvar_create():
+    return aurora_condvar_create()
+end
+
+## Destroy a condition variable
+function condvar_destroy(handle):
+    aurora_condvar_destroy(handle)
+end
+
+## Wait on a condition variable (atomically unlocks mutex)
+function condvar_wait(handle, mutex_handle):
+    aurora_condvar_wait(handle, mutex_handle)
+end
+
+## Signal one waiting thread
+function condvar_signal(handle):
+    aurora_condvar_signal(handle)
+end
+
+## Broadcast to all waiting threads
+function condvar_broadcast(handle):
+    aurora_condvar_broadcast(handle)
+end
+
+## ── Semaphore ──
+
+## Create a counting semaphore with initial count
+function semaphore_create(initial_count):
+    return aurora_semaphore_create(initial_count)
+end
+
+## Destroy a semaphore
+function semaphore_destroy(handle):
+    aurora_semaphore_destroy(handle)
+end
+
+## Decrement (block if zero)
+function semaphore_wait(handle):
+    aurora_semaphore_wait(handle)
+end
+
+## Increment (wake a waiter)
+function semaphore_post(handle):
+    aurora_semaphore_post(handle)
+end
+
+## Try to decrement (non-blocking)
+function semaphore_try_wait(handle):
+    return aurora_semaphore_try_wait(handle) == 1
+end
+
+## ── Atomic ──
+
+## Create an atomic i64 with initial value
+function atomic_create(initial):
+    return aurora_atomic_create(initial)
+end
+
+## Destroy an atomic
+function atomic_destroy(handle):
+    aurora_atomic_destroy(handle)
+end
+
+## Load current value
+function atomic_load(handle):
+    return aurora_atomic_load(handle)
+end
+
+## Store a value
+function atomic_store(handle, val):
+    aurora_atomic_store(handle, val)
+end
+
+## Atomically add and return previous value
+function atomic_fetch_add(handle, val):
+    return aurora_atomic_fetch_add(handle, val)
+end
+
+## Atomically subtract and return previous value
+function atomic_fetch_sub(handle, val):
+    return aurora_atomic_fetch_sub(handle, val)
+end
+
+## Atomically exchange a value
+function atomic_exchange(handle, val):
+    return aurora_atomic_exchange(handle, val)
+end
+
+## Compare-and-exchange: set to desired only if current == expected
+function atomic_compare_exchange(handle, expected, desired):
+    return aurora_atomic_compare_exchange(handle, expected, desired) == 1
+end
+
+## ── Future / Promise ──
+
+## Create a future (initially not ready)
+function future_create():
+    return aurora_future_create()
+end
+
+## Destroy a future
+function future_destroy(handle):
+    aurora_future_destroy(handle)
+end
+
+## Check if future has a value
+function future_is_ready(handle):
+    return aurora_future_is_ready(handle) == 1
+end
+
+## Get future value (blocks until ready)
+function future_get(handle):
+    return aurora_future_get(handle)
+end
+
+## Try to get future value (non-blocking, returns 0 if not ready)
+function future_try_get(handle):
+    return aurora_future_try_get(handle)
+end
+
+## Set future value (fulfills the promise)
+function promise_set_value(future_handle, value):
+    aurora_promise_set_value(future_handle, value)
+end
+
+## Set future exception
+function promise_set_exception(future_handle):
+    aurora_promise_set_exception(future_handle)
+end
+
+## ── Thread Pool ──
+
+## Create a thread pool with N worker threads
+function thread_pool_create(thread_count):
+    return aurora_thread_pool_create(thread_count)
+end
+
+## Destroy a thread pool (drains pending tasks, joins workers)
+function thread_pool_destroy(handle):
+    aurora_thread_pool_destroy(handle)
+end
+
+## Enqueue a function+arg onto the thread pool
+function thread_pool_enqueue(handle, func, arg):
+    return aurora_thread_pool_enqueue(handle, func, arg)
+end
+
+## Get number of pending tasks
+function thread_pool_pending(handle):
+    return aurora_thread_pool_pending(handle)
+end
+
+## Get number of worker threads
+function thread_pool_worker_count(handle):
+    return aurora_thread_pool_worker_count(handle)
+end

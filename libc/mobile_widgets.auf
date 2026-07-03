@@ -1,0 +1,112 @@
+## Aurora Mobile Widget System
+## Usage: import "mobile_widgets"  or  import libc:mobile_widgets
+##
+## Provides a cross-platform mobile UI widget system for Android and iOS.
+## Supports: Button, Text, Image, Column, Row, Grid, List, Scroll, Input,
+## Dialog, BottomSheet, NavigationBar, TabBar, Drawer, FloatingButton, SnackBar.
+##
+## Widget Types:
+@ MW_BUTTON       = 0
+@ MW_TEXT         = 1
+@ MW_IMAGE        = 2
+@ MW_COLUMN       = 3
+@ MW_ROW          = 4
+@ MW_GRID         = 5
+@ MW_LIST         = 6
+@ MW_SCROLL       = 7
+@ MW_INPUT        = 8
+@ MW_DIALOG       = 9
+@ MW_BOTTOM_SHEET = 10
+@ MW_NAV_BAR      = 11
+@ MW_TAB_BAR      = 12
+@ MW_DRAWER       = 13
+@ MW_FAB          = 14
+@ MW_SNACKBAR     = 15
+
+## Event Types
+@ MW_EVENT_CLICK      = 0
+@ MW_EVENT_CHANGE     = 1
+@ MW_EVENT_FOCUS      = 2
+@ MW_EVENT_BLUR       = 3
+@ MW_EVENT_SUBMIT     = 4
+@ MW_EVENT_TAB_SELECT = 5
+@ MW_EVENT_SCROLL     = 6
+@ MW_EVENT_DRAWER     = 7
+@ MW_EVENT_DISMISS    = 8
+
+## Layout Alignment
+@ MW_MAIN_START        = 0
+@ MW_MAIN_CENTER       = 1
+@ MW_MAIN_END          = 2
+@ MW_MAIN_SPACE_BETWEEN = 3
+@ MW_MAIN_SPACE_AROUND  = 4
+@ MW_CROSS_START       = 0
+@ MW_CROSS_CENTER      = 1
+@ MW_CROSS_END         = 2
+@ MW_CROSS_STRETCH     = 3
+
+## Touch Actions
+@ MW_TOUCH_DOWN   = 0
+@ MW_TOUCH_UP     = 1
+@ MW_TOUCH_MOVE   = 2
+@ MW_TOUCH_CANCEL = 3
+
+## ════════════════════════════════════════════════════════════
+## Low-level extern declarations
+## ════════════════════════════════════════════════════════════
+
+## Lifecycle
+extern function mw_init()
+extern function mw_shutdown()
+
+## Create / Destroy
+extern function mw_create(type: i32) -> pointer
+extern function mw_destroy(widget: pointer)
+
+## Parenting
+extern function mw_add_child(parent: pointer, child: pointer)
+extern function mw_remove_child(parent: pointer, child: pointer)
+
+## Position / Size
+extern function mw_set_pos(widget: pointer, x: f32, y: f32)
+extern function mw_set_size(widget: pointer, w: f32, h: f32)
+extern function mw_get_width(widget: pointer) -> f32
+extern function mw_get_height(widget: pointer) -> f32
+
+## Layout
+extern function mw_layout(widget: pointer)
+extern function mw_set_align(widget: pointer, main_axis: i32, cross_axis: i32)
+extern function mw_set_spacing(widget: pointer, spacing: f32)
+extern function mw_set_padding(widget: pointer, l: f32, t: f32, r: f32, b: f32)
+extern function mw_set_margin(widget: pointer, l: f32, t: f32, r: f32, b: f32)
+
+## Visual Properties
+extern function mw_set_bg_color(widget: pointer, r: f32, g: f32, b: f32, a: f32)
+extern function mw_set_text_color(widget: pointer, r: f32, g: f32, b: f32, a: f32)
+extern function mw_set_font_size(widget: pointer, size: f32)
+extern function mw_set_text(widget: pointer, text: string)
+extern function mw_get_text(widget: pointer) -> string
+extern function mw_set_enabled(widget: pointer, enabled: i32)
+extern function mw_set_visible(widget: pointer, visible: i32)
+extern function mw_set_image(widget: pointer, path: string)
+
+## Value / Selection
+extern function mw_set_value(widget: pointer, value: f32)
+extern function mw_set_selected(widget: pointer, index: i32)
+extern function mw_get_type(widget: pointer) -> i32
+
+## Items (for List, TabBar)
+extern function mw_add_item(widget: pointer, text: string)
+extern function mw_remove_item(widget: pointer, index: i32)
+extern function mw_clear_items(widget: pointer)
+
+## Events
+extern function mw_set_callback(widget: pointer, callback: pointer)
+extern function mw_handle_touch(widget: pointer, x: f32, y: f32, action: i32) -> i32
+
+## Scroll
+extern function mw_set_scroll_pos(widget: pointer, x: f32, y: f32)
+extern function mw_get_scroll_pos(widget: pointer, x: pointer, y: pointer)
+
+## Rendering
+extern function mw_render(widget: pointer)

@@ -1,0 +1,150 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 27 — Security Module
+//  Sandbox, Permission Model, Secure Storage, Encryption,
+//  Certificate APIs, Hashing, Authentication Helpers
+// ═══════════════════════════════════════════════════════════════════
+
+module "sec"
+
+// ── Extern Functions (Sandbox, 4) ──
+extern function aurora_sec_sandbox_init() -> int
+extern function aurora_sec_sandbox_allow_path(path: str) -> int
+extern function aurora_sec_sandbox_check_path(path: str) -> int
+extern function aurora_sec_sandbox_destroy()
+
+// ── Extern Functions (Permission, 4) ──
+extern function aurora_sec_permission_check(perm: str) -> int
+extern function aurora_sec_permission_request(perm: str) -> int
+extern function aurora_sec_permission_list() -> str
+extern function aurora_sec_permission_revoke(perm: str) -> int
+
+// ── Extern Functions (Secure Storage, 5) ──
+extern function aurora_sec_storage_open(path: str, key: ptr, key_len: int) -> ptr
+extern function aurora_sec_storage_set(store: ptr, key: str, value: str) -> int
+extern function aurora_sec_storage_get(store: ptr, key: str) -> str
+extern function aurora_sec_storage_remove(store: ptr, key: str) -> int
+extern function aurora_sec_storage_close(store: ptr)
+
+// ── Extern Functions (Encryption, 5) ──
+extern function aurora_sec_generate_key(out: ptr, len: int) -> int
+extern function aurora_sec_generate_iv(out: ptr, len: int) -> int
+extern function aurora_sec_encrypt(key: ptr, key_len: int, iv: ptr, input: ptr, in_len: int, output: ptr, out_len: ptr) -> int
+extern function aurora_sec_decrypt(key: ptr, key_len: int, iv: ptr, input: ptr, in_len: int, output: ptr, out_len: ptr) -> int
+extern function aurora_sec_pbkdf2(password: str, salt: ptr, salt_len: int, iterations: int, out: ptr, out_len: int) -> int
+
+// ── Extern Functions (Certificates, 4) ──
+extern function aurora_sec_cert_load(path: str) -> ptr
+extern function aurora_sec_cert_info(cert: ptr) -> str
+extern function aurora_sec_cert_verify(cert: ptr, ca_path: str) -> int
+extern function aurora_sec_cert_free(cert: ptr)
+
+// ── Extern Functions (Hashing, 4) ──
+extern function aurora_sec_sha256(data: ptr, len: int) -> str
+extern function aurora_sec_hmac_sha256(key: ptr, key_len: int, data: ptr, data_len: int) -> str
+extern function aurora_sec_hash_password(password: str) -> str
+extern function aurora_sec_verify_password(password: str, hash: str) -> int
+
+// ── Extern Functions (Authentication, 4) ──
+extern function aurora_sec_token_generate(payload: str, secret: str) -> str
+extern function aurora_sec_token_verify(token: str, secret: str) -> int
+extern function aurora_sec_basic_auth(username: str, password: str) -> str
+extern function aurora_sec_bearer_auth(token: str) -> str
+
+// ── Wrappers ──
+
+// Sandbox
+pub fn sandbox_init() -> int
+    aurora_sec_sandbox_init()
+
+pub fn sandbox_allow_path(path: str) -> int
+    aurora_sec_sandbox_allow_path(path)
+
+pub fn sandbox_check_path(path: str) -> int
+    aurora_sec_sandbox_check_path(path)
+
+pub fn sandbox_destroy()
+    aurora_sec_sandbox_destroy()
+
+// Permission Model
+pub fn permission_check(perm: str) -> int
+    aurora_sec_permission_check(perm)
+
+pub fn permission_request(perm: str) -> int
+    aurora_sec_permission_request(perm)
+
+pub fn permission_list() -> str
+    aurora_sec_permission_list()
+
+pub fn permission_revoke(perm: str) -> int
+    aurora_sec_permission_revoke(perm)
+
+// Secure Storage
+pub fn storage_open(path: str, key: ptr, key_len: int) -> ptr
+    aurora_sec_storage_open(path, key, key_len)
+
+pub fn storage_set(store: ptr, key: str, value: str) -> int
+    aurora_sec_storage_set(store, key, value)
+
+pub fn storage_get(store: ptr, key: str) -> str
+    aurora_sec_storage_get(store, key)
+
+pub fn storage_remove(store: ptr, key: str) -> int
+    aurora_sec_storage_remove(store, key)
+
+pub fn storage_close(store: ptr)
+    aurora_sec_storage_close(store)
+
+// Encryption
+pub fn generate_key(out: ptr, len: int) -> int
+    aurora_sec_generate_key(out, len)
+
+pub fn generate_iv(out: ptr, len: int) -> int
+    aurora_sec_generate_iv(out, len)
+
+pub fn encrypt(key: ptr, key_len: int, iv: ptr, input: ptr, in_len: int, output: ptr, out_len: ptr) -> int
+    aurora_sec_encrypt(key, key_len, iv, input, in_len, output, out_len)
+
+pub fn decrypt(key: ptr, key_len: int, iv: ptr, input: ptr, in_len: int, output: ptr, out_len: ptr) -> int
+    aurora_sec_decrypt(key, key_len, iv, input, in_len, output, out_len)
+
+pub fn pbkdf2(password: str, salt: ptr, salt_len: int, iterations: int, out: ptr, out_len: int) -> int
+    aurora_sec_pbkdf2(password, salt, salt_len, iterations, out, out_len)
+
+// Certificates
+pub fn cert_load(path: str) -> ptr
+    aurora_sec_cert_load(path)
+
+pub fn cert_info(cert: ptr) -> str
+    aurora_sec_cert_info(cert)
+
+pub fn cert_verify(cert: ptr, ca_path: str) -> int
+    aurora_sec_cert_verify(cert, ca_path)
+
+pub fn cert_free(cert: ptr)
+    aurora_sec_cert_free(cert)
+
+// Hashing
+pub fn sha256(data: ptr, len: int) -> str
+    aurora_sec_sha256(data, len)
+
+pub fn hmac_sha256(key: ptr, key_len: int, data: ptr, data_len: int) -> str
+    aurora_sec_hmac_sha256(key, key_len, data, data_len)
+
+pub fn hash_password(password: str) -> str
+    aurora_sec_hash_password(password)
+
+pub fn verify_password(password: str, hash: str) -> int
+    aurora_sec_verify_password(password, hash)
+
+// Authentication
+pub fn token_generate(payload: str, secret: str) -> str
+    aurora_sec_token_generate(payload, secret)
+
+pub fn token_verify(token: str, secret: str) -> int
+    aurora_sec_token_verify(token, secret)
+
+pub fn basic_auth(username: str, password: str) -> str
+    aurora_sec_basic_auth(username, password)
+
+pub fn bearer_auth(token: str) -> str
+    aurora_sec_bearer_auth(token)

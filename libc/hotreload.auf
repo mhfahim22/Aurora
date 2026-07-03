@@ -1,0 +1,115 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 23 — Hot Reload
+//  UI reload, code reload, asset reload, state preservation,
+//  developer console
+// ═══════════════════════════════════════════════════════════════════
+
+module "hotreload"
+
+// ── Extern Functions (File Watching, 4) ──
+extern function aurora_hotreload_watch(path: str) -> int
+extern function aurora_hotreload_unwatch(path: str)
+extern function aurora_hotreload_poll() -> str
+extern function aurora_hotreload_clear()
+
+// ── Extern Functions (UI Reload, 4) ──
+extern function aurora_hotreload_ui_set_rebuild_fn(fn: ptr)
+extern function aurora_hotreload_ui_rebuild(widget_id: str)
+extern function aurora_hotreload_ui_preserve_state(id: str, data: str)
+extern function aurora_hotreload_ui_get_state(id: str) -> str
+
+// ── Extern Functions (Code Reload, 4) ──
+extern function aurora_hotreload_code_reload(module: str) -> int
+extern function aurora_hotreload_code_is_stale(module: str) -> int
+extern function aurora_hotreload_code_set_reload_fn(fn: ptr)
+extern function aurora_hotreload_code_get_version(module: str) -> str
+
+// ── Extern Functions (Asset Reload, 3) ──
+extern function aurora_hotreload_asset_reload(path: str)
+extern function aurora_hotreload_asset_set_reload_fn(fn: ptr)
+extern function aurora_hotreload_asset_is_dirty(path: str) -> int
+
+// ── Extern Functions (State Preservation, 3) ──
+extern function aurora_hotreload_state_save(key: str, data: str)
+extern function aurora_hotreload_state_load(key: str) -> str
+extern function aurora_hotreload_state_clear()
+
+// ── Extern Functions (Developer Console, 4) ──
+extern function aurora_hotreload_console_open()
+extern function aurora_hotreload_console_close()
+extern function aurora_hotreload_console_log(msg: str)
+extern function aurora_hotreload_console_exec(command: str) -> str
+
+// ── Wrappers ──
+
+// File Watching
+pub fn watch(path: str) -> int
+    aurora_hotreload_watch(path)
+
+pub fn unwatch(path: str)
+    aurora_hotreload_unwatch(path)
+
+pub fn poll() -> str
+    aurora_hotreload_poll()
+
+pub fn clear_watches()
+    aurora_hotreload_clear()
+
+// UI Reload
+pub fn set_ui_rebuild_fn(fn: ptr)
+    aurora_hotreload_ui_set_rebuild_fn(fn)
+
+pub fn ui_rebuild(widget_id: str)
+    aurora_hotreload_ui_rebuild(widget_id)
+
+pub fn preserve_state(id: str, data: str)
+    aurora_hotreload_ui_preserve_state(id, data)
+
+pub fn get_state(id: str) -> str
+    aurora_hotreload_ui_get_state(id)
+
+// Code Reload
+pub fn code_reload(module: str) -> int
+    aurora_hotreload_code_reload(module)
+
+pub fn code_is_stale(module: str) -> int
+    aurora_hotreload_code_is_stale(module)
+
+pub fn set_code_reload_fn(fn: ptr)
+    aurora_hotreload_code_set_reload_fn(fn)
+
+pub fn code_get_version(module: str) -> str
+    aurora_hotreload_code_get_version(module)
+
+// Asset Reload
+pub fn asset_reload(path: str)
+    aurora_hotreload_asset_reload(path)
+
+pub fn set_asset_reload_fn(fn: ptr)
+    aurora_hotreload_asset_set_reload_fn(fn)
+
+pub fn asset_is_dirty(path: str) -> int
+    aurora_hotreload_asset_is_dirty(path)
+
+// State Preservation
+pub fn state_save(key: str, data: str)
+    aurora_hotreload_state_save(key, data)
+
+pub fn state_load(key: str) -> str
+    aurora_hotreload_state_load(key)
+
+pub fn state_clear()
+    aurora_hotreload_state_clear()
+
+// Developer Console
+pub fn console_open()
+    aurora_hotreload_console_open()
+
+pub fn console_close()
+    aurora_hotreload_console_close()
+
+pub fn console_log(msg: str)
+    aurora_hotreload_console_log(msg)
+
+pub fn console_exec(command: str) -> str
+    aurora_hotreload_console_exec(command)

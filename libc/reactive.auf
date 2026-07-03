@@ -1,0 +1,116 @@
+## Reactive UI System — State, Binding, Computed, Effects
+## Usage: import "reactive"
+
+/* ── State ── */
+extern function aurora_reactive_state_new(initial: pointer) -> pointer
+extern function aurora_reactive_state_set(state: pointer, value: pointer)
+extern function aurora_reactive_state_get(state: pointer) -> pointer
+extern function aurora_reactive_state_delete(state: pointer)
+
+/* ── Computed ── */
+extern function aurora_reactive_computed_new(fn: pointer, user_data: pointer) -> pointer
+extern function aurora_reactive_computed_get(computed: pointer) -> pointer
+
+/* ── Effect ── */
+extern function aurora_reactive_effect(fn: pointer, user_data: pointer) -> int
+extern function aurora_reactive_effect_clear(id: int)
+
+/* ── Binding ── */
+extern function aurora_reactive_bind_text(widget: pointer, state: pointer) -> int
+extern function aurora_reactive_bind_enabled(widget: pointer, state: pointer) -> int
+extern function aurora_reactive_bind_visible(widget: pointer, state: pointer) -> int
+extern function aurora_reactive_bind_checked(widget: pointer, state: pointer) -> int
+extern function aurora_reactive_bind_value(widget: pointer, state: pointer) -> int
+extern function aurora_reactive_bind_label(widget: pointer, state: pointer) -> int
+extern function aurora_reactive_unbind(widget: pointer, id: int)
+extern function aurora_reactive_unbind_all(widget: pointer)
+
+/* ── Reactive List ── */
+extern function aurora_reactive_list_new() -> pointer
+extern function aurora_reactive_list_add(list: pointer, item: pointer)
+extern function aurora_reactive_list_insert(list: pointer, index: int, item: pointer)
+extern function aurora_reactive_list_get(list: pointer, index: int) -> pointer
+extern function aurora_reactive_list_set(list: pointer, index: int, item: pointer)
+extern function aurora_reactive_list_remove(list: pointer, index: int)
+extern function aurora_reactive_list_size(list: pointer) -> int
+extern function aurora_reactive_list_clear(list: pointer)
+extern function aurora_reactive_list_delete(list: pointer)
+
+/* ── Lifecycle ── */
+extern function aurora_reactive_on_change(state: pointer, cb: pointer, user_data: pointer) -> int
+extern function aurora_reactive_on_mount(widget: pointer, fn: pointer, user_data: pointer)
+extern function aurora_reactive_on_unmount(widget: pointer, fn: pointer, user_data: pointer)
+
+/* ── Convenience wrappers ── */
+function reactive_state(initial):
+    return aurora_reactive_state_new(initial)
+end
+function reactive_state_set(state, value):
+    aurora_reactive_state_set(state, value)
+end
+function reactive_state_get(state):
+    return aurora_reactive_state_get(state)
+end
+function reactive_computed(fn, data):
+    return aurora_reactive_computed_new(fn, data)
+end
+function reactive_computed_get(c):
+    return aurora_reactive_computed_get(c)
+end
+function reactive_effect(fn, data):
+    return aurora_reactive_effect(fn, data)
+end
+function reactive_effect_clear(id):
+    aurora_reactive_effect_clear(id)
+end
+function reactive_bind_text(widget, state):
+    return aurora_reactive_bind_text(widget, state)
+end
+function reactive_bind_enabled(widget, state):
+    return aurora_reactive_bind_enabled(widget, state)
+end
+function reactive_bind_visible(widget, state):
+    return aurora_reactive_bind_visible(widget, state)
+end
+function reactive_bind_checked(widget, state):
+    return aurora_reactive_bind_checked(widget, state)
+end
+function reactive_bind_value(widget, state):
+    return aurora_reactive_bind_value(widget, state)
+end
+function reactive_bind_label(widget, state):
+    return aurora_reactive_bind_label(widget, state)
+end
+function reactive_unbind(widget, id):
+    aurora_reactive_unbind(widget, id)
+end
+function reactive_unbind_all(widget):
+    aurora_reactive_unbind_all(widget)
+end
+function reactive_list_new():
+    return aurora_reactive_list_new()
+end
+function reactive_list_add(list, item):
+    aurora_reactive_list_add(list, item)
+end
+function reactive_list_get(list, index):
+    return aurora_reactive_list_get(list, index)
+end
+function reactive_list_remove(list, index):
+    aurora_reactive_list_remove(list, index)
+end
+function reactive_list_size(list):
+    return aurora_reactive_list_size(list)
+end
+function reactive_list_clear(list):
+    aurora_reactive_list_clear(list)
+end
+function reactive_on_change(state, cb, data):
+    return aurora_reactive_on_change(state, cb, data)
+end
+function reactive_on_mount(widget, fn, data):
+    aurora_reactive_on_mount(widget, fn, data)
+end
+function reactive_on_unmount(widget, fn, data):
+    aurora_reactive_on_unmount(widget, fn, data)
+end

@@ -1,0 +1,60 @@
+## Canvas 2D Graphics Engine — shapes, paths, styles, transforms, text, images
+## Usage: import "canvas"
+
+## ── Lifecycle ──
+extern function aurora_canvas_create(widget: pointer) -> pointer
+extern function aurora_canvas_destroy(ctx: pointer)
+extern function aurora_canvas_begin(ctx: pointer, bg_color: int)
+extern function aurora_canvas_end(ctx: pointer)
+extern function aurora_canvas_clear(ctx: pointer, color: int)
+extern function aurora_canvas_resize(ctx: pointer, w: int, h: int)
+
+## ── Shapes ──
+extern function aurora_canvas_rect(ctx: pointer, x: float, y: float, w: float, h: float)
+extern function aurora_canvas_rounded_rect(ctx: pointer, x: float, y: float, w: float, h: float, r: float)
+extern function aurora_canvas_circle(ctx: pointer, cx: float, cy: float, r: float)
+extern function aurora_canvas_ellipse(ctx: pointer, cx: float, cy: float, rx: float, ry: float)
+extern function aurora_canvas_line(ctx: pointer, x1: float, y1: float, x2: float, y2: float)
+extern function aurora_canvas_polygon(ctx: pointer, points: pointer, count: int)
+extern function aurora_canvas_bezier(ctx: pointer, x1: float, y1: float, cx1: float, cy1: float, cx2: float, cy2: float, x2: float, y2: float)
+extern function aurora_canvas_arc(ctx: pointer, cx: float, cy: float, r: float, start_angle: float, end_angle: float)
+
+## ── Style ──
+extern function aurora_canvas_set_fill(ctx: pointer, color: int)
+extern function aurora_canvas_set_stroke(ctx: pointer, color: int)
+extern function aurora_canvas_set_stroke_width(ctx: pointer, w: float)
+extern function aurora_canvas_set_alpha(ctx: pointer, a: float)
+
+## ── Transform ──
+extern function aurora_canvas_translate(ctx: pointer, dx: float, dy: float)
+extern function aurora_canvas_rotate(ctx: pointer, angle: float)
+extern function aurora_canvas_scale(ctx: pointer, sx: float, sy: float)
+extern function aurora_canvas_save(ctx: pointer)
+extern function aurora_canvas_restore(ctx: pointer)
+extern function aurora_canvas_reset_transform(ctx: pointer)
+
+## ── Path ──
+extern function aurora_canvas_begin_path(ctx: pointer)
+extern function aurora_canvas_move_to(ctx: pointer, x: float, y: float)
+extern function aurora_canvas_line_to(ctx: pointer, x: float, y: float)
+extern function aurora_canvas_bezier_to(ctx: pointer, cp1x: float, cp1y: float, cp2x: float, cp2y: float, x: float, y: float)
+extern function aurora_canvas_close_path(ctx: pointer)
+extern function aurora_canvas_stroke(ctx: pointer)
+extern function aurora_canvas_fill(ctx: pointer)
+
+## ── Text ──
+extern function aurora_canvas_set_font(ctx: pointer, name: cstring, size: float)
+extern function aurora_canvas_draw_text(ctx: pointer, text: cstring, x: float, y: float)
+extern function aurora_canvas_measure_text(ctx: pointer, text: cstring, out_w: pointer, out_h: pointer)
+
+## ── Image ──
+extern function aurora_canvas_draw_image(ctx: pointer, path: cstring, x: float, y: float, w: float, h: float)
+extern function aurora_canvas_draw_rgba(ctx: pointer, rgba: pointer, img_w: int, img_h: int, x: float, y: float, w: float, h: float)
+
+## ── Gradient ──
+extern function aurora_canvas_set_linear_gradient(ctx: pointer, x1: float, y1: float, x2: float, y2: float, c1: int, c2: int)
+extern function aurora_canvas_clear_gradient(ctx: pointer)
+
+## ── Shadow ──
+extern function aurora_canvas_set_shadow(ctx: pointer, blur: float, dx: float, dy: float, color: int)
+extern function aurora_canvas_clear_shadow(ctx: pointer)

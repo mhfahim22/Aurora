@@ -1,0 +1,129 @@
+## Aurora iOS Runtime API
+## Usage: import "ios"  or  import libc:ios
+##
+## Provides access to iOS platform features: UIKit, touch input,
+## device info, haptics, and file system paths.
+##
+## Example:
+##   import "ios"
+##
+##   w = ios_screen_width()
+##   h = ios_screen_height()
+##   output("Screen: " + str(w) + "x" + str(h))
+##
+##   n = ios_touch_count()
+##   if n > 0
+##       ev = map()
+##       ios_touch_get(0, ev)
+##       output("Touch at " + str(ev.x) + ", " + str(ev.y))
+##   end
+##
+##   ios_haptic(1)  # Medium impact
+##
+## ════════════════════════════════════════════════════════════
+
+import "collections"
+
+## ── Screen ──
+
+extern function aurora_ios_screen_width() -> f32
+extern function aurora_ios_screen_height() -> f32
+extern function aurora_ios_screen_scale() -> f32
+extern function aurora_ios_orientation() -> i32
+extern function aurora_ios_set_orientation(orient: i32)
+
+## ── Touch ──
+
+extern function aurora_ios_touch_count() -> i32
+extern function aurora_ios_touch_get(index: i32, out: pointer) -> i32
+
+## ── Bundle / Paths ──
+
+extern function aurora_ios_path_for_resource(name: cstring, type: cstring) -> cstring
+extern function aurora_ios_documents_path() -> cstring
+extern function aurora_ios_cache_path() -> cstring
+
+## ── Device info ──
+
+extern function aurora_ios_device_model() -> cstring
+extern function aurora_ios_os_version() -> cstring
+extern function aurora_ios_is_ipad() -> i32
+
+## ── Haptics ──
+
+extern function aurora_ios_haptic(type: i32)
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Screen ──
+
+function ios_screen_width():
+    return aurora_ios_screen_width()
+end
+
+function ios_screen_height():
+    return aurora_ios_screen_height()
+end
+
+function ios_screen_scale():
+    return aurora_ios_screen_scale()
+end
+
+function ios_orientation():
+    return aurora_ios_orientation()
+end
+
+function ios_set_orientation(orient):
+    aurora_ios_set_orientation(orient)
+end
+
+## ── Touch ──
+
+function ios_touch_count():
+    return aurora_ios_touch_count()
+end
+
+function ios_touch_get(index):
+    ev = map()
+    rc = aurora_ios_touch_get(index, addr(ev))
+    if rc == 0
+        return ev
+    end
+    return null
+end
+
+## ── Paths ──
+
+function ios_path_for_resource(name, ext):
+    return aurora_ios_path_for_resource(name, ext)
+end
+
+function ios_documents_path():
+    return aurora_ios_documents_path()
+end
+
+function ios_cache_path():
+    return aurora_ios_cache_path()
+end
+
+## ── Device ──
+
+function ios_device_model():
+    return aurora_ios_device_model()
+end
+
+function ios_os_version():
+    return aurora_ios_os_version()
+end
+
+function ios_is_ipad():
+    return aurora_ios_is_ipad() != 0
+end
+
+## ── Haptics ──
+
+function ios_haptic(type):
+    aurora_ios_haptic(type)
+end

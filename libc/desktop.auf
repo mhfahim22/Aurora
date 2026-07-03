@@ -1,0 +1,69 @@
+## Aurora Desktop Integration Module
+## Usage: import "desktop"  or  import libc:desktop
+##
+## Provides desktop platform integration: system tray, notifications,
+## clipboard, drag & drop, file associations, startup registration,
+## DWM window effects, and global hotkeys.
+##
+## ════════════════════════════════════════════════════════════
+
+## Tray Icon Types
+@ TRAY_ICON_INFO    = 0
+@ TRAY_ICON_WARNING = 1
+@ TRAY_ICON_ERROR   = 2
+@ TRAY_ICON_NONE    = 3
+
+## Window Effect Types
+@ WINDOW_EFFECT_NONE    = 0
+@ WINDOW_EFFECT_ACRYLIC = 1
+@ WINDOW_EFFECT_MICA    = 2
+@ WINDOW_EFFECT_BLUR    = 3
+
+## ════════════════════════════════════════════════════════════
+## Low-level extern declarations
+## ════════════════════════════════════════════════════════════
+
+## Lifecycle
+extern function desktop_init()
+extern function desktop_shutdown()
+
+## System Tray
+extern function desktop_tray_create(tooltip: string) -> pointer
+extern function desktop_tray_destroy(tray: pointer)
+extern function desktop_tray_set_tooltip(tray: pointer, tip: string)
+extern function desktop_tray_set_icon(tray: pointer, path: string)
+extern function desktop_tray_add_menu_item(tray: pointer, id: i32, text: string)
+extern function desktop_tray_add_menu_separator(tray: pointer)
+extern function desktop_tray_show_balloon(tray: pointer, title: string, text: string, icon_type: i32)
+extern function desktop_tray_set_callback(tray: pointer, callback: pointer)
+extern function desktop_tray_set_visible(tray: pointer, visible: i32)
+
+## Notifications
+extern function desktop_notification_show(title: string, message: string) -> i32
+extern function desktop_notification_hide()
+
+## Clipboard
+extern function desktop_clipboard_set_text(text: string) -> i32
+extern function desktop_clipboard_get_text() -> string
+
+## Drag & Drop
+extern function desktop_drop_target_create(hwnd: pointer, callback: pointer) -> pointer
+extern function desktop_drop_target_destroy(target: pointer)
+
+## File Associations
+extern function desktop_assoc_register(ext: string, prog_id: string, desc: string, command: string) -> i32
+extern function desktop_assoc_unregister(ext: string, prog_id: string) -> i32
+extern function desktop_assoc_is_registered(ext: string) -> i32
+
+## Startup Registration
+extern function desktop_startup_set(app_name: string, command: string, enable: i32) -> i32
+extern function desktop_startup_is_enabled(app_name: string) -> i32
+
+## Window Visual Effects
+extern function desktop_window_set_effect(hwnd: pointer, effect: i32) -> i32
+extern function desktop_window_set_dark_mode(hwnd: pointer, enable: i32) -> i32
+extern function desktop_window_set_round_corners(hwnd: pointer, enable: i32) -> i32
+
+## Global Hotkeys
+extern function desktop_hotkey_register(id: i32, ctrl: i32, alt: i32, shift: i32, key: i32, callback: pointer) -> i32
+extern function desktop_hotkey_unregister(id: i32)

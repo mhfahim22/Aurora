@@ -1,0 +1,56 @@
+## Aurora Standard Library — Process
+## Usage:  import "process"
+##
+## Spawn child processes, read/write stdio pipes, wait for exit, kill.
+##
+## Example:
+##   import "process"
+##   proc = spawn("echo hello")
+##   buf = cstring_repeat(256)
+##   n = process_read(proc, buf, 256)
+##   output(substr(buf, 0, n))
+##   code = process_wait(proc)
+##   process_close(proc)
+## ════════════════════════════════════════════════════════════
+
+extern function aurora_process_spawn(command: cstring) -> i64
+extern function aurora_process_wait(handle: i64) -> i32
+extern function aurora_process_kill(handle: i64) -> i32
+extern function aurora_process_pipe_read(handle: i64, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_process_pipe_write(handle: i64, data: cstring, len: i32) -> i32
+extern function aurora_process_close(handle: i64)
+
+## ── Spawn a process ──
+function spawn(command):
+    return aurora_process_spawn(command)
+end
+
+## ── Wait for process to exit (returns exit code) ──
+function process_wait(handle):
+    return aurora_process_wait(handle)
+end
+
+## ── Kill/terminate process ──
+function process_kill(handle):
+    return aurora_process_kill(handle) == 1
+end
+
+## ── Read from process stdout ──
+function process_read(handle, bufsize):
+    buf = cstring_repeat(bufsize)
+    n = aurora_process_pipe_read(handle, buf, bufsize)
+    if n < 0
+        return ""
+    end
+    return substr(buf, 0, n)
+end
+
+## ── Write to process stdin ──
+function process_write(handle, data):
+    return aurora_process_pipe_write(handle, data, strlen(data))
+end
+
+## ── Close process handle (frees all resources) ──
+function process_close(handle):
+    aurora_process_close(handle)
+end

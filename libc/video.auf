@@ -1,0 +1,147 @@
+## Video Module — MPEG-1 video playback
+## Usage: import "video"
+##
+## Supports: MPEG-1 files (.mpg), subtitles (.srt)
+## Features: play, pause, resume, stop, seek, volume, loop, RGBA frame output
+
+## ── Lifecycle ──
+extern function aurora_video_init() -> int
+extern function aurora_video_shutdown()
+
+## ── Player ──
+extern function aurora_video_player_new() -> pointer
+extern function aurora_video_player_open(p: pointer, path: cstring) -> int
+extern function aurora_video_player_play(p: pointer)
+extern function aurora_video_player_pause(p: pointer)
+extern function aurora_video_player_resume(p: pointer)
+extern function aurora_video_player_stop(p: pointer)
+extern function aurora_video_player_is_playing(p: pointer) -> int
+extern function aurora_video_player_has_ended(p: pointer) -> int
+extern function aurora_video_player_free(p: pointer)
+
+## ── Seeking / Time / Duration ──
+extern function aurora_video_player_set_time(p: pointer, sec: float)
+extern function aurora_video_player_get_time(p: pointer) -> float
+extern function aurora_video_player_get_duration(p: pointer) -> float
+
+## ── Properties ──
+extern function aurora_video_player_get_width(p: pointer) -> int
+extern function aurora_video_player_get_height(p: pointer) -> int
+extern function aurora_video_player_get_fps(p: pointer) -> float
+
+## ── Volume / Loop ──
+extern function aurora_video_player_set_volume(p: pointer, vol: float)
+extern function aurora_video_player_get_volume(p: pointer) -> float
+extern function aurora_video_player_set_looping(p: pointer, loop: int)
+extern function aurora_video_player_get_looping(p: pointer) -> int
+
+## ── Subtitle ──
+extern function aurora_video_player_subtitle_load(p: pointer, path: cstring) -> int
+extern function aurora_video_player_subtitle_get_text(p: pointer) -> cstring
+
+## ── Frame decoding ──
+extern function aurora_video_player_decode(p: pointer, dt: float)
+extern function aurora_video_player_read_frame(p: pointer, buf: pointer, buf_size: int) -> int
+
+## ════════════════════════════════════════════════════════════
+## High-level Aurora wrappers
+## ════════════════════════════════════════════════════════════
+
+function video_init():
+    return aurora_video_init()
+end
+
+function video_open(path):
+    p = aurora_video_player_new()
+    if p != 0:
+        if aurora_video_player_open(p, path) != 0:
+            return p
+        end
+        aurora_video_player_free(p)
+    end
+    return 0
+end
+
+function video_play(p):
+    aurora_video_player_play(p)
+end
+
+function video_pause(p):
+    aurora_video_player_pause(p)
+end
+
+function video_resume(p):
+    aurora_video_player_resume(p)
+end
+
+function video_stop(p):
+    aurora_video_player_stop(p)
+end
+
+function video_is_playing(p):
+    return aurora_video_player_is_playing(p)
+end
+
+function video_has_ended(p):
+    return aurora_video_player_has_ended(p)
+end
+
+function video_free(p):
+    aurora_video_player_free(p)
+end
+
+function video_set_time(p, sec):
+    aurora_video_player_set_time(p, sec)
+end
+
+function video_get_time(p):
+    return aurora_video_player_get_time(p)
+end
+
+function video_get_duration(p):
+    return aurora_video_player_get_duration(p)
+end
+
+function video_get_width(p):
+    return aurora_video_player_get_width(p)
+end
+
+function video_get_height(p):
+    return aurora_video_player_get_height(p)
+end
+
+function video_get_fps(p):
+    return aurora_video_player_get_fps(p)
+end
+
+function video_set_volume(p, vol):
+    aurora_video_player_set_volume(p, vol)
+end
+
+function video_get_volume(p):
+    return aurora_video_player_get_volume(p)
+end
+
+function video_set_looping(p, loop):
+    aurora_video_player_set_looping(p, loop)
+end
+
+function video_get_looping(p):
+    return aurora_video_player_get_looping(p)
+end
+
+function video_load_subtitle(p, path):
+    return aurora_video_player_subtitle_load(p, path)
+end
+
+function video_get_subtitle(p):
+    return aurora_video_player_subtitle_get_text(p)
+end
+
+function video_decode(p, dt):
+    aurora_video_player_decode(p, dt)
+end
+
+function video_read_frame(p, buf, buf_size):
+    return aurora_video_player_read_frame(p, buf, buf_size)
+end

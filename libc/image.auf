@@ -1,8 +1,42 @@
-## Image/Texture Loading Module
+## Image Library — load, save, process, SVG, ICO
 ## Usage: import "image"
 ##
-## Loads images via stb_image and creates OpenGL textures.
+## Formats: PNG, JPEG, BMP, TGA, GIF, SVG, ICO
+## Processing: resize, crop, rotate, blur, brightness, contrast, saturation, flip, grayscale, invert
 
-extern function aurora_image_load(path: pointer, width: pointer, height: pointer, channels: pointer) -> pointer
-extern function aurora_image_free(data: pointer)
-extern function aurora_image_create_gl_texture(path: cstring) -> u32
+## ── Lifecycle ──
+extern function aurora_img_new(width: int, height: int, channels: int) -> pointer
+extern function aurora_img_load(path: cstring) -> pointer
+extern function aurora_img_load_mem(data: pointer, len: int) -> pointer
+extern function aurora_img_free(img: pointer)
+extern function aurora_img_copy(img: pointer) -> pointer
+
+## ── Properties ──
+extern function aurora_img_width(img: pointer) -> int
+extern function aurora_img_height(img: pointer) -> int
+extern function aurora_img_channels(img: pointer) -> int
+extern function aurora_img_data(img: pointer) -> pointer
+extern function aurora_img_detect_format(path: cstring) -> int
+
+## ── Save ──
+extern function aurora_img_save_png(img: pointer, path: cstring) -> int
+extern function aurora_img_save_jpg(img: pointer, path: cstring, quality: int) -> int
+extern function aurora_img_save_bmp(img: pointer, path: cstring) -> int
+extern function aurora_img_save_tga(img: pointer, path: cstring) -> int
+
+## ── Processing ──
+extern function aurora_img_resize(img: pointer, w: int, h: int) -> pointer
+extern function aurora_img_crop(img: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_img_rotate(img: pointer, angle: float) -> pointer
+extern function aurora_img_blur(img: pointer, radius: float) -> pointer
+extern function aurora_img_brightness(img: pointer, factor: float)
+extern function aurora_img_contrast(img: pointer, factor: float)
+extern function aurora_img_saturation(img: pointer, factor: float)
+extern function aurora_img_flip_h(img: pointer) -> pointer
+extern function aurora_img_flip_v(img: pointer) -> pointer
+extern function aurora_img_grayscale(img: pointer) -> pointer
+extern function aurora_img_invert(img: pointer) -> pointer
+
+## ── SVG / ICO ──
+extern function aurora_img_load_svg(path: cstring, width: int, height: int) -> pointer
+extern function aurora_img_load_ico(path: cstring) -> pointer

@@ -1,0 +1,100 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 20 — Plugin System
+//  Native plugins, dynamic libraries, reflection, version compat
+// ═══════════════════════════════════════════════════════════════════
+
+module "plugin"
+
+// ── Extern Functions (Plugin Management, 7) ──
+extern function aurora_plugin_load(path: str) -> int
+extern function aurora_plugin_unload(name: str) -> int
+extern function aurora_plugin_unload_all() -> int
+extern function aurora_plugin_get_count() -> int
+extern function aurora_plugin_get_name(index: int) -> str
+extern function aurora_plugin_is_loaded(name: str) -> int
+extern function aurora_plugin_scan(directory: str) -> int
+
+// ── Extern Functions (Plugin Metadata, 3) ──
+extern function aurora_plugin_get_info(name: str, field: str) -> str
+extern function aurora_plugin_get_abi(name: str) -> int
+extern function aurora_plugin_get_function(plugin: str, func: str) -> ptr
+
+// ── Extern Functions (Reflection Query, 8) ──
+extern function aurora_reflection_get_type_count() -> int
+extern function aurora_reflection_get_type_name(index: int) -> str
+extern function aurora_reflection_get_field_count(type_name: str) -> int
+extern function aurora_reflection_get_field_info(type_name: str, index: int, name: ptr, typ: ptr, offset: ptr, size: ptr)
+extern function aurora_reflection_get_method_count(type_name: str) -> int
+extern function aurora_reflection_get_method_info(type_name: str, index: int, name: ptr, return_type: ptr)
+extern function aurora_reflection_get_method_pointer(type_name: str, method_name: str) -> ptr
+
+// ── Extern Functions (Version, 2) ──
+extern function aurora_version_abi() -> int
+extern function aurora_version_string() -> str
+
+// ── Wrappers ──
+
+// Plugin Management
+pub fn plugin_load(path: str) -> int
+    aurora_plugin_load(path)
+
+pub fn plugin_unload(name: str) -> int
+    aurora_plugin_unload(name)
+
+pub fn plugin_unload_all() -> int
+    aurora_plugin_unload_all()
+
+pub fn plugin_get_count() -> int
+    aurora_plugin_get_count()
+
+pub fn plugin_get_name(index: int) -> str
+    aurora_plugin_get_name(index)
+
+pub fn plugin_is_loaded(name: str) -> int
+    aurora_plugin_is_loaded(name)
+
+pub fn plugin_scan(directory: str) -> int
+    aurora_plugin_scan(directory)
+
+// Plugin Metadata
+pub fn plugin_get_info(name: str, field: str) -> str
+    aurora_plugin_get_info(name, field)
+
+pub fn plugin_get_abi(name: str) -> int
+    aurora_plugin_get_abi(name)
+
+pub fn plugin_get_function(plugin: str, func: str) -> ptr
+    aurora_plugin_get_function(plugin, func)
+
+// Reflection
+pub fn reflect_type_count() -> int
+    aurora_reflection_get_type_count()
+
+pub fn reflect_type_name(index: int) -> str
+    aurora_reflection_get_type_name(index)
+
+pub fn reflect_field_count(type_name: str) -> int
+    aurora_reflection_get_field_count(type_name)
+
+pub fn reflect_get_field(type_name: str, index: int) -> str
+    name: ptr; typ: ptr; offset: int = 0; size: int = 0
+    aurora_reflection_get_field_info(type_name, index, &name, &typ, &offset, &size)
+    name
+
+pub fn reflect_method_count(type_name: str) -> int
+    aurora_reflection_get_method_count(type_name)
+
+pub fn reflect_get_method(type_name: str, index: int) -> str
+    name: ptr; return_type: ptr
+    aurora_reflection_get_method_info(type_name, index, &name, &return_type)
+    name
+
+pub fn reflect_method_ptr(type_name: str, method_name: str) -> ptr
+    aurora_reflection_get_method_pointer(type_name, method_name)
+
+// Version
+pub fn version_abi() -> int
+    aurora_version_abi()
+
+pub fn version_string() -> str
+    aurora_version_string()

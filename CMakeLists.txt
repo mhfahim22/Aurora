@@ -112,6 +112,7 @@ add_executable(aurorac
     aurora/src/compiler/runtime_exports_init.cpp
     aurora/src/compiler/package_manager.cpp
     aurora/src/compiler/doc_generator.cpp
+    aurora/src/compiler/build_system.cpp
 )
 
 # LLVM components: native + nativecodegen auto-detect the host architecture
@@ -225,6 +226,27 @@ add_library(aurora_runtime STATIC
     aurora/src/std/regex.cpp
     aurora/src/std/crypto.cpp
     aurora/src/std/audio.cpp
+    aurora/src/std/animation.cpp
+    aurora/src/std/async.cpp
+    aurora/src/std/canvas.cpp
+    aurora/src/std/db.cpp
+    aurora/src/std/desktop.cpp
+    aurora/src/std/dev.cpp
+    aurora/src/std/game.cpp
+    aurora/src/std/hotreload.cpp
+    aurora/src/std/image.cpp
+    aurora/src/std/mobile_stubs.cpp
+    aurora/src/std/pkg.cpp
+    aurora/src/std/plugin.cpp
+    aurora/src/std/process.cpp
+    aurora/src/std/reactive.cpp
+    aurora/src/std/security.cpp
+    aurora/src/std/serial.cpp
+    aurora/src/std/test.cpp
+    aurora/src/std/thread.cpp
+    aurora/src/std/video.cpp
+    aurora/src/mobile/widgets.cpp
+    third_party/sqlite3/sqlite3.c
 )
 
 if(WIN32)
@@ -247,6 +269,7 @@ endif()
 
 target_include_directories(aurora_runtime PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include
     ${CMAKE_SOURCE_DIR}/aurora/src/runtime/backend
+    ${CMAKE_SOURCE_DIR}/third_party
     "${CMAKE_BINARY_DIR}/include")
 
 # ── OpenGL / 3D Graphics support (optional) ──
@@ -642,6 +665,23 @@ if(ENABLE_ASAN)
     target_link_options(test_server PRIVATE ${ASAN_LINK_FLAGS})
 endif()
 add_test(NAME test_server COMMAND test_server)
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 29: Cross-Platform Validation
+# ═══════════════════════════════════════════════════════════════
+add_executable(test_crossplatform
+    aurora/tests/crossplatform/validate.cpp
+)
+target_link_libraries(test_crossplatform PRIVATE aurora_runtime)
+target_include_directories(test_crossplatform PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+if(WIN32)
+    target_link_libraries(test_crossplatform PRIVATE ws2_32.lib)
+endif()
+if(ENABLE_ASAN)
+    target_compile_options(test_crossplatform PRIVATE ${ASAN_FLAGS})
+    target_link_options(test_crossplatform PRIVATE ${ASAN_LINK_FLAGS})
+endif()
+add_test(NAME test_crossplatform COMMAND test_crossplatform)
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 4: AI Benchmark

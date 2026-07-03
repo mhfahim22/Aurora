@@ -1,22 +1,34 @@
-## Aurora Standard Library — Networking
+## Aurora Standard Library — Networking (Phase 13)
 ## Usage:  import "net"
 ##
-## Low-level TCP sockets + HTTP client + DNS resolution.
+## HTTP/HTTPS client, TCP/UDP sockets, WebSocket client,
+## DNS resolution, multipart upload, download, auth, URL helpers.
 ## All functions block the current fiber.
 ##
 ## Example:
 ##   import "net"
-##   sock = tcp_connect("example.com", 80)
-##   tcp_send(sock, "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
-##   buf = cstring_repeat(4096)
-##   n = tcp_recv(sock, buf, 4096)
-##   output(substr(buf, 0, n))
-##   tcp_close(sock)
+##   data = http_get("https://api.example.com/data")
+##   output(data)
 ## ════════════════════════════════════════════════════════════
 
-## ── HTTP ──
+## ── HTTP Methods ──
 extern function aurora_net_http_get(url: cstring, buffer: cstring, buffer_size: i32) -> i32
 extern function aurora_net_http_post(url: cstring, body: cstring, content_type: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_http_put(url: cstring, body: cstring, content_type: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_http_delete(url: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_http_patch(url: cstring, body: cstring, content_type: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_http_head(url: cstring, buffer: cstring, buffer_size: i32) -> i32
+
+## ── HTTP with custom headers ──
+extern function aurora_net_http_get_ex(url: cstring, headers: cstring, buffer: cstring, buffer_size: i32) -> i32
+extern function aurora_net_http_post_ex(url: cstring, headers: cstring, body: cstring, content_type: cstring, buffer: cstring, buffer_size: i32) -> i32
+
+## ── HTTP status code ──
+extern function aurora_net_http_status(response: cstring) -> i32
+
+## ── URL helpers ──
+extern function aurora_net_url_encode(input: cstring, out: cstring, out_size: i32) -> i32
+extern function aurora_net_url_decode(input: cstring, out: cstring, out_size: i32) -> i32
 
 ## ── DNS ──
 extern function aurora_net_dns_lookup(hostname: cstring, buffer: cstring, buffer_size: i32) -> i32
@@ -27,32 +39,138 @@ extern function aurora_net_tcp_send(sock: i64, data: cstring, len: i32) -> i32
 extern function aurora_net_tcp_recv(sock: i64, buffer: cstring, buffer_size: i32) -> i32
 extern function aurora_net_tcp_close(sock: i64)
 
+## ── UDP Socket (blocking) ──
+extern function aurora_net_udp_socket() -> i64
+extern function aurora_net_udp_sendto(sock: i64, data: cstring, len: i32, host: cstring, port: i32) -> i32
+extern function aurora_net_udp_recvfrom(sock: i64, buffer: cstring, buffer_size: i32, src_host: cstring, src_host_size: i32, src_port: pointer) -> i32
+extern function aurora_net_udp_close(sock: i64)
+
+## ── WebSocket Client ──
+extern function aurora_net_ws_connect(url: cstring, response: cstring, response_size: i32) -> i64
+extern function aurora_net_ws_send(ws: i64, data: cstring, len: i32, is_text: i32) -> i32
+extern function aurora_net_ws_recv(ws: i64, buffer: cstring, buffer_size: i32, is_text: pointer) -> i32
+extern function aurora_net_ws_close(ws: i64)
+
+## ── Multipart ──
+extern function aurora_net_multipart_begin(boundary: cstring) -> pointer
+extern function aurora_net_multipart_add_field(form: pointer, boundary: cstring, name: cstring, value: cstring) -> pointer
+extern function aurora_net_multipart_add_file(form: pointer, boundary: cstring, name: cstring, filename: cstring, data: cstring, data_len: i32) -> pointer
+extern function aurora_net_multipart_end(form: pointer, boundary: cstring, out_len: pointer) -> pointer
+
+## ── Download helper ──
+extern function aurora_net_download(url: cstring, filepath: cstring) -> i32
+
+## ── Authentication helpers ──
+extern function aurora_net_auth_basic(username: cstring, password: cstring, out: cstring, out_size: i32)
+extern function aurora_net_auth_bearer(token: cstring, out: cstring, out_size: i32)
+
+## ── Send all bytes ──
+extern function aurora_send_all(sock: i64, data: cstring, len: i32) -> i32
+
 ## ── IP resolution ──
 extern function aurora_net_resolve_host(hostname: cstring, buffer: cstring, buffer_size: i32) -> i32
-
-## ── Send all bytes (retries partial writes) ──
-extern function aurora_send_all(sock: i64, data: cstring, len: i32) -> i32
 
 ## ════════════════════════════════════════════════════════════
 ## Aurora-level convenience wrappers
 ## ════════════════════════════════════════════════════════════
 
 ## ── HTTP helpers ──
+
 function http_get(url):
     buf = cstring_repeat(65536)
     n = aurora_net_http_get(url, buf, 65536)
-    if n < 0
-        return ""
-    end
+    if n < 0 return "" end
     return substr(buf, 0, n)
 end
 
 function http_post(url, body, content_type):
     buf = cstring_repeat(65536)
     n = aurora_net_http_post(url, body, content_type, buf, 65536)
-    if n < 0
-        return ""
-    end
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_put(url, body, content_type):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_put(url, body, content_type, buf, 65536)
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_delete(url):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_delete(url, buf, 65536)
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_patch(url, body, content_type):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_patch(url, body, content_type, buf, 65536)
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_head(url):
+    buf = cstring_repeat(4096)
+    n = aurora_net_http_head(url, buf, 4096)
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_get_with_headers(url, headers):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_get_ex(url, headers, buf, 65536)
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_post_with_headers(url, headers, body, content_type):
+    buf = cstring_repeat(65536)
+    n = aurora_net_http_post_ex(url, headers, body, content_type, buf, 65536)
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function http_status(response):
+    return aurora_net_http_status(response)
+end
+
+## ── REST helpers ──
+
+function rest_get(url):
+    return http_get(url)
+end
+
+function rest_post(url, body, content_type):
+    return http_post(url, body, content_type)
+end
+
+function rest_put(url, body, content_type):
+    return http_put(url, body, content_type)
+end
+
+function rest_delete(url):
+    return http_delete(url)
+end
+
+function rest_patch(url, body, content_type):
+    return http_patch(url, body, content_type)
+end
+
+## ── URL encoding ──
+
+function url_encode(input):
+    buf = cstring_repeat(4096)
+    n = aurora_net_url_encode(input, buf, 4096)
+    if n < 0 return input end
+    return substr(buf, 0, n)
+end
+
+function url_decode(input):
+    buf = cstring_repeat(4096)
+    n = aurora_net_url_decode(input, buf, 4096)
+    if n < 0 return input end
     return substr(buf, 0, n)
 end
 
@@ -60,9 +178,7 @@ end
 function dns_lookup(hostname):
     buf = cstring_repeat(256)
     n = aurora_net_dns_lookup(hostname, buf, 256)
-    if n < 0
-        return ""
-    end
+    if n < 0 return "" end
     return substr(buf, 0, n)
 end
 
@@ -78,9 +194,7 @@ end
 function tcp_recv(sock, bufsize):
     buf = cstring_repeat(bufsize)
     n = aurora_net_tcp_recv(sock, buf, bufsize)
-    if n < 0
-        return ""
-    end
+    if n < 0 return "" end
     return substr(buf, 0, n)
 end
 
@@ -88,17 +202,105 @@ function tcp_close(sock):
     aurora_net_tcp_close(sock)
 end
 
+## ── UDP wrappers ──
+function udp_socket():
+    return aurora_net_udp_socket()
+end
+
+function udp_sendto(sock, data, host, port):
+    return aurora_net_udp_sendto(sock, data, strlen(data), host, port)
+end
+
+function udp_recvfrom(sock, bufsize):
+    buf = cstring_repeat(bufsize)
+    src_host = cstring_repeat(64)
+    src_port = 0
+    n = aurora_net_udp_recvfrom(sock, buf, bufsize, src_host, 64, addr(src_port))
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function udp_recvfrom_ex(sock, bufsize):
+    buf = cstring_repeat(bufsize)
+    src_host = cstring_repeat(64)
+    src_port = 0
+    n = aurora_net_udp_recvfrom(sock, buf, bufsize, src_host, 64, addr(src_port))
+    return substr(buf, 0, n), substr(src_host, 0, strlen(src_host)), src_port
+end
+
+function udp_close(sock):
+    aurora_net_udp_close(sock)
+end
+
+## ── WebSocket wrappers ──
+function ws_connect(url):
+    buf = cstring_repeat(4096)
+    handle = aurora_net_ws_connect(url, buf, 4096)
+    return handle
+end
+
+function ws_send(ws, data, is_text):
+    return aurora_net_ws_send(ws, data, strlen(data), is_text)
+end
+
+function ws_recv(ws, bufsize):
+    buf = cstring_repeat(bufsize)
+    is_text = 0
+    n = aurora_net_ws_recv(ws, buf, bufsize, addr(is_text))
+    if n < 0 return "" end
+    return substr(buf, 0, n)
+end
+
+function ws_close(ws):
+    aurora_net_ws_close(ws)
+end
+
 ## ── Resolve hostname to IP string ──
 function resolve_host(hostname):
     buf = cstring_repeat(256)
     n = aurora_net_resolve_host(hostname, buf, 256)
-    if n < 0
-        return ""
-    end
+    if n < 0 return "" end
     return substr(buf, 0, n)
 end
 
 ## ── Send all bytes ──
 function send_all(sock, data):
     return aurora_send_all(sock, data, strlen(data))
+end
+
+## ── Download ──
+function download(url, filepath):
+    return aurora_net_download(url, filepath)
+end
+
+## ── Auth header generation ──
+function auth_basic(username, password):
+    buf = cstring_repeat(512)
+    aurora_net_auth_basic(username, password, buf, 512)
+    return substr(buf, 0, strlen(buf))
+end
+
+function auth_bearer(token):
+    buf = cstring_repeat(512)
+    aurora_net_auth_bearer(token, buf, 512)
+    return substr(buf, 0, strlen(buf))
+end
+
+## ── Multipart form-data builder ──
+function multipart_begin(boundary):
+    return aurora_net_multipart_begin(boundary)
+end
+
+function multipart_add_field(form, boundary, name, value):
+    return aurora_net_multipart_add_field(form, boundary, name, value)
+end
+
+function multipart_add_file(form, boundary, name, filename, data):
+    return aurora_net_multipart_add_file(form, boundary, name, filename, data, strlen(data))
+end
+
+function multipart_end(form, boundary):
+    out_len = 0
+    result = aurora_net_multipart_end(form, boundary, addr(out_len))
+    return result
 end

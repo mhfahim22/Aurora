@@ -1,0 +1,59 @@
+## Animation System — tweens, sequences, controllers, keyframes
+## Usage: import "animation"
+##
+## Easing constants: AURORA_EASE_LINEAR, AURORA_EASE_IN_QUAD, AURORA_EASE_OUT_QUAD, etc.
+## Types: Tween (single float property), Seq (serial steps), Ctrl (parallel tweens), Kf (keyframe curve)
+## Apply to any property: opacity, position, scale, rotation, color, etc.
+
+## ── Easing ──
+extern function aurora_anim_ease_linear(t: float) -> float
+extern function aurora_anim_ease_in_quad(t: float) -> float
+extern function aurora_anim_ease_out_quad(t: float) -> float
+extern function aurora_anim_ease_in_out_quad(t: float) -> float
+extern function aurora_anim_ease_in_cubic(t: float) -> float
+extern function aurora_anim_ease_out_cubic(t: float) -> float
+extern function aurora_anim_ease_in_out_cubic(t: float) -> float
+extern function aurora_anim_ease_in_quart(t: float) -> float
+extern function aurora_anim_ease_out_quart(t: float) -> float
+extern function aurora_anim_ease_in_out_quart(t: float) -> float
+extern function aurora_anim_ease_in_elastic(t: float) -> float
+extern function aurora_anim_ease_out_elastic(t: float) -> float
+extern function aurora_anim_ease_in_out_elastic(t: float) -> float
+extern function aurora_anim_ease_in_bounce(t: float) -> float
+extern function aurora_anim_ease_out_bounce(t: float) -> float
+extern function aurora_anim_ease_in_out_bounce(t: float) -> float
+extern function aurora_anim_ease_in_back(t: float) -> float
+extern function aurora_anim_ease_out_back(t: float) -> float
+extern function aurora_anim_ease_in_out_back(t: float) -> float
+extern function aurora_anim_ease_apply(easing: int, t: float) -> float
+
+## ── Tween ──
+extern function aurora_anim_tween(from: float, to: float, duration: float, easing: int) -> pointer
+extern function aurora_anim_tween_on_update(tween: pointer, cb: function(userdata: pointer, val: float), userdata: pointer)
+extern function aurora_anim_tween_on_done(tween: pointer, cb: function(userdata: pointer), userdata: pointer)
+extern function aurora_anim_tween_update(tween: pointer, dt: float)
+extern function aurora_anim_tween_is_done(tween: pointer) -> int
+extern function aurora_anim_tween_value(tween: pointer) -> float
+extern function aurora_anim_tween_free(tween: pointer)
+
+## ── Sequence (serial) ──
+extern function aurora_anim_seq_new() -> pointer
+extern function aurora_anim_seq_add(seq: pointer, from: float, to: float, duration: float, easing: int)
+extern function aurora_anim_seq_on_update(seq: pointer, cb: function(userdata: pointer, val: float), userdata: pointer)
+extern function aurora_anim_seq_on_done(seq: pointer, cb: function(userdata: pointer), userdata: pointer)
+extern function aurora_anim_seq_update(seq: pointer, dt: float)
+extern function aurora_anim_seq_is_done(seq: pointer) -> int
+extern function aurora_anim_seq_free(seq: pointer)
+
+## ── Controller (parallel) ──
+extern function aurora_anim_ctrl_new() -> pointer
+extern function aurora_anim_ctrl_add(ctrl: pointer, tween: pointer)
+extern function aurora_anim_ctrl_update(ctrl: pointer, dt: float)
+extern function aurora_anim_ctrl_is_done(ctrl: pointer) -> int
+extern function aurora_anim_ctrl_free(ctrl: pointer)
+
+## ── Keyframe (curve evaluation) ──
+extern function aurora_anim_kf_new(num_frames: int) -> pointer
+extern function aurora_anim_kf_set_key(kf: pointer, index: int, time: float, value: float)
+extern function aurora_anim_kf_evaluate(kf: pointer, t: float) -> float
+extern function aurora_anim_kf_free(kf: pointer)

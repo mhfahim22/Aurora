@@ -1,12 +1,175 @@
-## Dev Server with Hot-Reload
-## Usage: import "dev"
-##
-## Example:
-##   import "dev"
-##   dev_server(8080, "./src")
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 25 — Developer Tools
+//  Formatter, Linter, LSP, Autocomplete, Debugger, Profiler,
+//  Inspector, Memory Viewer, Performance Monitor
+// ═══════════════════════════════════════════════════════════════════
 
-extern function aurora_dev_server(port: int, src_dir: cstring)
+module "dev"
 
-function dev_server(port, src_dir)
+// ── Extern Functions (Dev Server, 1) ──
+extern function aurora_dev_server(port: int, src_dir: str)
+
+// ── Extern Functions (Formatting, 4) ──
+extern function aurora_dev_format(code: str) -> str
+extern function aurora_dev_format_file(path: str) -> int
+extern function aurora_dev_format_set_tab_size(n: int)
+extern function aurora_dev_format_set_spaces(use_spaces: int)
+
+// ── Extern Functions (Linting, 3) ──
+extern function aurora_dev_lint(code: str) -> str
+extern function aurora_dev_lint_file(path: str) -> str
+extern function aurora_dev_lint_set_rule(rule: str, enabled: int) -> int
+
+// ── Extern Functions (LSP, 4) ──
+extern function aurora_dev_lsp_start(port: int) -> int
+extern function aurora_dev_lsp_stop() -> int
+extern function aurora_dev_lsp_is_running() -> int
+extern function aurora_dev_lsp_set_root(path: str) -> int
+
+// ── Extern Functions (Completions, 3) ──
+extern function aurora_dev_complete(code: str, line: int, col: int) -> str
+extern function aurora_dev_complete_file(path: str, line: int, col: int) -> str
+extern function aurora_dev_complete_detail(label: str) -> str
+
+// ── Extern Functions (Debugger, 4) ──
+extern function aurora_dev_debug_attach(target: str) -> int
+extern function aurora_dev_debug_break() -> int
+extern function aurora_dev_debug_continue() -> int
+extern function aurora_dev_debug_step_over() -> int
+
+// ── Extern Functions (Profiler, 4) ──
+extern function aurora_dev_profiler_start() -> int
+extern function aurora_dev_profiler_stop() -> int
+extern function aurora_dev_profiler_report() -> str
+extern function aurora_dev_profiler_reset()
+
+// ── Extern Functions (Inspector, 3) ──
+extern function aurora_dev_inspector_tree() -> str
+extern function aurora_dev_inspector_select(x: int, y: int) -> str
+extern function aurora_dev_inspector_refresh()
+
+// ── Extern Functions (Memory Viewer, 3) ──
+extern function aurora_dev_memory_stats() -> str
+extern function aurora_dev_memory_snapshot() -> str
+extern function aurora_dev_memory_leak_check() -> int
+
+// ── Extern Functions (Performance Monitor, 5) ──
+extern function aurora_dev_perf_start() -> int
+extern function aurora_dev_perf_stop() -> int
+extern function aurora_dev_perf_fps() -> f64
+extern function aurora_dev_perf_frame_time() -> f64
+extern function aurora_dev_perf_report() -> str
+
+// ── Wrappers ──
+
+// Dev Server
+pub fn dev_server(port: int, src_dir: str)
     aurora_dev_server(port, src_dir)
-end
+
+// Formatting
+pub fn format_code(code: str) -> str
+    aurora_dev_format(code)
+
+pub fn format_file(path: str) -> int
+    aurora_dev_format_file(path)
+
+pub fn set_tab_size(n: int)
+    aurora_dev_format_set_tab_size(n)
+
+pub fn set_use_spaces(use_spaces: int)
+    aurora_dev_format_set_spaces(use_spaces)
+
+// Linting
+pub fn lint(code: str) -> str
+    aurora_dev_lint(code)
+
+pub fn lint_file(path: str) -> str
+    aurora_dev_lint_file(path)
+
+pub fn set_lint_rule(rule: str, enabled: int) -> int
+    aurora_dev_lint_set_rule(rule, enabled)
+
+// LSP
+pub fn lsp_start(port: int) -> int
+    aurora_dev_lsp_start(port)
+
+pub fn lsp_stop() -> int
+    aurora_dev_lsp_stop()
+
+pub fn lsp_is_running() -> int
+    aurora_dev_lsp_is_running()
+
+pub fn lsp_set_root(path: str) -> int
+    aurora_dev_lsp_set_root(path)
+
+// Completions
+pub fn complete(code: str, line: int, col: int) -> str
+    aurora_dev_complete(code, line, col)
+
+pub fn complete_file(path: str, line: int, col: int) -> str
+    aurora_dev_complete_file(path, line, col)
+
+pub fn complete_detail(label: str) -> str
+    aurora_dev_complete_detail(label)
+
+// Debugger
+pub fn debug_attach(target: str) -> int
+    aurora_dev_debug_attach(target)
+
+pub fn debug_break() -> int
+    aurora_dev_debug_break()
+
+pub fn debug_continue() -> int
+    aurora_dev_debug_continue()
+
+pub fn debug_step_over() -> int
+    aurora_dev_debug_step_over()
+
+// Profiler
+pub fn profiler_start() -> int
+    aurora_dev_profiler_start()
+
+pub fn profiler_stop() -> int
+    aurora_dev_profiler_stop()
+
+pub fn profiler_report() -> str
+    aurora_dev_profiler_report()
+
+pub fn profiler_reset()
+    aurora_dev_profiler_reset()
+
+// Inspector
+pub fn inspector_tree() -> str
+    aurora_dev_inspector_tree()
+
+pub fn inspector_select(x: int, y: int) -> str
+    aurora_dev_inspector_select(x, y)
+
+pub fn inspector_refresh()
+    aurora_dev_inspector_refresh()
+
+// Memory Viewer
+pub fn memory_stats() -> str
+    aurora_dev_memory_stats()
+
+pub fn memory_snapshot() -> str
+    aurora_dev_memory_snapshot()
+
+pub fn memory_leak_check() -> int
+    aurora_dev_memory_leak_check()
+
+// Performance Monitor
+pub fn perf_start() -> int
+    aurora_dev_perf_start()
+
+pub fn perf_stop() -> int
+    aurora_dev_perf_stop()
+
+pub fn perf_fps() -> f64
+    aurora_dev_perf_fps()
+
+pub fn perf_frame_time() -> f64
+    aurora_dev_perf_frame_time()
+
+pub fn perf_report() -> str
+    aurora_dev_perf_report()

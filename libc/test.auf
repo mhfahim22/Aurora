@@ -1,0 +1,153 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 24 — Testing Framework
+//  Unit tests, integration tests, widget tests, benchmarks,
+//  snapshots, coverage
+// ═══════════════════════════════════════════════════════════════════
+
+module "test"
+
+// ── Extern Functions (Test Registration, 3) ──
+extern function aurora_test_describe(suite: str, fn: ptr) -> int
+extern function aurora_test_it(name: str, fn: ptr) -> int
+extern function aurora_test_run() -> int
+
+// ── Extern Functions (Assertions, 7) ──
+extern function aurora_test_assert(condition: int, msg: str)
+extern function aurora_test_assert_eq_int(a: int, b: int, msg: str)
+extern function aurora_test_assert_eq_float(a: f64, b: f64, epsilon: f64, msg: str)
+extern function aurora_test_assert_eq_str(a: str, b: str, msg: str)
+extern function aurora_test_assert_true(condition: int, msg: str)
+extern function aurora_test_assert_false(condition: int, msg: str)
+extern function aurora_test_assert_null(ptr: ptr, msg: str)
+
+// ── Extern Functions (Integration Tests, 3) ──
+extern function aurora_test_setup(fn: ptr)
+extern function aurora_test_teardown(fn: ptr)
+extern function aurora_test_integration(name: str, fn: ptr) -> int
+
+// ── Extern Functions (Widget Tests, 3) ──
+extern function aurora_test_widget(name: str, fn: ptr) -> int
+extern function aurora_test_find_widget(id: str) -> ptr
+extern function aurora_test_click(id: str) -> int
+
+// ── Extern Functions (Benchmark Tests, 4) ──
+extern function aurora_test_bench(name: str, fn: ptr, iterations: int) -> int
+extern function aurora_test_bench_start()
+extern function aurora_test_bench_end()
+extern function aurora_test_bench_result() -> f64
+
+// ── Extern Functions (Snapshot Tests, 3) ──
+extern function aurora_test_snapshot(name: str, value: str) -> int
+extern function aurora_test_snapshot_update(name: str, value: str) -> int
+extern function aurora_test_snapshot_delete(name: str) -> int
+
+// ── Extern Functions (Coverage, 3) ──
+extern function aurora_test_coverage_start() -> int
+extern function aurora_test_coverage_stop() -> int
+extern function aurora_test_coverage_report() -> str
+
+// ── Extern Functions (Results, 4) ──
+extern function aurora_test_pass_count() -> int
+extern function aurora_test_fail_count() -> int
+extern function aurora_test_total_count() -> int
+extern function aurora_test_results() -> str
+
+// ── Wrappers ──
+
+// Test Registration
+pub fn describe(suite: str, fn: ptr) -> int
+    aurora_test_describe(suite, fn)
+
+pub fn it(name: str, fn: ptr) -> int
+    aurora_test_it(name, fn)
+
+pub fn run() -> int
+    aurora_test_run()
+
+// Assertions
+pub fn assert(condition: int, msg: str)
+    aurora_test_assert(condition, msg)
+
+pub fn assert_eq_int(a: int, b: int, msg: str)
+    aurora_test_assert_eq_int(a, b, msg)
+
+pub fn assert_eq_float(a: f64, b: f64, epsilon: f64, msg: str)
+    aurora_test_assert_eq_float(a, b, epsilon, msg)
+
+pub fn assert_eq_str(a: str, b: str, msg: str)
+    aurora_test_assert_eq_str(a, b, msg)
+
+pub fn assert_true(condition: int, msg: str)
+    aurora_test_assert_true(condition, msg)
+
+pub fn assert_false(condition: int, msg: str)
+    aurora_test_assert_false(condition, msg)
+
+pub fn assert_null(ptr: ptr, msg: str)
+    aurora_test_assert_null(ptr, msg)
+
+// Integration Tests
+pub fn setup(fn: ptr)
+    aurora_test_setup(fn)
+
+pub fn teardown(fn: ptr)
+    aurora_test_teardown(fn)
+
+pub fn integration(name: str, fn: ptr) -> int
+    aurora_test_integration(name, fn)
+
+// Widget Tests
+pub fn widget_test(name: str, fn: ptr) -> int
+    aurora_test_widget(name, fn)
+
+pub fn find_widget(id: str) -> ptr
+    aurora_test_find_widget(id)
+
+pub fn click(id: str) -> int
+    aurora_test_click(id)
+
+// Benchmark Tests
+pub fn bench(name: str, fn: ptr, iterations: int) -> int
+    aurora_test_bench(name, fn, iterations)
+
+pub fn bench_start()
+    aurora_test_bench_start()
+
+pub fn bench_end()
+    aurora_test_bench_end()
+
+pub fn bench_result() -> f64
+    aurora_test_bench_result()
+
+// Snapshot Tests
+pub fn snapshot(name: str, value: str) -> int
+    aurora_test_snapshot(name, value)
+
+pub fn snapshot_update(name: str, value: str) -> int
+    aurora_test_snapshot_update(name, value)
+
+pub fn snapshot_delete(name: str) -> int
+    aurora_test_snapshot_delete(name)
+
+// Coverage
+pub fn coverage_start() -> int
+    aurora_test_coverage_start()
+
+pub fn coverage_stop() -> int
+    aurora_test_coverage_stop()
+
+pub fn coverage_report() -> str
+    aurora_test_coverage_report()
+
+// Results
+pub fn pass_count() -> int
+    aurora_test_pass_count()
+
+pub fn fail_count() -> int
+    aurora_test_fail_count()
+
+pub fn total_count() -> int
+    aurora_test_total_count()
+
+pub fn results() -> str
+    aurora_test_results()

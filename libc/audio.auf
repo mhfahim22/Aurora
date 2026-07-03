@@ -1,30 +1,195 @@
-## Audio Module
+## Audio Module — playback, recording, effects
 ## Usage: import "audio"
 ##
-## Simple audio playback using Win32 PlaySound.
+## Supported formats: WAV, MP3, FLAC, OGG (via miniaudio)
+## Features: volume, pitch, loop, seek, reverb, echo, lowpass, highpass, recording
 
-extern function aurora_audio_init() -> i32
-extern function aurora_audio_play_file(path: cstring) -> i32
-extern function aurora_audio_play(path: cstring)
-extern function aurora_audio_play_tone(freq: i32, duration_ms: i32)
-extern function aurora_audio_stop_all()
+## ── Lifecycle ──
+extern function aurora_audio_init() -> int
 extern function aurora_audio_shutdown()
+
+## ── Source (play a sound file or memory buffer) ──
+extern function aurora_audio_src_new() -> pointer
+extern function aurora_audio_src_load_file(src: pointer, path: cstring) -> int
+extern function aurora_audio_src_load_mem(src: pointer, data: pointer, len: int) -> int
+extern function aurora_audio_src_play(src: pointer)
+extern function aurora_audio_src_stop(src: pointer)
+extern function aurora_audio_src_pause(src: pointer)
+extern function aurora_audio_src_resume(src: pointer)
+extern function aurora_audio_src_is_playing(src: pointer) -> int
+extern function aurora_audio_src_free(src: pointer)
+
+## ── Volume / Pitch / Loop / Time / Duration ──
+extern function aurora_audio_src_set_volume(src: pointer, vol: float)
+extern function aurora_audio_src_get_volume(src: pointer) -> float
+extern function aurora_audio_src_set_pitch(src: pointer, pitch: float)
+extern function aurora_audio_src_get_pitch(src: pointer) -> float
+extern function aurora_audio_src_set_looping(src: pointer, loop: int)
+extern function aurora_audio_src_get_looping(src: pointer) -> int
+extern function aurora_audio_src_set_time(src: pointer, sec: float)
+extern function aurora_audio_src_get_time(src: pointer) -> float
+extern function aurora_audio_src_get_duration(src: pointer) -> float
+
+## ── Effects ──
+extern function aurora_audio_src_set_reverb(src: pointer, mix: float, decay: float)
+extern function aurora_audio_src_set_echo(src: pointer, delay_ms: float, decay: float)
+extern function aurora_audio_src_set_lowpass(src: pointer, cutoff_hz: float)
+extern function aurora_audio_src_set_highpass(src: pointer, cutoff_hz: float)
+extern function aurora_audio_src_clear_effects(src: pointer)
+
+## ── Recording ──
+extern function aurora_audio_rec_new(sample_rate: int, channels: int) -> pointer
+extern function aurora_audio_rec_start(rec: pointer)
+extern function aurora_audio_rec_read(rec: pointer, buf: pointer, frames: int) -> int
+extern function aurora_audio_rec_stop(rec: pointer)
+extern function aurora_audio_rec_free(rec: pointer)
+
+## ── Legacy compat ──
+extern function aurora_audio_play_file(path: cstring) -> int
+extern function aurora_audio_play(path: cstring)
+extern function aurora_audio_play_tone(freq: int, duration_ms: int)
+extern function aurora_audio_stop_all()
+
+## ── High-level Aurora wrappers ──
 
 function audio_init():
     return aurora_audio_init()
 end
+
+function audio_shutdown():
+    aurora_audio_shutdown()
+end
+
+function audio_load(path):
+    ## Load a sound file and return a source handle.
+    ## Returns 0 on failure, non-zero pointer on success.
+    ## Usage: src = audio_load("song.mp3")
+    src = aurora_audio_src_new()
+    if src != 0:
+        if aurora_audio_src_load_file(src, path) != 0:
+            return src
+        end
+        aurora_audio_src_free(src)
+    end
+    return src
+end
+
+function audio_play_src(src):
+    aurora_audio_src_play(src)
+end
+
+function audio_play(path):
+    ## Convenience: load and play a file in one call.
+    src = audio_load(path)
+    if src != 0:
+        aurora_audio_src_play(src)
+    end
+end
+
+function audio_stop(src):
+    aurora_audio_src_stop(src)
+end
+
+function audio_pause(src):
+    aurora_audio_src_pause(src)
+end
+
+function audio_resume(src):
+    aurora_audio_src_resume(src)
+end
+
+function audio_is_playing(src):
+    return aurora_audio_src_is_playing(src)
+end
+
+function audio_free(src):
+    aurora_audio_src_free(src)
+end
+
+function audio_set_volume(src, vol):
+    aurora_audio_src_set_volume(src, vol)
+end
+
+function audio_get_volume(src):
+    return aurora_audio_src_get_volume(src)
+end
+
+function audio_set_pitch(src, pitch):
+    aurora_audio_src_set_pitch(src, pitch)
+end
+
+function audio_get_pitch(src):
+    return aurora_audio_src_get_pitch(src)
+end
+
+function audio_set_looping(src, loop):
+    aurora_audio_src_set_looping(src, loop)
+end
+
+function audio_get_looping(src):
+    return aurora_audio_src_get_looping(src)
+end
+
+function audio_set_time(src, sec):
+    aurora_audio_src_set_time(src, sec)
+end
+
+function audio_get_time(src):
+    return aurora_audio_src_get_time(src)
+end
+
+function audio_get_duration(src):
+    return aurora_audio_src_get_duration(src)
+end
+
+function audio_set_reverb(src, mix, decay):
+    aurora_audio_src_set_reverb(src, mix, decay)
+end
+
+function audio_set_echo(src, delay_ms, decay):
+    aurora_audio_src_set_echo(src, delay_ms, decay)
+end
+
+function audio_set_lowpass(src, cutoff_hz):
+    aurora_audio_src_set_lowpass(src, cutoff_hz)
+end
+
+function audio_set_highpass(src, cutoff_hz):
+    aurora_audio_src_set_highpass(src, cutoff_hz)
+end
+
+function audio_clear_effects(src):
+    aurora_audio_src_clear_effects(src)
+end
+
+function audio_rec_start(sample_rate, channels):
+    rec = aurora_audio_rec_new(sample_rate, channels)
+    if rec != 0:
+        aurora_audio_rec_start(rec)
+    end
+    return rec
+end
+
+function audio_rec_read(rec, buf, frames):
+    return aurora_audio_rec_read(rec, buf, frames)
+end
+
+function audio_rec_stop(rec):
+    aurora_audio_rec_stop(rec)
+end
+
+function audio_rec_free(rec):
+    aurora_audio_rec_free(rec)
+end
+
 function audio_play_file(path):
     return aurora_audio_play_file(path)
 end
-function audio_play(path):
-    aurora_audio_play(path)
-end
+
 function audio_play_tone(freq, duration_ms):
     aurora_audio_play_tone(freq, duration_ms)
 end
+
 function audio_stop_all():
     aurora_audio_stop_all()
-end
-function audio_shutdown():
-    aurora_audio_shutdown()
 end

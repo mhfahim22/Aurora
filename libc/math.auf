@@ -17,6 +17,22 @@ extern function aurora_math_ceil(x: f64) -> f64
 extern function aurora_math_round(x: f64) -> f64
 extern function aurora_math_random() -> f64
 extern function aurora_math_random_int(min: i64, max: i64) -> i64
+extern function aurora_math_asin(x: f64) -> f64
+extern function aurora_math_acos(x: f64) -> f64
+extern function aurora_math_atan(x: f64) -> f64
+extern function aurora_math_atan2(y: f64, x: f64) -> f64
+extern function aurora_math_sinh(x: f64) -> f64
+extern function aurora_math_cosh(x: f64) -> f64
+extern function aurora_math_tanh(x: f64) -> f64
+extern function aurora_math_log2(x: f64) -> f64
+extern function aurora_math_cbrt(x: f64) -> f64
+extern function aurora_math_hypot(x: f64, y: f64) -> f64
+extern function aurora_math_erf(x: f64) -> f64
+extern function aurora_math_tgamma(x: f64) -> f64
+extern function aurora_math_fmod(x: f64, y: f64) -> f64
+extern function aurora_math_remainder(x: f64, y: f64) -> f64
+extern function aurora_math_copysign(x: f64, y: f64) -> f64
+extern function aurora_math_nextafter(x: f64, y: f64) -> f64
 
 function pi():
     return aurora_math_pi()
