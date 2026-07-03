@@ -10,8 +10,12 @@
 #include <vector>
 #include <algorithm>
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#endif
+
+#ifdef _WIN32
 
 /* ════════════════════════════════════════════════════════════
    Internal structures
@@ -612,3 +616,48 @@ void aurora_canvas_clear_shadow(AuroraCanvas* ctx) {
     if (!ctx) return;
     ctx->use_shadow = false;
 }
+
+#else  // !_WIN32
+
+AuroraCanvas* aurora_canvas_create(AuroraWidget widget) { (void)widget; return nullptr; }
+void aurora_canvas_destroy(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_begin(AuroraCanvas* ctx, unsigned int bg) { (void)ctx; (void)bg; }
+void aurora_canvas_end(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_clear(AuroraCanvas* ctx, unsigned int c) { (void)ctx; (void)c; }
+void aurora_canvas_resize(AuroraCanvas* ctx, int w, int h) { (void)ctx; (void)w; (void)h; }
+void aurora_canvas_rect(AuroraCanvas* ctx, float x, float y, float w, float h) { (void)ctx; (void)x; (void)y; (void)w; (void)h; }
+void aurora_canvas_rounded_rect(AuroraCanvas* ctx, float x, float y, float w, float h, float r) { (void)ctx; (void)x; (void)y; (void)w; (void)h; (void)r; }
+void aurora_canvas_circle(AuroraCanvas* ctx, float cx, float cy, float r) { (void)ctx; (void)cx; (void)cy; (void)r; }
+void aurora_canvas_ellipse(AuroraCanvas* ctx, float cx, float cy, float rx, float ry) { (void)ctx; (void)cx; (void)cy; (void)rx; (void)ry; }
+void aurora_canvas_line(AuroraCanvas* ctx, float x1, float y1, float x2, float y2) { (void)ctx; (void)x1; (void)y1; (void)x2; (void)y2; }
+void aurora_canvas_polygon(AuroraCanvas* ctx, const float* pts, int n) { (void)ctx; (void)pts; (void)n; }
+void aurora_canvas_bezier(AuroraCanvas* ctx, float x1, float y1, float cx1, float cy1, float cx2, float cy2, float x2, float y2) { (void)ctx; (void)x1; (void)y1; (void)cx1; (void)cy1; (void)cx2; (void)cy2; (void)x2; (void)y2; }
+void aurora_canvas_arc(AuroraCanvas* ctx, float cx, float cy, float r, float sa, float ea) { (void)ctx; (void)cx; (void)cy; (void)r; (void)sa; (void)ea; }
+void aurora_canvas_set_fill(AuroraCanvas* ctx, unsigned int c) { (void)ctx; (void)c; }
+void aurora_canvas_set_stroke(AuroraCanvas* ctx, unsigned int c) { (void)ctx; (void)c; }
+void aurora_canvas_set_stroke_width(AuroraCanvas* ctx, float w) { (void)ctx; (void)w; }
+void aurora_canvas_set_alpha(AuroraCanvas* ctx, float a) { (void)ctx; (void)a; }
+void aurora_canvas_translate(AuroraCanvas* ctx, float dx, float dy) { (void)ctx; (void)dx; (void)dy; }
+void aurora_canvas_rotate(AuroraCanvas* ctx, float a) { (void)ctx; (void)a; }
+void aurora_canvas_scale(AuroraCanvas* ctx, float sx, float sy) { (void)ctx; (void)sx; (void)sy; }
+void aurora_canvas_save(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_restore(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_reset_transform(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_begin_path(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_move_to(AuroraCanvas* ctx, float x, float y) { (void)ctx; (void)x; (void)y; }
+void aurora_canvas_line_to(AuroraCanvas* ctx, float x, float y) { (void)ctx; (void)x; (void)y; }
+void aurora_canvas_bezier_to(AuroraCanvas* ctx, float cp1x, float cp1y, float cp2x, float cp2y, float x, float y) { (void)ctx; (void)cp1x; (void)cp1y; (void)cp2x; (void)cp2y; (void)x; (void)y; }
+void aurora_canvas_close_path(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_stroke(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_fill(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_set_font(AuroraCanvas* ctx, const char* name, float sz) { (void)ctx; (void)name; (void)sz; }
+void aurora_canvas_draw_text(AuroraCanvas* ctx, const char* txt, float x, float y) { (void)ctx; (void)txt; (void)x; (void)y; }
+void aurora_canvas_measure_text(AuroraCanvas* ctx, const char* txt, float* out_w, float* out_h) { (void)ctx; (void)txt; if (out_w) *out_w = 0; if (out_h) *out_h = 0; }
+void aurora_canvas_draw_image(AuroraCanvas* ctx, const char* p, float x, float y, float w, float h) { (void)ctx; (void)p; (void)x; (void)y; (void)w; (void)h; }
+void aurora_canvas_draw_rgba(AuroraCanvas* ctx, const void* rgba, int iw, int ih, float x, float y, float w, float h) { (void)ctx; (void)rgba; (void)iw; (void)ih; (void)x; (void)y; (void)w; (void)h; }
+void aurora_canvas_set_linear_gradient(AuroraCanvas* ctx, float x1, float y1, float x2, float y2, unsigned int c1, unsigned int c2) { (void)ctx; (void)x1; (void)y1; (void)x2; (void)y2; (void)c1; (void)c2; }
+void aurora_canvas_clear_gradient(AuroraCanvas* ctx) { (void)ctx; }
+void aurora_canvas_set_shadow(AuroraCanvas* ctx, float bl, float dx, float dy, unsigned int c) { (void)ctx; (void)bl; (void)dx; (void)dy; (void)c; }
+void aurora_canvas_clear_shadow(AuroraCanvas* ctx) { (void)ctx; }
+
+#endif  // _WIN32
