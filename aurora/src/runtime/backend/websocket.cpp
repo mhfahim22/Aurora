@@ -26,6 +26,7 @@ static int sha1(const uint8_t* data, size_t len, uint8_t out[20]) {
 
 #else
 #include <dlfcn.h>
+#include <sys/socket.h>
 
 static void* libcrypto_handle = NULL;
 static int (*crypto_sha1)(const uint8_t*, size_t, uint8_t*) = NULL;

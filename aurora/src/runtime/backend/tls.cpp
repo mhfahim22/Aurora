@@ -606,8 +606,8 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
         ctx->ssl.libcrypto = dlopen("libcrypto.so", RTLD_LAZY | RTLD_LOCAL);
 
 #define LOAD(name) do { \
-    ctx->ssl.name = (decltype(ctx->ssl.name))dlsym(ctx->ssl.libssl, "SSL_" #name); \
-    if (!ctx->ssl.name) { \
+    ctx->ssl.SSL_ ## name = (decltype(ctx->ssl.SSL_ ## name))dlsym(ctx->ssl.libssl, "SSL_" #name); \
+    if (!ctx->ssl.SSL_ ## name) { \
         printf("[tls] missing OpenSSL symbol: %s\n", "SSL_" #name); \
         dlclose(ctx->ssl.libssl); \
         free(ctx); \

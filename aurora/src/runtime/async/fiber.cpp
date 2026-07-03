@@ -24,6 +24,12 @@
   #endif
   #include <windows.h>
   static constexpr size_t kFiberStackSize = 64 * 1024;  /* 64 KB */
+#elif defined(__APPLE__)
+  #ifndef _XOPEN_SOURCE
+  #define _XOPEN_SOURCE 700
+  #endif
+  #include <ucontext.h>
+  static constexpr size_t kFiberStackSize = 64 * 1024;  /* 64 KB */
 #else
   #include <ucontext.h>
   static constexpr size_t kFiberStackSize = 64 * 1024;  /* 64 KB */
