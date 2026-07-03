@@ -178,10 +178,10 @@ jobs:
 
     - name: Build All Targets
       run: |
-        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc) >build.log 2>&1; rc=$?
+        rc=0; cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc) >build.log 2>&1 || rc=$?
         cat build.log
         if [ $rc -ne 0 ]; then
-          echo "## ❌ Build Failed (core targets)" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Failed (core targets)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           grep -E "error:|Error " build.log | head -20 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -239,10 +239,10 @@ jobs:
 
     - name: Build All Targets
       run: |
-        cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(sysctl -n hw.ncpu) >build.log 2>&1; rc=$?
+        rc=0; cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(sysctl -n hw.ncpu) >build.log 2>&1 || rc=$?
         cat build.log
         if [ $rc -ne 0 ]; then
-          echo "## ❌ Build Failed (core targets)" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Failed (core targets)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           grep -E "error:|Error " build.log | head -20 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
