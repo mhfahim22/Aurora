@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 param(
     [string]$BuildDir = "build/Release",
-    [string]$OptPath = "C:\LLVM\bin\opt.exe"
+    [string]$OptPath = "opt.exe"
 )
 
 $Root = Split-Path -Parent $PSScriptRoot

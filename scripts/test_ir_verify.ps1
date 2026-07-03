@@ -9,7 +9,7 @@
 param(
     [string]$Compiler = "",
     [string]$ExamplesDir = "",
-    [string]$OptPath = "C:\LLVM\bin\opt.exe"
+    [string]$OptPath = "opt.exe"
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
