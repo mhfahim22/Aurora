@@ -211,7 +211,7 @@ private:
         }
 done:
         std::stringstream ss;
-        ss << exe_name << "," << mod_time.time_since_epoch().count();
+        ss << exe_name << "," << static_cast<int64_t>(mod_time.time_since_epoch().count());
         return sha256(ss.str());
     }
 
@@ -299,7 +299,7 @@ done:
         for (auto& [output, cached] : cache_) {
             f << output << "=" << cached.flags_hash << ":" << cached.compiler_hash << ":";
             for (auto& e : cached.deps) {
-                f << e.hash << "," << e.file_size << "," << e.mtime << ",";
+                f << e.hash << "," << e.file_size << "," << static_cast<int64_t>(e.mtime) << ",";
             }
             f << "\n";
         }
