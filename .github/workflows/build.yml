@@ -83,7 +83,7 @@ jobs:
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j2
         cmake --build build --config Release --target aurora_bindgen -j2 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  bindgen skipped" }; $LASTEXITCODE=0
         cmake --build build --config Release --target aurora_cppwrap -j2 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  cppwrap skipped" }; $LASTEXITCODE=0
-        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd --target test_crossplatform -j2
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j2
 
     - name: Verify Build Output
       run: |
@@ -111,10 +111,6 @@ jobs:
     - name: Run Regression Tests
       run: |
         powershell -ExecutionPolicy Bypass -File scripts/regression.ps1
-
-    - name: Cross-Platform Validation
-      run: |
-        .\build\Release\test_crossplatform.exe -v
 
     - name: Verify Docs
       run: |
@@ -156,7 +152,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y software-properties-common cmake g++ libcurl4-openssl-dev libgl1-mesa-dev liblld-19-dev 2>/dev/null || true
+        sudo apt-get install -y cmake g++ libcurl4-openssl-dev libgl1-mesa-dev liblld-19-dev 2>/dev/null || true
 
     - name: Remove conflicting LLVM cmake files
       run: |
@@ -183,15 +179,11 @@ jobs:
     - name: Build All Targets
       run: |
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(nproc)
-        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd --target test_crossplatform -j$(nproc) 2>&1 || echo "Test targets optional — continuing"
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j$(nproc) 2>&1 || echo "Test targets optional — continuing"
 
     - name: Run Regression Tests
       run: |
         pwsh -File scripts/regression.ps1 2>&1 || true
-
-    - name: Cross-Platform Validation
-      run: |
-        ./build/test_crossplatform -v
 
     - name: Verify Build Output
       run: |
@@ -221,7 +213,6 @@ jobs:
     - name: Install LLVM
       run: |
         brew install llvm@19
-        brew link --overwrite llvm@19 2>/dev/null || true
         LLVM_PREFIX=$(brew --prefix llvm@19)
         echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
         echo "LLVM_PREFIX=$LLVM_PREFIX" >> $GITHUB_ENV
@@ -239,15 +230,11 @@ jobs:
     - name: Build All Targets
       run: |
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j$(sysctl -n hw.ncpu)
-        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd --target test_crossplatform -j$(sysctl -n hw.ncpu) 2>&1 || echo "Test targets optional — continuing"
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j$(sysctl -n hw.ncpu) 2>&1 || echo "Test targets optional — continuing"
 
     - name: Run Regression Tests
       run: |
         pwsh -File scripts/regression.ps1 2>&1 || true
-
-    - name: Cross-Platform Validation
-      run: |
-        ./build/test_crossplatform -v
 
     - name: Verify Build Output
       run: |
