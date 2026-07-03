@@ -320,6 +320,8 @@ char* aurora_desktop_clipboard_get_text(void) {
 #endif
 }
 
+#ifdef _WIN32
+
 struct DropTargetData {
     HWND    hwnd;
     WNDPROC orig_proc;
@@ -345,6 +347,8 @@ static LRESULT CALLBACK DropWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (dd) return CallWindowProcW(dd->orig_proc, hwnd, msg, wp, lp);
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
+
+#endif  // _WIN32
 
 void* aurora_desktop_drop_target_create(void* hwnd, void* callback) {
 #ifndef _WIN32
