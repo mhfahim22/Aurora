@@ -1,0 +1,2 @@
+/* Aurora Android App — settings.gradle */
+rootProject.name = 'AuroraApp'
