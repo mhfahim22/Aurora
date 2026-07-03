@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <cstdarg>
 #include <string>
 #include <vector>
 
@@ -283,9 +284,10 @@ int aurora_pkg_list_installed(char*** out_names, int* out_count) {
 /* ── Registry (2) ── */
 
 void aurora_pkg_set_registry(const char* url) {
-    if (url)
-        strncpy_s(g_registry_url, url, sizeof(g_registry_url) - 1);
-    else
+    if (url) {
+        strncpy(g_registry_url, url, sizeof(g_registry_url) - 1);
+        g_registry_url[sizeof(g_registry_url) - 1] = '\0';
+    } else
         g_registry_url[0] = '\0';
 }
 
@@ -310,7 +312,8 @@ int aurora_pkg_login(const char* token) {
         free(json);
         aurora_json_free(root);
         if (ok) {
-            strncpy_s(g_auth_token, token, sizeof(g_auth_token) - 1);
+            strncpy(g_auth_token, token, sizeof(g_auth_token) - 1);
+            g_auth_token[sizeof(g_auth_token) - 1] = '\0';
             return 1;
         }
     }

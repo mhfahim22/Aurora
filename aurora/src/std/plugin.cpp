@@ -116,7 +116,8 @@ int aurora_plugin_load(const char* path) {
 
     /* Register plugin */
     int idx = g_plugin_count++;
-    strncpy_s(g_plugins[idx].name, sizeof(g_plugins[idx].name), pname, _TRUNCATE);
+    strncpy(g_plugins[idx].name, pname, sizeof(g_plugins[idx].name) - 1);
+    g_plugins[idx].name[sizeof(g_plugins[idx].name) - 1] = '\0';
     g_plugins[idx].handle = handle;
     g_plugins[idx].loaded = 1;
     g_plugins[idx].abi_version = abi;
