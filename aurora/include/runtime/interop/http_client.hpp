@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #define AURORA_UA "Aurora-Voss/0.4 (github.com/anomalyco/aurora)"
 
 #ifdef _WIN32
