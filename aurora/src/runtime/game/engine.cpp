@@ -1,5 +1,6 @@
 #include "runtime/game.hpp"
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #ifdef _WIN32
@@ -208,31 +209,7 @@ int aurora_collision_check(AuroraEntity* a, AuroraEntity* b) {
     return (dx < threshold && dy < threshold && dz < threshold) ? 1 : 0;
 }
 
-/* ── Audio ── */
-void aurora_audio_play(const char* clip_path) {
-    if (!clip_path) return;
-    printf("[audio] playing: %s\n", clip_path);
-#ifdef _WIN32
-    /* Play a simple beep as audio feedback */
-    Beep(440, 200);
-#endif
-}
-
-void aurora_audio_play_tone(int frequency, int duration_ms) {
-    if (frequency < 37 || duration_ms < 1) return;
-    printf("[audio] tone: %d Hz for %d ms\n", frequency, duration_ms);
-#ifdef _WIN32
-    Beep((DWORD)frequency, (DWORD)duration_ms);
-#else
-    /* On Linux/macOS, use terminal bell sequence */
-    printf("\a");
-    fflush(stdout);
-#endif
-}
-
-void aurora_audio_stop_all() {
-    printf("[audio] all stopped\n");
-}
+/* ── Audio (moved to aurora/src/std/audio.cpp) ── */
 
 /* ── Animation ── */
 AuroraAnimation* aurora_animation_create(double* keyframes, double* values,
