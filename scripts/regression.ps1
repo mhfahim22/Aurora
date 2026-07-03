@@ -29,6 +29,11 @@ Write-Step "Stage 0: Pre-checks"
 $preOk = $true
 if (-not (Test-Path $Compiler)) { Write-Host "FAIL: Compiler not found: $Compiler" -ForegroundColor Red; $preOk = $false }
 if (-not (Test-Path $RuntimeLib)) { Write-Host "FAIL: Runtime lib not found: $RuntimeLib" -ForegroundColor Red; $preOk = $false }
+if (-not (Test-Path $OptPath)) {
+    $found = Get-Command "opt" -ErrorAction SilentlyContinue
+    if (-not $found) { $found = Get-Command "opt.exe" -ErrorAction SilentlyContinue }
+    if ($found) { $OptPath = $found.Source }
+}
 if (-not (Test-Path $OptPath)) { Write-Host "FAIL: opt not found: $OptPath" -ForegroundColor Red; $preOk = $false }
 if (-not (Test-Path $TestSrcDir)) { Write-Host "FAIL: Test src dir missing" -ForegroundColor Red; $preOk = $false }
 if (-not (Test-Path $ExamplesDir)) { Write-Host "FAIL: Examples dir missing" -ForegroundColor Red; $preOk = $false }

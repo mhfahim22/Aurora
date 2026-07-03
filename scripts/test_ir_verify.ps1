@@ -21,6 +21,11 @@ if (-not (Test-Path $Compiler)) {
     exit 1
 }
 if (-not (Test-Path $OptPath)) {
+    $found = Get-Command "opt" -ErrorAction SilentlyContinue
+    if (-not $found) { $found = Get-Command "opt.exe" -ErrorAction SilentlyContinue }
+    if ($found) { $OptPath = $found.Source }
+}
+if (-not (Test-Path $OptPath)) {
     Write-Host "ERROR: opt not found at $OptPath" -ForegroundColor Red
     exit 1
 }
