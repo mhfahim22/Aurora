@@ -12,6 +12,9 @@
 #import <map>
 #import <string>
 
+/* ── Forward declarations ── */
+@class AuroraListDataSource;
+
 /* ── Internal widget state ── */
 struct GuiWidget {
     int     id;
