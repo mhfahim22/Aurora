@@ -552,6 +552,7 @@ void aurora_tls_close(int64_t tls_conn) {
 /* ── POSIX: OpenSSL-based TLS ── */
 #include <dlfcn.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 /* Dynamic loading for OpenSSL */
 struct OpenSSLFuncs {
@@ -580,6 +581,7 @@ struct AuroraTLSContext {
 struct TLSConn {
     void* ssl;
     int64_t sock;
+    OpenSSLFuncs* funcs;
 };
 
 extern "C" {
@@ -707,6 +709,7 @@ int64_t aurora_tls_accept(int64_t sock, AuroraTLSContext* ctx) {
     TLSConn* conn = (TLSConn*)calloc(1, sizeof(TLSConn));
     if (!conn) return -1;
     conn->sock = sock;
+    conn->funcs = &ctx->ssl;
     conn->ssl = ctx->ssl.SSL_new(ctx->ssl_ctx);
     if (!conn->ssl) { free(conn); return -1; }
     ctx->ssl.SSL_set_fd(conn->ssl, (int)sock);
@@ -721,21 +724,21 @@ int64_t aurora_tls_accept(int64_t sock, AuroraTLSContext* ctx) {
 int aurora_tls_read(int64_t tls_conn, char* buf, int size) {
     TLSConn* conn = (TLSConn*)(intptr_t)tls_conn;
     if (!conn || !conn->ssl) return -1;
-    return conn->ssl.SSL_read(conn->ssl, buf, size);
+    return conn->funcs->SSL_read(conn->ssl, buf, size);
 }
 
 int aurora_tls_write(int64_t tls_conn, const char* data, int len) {
     TLSConn* conn = (TLSConn*)(intptr_t)tls_conn;
     if (!conn || !conn->ssl || !data) return -1;
-    return conn->ssl.SSL_write(conn->ssl, data, len);
+    return conn->funcs->SSL_write(conn->ssl, data, len);
 }
 
 void aurora_tls_close(int64_t tls_conn) {
     TLSConn* conn = (TLSConn*)(intptr_t)tls_conn;
     if (!conn) return;
     if (conn->ssl) {
-        conn->ssl.SSL_shutdown(conn->ssl);
-        conn->ssl.SSL_free(conn->ssl);
+        conn->funcs->SSL_shutdown(conn->ssl);
+        conn->funcs->SSL_free(conn->ssl);
     }
 #ifdef _WIN32
     closesocket((SOCKET)(intptr_t)conn->sock);
