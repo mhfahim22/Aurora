@@ -224,6 +224,7 @@ add_library(aurora_runtime STATIC
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
     aurora/src/std/crypto.cpp
+    aurora/src/std/audio.cpp
 )
 
 if(WIN32)
