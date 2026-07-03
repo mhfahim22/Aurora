@@ -19,6 +19,10 @@
  *           marshaling to prevent type confusion.
  */
 
+/* ── Thread safety: std::atomic flag for init-once ── */
+#include <atomic>
+static std::atomic<int> quickjs_bridge_initialized_{0};
+
 extern "C" {
 
 /* Opaque handle types for QuickJS (loaded at runtime) */
@@ -27,10 +31,6 @@ typedef struct QJSContext { void* data; } QJSContext;
 typedef struct { uint64_t data[2]; } QJSValue;
 
 static void* quickjs_dll_handle_ = nullptr;
-
-/* ── Thread safety: std::atomic flag for init-once ── */
-#include <atomic>
-static std::atomic<int> quickjs_bridge_initialized_{0};
 
 /* ── Global QuickJS runtime and context (singleton, lazily created) ── */
 static QJSRuntime* qjs_rt_ = nullptr;
