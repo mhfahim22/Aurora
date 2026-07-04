@@ -13,8 +13,10 @@ param(
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
-if (-not $Compiler) { $Compiler = Join-Path $Root "build_release/Release/aurorac.exe" }
+$IsWindows = $env:OS -eq "Windows_NT"
+if (-not $Compiler) { $Compiler = Join-Path $Root (Join-Path $(if ($IsWindows) { "build/Release" } else { "build" }) $(if ($IsWindows) { "aurorac.exe" } else { "aurorac" })) }
 if (-not $ExamplesDir) { $ExamplesDir = Join-Path $Root "examples" }
+if (-not $OptPath) { $OptPath = if ($IsWindows) { "opt.exe" } else { "opt" } }
 
 if (-not (Test-Path $Compiler)) {
     Write-Host "ERROR: Compiler not found at $Compiler" -ForegroundColor Red
@@ -83,8 +85,9 @@ foreach ($file in $examples) {
     }
 
     $allOk = $true
+    $nullDev = if ($IsWindows) { "nul" } else { "/dev/null" }
     foreach ($irFile in Get-ChildItem -Path $outDir -Filter "*.ll") {
-        $verifyOutput = & $OptPath -passes=verify -o nul $irFile.FullName 2>&1
+        $verifyOutput = & $OptPath -passes=verify -o $nullDev $irFile.FullName 2>&1
         if ($LASTEXITCODE -ne 0) {
             $allOk = $false
             $errMsg = ($verifyOutput | Out-String).Trim()
