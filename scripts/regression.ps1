@@ -1,12 +1,20 @@
 #!/usr/bin/env pwsh
 param(
-    [string]$BuildDir = "build/Release",
-    [string]$OptPath = "opt.exe"
+    [string]$BuildDir = "",
+    [string]$OptPath = ""
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
-$Compiler = Join-Path (Join-Path $Root $BuildDir) "aurorac.exe"
-$RuntimeLib = Join-Path (Join-Path $Root $BuildDir) "aurora_runtime.lib"
+$IsWindows = $env:OS -eq "Windows_NT"
+
+if (-not $BuildDir) {
+    $BuildDir = if ($IsWindows) { "build/Release" } else { "build" }
+}
+$Compiler = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWindows) { "aurorac.exe" } else { "aurorac" })
+$RuntimeLib = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWindows) { "aurora_runtime.lib" } else { "libaurora_runtime.a" })
+if (-not $OptPath) {
+    $OptPath = if ($IsWindows) { "opt.exe" } else { "opt" }
+}
 $TestSrcDir = Join-Path $PSScriptRoot "test_src"
 $ExamplesDir = Join-Path $Root "examples"
 
@@ -62,6 +70,7 @@ if (Test-Path $irVerifyScript) {
     $irExit = 1
 }
 Test-Result "IR verify (49 examples)" ($irExit -eq 0)
+if ($irExit -ne 0 -and $irOut) { Write-Host $irOut -ForegroundColor DarkRed }
 
 # Stage 3: Compiler feature tests
 Write-Step "Stage 3: Compiler feature tests"
