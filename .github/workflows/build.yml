@@ -83,7 +83,7 @@ jobs:
         cmake --build build --config Release --target aurorac --target aurora_runtime --target voss --target aurora_lsp -j2
         cmake --build build --config Release --target aurora_bindgen -j2 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  bindgen skipped" }; $LASTEXITCODE=0
         cmake --build build --config Release --target aurora_cppwrap -j2 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  cppwrap skipped" }; $LASTEXITCODE=0
-        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j2
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd --target test_crossplatform -j2
 
     - name: Verify Build Output
       run: |
@@ -187,7 +187,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           exit $rc
         fi
-        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j$(nproc) >build_test.log 2>&1 || true
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd --target test_crossplatform -j$(nproc) >build_test.log 2>&1 || true
         grep -E "error:|Error " build_test.log | head -20 || true
 
     - name: Run Regression Tests
@@ -248,7 +248,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           exit $rc
         fi
-        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd -j$(sysctl -n hw.ncpu) >build_test.log 2>&1 || true
+        cmake --build build --config Release --target test_server --target test_fiber --target test_autograd --target test_crossplatform -j$(sysctl -n hw.ncpu) >build_test.log 2>&1 || true
         grep -E "error:|Error " build_test.log | head -20 || true
 
     - name: Run Regression Tests
