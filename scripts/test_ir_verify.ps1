@@ -36,7 +36,7 @@ Write-Host "=== LLVM IR Verification Pipeline ===" -ForegroundColor Cyan
 
 $examples = Get-ChildItem -Recurse -Path $ExamplesDir -Filter "*.aura" |
     Where-Object { $_.FullName -notmatch 'node_modules|packages|dist' } |
-    Where-Object { $_.DirectoryName -notmatch '[\\/]2d[\\/]' }
+    Where-Object { $_.Directory.Name -ne '2d' }
 
 Write-Host "Found $($examples.Count) .aura examples"
 
