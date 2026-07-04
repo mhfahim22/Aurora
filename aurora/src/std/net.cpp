@@ -556,7 +556,11 @@ int64_t aurora_net_ws_connect(const char* url, char* response, int response_size
     if (response) response[total] = '\0';
 
     if (!strstr(response, "101") || !strstr(response, "101 Switching Protocols")) {
+#ifdef _WIN32
         closesocket(sock);
+#else
+        close(sock);
+#endif
         return -1;
     }
 
