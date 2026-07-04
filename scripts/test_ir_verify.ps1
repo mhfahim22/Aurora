@@ -9,14 +9,14 @@
 param(
     [string]$Compiler = "",
     [string]$ExamplesDir = "",
-    [string]$OptPath = "opt.exe"
+    [string]$OptPath = ""
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
-$IsWindows = $env:OS -eq "Windows_NT"
-if (-not $Compiler) { $Compiler = Join-Path $Root (Join-Path $(if ($IsWindows) { "build/Release" } else { "build" }) $(if ($IsWindows) { "aurorac.exe" } else { "aurorac" })) }
+$IsWinOS = $env:OS -eq "Windows_NT"
+if (-not $Compiler) { $Compiler = Join-Path $Root (Join-Path $(if ($IsWinOS) { "build/Release" } else { "build" }) $(if ($IsWinOS) { "aurorac.exe" } else { "aurorac" })) }
 if (-not $ExamplesDir) { $ExamplesDir = Join-Path $Root "examples" }
-if (-not $OptPath) { $OptPath = if ($IsWindows) { "opt.exe" } else { "opt" } }
+if (-not $OptPath) { $OptPath = if ($IsWinOS) { "opt.exe" } else { "opt" } }
 
 if (-not (Test-Path $Compiler)) {
     Write-Host "ERROR: Compiler not found at $Compiler" -ForegroundColor Red
@@ -85,7 +85,7 @@ foreach ($file in $examples) {
     }
 
     $allOk = $true
-    $nullDev = if ($IsWindows) { "nul" } else { "/dev/null" }
+    $nullDev = if ($IsWinOS) { "nul" } else { "/dev/null" }
     foreach ($irFile in Get-ChildItem -Path $outDir -Filter "*.ll") {
         $verifyOutput = & $OptPath -passes=verify -o $nullDev $irFile.FullName 2>&1
         if ($LASTEXITCODE -ne 0) {

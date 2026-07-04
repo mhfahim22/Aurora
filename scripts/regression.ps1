@@ -5,15 +5,15 @@ param(
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
-$IsWindows = $env:OS -eq "Windows_NT"
+$IsWinOS = $env:OS -eq "Windows_NT"
 
 if (-not $BuildDir) {
-    $BuildDir = if ($IsWindows) { "build/Release" } else { "build" }
+    $BuildDir = if ($IsWinOS) { "build/Release" } else { "build" }
 }
-$Compiler = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWindows) { "aurorac.exe" } else { "aurorac" })
-$RuntimeLib = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWindows) { "aurora_runtime.lib" } else { "libaurora_runtime.a" })
+$Compiler = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWinOS) { "aurorac.exe" } else { "aurorac" })
+$RuntimeLib = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWinOS) { "aurora_runtime.lib" } else { "libaurora_runtime.a" })
 if (-not $OptPath) {
-    $OptPath = if ($IsWindows) { "opt.exe" } else { "opt" }
+    $OptPath = if ($IsWinOS) { "opt.exe" } else { "opt" }
 }
 $TestSrcDir = Join-Path $PSScriptRoot "test_src"
 $ExamplesDir = Join-Path $Root "examples"
