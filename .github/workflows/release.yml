@@ -255,6 +255,9 @@ jobs:
     needs: [build-windows, build-ubuntu, build-macos]
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
     - name: Download All Artifacts
       uses: actions/download-artifact@v4
       with:
