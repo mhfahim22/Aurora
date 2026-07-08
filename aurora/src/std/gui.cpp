@@ -566,7 +566,7 @@ void aurora_gui_mouse_set_pos(int x, int y) { (void)x;(void)y; }
 /* ── Legacy aliases ── */
 void aurora_gui_run() { aurora_gui_app_run(); }
 void aurora_gui_quit() { aurora_gui_app_quit(); }
-void aurora_gui_set_callback(AuroraWidget w, AuroraEventCallback cb) { aurora_gui_set_callback(w, cb); }
+void aurora_gui_set_callback(AuroraWidget w, AuroraEventCallback cb) { (void)w;(void)cb; }
 void aurora_gui_layout_horizontal(AuroraWidget p, int m) { (void)p;(void)m; }
 void aurora_gui_layout_vertical(AuroraWidget p, int m) { (void)p;(void)m; }
 
