@@ -1,6 +1,7 @@
 #include "std/theme_store.hpp"
 #include "std/app.hpp"
 #include "std/json.hpp"
+#include <cstdarg>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>

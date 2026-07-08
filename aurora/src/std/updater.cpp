@@ -149,11 +149,12 @@ int aurora_updater_download(void) {
     out_path += ".exe";
     char cmd[8192];
     snprintf(cmd, sizeof(cmd), "curl -L -o \"%s\" \"%s\" 2>nul", out_path.c_str(), g_updater.download_url);
+    int ret = system(cmd);
 #else
     out_path += ".AppImage";
     std::string cmd = "curl -L -o \"" + out_path + "\" \"" + std::string(g_updater.download_url) + "\" 2>/dev/null";
+    int ret = system(cmd.c_str());
 #endif
-    int ret = system(cmd);
     g_updater.download_progress_val = (ret == 0) ? 100 : 0;
     g_updater.downloading = 0;
     return (ret == 0) ? 1 : 0;
