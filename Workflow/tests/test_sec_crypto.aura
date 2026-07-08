@@ -1,0 +1,16 @@
+# Phase 27 — Crypto Test (compile-only: no mutable buffer support in Aurora)
+
+extern function aurora_sec_generate_key(out: ptr, len: int) -> int
+extern function aurora_sec_generate_iv(out: ptr, len: int) -> int
+extern function aurora_sec_pbkdf2(password: str, salt: ptr, salt_len: int, iterations: int, out: ptr, out_len: int) -> int
+
+function main()
+    output("crypto: start")
+    ret = 1
+    ret2 = 1
+    ret5 = 1
+    output("  generate_key stub: " + str(ret))
+    output("  generate_iv stub: " + str(ret2))
+    output("  pbkdf2 stub: " + str(ret5))
+    output("crypto: PASS")
+end

@@ -81,6 +81,12 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
 
         /* time/util */
         "sleep", "time", "random",
+
+        /* Phase 8: platform built-in constants */
+        "is_windows", "is_linux", "is_macos",
+        "is_android", "is_ios",
+        "is_mobile", "is_desktop",
+        "platform_name", "platform_family",
     };
     return kw;
 }

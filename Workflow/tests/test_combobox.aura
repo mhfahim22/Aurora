@@ -1,0 +1,43 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_combobox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_combobox_add_item(cb: pointer, item: cstring)
+extern function aurora_gui_combobox_clear(cb: pointer)
+extern function aurora_gui_combobox_get_selected(cb: pointer) -> int
+extern function aurora_gui_combobox_set_selected(cb: pointer, idx: int)
+extern function aurora_gui_combobox_count(cb: pointer) -> int
+extern function aurora_gui_combobox_get_item(cb: pointer, idx: int) -> cstring
+
+function main()
+    output("combobox: start")
+    win = aurora_gui_window_new("CmTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    cb = aurora_gui_combobox_new(win, 10, 10, 150, 25)
+    if cb == null
+        output("  note: combobox_new returned null (headless)")
+    end
+
+    aurora_gui_combobox_add_item(cb, "Item A")
+    aurora_gui_combobox_add_item(cb, "Item B")
+    aurora_gui_combobox_add_item(cb, "Item C")
+    cnt = aurora_gui_combobox_count(cb)
+    if cnt < 0
+        output("FAIL: combobox count < 0")
+        return
+    end
+
+    aurora_gui_combobox_set_selected(cb, 1)
+    sel = aurora_gui_combobox_get_selected(cb)
+    if sel < 0
+        output("FAIL: combobox selected < 0")
+        return
+    end
+
+    aurora_gui_combobox_clear(cb)
+
+    aurora_gui_window_destroy(win)
+    output("combobox: PASS")
+end

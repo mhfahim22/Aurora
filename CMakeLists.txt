@@ -198,6 +198,7 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/async/channel.cpp
     aurora/src/runtime/async/event_bus.cpp
     aurora/src/runtime/async/fiber.cpp
+    aurora/src/runtime/async/event_loop.cpp
     aurora/src/runtime/std/collections.cpp
     aurora/src/runtime/ai/tensor.cpp
     aurora/src/runtime/ai/autograd.cpp
@@ -217,8 +218,26 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/backend/tls.cpp
     aurora/src/runtime/backend/websocket.cpp
     aurora/src/runtime/backend/database.cpp
+    aurora/src/runtime/backend/graphql.cpp
+    aurora/src/runtime/backend/gateway.cpp
+    aurora/src/runtime/backend/h2_server.cpp
+    aurora/src/runtime/backend/webhook.cpp
+    aurora/src/runtime/backend/orm.cpp
+    aurora/src/runtime/backend/rest.cpp
+    aurora/src/runtime/backend/template.cpp
     aurora/src/runtime/backend/miniz.c
     aurora/src/runtime/backend/miniz_tdef.c
+    aurora/src/std/app.cpp
+    aurora/src/std/app_layout.cpp
+    aurora/src/std/app_nav.cpp
+    aurora/src/std/app_theme.cpp
+    aurora/src/std/widget.cpp
+    aurora/src/std/widgets_advanced.cpp
+    aurora/src/std/widget_tree_diff.cpp
+    aurora/src/std/hot_reload_gui.cpp
+    aurora/src/std/inspector.cpp
+    aurora/src/std/i18n.cpp
+    aurora/src/std/a11y.cpp
     aurora/src/std/math.cpp
     aurora/src/std/json.cpp
     aurora/src/std/fs.cpp
@@ -227,6 +246,7 @@ add_library(aurora_runtime STATIC
     aurora/src/std/crypto.cpp
     aurora/src/std/audio.cpp
     aurora/src/std/animation.cpp
+    aurora/src/std/app_security.cpp
     aurora/src/std/async.cpp
     aurora/src/std/canvas.cpp
     aurora/src/std/db.cpp
@@ -238,13 +258,20 @@ add_library(aurora_runtime STATIC
     aurora/src/std/mobile_stubs.cpp
     aurora/src/std/pkg.cpp
     aurora/src/std/plugin.cpp
+    aurora/src/std/theme_store.cpp
+    aurora/src/std/widget_plugin.cpp
     aurora/src/std/process.cpp
+    aurora/src/std/push.cpp
     aurora/src/std/reactive.cpp
+    aurora/src/std/store.cpp
+    aurora/src/std/telemetry.cpp
+    aurora/src/std/updater.cpp
     aurora/src/std/security.cpp
     aurora/src/std/serial.cpp
     aurora/src/std/test.cpp
     aurora/src/std/thread.cpp
     aurora/src/std/video.cpp
+    aurora/src/std/virtual_scroll.cpp
     aurora/src/mobile/widgets.cpp
     third_party/sqlite3/sqlite3.c
 )
@@ -260,8 +287,16 @@ if(APPLE)
     target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
     set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
         COMPILE_FLAGS "-x objective-c++")
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        target_sources(aurora_runtime PRIVATE
+            aurora/src/mobile/ios/ios_runtime.mm
+            aurora/src/mobile/ios/ios_renderer.mm
+            aurora/src/mobile/ios/ios_renderer_widgets.mm)
+        target_link_libraries(aurora_runtime PRIVATE "-framework UIKit" "-framework Metal")
+    endif()
 else()
-    target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp)
+    target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp
+        aurora/src/mobile/desktop_renderer.cpp)
     if(WIN32)
         target_sources(aurora_runtime PRIVATE aurora/src/runtime/ui/ui_win32.cpp)
     endif()
@@ -449,6 +484,7 @@ add_executable(voss
     aurora/tools/voss/commands_config.cpp
     aurora/tools/voss/commands_template.cpp
     aurora/tools/voss/commands_advanced.cpp
+    aurora/tools/voss/commands_theme.cpp
     aurora/tools/voss/commands_bind.cpp
     aurora/tools/voss/bridge_main.cpp
     aurora/tools/voss/bridge_pypi.cpp

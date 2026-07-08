@@ -1,0 +1,88 @@
+# Phase 15 — Database Prepared Statement Test
+
+extern function aurora_db_sqlite_open(path: str) -> ptr
+extern function aurora_db_sqlite_close(db: ptr)
+extern function aurora_db_sqlite_prepare(db: ptr, sql: str) -> ptr
+extern function aurora_db_sqlite_bind_int(stmt: ptr, index: int, value: int)
+extern function aurora_db_sqlite_bind_text(stmt: ptr, index: int, value: str)
+extern function aurora_db_sqlite_step(stmt: ptr) -> int
+extern function aurora_db_sqlite_column_count(stmt: ptr) -> int
+extern function aurora_db_sqlite_column_name(stmt: ptr, col: int) -> str
+extern function aurora_db_sqlite_column_type(stmt: ptr, col: int) -> int
+extern function aurora_db_sqlite_column_text(stmt: ptr, col: int) -> str
+extern function aurora_db_sqlite_column_int(stmt: ptr, col: int) -> int
+extern function aurora_db_sqlite_finalize(stmt: ptr)
+
+function main()
+    output("db_prepare: start")
+    db = aurora_db_sqlite_open(":memory:")
+    if db == null
+        output("FAIL: open returned null")
+        return
+    end
+    output("  open: ok")
+    aurora_db_sqlite_exec(db, "CREATE TABLE users (id INT, name TEXT)")
+    stmt = aurora_db_sqlite_prepare(db, "INSERT INTO users VALUES (?, ?)")
+    if stmt == null
+        output("FAIL: prepare insert returned null")
+        return
+    end
+    output("  prepare insert: ok")
+    aurora_db_sqlite_bind_int(stmt, 1, 42)
+    aurora_db_sqlite_bind_text(stmt, 2, "Bob")
+    step = aurora_db_sqlite_step(stmt)
+    if step != 101
+        output("FAIL: step insert = " + str(step))
+        return
+    end
+    output("  insert step: " + str(step))
+    aurora_db_sqlite_finalize(stmt)
+    output("  finalize insert: ok")
+    stmt2 = aurora_db_sqlite_prepare(db, "SELECT * FROM users")
+    if stmt2 == null
+        output("FAIL: prepare select returned null")
+        return
+    end
+    output("  prepare select: ok")
+    step2 = aurora_db_sqlite_step(stmt2)
+    if step2 != 100
+        output("FAIL: select step = " + str(step2))
+        return
+    end
+    output("  select step: " + str(step2))
+    cc = aurora_db_sqlite_column_count(stmt2)
+    if cc != 2
+        output("FAIL: column count = " + str(cc))
+        return
+    end
+    output("  columns: " + str(cc))
+    cname1 = aurora_db_sqlite_column_name(stmt2, 0)
+    if cname1 != "id"
+        output("FAIL: column 0 name = " + cname1)
+        return
+    end
+    cname2 = aurora_db_sqlite_column_name(stmt2, 1)
+    if cname2 != "name"
+        output("FAIL: column 1 name = " + cname2)
+        return
+    end
+    output("  column names: id, name")
+    ctype1 = aurora_db_sqlite_column_type(stmt2, 0)
+    output("  column 0 type: " + str(ctype1))
+    ctype2 = aurora_db_sqlite_column_type(stmt2, 1)
+    output("  column 1 type: " + str(ctype2))
+    cval1 = aurora_db_sqlite_column_int(stmt2, 0)
+    if cval1 != 42
+        output("FAIL: column int = " + str(cval1))
+        return
+    end
+    cval2 = aurora_db_sqlite_column_text(stmt2, 1)
+    if cval2 != "Bob"
+        output("FAIL: column text = " + cval2)
+        return
+    end
+    output("  values: 42, Bob")
+    aurora_db_sqlite_finalize(stmt2)
+    aurora_db_sqlite_close(db)
+    output("db_prepare: PASS")
+end

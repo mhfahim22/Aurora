@@ -1,0 +1,173 @@
+## Layout Nested Layout Unit Tests
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
+extern function aurora_app_layout_node_set_align(node: ptr, align: int)
+extern function aurora_app_layout_node_set_wrap(node: ptr, wrap: int)
+extern function aurora_app_layout_node_set_gap(node: ptr, gap: double)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_min_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_max_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_padding(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_node_set_margin(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_x(node: ptr) -> double
+extern function aurora_app_layout_node_get_y(node: ptr) -> double
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+extern function aurora_app_layout_node_get_h(node: ptr) -> double
+extern function aurora_app_layout_node_set_flex(node: ptr, grow: int, shrink: int, basis: int)
+
+function main()
+    output("═══ Layout Nested Test ═══")
+
+    output("  setup: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create returned null")
+        return
+    end
+    root = aurora_app_layout_node_new(0, 0)
+    if root == 0
+        output("FAIL: node_new root returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(root, 1)
+    aurora_app_layout_node_set_size(root, 400.0, 400.0)
+    output("  setup: pass")
+
+    output("  create parent A (row): start")
+    parent_a = aurora_app_layout_node_new(root, 0)
+    if parent_a == 0
+        output("FAIL: node_new parent_a returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(parent_a, 0)
+    aurora_app_layout_node_set_size(parent_a, 400.0, 100.0)
+    output("  create parent A (row): pass")
+
+    output("  create children of A: start")
+    a1 = aurora_app_layout_node_new(parent_a, 0)
+    if a1 == 0
+        output("FAIL: node_new a1 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_size(a1, 80.0, 40.0)
+    a2 = aurora_app_layout_node_new(parent_a, 0)
+    if a2 == 0
+        output("FAIL: node_new a2 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_size(a2, 80.0, 40.0)
+    output("  create children of A: pass")
+
+    output("  create parent B (column): start")
+    parent_b = aurora_app_layout_node_new(root, 0)
+    if parent_b == 0
+        output("FAIL: node_new parent_b returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(parent_b, 1)
+    aurora_app_layout_node_set_size(parent_b, 400.0, 200.0)
+    output("  create parent B (column): pass")
+
+    output("  create children of B: start")
+    b1 = aurora_app_layout_node_new(parent_b, 0)
+    if b1 == 0
+        output("FAIL: node_new b1 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_size(b1, 100.0, 40.0)
+    b2 = aurora_app_layout_node_new(parent_b, 0)
+    if b2 == 0
+        output("FAIL: node_new b2 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_size(b2, 100.0, 40.0)
+    b3 = aurora_app_layout_node_new(parent_b, 0)
+    if b3 == 0
+        output("FAIL: node_new b3 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_size(b3, 100.0, 40.0)
+    output("  create children of B: pass")
+
+    output("  calculate: start")
+    aurora_app_layout_calculate(root, 400.0, 400.0)
+    output("  calculate: pass")
+
+    output("  verify all positions: start")
+    rx = aurora_app_layout_node_get_x(root)
+    ry = aurora_app_layout_node_get_y(root)
+    rw = aurora_app_layout_node_get_w(root)
+    rh = aurora_app_layout_node_get_h(root)
+    output("  root x=" + str(rx) + " y=" + str(ry) + " w=" + str(rw) + " h=" + str(rh))
+
+    pax = aurora_app_layout_node_get_x(parent_a)
+    pay = aurora_app_layout_node_get_y(parent_a)
+    paw = aurora_app_layout_node_get_w(parent_a)
+    pah = aurora_app_layout_node_get_h(parent_a)
+    output("  parentA x=" + str(pax) + " y=" + str(pay) + " w=" + str(paw) + " h=" + str(pah))
+
+    a1x = aurora_app_layout_node_get_x(a1)
+    a1y = aurora_app_layout_node_get_y(a1)
+    a2x = aurora_app_layout_node_get_x(a2)
+    a2y = aurora_app_layout_node_get_y(a2)
+    output("  a1 x=" + str(a1x) + " y=" + str(a1y) + " a2 x=" + str(a2x) + " y=" + str(a2y))
+
+    pbx = aurora_app_layout_node_get_x(parent_b)
+    pby = aurora_app_layout_node_get_y(parent_b)
+    b1x = aurora_app_layout_node_get_x(b1)
+    b1y = aurora_app_layout_node_get_y(b1)
+    b2x = aurora_app_layout_node_get_x(b2)
+    b2y = aurora_app_layout_node_get_y(b2)
+    b3x = aurora_app_layout_node_get_x(b3)
+    b3y = aurora_app_layout_node_get_y(b3)
+    output("  parentB x=" + str(pbx) + " y=" + str(pby) + " b1 x=" + str(b1x) + " y=" + str(b1y) + " b2 x=" + str(b2x) + " y=" + str(b2y) + " b3 x=" + str(b3x) + " y=" + str(b3y))
+
+    if rw == 0
+        output("FAIL: root width is 0")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    if paw == 0
+        output("FAIL: parentA width is 0")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    if a1x == a2x
+        if a1y == a2y
+            output("FAIL: a1 and a2 have same position")
+            aurora_app_layout_destroy(lay)
+            return
+        end
+    end
+    if b1x == b2x
+        if b1y == b2y
+            if b2x == b3x
+                if b2y == b3y
+                    output("FAIL: b children have same position")
+                    aurora_app_layout_destroy(lay)
+                    return
+                end
+            end
+        end
+    end
+    output("  verify all positions: pass")
+
+    output("  destroy: start")
+    aurora_app_layout_destroy(lay)
+    output("  destroy: pass")
+
+    output("PASS")
+end

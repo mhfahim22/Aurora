@@ -1,0 +1,55 @@
+## TreeView Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ TreeView Test ═══")
+
+    output("  treeview new: start")
+    win = aurora_gui_window_new("TreeView Test", 400, 300)
+    tv = aurora_gui_treeview_new(win, 10, 10, 200, 200)
+    if tv == 0
+        output("FAIL: treeview_new returned null")
+        return
+    end
+    output("  treeview new: pass")
+
+    output("  treeview add_item root: start")
+    root = aurora_gui_treeview_add_item(tv, "Root", 0)
+    if root == 0
+        output("FAIL: treeview_add_item root returned null")
+        return
+    end
+    output("  treeview add_item root: pass")
+
+    output("  treeview add_item child: start")
+    child = aurora_gui_treeview_add_item(tv, "Child 1", root)
+    if child == 0
+        output("FAIL: treeview_add_item child returned null")
+        return
+    end
+    output("  treeview add_item child: pass")
+
+    output("  treeview set_item_text: start")
+    aurora_gui_treeview_set_item_text(tv, child, "Updated Child")
+    output("  treeview set_item_text: pass")
+
+    output("  treeview expand collapse: start")
+    aurora_gui_treeview_expand(tv, root)
+    aurora_gui_treeview_collapse(tv, root)
+    output("  treeview expand collapse: pass")
+
+    output("  treeview get_selected: start")
+    sel = aurora_gui_treeview_get_selected(tv)
+    output("  treeview get_selected: pass")
+
+    output("  treeview remove_item: start")
+    aurora_gui_treeview_remove_item(tv, child)
+    output("  treeview remove_item: pass")
+
+    output("  treeview clear: start")
+    aurora_gui_treeview_clear(tv)
+    output("  treeview clear: pass")
+
+    output("PASS")
+end

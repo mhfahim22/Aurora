@@ -1,0 +1,41 @@
+# Navigation Callback Test
+# Verifies on_change callback can be registered
+
+extern function aurora_app_nav_init() -> ptr
+extern function aurora_app_nav_destroy(nav: ptr)
+extern function aurora_app_nav_register(nav: ptr, name: string, screen: ptr)
+extern function aurora_app_nav_push(nav: ptr, name: string) -> int
+extern function aurora_app_nav_pop(nav: ptr) -> int
+extern function aurora_app_nav_current(nav: ptr) -> string
+extern function aurora_app_nav_depth(nav: ptr) -> int
+extern function aurora_app_nav_set_on_change(nav: ptr, cb: ptr)
+
+function nav_change_cb()
+    output("nav_change callback invoked")
+end
+
+function main()
+    nav = aurora_app_nav_init()
+    if nav == 0
+        output("FAIL: nav_init returned null")
+        return
+    end
+
+    aurora_app_nav_register(nav, "home", 0)
+    aurora_app_nav_set_on_change(nav, nav_change_cb)
+
+    result = aurora_app_nav_push(nav, "home")
+    if result != 0
+        output("FAIL: nav_push returned " + str(result))
+        return
+    end
+
+    result = aurora_app_nav_pop(nav)
+    if result != 0
+        output("FAIL: nav_pop returned " + str(result))
+        return
+    end
+
+    aurora_app_nav_destroy(nav)
+    output("PASS")
+end

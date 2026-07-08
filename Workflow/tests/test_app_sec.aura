@@ -1,0 +1,38 @@
+# Phase 12 — App Security Test (stub-tolerant)
+
+extern function aurora_app_sec_init() -> int
+extern function aurora_app_sec_declare_permission(perm: str) -> int
+extern function aurora_app_sec_check_permission(perm: str) -> int
+extern function aurora_app_sec_enforce_permissions(enforce: int) -> int
+extern function aurora_app_sec_sanitize_input(input: str, out: ptr, out_size: int) -> int
+extern function aurora_app_sec_validate_path(path: str) -> int
+extern function aurora_app_sec_csp_set(policy: str) -> int
+extern function aurora_app_sec_csp_get() -> str
+extern function aurora_app_sec_csp_check_url(url: str) -> int
+extern function aurora_app_sec_csp_reset() -> int
+
+function main()
+    output("app_sec: start")
+    init = aurora_app_sec_init()
+    output("  init: " + str(init))
+    d1 = aurora_app_sec_declare_permission("network")
+    d2 = aurora_app_sec_declare_permission("filesystem")
+    output("  declare perms: " + str(d1) + " " + str(d2))
+    chk = aurora_app_sec_check_permission("network")
+    output("  network perm: " + str(chk))
+    chk2 = aurora_app_sec_check_permission("camera")
+    output("  camera perm: " + str(chk2))
+    ok_path = aurora_app_sec_validate_path("safe/path.txt")
+    output("  safe path: " + str(ok_path))
+    trav = aurora_app_sec_validate_path("../escape")
+    output("  path traversal: " + str(trav))
+    csp = aurora_app_sec_csp_set("default-src 'self'")
+    output("  csp set: " + str(csp))
+    csp2 = aurora_app_sec_csp_get()
+    output("  csp get: " + csp2)
+    urlchk = aurora_app_sec_csp_check_url("https://evil.com")
+    output("  csp check url: " + str(urlchk))
+    rst = aurora_app_sec_csp_reset()
+    output("  csp reset: " + str(rst))
+    output("app_sec: PASS")
+end

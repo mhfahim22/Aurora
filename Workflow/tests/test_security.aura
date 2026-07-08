@@ -1,0 +1,57 @@
+## Security Tests (Phase 12.2 / 12.3)
+
+extern function aurora_app_sec_init() -> int
+extern function aurora_app_sec_declare_permission(perm: str) -> int
+extern function aurora_app_sec_check_permission(perm: str) -> int
+extern function aurora_app_sec_enforce_permissions(enforce: int) -> int
+extern function aurora_app_sec_sanitize_input(input: str, out: ptr, out_size: int) -> int
+extern function aurora_app_sec_validate_path(path: str) -> int
+extern function aurora_app_sec_csp_set(policy: str) -> int
+extern function aurora_app_sec_csp_get() -> str
+
+function main()
+    output("═══ Security Tests ═══")
+
+    aurora_app_sec_init()
+    output("  sec init: ok")
+
+    aurora_app_sec_declare_permission("network")
+    aurora_app_sec_declare_permission("filesystem")
+    chk = aurora_app_sec_check_permission("network")
+    output("  network perm: " + str(chk))
+    if chk != 1
+        output("  FAIL: network permission = " + str(chk))
+        return
+    end
+
+    chk2 = aurora_app_sec_check_permission("camera")
+    output("  camera perm (undeclared): " + str(chk2))
+    if chk2 != 0
+        output("  FAIL: camera should be denied = " + str(chk2))
+        return
+    end
+
+    aurora_app_sec_csp_set("default-src 'self'")
+    csp = aurora_app_sec_csp_get()
+    output("  CSP: " + csp)
+    if csp == 0
+        output("  FAIL: CSP null")
+        return
+    end
+    if csp == ""
+        output("  FAIL: CSP empty string")
+        return
+    end
+
+    if aurora_app_sec_validate_path("safe/path.txt") != 1
+        output("  FAIL: safe path rejected")
+        return
+    end
+    if aurora_app_sec_validate_path("../escape") != 0
+        output("  FAIL: traversal not blocked")
+        return
+    end
+    output("  path validation: pass")
+
+    output("═══ Security Tests PASS ═══")
+end

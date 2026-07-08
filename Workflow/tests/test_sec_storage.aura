@@ -1,0 +1,45 @@
+# Phase 27 — Secure Storage Test
+
+extern function aurora_sec_storage_open(path: str, key: ptr, key_len: int) -> ptr
+extern function aurora_sec_storage_set(store: ptr, key: str, value: str) -> int
+extern function aurora_sec_storage_get(store: ptr, key: str) -> str
+extern function aurora_sec_storage_remove(store: ptr, key: str) -> int
+extern function aurora_sec_storage_close(store: ptr)
+
+function main()
+    output("storage: start")
+    key = "0123456789ABCDEF"
+    store = aurora_sec_storage_open("test_store.db", key, 16)
+    if store == null
+        output("FAIL: storage_open returned null")
+        return
+    end
+    output("  open: ok")
+    ret = aurora_sec_storage_set(store, "user", "alice")
+    if ret != 1
+        output("FAIL: set returned " + str(ret))
+        return
+    end
+    output("  set: ok")
+    val = aurora_sec_storage_get(store, "user")
+    if val != "alice"
+        output("FAIL: get returned " + val)
+        return
+    end
+    output("  get alice: ok")
+    ret2 = aurora_sec_storage_remove(store, "user")
+    if ret2 != 1
+        output("FAIL: remove returned " + str(ret2))
+        return
+    end
+    output("  remove: ok")
+    val2 = aurora_sec_storage_get(store, "user")
+    if val2 != ""
+        output("FAIL: get after remove returned " + val2)
+        return
+    end
+    output("  get after remove empty: ok")
+    aurora_sec_storage_close(store)
+    output("  close: ok")
+    output("storage: PASS")
+end

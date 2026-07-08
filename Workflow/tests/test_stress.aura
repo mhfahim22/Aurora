@@ -1,0 +1,18 @@
+## Stress Test — 1000 widgets (Phase 12.3)
+
+import "gui"
+
+function main()
+    output("═══ Stress Test: 1000 Widgets ═══")
+    win = aurora_gui_window_new("Stress Test", 800, 600)
+
+    output("Creating 1000 buttons...")
+    for i in range(1000)
+        btn = aurora_gui_button_new(win, str(i), i % 20 * 40, i / 20 * 30, 38, 28)
+        if i % 200 == 0
+            output("  created " + str(i) + " widgets...")
+        end
+    end
+    output("Created 1000 buttons OK")
+    output("═══ Stress Test PASS ═══")
+end

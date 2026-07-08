@@ -1,0 +1,105 @@
+## Phase 8: Cross-Platform Widget Component Builder
+## Usage: import "widget"
+
+## ── Extern functions from widget.hpp ──
+
+extern function aurora_widget_new(type: i32) -> pointer
+extern function aurora_widget_free(w: pointer)
+extern function aurora_widget_add_child(parent: pointer, child: pointer)
+extern function aurora_widget_set_text(w: pointer, text: cstring)
+extern function aurora_widget_set_value(w: pointer, val: f32)
+extern function aurora_widget_set_bg(w: pointer, color: i32)
+extern function aurora_widget_set_font_size(w: pointer, size: i32)
+extern function aurora_widget_layout(w: pointer, pw: f32, ph: f32)
+extern function aurora_widget_render(w: pointer)
+
+## ── Widget Type Constants ──
+
+const APP_WIDGET_BUTTON   := 0
+const APP_WIDGET_LABEL    := 1
+const APP_WIDGET_TEXTBOX  := 2
+const APP_WIDGET_COLUMN   := 4
+const APP_WIDGET_ROW      := 5
+const APP_WIDGET_GRID     := 6
+const APP_WIDGET_LIST     := 7
+const APP_WIDGET_SLIDER   := 9
+const APP_WIDGET_SWITCH   := 10
+const APP_WIDGET_CHECKBOX := 11
+const APP_WIDGET_PROGRESS := 13
+
+## ── High-level convenience wrappers ──
+
+function widget_button(parent, text)
+    w = aurora_widget_new(APP_WIDGET_BUTTON)
+    aurora_widget_set_text(w, text)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_label(parent, text)
+    w = aurora_widget_new(APP_WIDGET_LABEL)
+    aurora_widget_set_text(w, text)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_column(parent)
+    w = aurora_widget_new(APP_WIDGET_COLUMN)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_row(parent)
+    w = aurora_widget_new(APP_WIDGET_ROW)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_slider(parent, val)
+    w = aurora_widget_new(APP_WIDGET_SLIDER)
+    aurora_widget_set_value(w, val)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_switch(parent, on)
+    w = aurora_widget_new(APP_WIDGET_SWITCH)
+    if on == 1
+        aurora_widget_set_value(w, 1.0)
+    end
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_checkbox(parent, text, checked)
+    w = aurora_widget_new(APP_WIDGET_CHECKBOX)
+    aurora_widget_set_text(w, text)
+    if checked == 1
+        aurora_widget_set_value(w, 1.0)
+    end
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_progress(parent, val)
+    w = aurora_widget_new(APP_WIDGET_PROGRESS)
+    aurora_widget_set_value(w, val)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+function widget_list(parent)
+    w = aurora_widget_new(APP_WIDGET_LIST)
+    aurora_widget_add_child(parent, w)
+    return w
+end
+
+## ── Style helpers ──
+
+function widget_set_bg(w, color)
+    aurora_widget_set_bg(w, color)
+end
+
+function widget_set_font_size(w, size)
+    aurora_widget_set_font_size(w, size)
+end

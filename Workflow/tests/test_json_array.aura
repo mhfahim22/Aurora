@@ -1,0 +1,69 @@
+# JSON Array Test
+# Verifies array creation, push, length, and indexed access
+
+extern function aurora_json_parse(json: string) -> ptr
+extern function aurora_json_serialize(val: ptr) -> string
+extern function aurora_json_type(val: ptr) -> int
+extern function aurora_json_new() -> ptr
+extern function aurora_json_new_num(n: double) -> ptr
+extern function aurora_json_new_str(s: string) -> ptr
+extern function aurora_json_new_array() -> ptr
+extern function aurora_json_new_object() -> ptr
+extern function aurora_json_set(obj: ptr, key: string, val: double)
+extern function aurora_json_set_str(obj: ptr, key: string, val: string)
+extern function aurora_json_set_obj(obj: ptr, key: string, val: ptr)
+extern function aurora_json_get_num(obj: ptr, key: string) -> double
+extern function aurora_json_get_str(obj: ptr, key: string) -> string
+extern function aurora_json_get_obj(obj: ptr, key: string) -> ptr
+extern function aurora_json_array_push(arr: ptr, val: ptr)
+extern function aurora_json_array_get(arr: ptr, idx: int) -> ptr
+extern function aurora_json_array_len(arr: ptr) -> int
+extern function aurora_json_free(val: ptr)
+
+function main()
+    arr = aurora_json_new_array()
+    if arr == 0
+        output("FAIL: new_array returned null")
+        return
+    end
+
+    item1 = aurora_json_new_num(10.0)
+    aurora_json_array_push(arr, item1)
+
+    item2 = aurora_json_new_num(20.0)
+    aurora_json_array_push(arr, item2)
+
+    item3 = aurora_json_new_str("three")
+    aurora_json_array_push(arr, item3)
+
+    len = aurora_json_array_len(arr)
+    if len != 3
+        output("FAIL: array length expected 3 got " + str(len))
+        aurora_json_free(arr)
+        return
+    end
+
+    v0 = aurora_json_array_get(arr, 0)
+    if v0 == 0
+        output("FAIL: array_get 0 returned null")
+        aurora_json_free(arr)
+        return
+    end
+
+    v1 = aurora_json_array_get(arr, 1)
+    if v1 == 0
+        output("FAIL: array_get 1 returned null")
+        aurora_json_free(arr)
+        return
+    end
+
+    v2 = aurora_json_array_get(arr, 2)
+    if v2 == 0
+        output("FAIL: array_get 2 returned null")
+        aurora_json_free(arr)
+        return
+    end
+
+    aurora_json_free(arr)
+    output("PASS")
+end

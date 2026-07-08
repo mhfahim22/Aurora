@@ -1,0 +1,29 @@
+# Phase 6 — Desktop GUI Widget Test
+# Verify all widget types via gui API
+
+import "gui"
+
+function main()
+    output("GUI Desktop Test: Starting...")
+    w = aurora_gui_window_new("Test", 800, 600)
+    if w == null
+        output("  window_new null (expected in headless)")
+    end
+    b = aurora_gui_button_new(w, "Click Me", 10, 10, 100, 30)
+    if b == null
+        output("  button_new null (expected in headless)")
+    end
+    l = aurora_gui_label_new(w, "Hello", 10, 50, 200, 20)
+    if l == null
+        output("  label_new null (expected in headless)")
+    end
+    tb = aurora_gui_textbox_new(w, 10, 80, 200, 30)
+    if tb == null
+        output("  textbox_new null (expected in headless)")
+    end
+    cb = aurora_gui_checkbox_new(w, "Check", 10, 120, 100, 24)
+    if cb == null
+        output("  checkbox_new null (expected in headless)")
+    end
+    output("PASS")
+end

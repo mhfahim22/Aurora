@@ -13,6 +13,7 @@
 extern function aurora_server_init(port: i64) -> pointer
 extern function aurora_server_start(srv: pointer)
 extern function aurora_server_stop(srv: pointer)
+extern function aurora_server_start_with_pool(srv: pointer, router: pointer, pool_size: i32)
 extern function aurora_server_enable_tls(srv: pointer, cert_path: cstring, key_path: cstring) -> i32
 
 # ── Routing ──
@@ -56,6 +57,122 @@ extern function aurora_ws_broadcast(opcode: i32, data: pointer, len: i32) -> i32
 
 # ── HTTP/2 ──
 extern function aurora_h2_is_upgrade(raw: cstring) -> i32
+extern function aurora_h2_new(sock: i64, tls_handle: i64, server_mode: i32) -> pointer
+extern function aurora_h2_free(h2: pointer)
+extern function aurora_h2_read_preface(h2: pointer) -> i32
+extern function aurora_h2_send_preface(h2: pointer) -> i32
+extern function aurora_h2_process_frames(h2: pointer) -> i32
+extern function aurora_h2_is_open(h2: pointer) -> i32
+extern function aurora_h2_send_response(h2: pointer, stream_id: i32, status_code: i32, headers: pointer, header_count: i32, body: cstring, body_len: i32) -> i32
+extern function aurora_h2_send_headers(h2: pointer, stream_id: i32, headers: pointer, header_count: i32, end_stream: i32) -> i32
+extern function aurora_h2_send_data(h2: pointer, stream_id: i32, data: cstring, len: i32, end_stream: i32) -> i32
+extern function aurora_h2_send_rst_stream(h2: pointer, stream_id: i32, error_code: u32) -> i32
+extern function aurora_h2_send_goaway(h2: pointer, error_code: u32) -> i32
+
+# ── SSE / Streaming ──
+extern function aurora_sse_start(res: pointer) -> i32
+extern function aurora_sse_send_event(res: pointer, event: cstring, data: cstring) -> i32
+extern function aurora_sse_send_comment(res: pointer, comment: cstring) -> i32
+extern function aurora_sse_end(res: pointer) -> i32
+extern function aurora_response_start_stream(res: pointer) -> i32
+extern function aurora_response_stream_chunk(res: pointer, data: cstring, len: i32) -> i32
+extern function aurora_response_end_stream(res: pointer) -> i32
+
+# ── Webhook ──
+extern function aurora_webhook_register(event: cstring, url: cstring, secret: cstring) -> i32
+extern function aurora_webhook_unregister(event: cstring, url: cstring) -> i32
+extern function aurora_webhook_trigger(event: cstring, payload_json: cstring) -> i32
+extern function aurora_webhook_verify(payload: cstring, signature: cstring, secret: cstring) -> i32
+extern function aurora_webhook_clear_all()
+
+# ── ORM (Object-Relational Mapping) ──
+extern function aurora_orm_schema_define(table_name: cstring) -> pointer
+extern function aurora_orm_schema_column(schema: pointer, name: cstring, type: i32, flags: i32, default_val: cstring)
+extern function aurora_orm_schema_free(schema: pointer)
+extern function aurora_orm_create(db: pointer, schema: pointer, json_data: cstring) -> i64
+extern function aurora_orm_find(db: pointer, schema: pointer, id: i64) -> cstring
+extern function aurora_orm_find_by(db: pointer, schema: pointer, field: cstring, value: cstring) -> cstring
+extern function aurora_orm_all(db: pointer, schema: pointer) -> cstring
+extern function aurora_orm_where(db: pointer, schema: pointer, conditions_json: cstring) -> cstring
+extern function aurora_orm_update(db: pointer, schema: pointer, id: i64, json_data: cstring) -> i32
+extern function aurora_orm_delete(db: pointer, schema: pointer, id: i64) -> i32
+extern function aurora_orm_count(db: pointer, schema: pointer) -> i64
+extern function aurora_orm_auto_migrate(db: pointer, schema: pointer) -> i32
+extern function aurora_orm_drop_table(db: pointer, schema: pointer) -> i32
+extern function aurora_orm_schema_table_name(schema: pointer) -> cstring
+extern function aurora_orm_schema_column_count(schema: pointer) -> i32
+extern function aurora_orm_schema_column_name(schema: pointer, index: i32) -> cstring
+extern function aurora_orm_schema_column_type(schema: pointer, index: i32) -> i32
+extern function aurora_orm_schema_column_flags(schema: pointer, index: i32) -> i32
+
+# ── REST (Auto-generated REST API) ──
+extern function aurora_rest_register(router: pointer, db: pointer, schema: pointer, prefix: cstring) -> i32
+extern function aurora_rest_unregister(router: pointer, schema: pointer) -> i32
+extern function aurora_rest_set_hook(router: pointer, schema: pointer, hook_type: i32, callback: pointer, user_data: pointer) -> i32
+
+# ── Cookie ──
+extern function aurora_http_get_cookie(req: pointer, name: cstring) -> cstring
+
+# ── Form body parsing ──
+extern function aurora_parse_form_body(body: cstring, len: i64) -> pointer
+extern function aurora_form_get(form: pointer, key: cstring) -> cstring
+extern function aurora_form_count(form: pointer) -> i32
+extern function aurora_form_key(form: pointer, index: i32) -> cstring
+extern function aurora_form_value(form: pointer, index: i32) -> cstring
+extern function aurora_form_free(form: pointer)
+
+# ── Multipart upload parsing ──
+extern function aurora_parse_multipart(body: cstring, len: i64, boundary: cstring) -> pointer
+extern function aurora_multipart_part_count(mp: pointer) -> i32
+extern function aurora_multipart_part_name(mp: pointer, index: i32) -> cstring
+extern function aurora_multipart_part_filename(mp: pointer, index: i32) -> cstring
+extern function aurora_multipart_part_content_type(mp: pointer, index: i32) -> cstring
+extern function aurora_multipart_part_data(mp: pointer, index: i32) -> cstring
+extern function aurora_multipart_part_size(mp: pointer, index: i32) -> i64
+extern function aurora_multipart_free(mp: pointer)
+
+# ── GraphQL ──
+extern function aurora_gql_schema_new() -> pointer
+extern function aurora_gql_schema_free(schema: pointer)
+extern function aurora_gql_type_add_object(schema: pointer, name: cstring, description: cstring) -> i32
+extern function aurora_gql_type_add_enum(schema: pointer, name: cstring, values_csv: cstring) -> i32
+extern function aurora_gql_type_add_scalar(schema: pointer, name: cstring) -> i32
+extern function aurora_gql_type_add_input(schema: pointer, name: cstring) -> i32
+extern function aurora_gql_field_add(schema: pointer, type_name: cstring, field_name: cstring, field_type: cstring, description: cstring, resolver: pointer, ctx: pointer) -> i32
+extern function aurora_gql_query_add(schema: pointer, field_name: cstring, field_type: cstring, description: cstring, resolver: pointer, ctx: pointer) -> i32
+extern function aurora_gql_mutation_add(schema: pointer, field_name: cstring, field_type: cstring, description: cstring, resolver: pointer, ctx: pointer) -> i32
+extern function aurora_gql_execute(schema: pointer, query: cstring, variables_json: cstring) -> pointer
+extern function aurora_gql_result_json(result: pointer) -> cstring
+extern function aurora_gql_result_errors(result: pointer) -> cstring
+extern function aurora_gql_result_has_errors(result: pointer) -> i32
+extern function aurora_gql_result_free(result: pointer)
+extern function aurora_gql_parse_sdl(schema: pointer, sdl: cstring) -> i32
+extern function aurora_gql_introspect(schema: pointer) -> cstring
+extern function aurora_gql_handle_request(schema: pointer, body_json: cstring, out_buffer: cstring, out_size: i32)
+
+# ── API Gateway ──
+extern function aurora_rate_limiter_new(max_requests: i32, window_sec: i32) -> pointer
+extern function aurora_rate_limiter_free(rl: pointer)
+extern function aurora_rate_limiter_allow(rl: pointer, key: cstring) -> i32
+extern function aurora_rate_limiter_remaining(rl: pointer, key: cstring) -> i32
+extern function aurora_rate_limiter_reset(rl: pointer, key: cstring)
+extern function aurora_gateway_new(rl: pointer) -> pointer
+extern function aurora_gateway_free(gw: pointer)
+extern function aurora_gateway_add_route(gw: pointer, method: cstring, path: cstring, upstream_url: cstring) -> i32
+extern function aurora_gateway_remove_route(gw: pointer, method: cstring, path: cstring) -> i32
+extern function aurora_gateway_forward(gw: pointer, method: cstring, path: cstring, body: cstring, headers: cstring, out_buffer: cstring, out_size: i32) -> i32
+extern function aurora_gateway_batch(gw: pointer, requests_json: cstring, out_buffer: cstring, out_size: i32) -> i32
+extern function aurora_gateway_health(gw: pointer, out_buffer: cstring, out_size: i32) -> i32
+extern function aurora_gateway_handle(gw: pointer, method: cstring, path: cstring, body: cstring, headers: cstring, client_ip: cstring, out_buffer: cstring, out_size: i32) -> i32
+
+# ── Security headers ──
+extern function aurora_add_security_headers(res: pointer)
+
+# ── Rate limit check ──
+extern function builtin_rate_limit_check(key: cstring) -> i64
+
+# ── CSRF verification ──
+extern function builtin_csrf_verify(token: cstring) -> i64
 
 # ════════════════════════════════════════════════════════════
 # Aurora-level convenience wrappers
@@ -174,4 +291,334 @@ end
 
 function h2_is_upgrade(raw):
     return aurora_h2_is_upgrade(raw) != 0
+end
+
+function h2_new(sock, tls_handle=0, server_mode=1):
+    return aurora_h2_new(sock, tls_handle, server_mode)
+end
+
+function h2_free(h2):
+    aurora_h2_free(h2)
+end
+
+function h2_read_preface(h2):
+    return aurora_h2_read_preface(h2) == 0
+end
+
+function h2_send_preface(h2):
+    return aurora_h2_send_preface(h2) == 0
+end
+
+function h2_process_frames(h2):
+    return aurora_h2_process_frames(h2) == 0
+end
+
+function h2_is_open(h2):
+    return aurora_h2_is_open(h2) != 0
+end
+
+function h2_send_response(h2, stream_id, status_code, body="", content_type="text/plain"):
+    headers = [content_type]
+    return aurora_h2_send_response(h2, stream_id, status_code, headers, 1, body, len_cstring(body)) == 0
+end
+
+function h2_send_goaway(h2, error_code=0):
+    return aurora_h2_send_goaway(h2, error_code) == 0
+end
+
+# ── SSE convenience ──
+function sse_start(res):
+    return aurora_sse_start(res) == 0
+end
+
+function sse_send(res, event, data):
+    return aurora_sse_send_event(res, event, data) == 0
+end
+
+function sse_comment(res, comment):
+    return aurora_sse_send_comment(res, comment) == 0
+end
+
+function sse_end(res):
+    aurora_sse_end(res)
+end
+
+# ── Streaming convenience ──
+function stream_start(res):
+    return aurora_response_start_stream(res) == 0
+end
+
+function stream_chunk(res, data):
+    return aurora_response_stream_chunk(res, data, len_cstring(data)) == 0
+end
+
+function stream_end(res):
+    aurora_response_end_stream(res)
+end
+
+# ── Webhook convenience ──
+function webhook_register(event, url, secret=""):
+    return aurora_webhook_register(event, url, secret) == 0
+end
+
+function webhook_trigger(event, payload_json):
+    return aurora_webhook_trigger(event, payload_json) == 0
+end
+
+function webhook_verify(payload, signature, secret):
+    return aurora_webhook_verify(payload, signature, secret) != 0
+end
+
+# ── ORM convenience ──
+function orm_schema(name):
+    return aurora_orm_schema_define(name)
+end
+
+function orm_column(schema, name, type, flags=0, default_val=""):
+    aurora_orm_schema_column(schema, name, type, flags, default_val)
+end
+
+function orm_create(db, schema, json_data):
+    return aurora_orm_create(db, schema, json_data)
+end
+
+function orm_find(db, schema, id):
+    return aurora_orm_find(db, schema, id)
+end
+
+function orm_all(db, schema):
+    return aurora_orm_all(db, schema)
+end
+
+function orm_where(db, schema, conditions):
+    return aurora_orm_where(db, schema, conditions)
+end
+
+function orm_update(db, schema, id, json_data):
+    return aurora_orm_update(db, schema, id, json_data)
+end
+
+function orm_delete(db, schema, id):
+    return aurora_orm_delete(db, schema, id)
+end
+
+function orm_count(db, schema):
+    return aurora_orm_count(db, schema)
+end
+
+function orm_migrate(db, schema):
+    return aurora_orm_auto_migrate(db, schema) == 0
+end
+
+function orm_schema_name(schema):
+    return aurora_orm_schema_table_name(schema)
+end
+
+# ── REST convenience ──
+function rest_register(router, db, schema, prefix=""):
+    return aurora_rest_register(router, db, schema, prefix) == 0
+end
+
+function rest_set_hook(router, schema, hook_type, callback, user_data=0):
+    return aurora_rest_set_hook(router, schema, hook_type, callback, user_data) == 0
+end
+
+# ── Security / hardening convenience ──
+function add_security_headers(res):
+    aurora_add_security_headers(res)
+end
+
+function rate_limit_check(key):
+    return builtin_rate_limit_check(key) != 0
+end
+
+function csrf_verify(token):
+    return builtin_csrf_verify(token) != 0
+end
+
+# ── Form body convenience ──
+function request_form(req):
+    return aurora_http_get_field(req, "form")
+end
+
+function form_get(form, key):
+    return aurora_form_get(form, key)
+end
+
+function form_count(form):
+    return aurora_form_count(form)
+end
+
+function form_key(form, index):
+    return aurora_form_key(form, index)
+end
+
+function form_value(form, index):
+    return aurora_form_value(form, index)
+end
+
+function form_free(form):
+    aurora_form_free(form)
+end
+
+# ── Multipart convenience ──
+function request_files(req):
+    return aurora_http_get_field(req, "files")
+end
+
+function multipart_count(mp):
+    return aurora_multipart_part_count(mp)
+end
+
+function multipart_name(mp, index):
+    return aurora_multipart_part_name(mp, index)
+end
+
+function multipart_filename(mp, index):
+    return aurora_multipart_part_filename(mp, index)
+end
+
+function multipart_content_type(mp, index):
+    return aurora_multipart_part_content_type(mp, index)
+end
+
+function multipart_data(mp, index):
+    return aurora_multipart_part_data(mp, index)
+end
+
+function multipart_size(mp, index):
+    return aurora_multipart_part_size(mp, index)
+end
+
+function multipart_free(mp):
+    aurora_multipart_free(mp)
+end
+
+# ── Cookie convenience ──
+function request_cookie(req, name):
+    return aurora_http_get_cookie(req, name)
+end
+
+# ── GraphQL wrappers ──
+
+function gql_schema_new():
+    return aurora_gql_schema_new()
+end
+
+function gql_schema_free(schema):
+    aurora_gql_schema_free(schema)
+end
+
+function gql_type_add_object(schema, name, description=""):
+    return aurora_gql_type_add_object(schema, name, description) == 1
+end
+
+function gql_type_add_enum(schema, name, values_csv):
+    return aurora_gql_type_add_enum(schema, name, values_csv) == 1
+end
+
+function gql_type_add_scalar(schema, name):
+    return aurora_gql_type_add_scalar(schema, name) == 1
+end
+
+function gql_type_add_input(schema, name):
+    return aurora_gql_type_add_input(schema, name) == 1
+end
+
+function gql_field_add(schema, type_name, field_name, field_type, description="", resolver=0, ctx=0):
+    return aurora_gql_field_add(schema, type_name, field_name, field_type, description, resolver, ctx) == 1
+end
+
+function gql_query_add(schema, field_name, field_type, description="", resolver=0, ctx=0):
+    return aurora_gql_query_add(schema, field_name, field_type, description, resolver, ctx) == 1
+end
+
+function gql_mutation_add(schema, field_name, field_type, description="", resolver=0, ctx=0):
+    return aurora_gql_mutation_add(schema, field_name, field_type, description, resolver, ctx) == 1
+end
+
+function gql_execute(schema, query, variables_json="{}"):
+    result = aurora_gql_execute(schema, query, variables_json)
+    js = aurora_gql_result_json(result)
+    aurora_gql_result_free(result)
+    return js
+end
+
+function gql_parse_sdl(schema, sdl):
+    return aurora_gql_parse_sdl(schema, sdl) == 1
+end
+
+function gql_introspect(schema):
+    return aurora_gql_introspect(schema)
+end
+
+function gql_handle_request(schema, body_json):
+    buf = cstring_repeat(65536)
+    aurora_gql_handle_request(schema, body_json, buf, 65536)
+    return buf
+end
+
+# ── API Gateway wrappers ──
+
+function rate_limiter_new(max_requests=100, window_sec=60):
+    return aurora_rate_limiter_new(max_requests, window_sec)
+end
+
+function rate_limiter_free(rl):
+    aurora_rate_limiter_free(rl)
+end
+
+function rate_limiter_allow(rl, key):
+    return aurora_rate_limiter_allow(rl, key) == 1
+end
+
+function rate_limiter_remaining(rl, key):
+    return aurora_rate_limiter_remaining(rl, key)
+end
+
+function rate_limiter_reset(rl, key):
+    aurora_rate_limiter_reset(rl, key)
+end
+
+function gateway_new(rl=0):
+    return aurora_gateway_new(rl)
+end
+
+function gateway_free(gw):
+    aurora_gateway_free(gw)
+end
+
+function gateway_add_route(gw, method, path, upstream_url):
+    return aurora_gateway_add_route(gw, method, path, upstream_url) == 1
+end
+
+function gateway_remove_route(gw, method, path):
+    return aurora_gateway_remove_route(gw, method, path) == 1
+end
+
+function gateway_forward(gw, method, path, body="", headers=""):
+    buf = cstring_repeat(65536)
+    n = aurora_gateway_forward(gw, method, path, body, headers, buf, 65536)
+    if n < 0 return "" end
+    return buf
+end
+
+function gateway_batch(gw, requests_json):
+    buf = cstring_repeat(131072)
+    n = aurora_gateway_batch(gw, requests_json, buf, 131072)
+    if n < 0 return "" end
+    return buf
+end
+
+function gateway_health(gw):
+    buf = cstring_repeat(4096)
+    aurora_gateway_health(gw, buf, 4096)
+    return buf
+end
+
+function gateway_handle(gw, method, path, body="", headers="", client_ip=""):
+    buf = cstring_repeat(65536)
+    n = aurora_gateway_handle(gw, method, path, body, headers, client_ip, buf, 65536)
+    if n < 0 return "" end
+    return buf
 end

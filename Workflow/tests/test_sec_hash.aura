@@ -1,0 +1,41 @@
+# Phase 27 — Hash Test
+
+extern function aurora_sec_sha256(data: ptr, len: int) -> str
+extern function aurora_sec_hmac_sha256(key: ptr, key_len: int, data: ptr, data_len: int) -> str
+extern function aurora_sec_hash_password(password: str) -> str
+extern function aurora_sec_verify_password(password: str, hash: str) -> int
+
+function main()
+    output("hash: start")
+    sha = aurora_sec_sha256("Hello Aurora", 12)
+    if sha == ""
+        output("FAIL: sha256 returned empty")
+        return
+    end
+    output("  sha256: " + sha)
+    hmac = aurora_sec_hmac_sha256("key", 3, "data", 4)
+    if hmac == ""
+        output("FAIL: hmac_sha256 returned empty")
+        return
+    end
+    output("  hmac: " + hmac)
+    hashed = aurora_sec_hash_password("mypassword")
+    if hashed == ""
+        output("FAIL: hash_password returned empty")
+        return
+    end
+    output("  hash: " + hashed)
+    ver = aurora_sec_verify_password("mypassword", hashed)
+    if ver != 1
+        output("FAIL: verify_password = " + str(ver))
+        return
+    end
+    output("  verify: ok")
+    ver2 = aurora_sec_verify_password("wrong", hashed)
+    if ver2 != 0
+        output("FAIL: wrong password verify = " + str(ver2))
+        return
+    end
+    output("  wrong password rejected: ok")
+    output("hash: PASS")
+end

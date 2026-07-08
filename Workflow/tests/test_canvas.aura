@@ -1,0 +1,36 @@
+## Canvas Widget Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ Canvas Test ═══")
+
+    output("  canvas new: start")
+    win = aurora_gui_window_new("Test", 400, 300)
+    cv = aurora_gui_canvas_new(win, 10, 10, 200, 200)
+    if cv == 0
+        output("FAIL: canvas_new returned null")
+        return
+    end
+    output("  canvas new: pass")
+
+    output("  canvas set_paint_callback: start")
+    aurora_gui_canvas_set_paint_callback(cv, 0, 0)
+    output("  canvas set_paint_callback: pass")
+
+    output("  canvas repaint: start")
+    aurora_gui_canvas_repaint(cv)
+    output("  canvas repaint: pass")
+
+    output("  canvas second instance: start")
+    win2 = aurora_gui_window_new("Test", 400, 300)
+    cv2 = aurora_gui_canvas_new(win2, 10, 10, 300, 200)
+    if cv2 == 0
+        output("FAIL: canvas_new second returned null")
+        return
+    end
+    aurora_gui_canvas_repaint(cv2)
+    output("  canvas second instance: pass")
+
+    output("PASS")
+end

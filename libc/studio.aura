@@ -1,0 +1,56 @@
+## ═══════════════════════════════════════════════════════════════════
+##  Aurora Studio — Visual UI Designer
+##  Phase 10.3: Drag-drop UI builder, widget palette, property editor
+##
+##  This module provides utility functions for building a visual
+##  UI designer tool in Aurora.
+## ═══════════════════════════════════════════════════════════════════
+
+import "app"
+import "gui"
+import "inspector"
+
+## Open the inspector overlay for a running app
+function studio_open_inspector()
+    aurora_inspector_init()
+    aurora_inspector_set_enabled(1)
+    output("Studio: Inspector opened. Press Ctrl+Shift+I to toggle.")
+end
+
+## Select a widget by coordinates in the inspector
+function studio_select_at(x, y)
+    w = aurora_gui_widget_find_at(x, y)
+    if w != null
+        aurora_inspector_select_widget(w)
+        output("Studio: Selected widget " + str(aurora_gui_widget_get_id(w)))
+    else
+        output("Studio: No widget at " + str(x) + "," + str(y))
+    end
+    return w
+end
+
+## Print widget tree to console
+function studio_print_tree()
+    output("=== Widget Tree ===")
+    output(aurora_hot_reload_gui_diff_tree())
+    output("=== End ===")
+end
+
+## Get widget count
+function studio_widget_count()
+    return aurora_gui_widget_count()
+end
+
+## Get widget info as formatted string
+function studio_widget_info(widget)
+    if widget == null
+        return "null"
+    end
+    id = aurora_gui_widget_get_id(widget)
+    tp = aurora_gui_widget_get_type(widget)
+    txt = aurora_gui_widget_get_text(widget)
+    if txt == null
+        txt = ""
+    end
+    return "Widget #" + str(id) + " type=" + str(tp) + " text=\"" + txt + "\""
+end

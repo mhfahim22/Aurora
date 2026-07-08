@@ -1,0 +1,114 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_set_title(win: pointer, title: cstring)
+extern function aurora_gui_window_resize(win: pointer, w: int, h: int)
+extern function aurora_gui_window_show(win: pointer)
+extern function aurora_gui_window_hide(win: pointer)
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_window_maximize(win: pointer)
+extern function aurora_gui_window_minimize(win: pointer)
+extern function aurora_gui_window_restore(win: pointer)
+extern function aurora_gui_window_get_width(win: pointer) -> int
+extern function aurora_gui_window_get_height(win: pointer) -> int
+extern function aurora_gui_window_set_min_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_max_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_resizable(win: pointer, resizable: int)
+
+extern function aurora_gui_set_enabled(widget: pointer, enabled: int)
+extern function aurora_gui_get_enabled(widget: pointer) -> int
+extern function aurora_gui_set_visible(widget: pointer, visible: int)
+extern function aurora_gui_get_visible(widget: pointer) -> int
+extern function aurora_gui_set_focus(widget: pointer)
+extern function aurora_gui_move(widget: pointer, x: int, y: int, w: int, h: int)
+extern function aurora_gui_get_native_handle(widget: pointer) -> pointer
+extern function aurora_gui_widget_get_text(widget: pointer) -> cstring
+extern function aurora_gui_widget_get_type(widget: pointer) -> int
+extern function aurora_gui_widget_get_id(widget: pointer) -> int
+extern function aurora_gui_widget_count() -> int
+extern function aurora_gui_widget_get_by_index(idx: int) -> pointer
+
+extern function aurora_gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_label_set_text(lbl: pointer, text: cstring)
+extern function aurora_gui_label_get_text(lbl: pointer) -> cstring
+extern function aurora_gui_label_set_font_size(lbl: pointer, size: int)
+extern function aurora_gui_label_set_color(lbl: pointer, color: int)
+extern function aurora_gui_label_set_align(lbl: pointer, align: int)
+
+extern function aurora_gui_text_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_text_set_text(txt: pointer, text: cstring)
+extern function aurora_gui_text_get_text(txt: pointer) -> cstring
+
+extern function aurora_gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_button_set_text(btn: pointer, text: cstring)
+extern function aurora_gui_button_get_text(btn: pointer) -> cstring
+
+extern function aurora_gui_checkbox_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_checkbox_set_text(cb: pointer, text: cstring)
+extern function aurora_gui_checkbox_get_text(cb: pointer) -> cstring
+extern function aurora_gui_checkbox_is_checked(cb: pointer) -> int
+extern function aurora_gui_checkbox_set_checked(cb: pointer, checked: int)
+
+extern function aurora_gui_radiobutton_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int, group_id: int) -> pointer
+extern function aurora_gui_radiobutton_set_text(rb: pointer, text: cstring)
+extern function aurora_gui_radiobutton_get_text(rb: pointer) -> cstring
+extern function aurora_gui_radiobutton_is_checked(rb: pointer) -> int
+extern function aurora_gui_radiobutton_set_checked(rb: pointer, checked: int)
+
+extern function aurora_gui_switch_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_switch_is_on(sw: pointer) -> int
+extern function aurora_gui_switch_set_on(sw: pointer, on: int)
+
+extern function aurora_gui_textbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_textbox_set_text(tb: pointer, text: cstring)
+extern function aurora_gui_textbox_get_text(tb: pointer) -> cstring
+extern function aurora_gui_textbox_set_readonly(tb: pointer, readonly: int)
+extern function aurora_gui_textbox_set_placeholder(tb: pointer, text: cstring)
+extern function aurora_gui_textbox_set_multiline(tb: pointer, multiline: int)
+extern function aurora_gui_textbox_get_line_count(tb: pointer) -> int
+
+extern function aurora_gui_passwordbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_passwordbox_set_text(pb: pointer, text: cstring)
+extern function aurora_gui_passwordbox_get_text(pb: pointer) -> cstring
+
+extern function aurora_gui_slider_new(parent: pointer, x: int, y: int, w: int, h: int, min: int, max: int) -> pointer
+extern function aurora_gui_slider_get_value(sl: pointer) -> int
+extern function aurora_gui_slider_set_value(sl: pointer, value: int)
+extern function aurora_gui_slider_set_range(sl: pointer, min: int, max: int)
+
+extern function aurora_gui_progressbar_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_progressbar_set_value(pb: pointer, value: int)
+extern function aurora_gui_progressbar_get_value(pb: pointer) -> int
+extern function aurora_gui_progressbar_set_range(pb: pointer, min: int, max: int)
+extern function aurora_gui_progressbar_set_marquee(pb: pointer, on: int)
+
+extern function aurora_gui_combobox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_combobox_add_item(cb: pointer, item: cstring)
+extern function aurora_gui_combobox_clear(cb: pointer)
+extern function aurora_gui_combobox_get_selected(cb: pointer) -> int
+extern function aurora_gui_combobox_set_selected(cb: pointer, idx: int)
+extern function aurora_gui_combobox_count(cb: pointer) -> int
+extern function aurora_gui_combobox_get_item(cb: pointer, idx: int) -> cstring
+
+extern function aurora_gui_dropdown_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_dropdown_add_item(dd: pointer, item: cstring)
+extern function aurora_gui_dropdown_clear(dd: pointer)
+extern function aurora_gui_dropdown_get_selected(dd: pointer) -> int
+extern function aurora_gui_dropdown_set_selected(dd: pointer, idx: int)
+extern function aurora_gui_dropdown_count(dd: pointer) -> int
+extern function aurora_gui_dropdown_get_item(dd: pointer, idx: int) -> cstring
+
+extern function aurora_gui_listbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_listbox_add_item(lb: pointer, item: cstring)
+extern function aurora_gui_listbox_clear(lb: pointer)
+extern function aurora_gui_listbox_get_selected(lb: pointer) -> int
+extern function aurora_gui_listbox_get_item(lb: pointer, idx: int) -> cstring
+extern function aurora_gui_listbox_count(lb: pointer) -> int
+
+function main()
+    output("gui: start")
+    win = aurora_gui_window_new("Test", 640, 480)
+    if win == null
+        output("FAIL: window_new null")
+        return
+    end
+    output("gui: PASS")
+end

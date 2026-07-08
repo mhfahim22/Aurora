@@ -1758,3 +1758,76 @@ void aurora_gui_layout_vertical(AuroraWidget parent, int margin) {
         if (w->parent == p && w->hwnd) { MoveWindow(w->hwnd, margin, y, w->w, w->h, TRUE); y += w->h + margin; }
     }
 }
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: WebView (Win32 — placeholder panel; WebView2 integration requires webview2.h)
+   ════════════════════════════════════════════════════════════ */
+
+extern "C" AuroraWidget aurora_gui_webview_new(AuroraWidget parent, int x, int y, int w_, int h_) {
+    GuiWidget* p = (GuiWidget*)parent;
+    GuiWidget* wv = widget_new(AURORA_WIDGET_WEBVIEW, p);
+    wv->x = x; wv->y = y; wv->w = w_; wv->h = h_;
+    wv->hwnd = CreateWindowExA(0, "STATIC", "WebView2",
+        WS_CHILD | WS_VISIBLE | SS_CENTER, x, y, w_, h_,
+        parent_hwnd(p), (HMENU)(INT_PTR)wv->id, GetModuleHandle(nullptr), nullptr);
+    if (wv->hwnd) SetWindowLongPtr(wv->hwnd, GWLP_USERDATA, (LONG_PTR)wv);
+    return wv;
+}
+
+extern "C" void aurora_gui_webview_navigate(AuroraWidget wv, const char* url) {
+    (void)wv; (void)url;
+}
+
+extern "C" void aurora_gui_webview_go_back(AuroraWidget wv) {
+    (void)wv;
+}
+
+extern "C" void aurora_gui_webview_go_forward(AuroraWidget wv) {
+    (void)wv;
+}
+
+extern "C" void aurora_gui_webview_reload(AuroraWidget wv) {
+    (void)wv;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: Media Player (Win32 — placeholder panel)
+   ════════════════════════════════════════════════════════════ */
+
+extern "C" AuroraWidget aurora_gui_media_new(AuroraWidget parent, int x, int y, int w_, int h_) {
+    GuiWidget* p = (GuiWidget*)parent;
+    GuiWidget* mw = widget_new(AURORA_WIDGET_MEDIA, p);
+    mw->x = x; mw->y = y; mw->w = w_; mw->h = h_;
+    mw->hwnd = CreateWindowExA(0, "STATIC", "Media Player",
+        WS_CHILD | WS_VISIBLE | SS_CENTER, x, y, w_, h_,
+        parent_hwnd(p), (HMENU)(INT_PTR)mw->id, GetModuleHandle(nullptr), nullptr);
+    if (mw->hwnd) SetWindowLongPtr(mw->hwnd, GWLP_USERDATA, (LONG_PTR)mw);
+    return mw;
+}
+
+extern "C" void aurora_gui_media_open(AuroraWidget mw, const char* src) { (void)mw; (void)src; }
+extern "C" void aurora_gui_media_play(AuroraWidget mw) { (void)mw; }
+extern "C" void aurora_gui_media_pause(AuroraWidget mw) { (void)mw; }
+extern "C" void aurora_gui_media_stop(AuroraWidget mw) { (void)mw; }
+extern "C" void aurora_gui_media_set_volume(AuroraWidget mw, float vol) { (void)mw; (void)vol; }
+extern "C" void aurora_gui_media_set_looping(AuroraWidget mw, int loop) { (void)mw; (void)loop; }
+extern "C" int aurora_gui_media_is_playing(AuroraWidget mw) { (void)mw; return 0; }
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: Map (Win32 — placeholder panel)
+   ════════════════════════════════════════════════════════════ */
+
+extern "C" AuroraWidget aurora_gui_map_new(AuroraWidget parent, int x, int y, int w_, int h_) {
+    GuiWidget* p = (GuiWidget*)parent;
+    GuiWidget* mp = widget_new(AURORA_WIDGET_MAP, p);
+    mp->x = x; mp->y = y; mp->w = w_; mp->h = h_;
+    mp->hwnd = CreateWindowExA(0, "STATIC", "Map",
+        WS_CHILD | WS_VISIBLE | SS_CENTER, x, y, w_, h_,
+        parent_hwnd(p), (HMENU)(INT_PTR)mp->id, GetModuleHandle(nullptr), nullptr);
+    if (mp->hwnd) SetWindowLongPtr(mp->hwnd, GWLP_USERDATA, (LONG_PTR)mp);
+    return mp;
+}
+
+extern "C" void aurora_gui_map_set_center(AuroraWidget mp, double lat, double lon) { (void)mp; (void)lat; (void)lon; }
+extern "C" void aurora_gui_map_set_zoom(AuroraWidget mp, int zoom) { (void)mp; (void)zoom; }
+extern "C" void aurora_gui_map_add_marker(AuroraWidget mp, double lat, double lon, const char* title) { (void)mp; (void)lat; (void)lon; (void)title; }

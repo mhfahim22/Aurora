@@ -1,0 +1,31 @@
+## Image Widget Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ Image Test ═══")
+
+    output("  image new with null path: start")
+    win = aurora_gui_window_new("Test", 400, 300)
+    img = aurora_gui_image_new(win, 0, 10, 10, 100, 100)
+    if img == 0
+        output("FAIL: image_new returned null")
+        return
+    end
+    output("  image new with null path: pass")
+
+    output("  image new with path: start")
+    win2 = aurora_gui_window_new("Test", 400, 300)
+    img2 = aurora_gui_image_new(win2, "test.png", 10, 120, 100, 100)
+    if img2 == 0
+        output("FAIL: image_new with path returned null")
+        return
+    end
+    output("  image new with path: pass")
+
+    output("  image load: start")
+    aurora_gui_image_load(img, "photo.png")
+    output("  image load: pass")
+
+    output("PASS")
+end

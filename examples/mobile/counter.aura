@@ -1,0 +1,74 @@
+## Counter App — Mobile (Android + iOS)
+## Uses mw_* widget API for cross-platform mobile UI
+
+import "mobile_widgets"
+
+function main()
+    mw_init()
+
+    root = mw_create(MW_COLUMN)
+    mw_set_size(root, 400, 700)
+    mw_set_align(root, MW_MAIN_CENTER, MW_CROSS_CENTER)
+    mw_set_spacing(root, 16)
+    mw_set_bg_color(root, 0.95, 0.95, 0.95, 1.0)
+
+    title = mw_create(MW_TEXT)
+    mw_set_text(title, "Counter")
+    mw_set_font_size(title, 32)
+    mw_set_text_color(title, 0.2, 0.2, 0.2, 1.0)
+    mw_add_child(root, title)
+
+    count_label = mw_create(MW_TEXT)
+    mw_set_text(count_label, "0")
+    mw_set_font_size(count_label, 64)
+    mw_set_text_color(count_label, 0.0, 0.5, 1.0, 1.0)
+    mw_add_child(root, count_label)
+
+    btn_row = mw_create(MW_ROW)
+    mw_set_align(btn_row, MW_MAIN_CENTER, MW_CROSS_CENTER)
+    mw_set_spacing(btn_row, 16)
+
+    btn_minus = mw_create(MW_BUTTON)
+    mw_set_text(btn_minus, "-")
+    mw_set_size(btn_minus, 80, 80)
+    mw_set_bg_color(btn_minus, 0.9, 0.3, 0.3, 1.0)
+    mw_set_text_color(btn_minus, 1.0, 1.0, 1.0, 1.0)
+    mw_set_font_size(btn_minus, 32)
+    mw_add_child(btn_row, btn_minus)
+
+    btn_plus = mw_create(MW_BUTTON)
+    mw_set_text(btn_plus, "+")
+    mw_set_size(btn_plus, 80, 80)
+    mw_set_bg_color(btn_plus, 0.3, 0.7, 0.3, 1.0)
+    mw_set_text_color(btn_plus, 1.0, 1.0, 1.0, 1.0)
+    mw_set_font_size(btn_plus, 32)
+    mw_add_child(btn_row, btn_plus)
+
+    mw_add_child(root, btn_row)
+
+    count = 0
+
+    function on_minus(widget, event, data)
+        if event == MW_EVENT_CLICK
+            count = count - 1
+            mw_set_text(count_label, count)
+            mw_render(root)
+        end
+    end
+
+    function on_plus(widget, event, data)
+        if event == MW_EVENT_CLICK
+            count = count + 1
+            mw_set_text(count_label, count)
+            mw_render(root)
+        end
+    end
+
+    mw_set_callback(btn_minus, on_minus)
+    mw_set_callback(btn_plus, on_plus)
+
+    mw_layout(root)
+    mw_render(root)
+
+    output("Counter app running...")
+end

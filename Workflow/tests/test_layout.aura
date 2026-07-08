@@ -1,0 +1,57 @@
+## Layout Tests (Phase 12.3)
+
+import "gui"
+
+function main()
+    output("═══ Layout Tests ═══")
+
+    output("  column: start")
+    win = aurora_gui_window_new("Layout Test", 400, 300)
+    col = aurora_gui_column_new(win, 10, 10, 200, 280)
+    if col == 0
+        output("  FAIL: column creation")
+        return
+    end
+    aurora_gui_layout_set_spacing(col, 8)
+    btn1 = aurora_gui_button_new(col, "A", 0, 0, 180, 30)
+    btn2 = aurora_gui_button_new(col, "B", 0, 0, 180, 30)
+    if btn1 == 0
+        output("  FAIL: column children btn1")
+        return
+    end
+    if btn2 == 0
+        output("  FAIL: column children btn2")
+        return
+    end
+    aurora_gui_layout_set_main_align(col, 1)
+    aurora_gui_layout_recalc(col)
+    output("  column: pass")
+
+    output("  row: start")
+    win2 = aurora_gui_window_new("Layout Test", 400, 300)
+    row = aurora_gui_row_new(win2, 10, 50, 380, 60)
+    if row == 0
+        output("  FAIL: row creation")
+        return
+    end
+    aurora_gui_layout_set_spacing(row, 6)
+    b1 = aurora_gui_button_new(row, "X", 0, 0, 80, 30)
+    b2 = aurora_gui_button_new(row, "Y", 0, 0, 80, 30)
+    b3 = aurora_gui_button_new(row, "Z", 0, 0, 80, 30)
+    if b1 == 0
+        output("  FAIL: row children b1")
+        return
+    end
+    if b2 == 0
+        output("  FAIL: row children b2")
+        return
+    end
+    if b3 == 0
+        output("  FAIL: row children b3")
+        return
+    end
+    aurora_gui_layout_recalc(row)
+    output("  row: pass")
+
+    output("═══ All layout tests PASS ═══")
+end

@@ -1,6 +1,39 @@
-## Aurora Template Engine — {{var}}, {%if%}, {%for%}, {%extends%}
+## Aurora Template Engine — {{var}}, {{#section}}, {{^inverted}}, {{>partial}}
+## Uses C runtime by default; falls back to pure-Aurora interpreter
 import "string"
 import "collections"
+import "json"
+
+## ── C Runtime Template Engine (fast path) ──
+extern function aurora_template_compile(name: cstring, source: cstring) -> pointer
+extern function aurora_template_render(name: cstring, context_json: cstring) -> cstring
+extern function aurora_template_render_string(source: cstring, context_json: cstring) -> cstring
+extern function aurora_template_free(name: cstring)
+
+## Register a template with the C runtime
+function template(name, source)
+    return bool(aurora_template_compile(name, source))
+end
+
+## Render a registered template with JSON context
+function render(name, ctx_json)
+    result = aurora_template_render(name, ctx_json)
+    if result != nil
+        return result
+    end
+    return ""
+end
+
+## Render a template string directly (no caching)
+function render_string(source, ctx_json)
+    result = aurora_template_render_string(source, ctx_json)
+    if result != nil
+        return result
+    end
+    return ""
+end
+
+## ── Pure-Aurora Template Engine (fallback / reference) ──
 
 function find_from(s, sub, start)
     n = strlen(s)
@@ -202,7 +235,7 @@ function render_tags(tpl, ctx)
 end
 
 function template_render(tpl, ctx)
-    return render_tags(tpl, ctx)
+    return render_string(tpl, ctx)
 end
 
 function template_render_file(path, ctx)
@@ -211,4 +244,12 @@ function template_render_file(path, ctx)
         return ""
     end
     return template_render(content, ctx)
+end
+
+function template_render_from_file(path, ctx_json)
+    content = read(path)
+    if content == ""
+        return ""
+    end
+    return render_string(content, ctx_json)
 end

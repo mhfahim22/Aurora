@@ -1,0 +1,97 @@
+## Table Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ Table Test ═══")
+
+    output("  table new: start")
+    win = aurora_gui_window_new("Test", 500, 400)
+    tbl = aurora_gui_table_new(win, 10, 10, 400, 300)
+    if tbl == 0
+        output("FAIL: table_new returned null")
+        return
+    end
+    output("  table new: pass")
+
+    output("  table add_column: start")
+    aurora_gui_table_add_column(tbl, "Name", 150)
+    aurora_gui_table_add_column(tbl, "Value", 150)
+    aurora_gui_table_add_column(tbl, "Status", 100)
+    cnt = aurora_gui_table_column_count(tbl)
+    if cnt != 3
+        output("FAIL: column_count = " + str(cnt) + ", expected 3")
+        return
+    end
+    output("  table add_column: pass")
+
+    output("  table add_row set_cell: start")
+    row1 = aurora_gui_table_add_row(tbl)
+    if row1 == 0
+        output("FAIL: table_add_row returned null")
+        return
+    end
+    aurora_gui_table_set_cell(tbl, 0, 0, "Alice")
+    aurora_gui_table_set_cell(tbl, 0, 1, "42")
+    aurora_gui_table_set_cell(tbl, 0, 2, "Active")
+    row2 = aurora_gui_table_add_row(tbl)
+    if row2 == 0
+        output("FAIL: table_add_row second returned null")
+        return
+    end
+    aurora_gui_table_set_cell(tbl, 1, 0, "Bob")
+    aurora_gui_table_set_cell(tbl, 1, 1, "37")
+    aurora_gui_table_set_cell(tbl, 1, 2, "Inactive")
+    output("  table add_row set_cell: pass")
+
+    output("  table get_cell: start")
+    cell = aurora_gui_table_get_cell(tbl, 0, 0)
+    if cell != "Alice"
+        output("FAIL: get_cell row0,col0 = " + cell)
+        return
+    end
+    cell2 = aurora_gui_table_get_cell(tbl, 1, 2)
+    if cell2 != "Inactive"
+        output("FAIL: get_cell row1,col2 = " + cell2)
+        return
+    end
+    output("  table get_cell: pass")
+
+    output("  table row_count: start")
+    rc = aurora_gui_table_row_count(tbl)
+    if rc != 2
+        output("FAIL: row_count = " + str(rc) + ", expected 2")
+        return
+    end
+    output("  table row_count: pass")
+
+    output("  table get_selected: start")
+    sel = aurora_gui_table_get_selected(tbl)
+    if sel != -1
+        if sel != 0
+            output("FAIL: get_selected unexpected = " + str(sel))
+            return
+        end
+    end
+    output("  table get_selected: pass")
+
+    output("  table remove_row: start")
+    aurora_gui_table_remove_row(tbl, 0)
+    rc2 = aurora_gui_table_row_count(tbl)
+    if rc2 != 1
+        output("FAIL: after remove row_count = " + str(rc2))
+        return
+    end
+    output("  table remove_row: pass")
+
+    output("  table clear: start")
+    aurora_gui_table_clear(tbl)
+    rc3 = aurora_gui_table_row_count(tbl)
+    if rc3 != 0
+        output("FAIL: after clear row_count = " + str(rc3))
+        return
+    end
+    output("  table clear: pass")
+
+    output("PASS")
+end

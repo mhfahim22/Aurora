@@ -299,15 +299,34 @@ void aurora_ws_registry_remove(int64_t sock) {
 }
 
 int aurora_ws_broadcast(int opcode, const uint8_t* data, int len) {
-    std::lock_guard<std::mutex> lock(g_ws_mutex);
-    if (!g_ws_clients) return 0;
+    std::vector<WSEntry> snapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_ws_mutex);
+        if (!g_ws_clients) return 0;
+        snapshot = *g_ws_clients;
+    }
     int sent_count = 0;
-    for (size_t i = 0; i < g_ws_clients->size(); i++) {
+    std::vector<int64_t> dead_socks;
+    for (size_t i = 0; i < snapshot.size(); i++) {
         int r = aurora_ws_write_frame(
-            (*g_ws_clients)[i].sock,
-            (*g_ws_clients)[i].tls_handle,
+            snapshot[i].sock,
+            snapshot[i].tls_handle,
             opcode, data, len);
         if (r > 0) sent_count++;
+        else dead_socks.push_back(snapshot[i].sock);
+    }
+    if (!dead_socks.empty()) {
+        std::lock_guard<std::mutex> lock(g_ws_mutex);
+        if (g_ws_clients) {
+            for (auto ds : dead_socks) {
+                for (size_t j = 0; j < g_ws_clients->size(); j++) {
+                    if ((*g_ws_clients)[j].sock == ds) {
+                        g_ws_clients->erase(g_ws_clients->begin() + (int)j);
+                        break;
+                    }
+                }
+            }
+        }
     }
     return sent_count;
 }

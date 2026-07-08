@@ -1,0 +1,25 @@
+## Widget Tree Diff Tests (Phase 12.3)
+
+import "gui"
+
+extern function aurora_widget_diff_init() -> int
+extern function aurora_widget_diff_snapshot() -> int
+extern function aurora_widget_diff_compute() -> int
+extern function aurora_widget_diff_get_change_count() -> int
+extern function aurora_widget_diff_clear()
+
+function main()
+    output("═══ Widget Diff Tests ═══")
+    win = aurora_gui_window_new("Diff Test", 400, 300)
+    aurora_widget_diff_init()
+    aurora_widget_diff_snapshot()
+    btn = aurora_gui_button_new(win, "Test", 10, 10, 100, 30)
+    changed = aurora_widget_diff_compute()
+    output("  changes after add: " + str(changed))
+    if changed <= 0
+        output("  FAIL: diff did not detect new widget")
+        return
+    end
+    aurora_widget_diff_clear()
+    output("═══ Widget Diff Tests PASS ═══")
+end

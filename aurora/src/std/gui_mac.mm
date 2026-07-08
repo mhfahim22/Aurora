@@ -441,4 +441,33 @@ void aurora_gui_layout_vertical(AuroraWidget parent, int margin) {
     (void)parent; (void)margin;
 }
 
+/* ════════════════════════════════════════════════════════════
+   Phase 9: WebView stubs (macOS — WKWebView integration pending)
+   ════════════════════════════════════════════════════════════ */
+AuroraWidget aurora_gui_webview_new(AuroraWidget p,int x,int y,int w,int h) { (void)p;(void)x;(void)y;(void)w;(void)h; return nullptr; }
+void aurora_gui_webview_navigate(AuroraWidget w,const char* u) { (void)w;(void)u; }
+void aurora_gui_webview_go_back(AuroraWidget w) { (void)w; }
+void aurora_gui_webview_go_forward(AuroraWidget w) { (void)w; }
+void aurora_gui_webview_reload(AuroraWidget w) { (void)w; }
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: Media Player stubs (macOS — AVPlayer integration pending)
+   ════════════════════════════════════════════════════════════ */
+AuroraWidget aurora_gui_media_new(AuroraWidget p,int x,int y,int w,int h) { (void)p;(void)x;(void)y;(void)w;(void)h; return nullptr; }
+void aurora_gui_media_open(AuroraWidget m,const char* s) { (void)m;(void)s; }
+void aurora_gui_media_play(AuroraWidget m) { (void)m; }
+void aurora_gui_media_pause(AuroraWidget m) { (void)m; }
+void aurora_gui_media_stop(AuroraWidget m) { (void)m; }
+void aurora_gui_media_set_volume(AuroraWidget m,float v) { (void)m;(void)v; }
+void aurora_gui_media_set_looping(AuroraWidget m,int l) { (void)m;(void)l; }
+int aurora_gui_media_is_playing(AuroraWidget m) { (void)m; return 0; }
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: Map stubs (macOS — MKMapView integration pending)
+   ════════════════════════════════════════════════════════════ */
+AuroraWidget aurora_gui_map_new(AuroraWidget p,int x,int y,int w,int h) { (void)p;(void)x;(void)y;(void)w;(void)h; return nullptr; }
+void aurora_gui_map_set_center(AuroraWidget m,double la,double lo) { (void)m;(void)la;(void)lo; }
+void aurora_gui_map_set_zoom(AuroraWidget m,int z) { (void)m;(void)z; }
+void aurora_gui_map_add_marker(AuroraWidget m,double la,double lo,const char* t) { (void)m;(void)la;(void)lo;(void)t; }
+
 } /* extern "C" */

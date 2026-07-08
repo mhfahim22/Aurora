@@ -1,0 +1,91 @@
+## Todo App — Mobile (Android + iOS)
+## Uses mw_* widget API for cross-platform mobile UI
+
+import "mobile_widgets"
+
+function main()
+    mw_init()
+
+    root = mw_create(MW_COLUMN)
+    mw_set_size(root, 400, 700)
+    mw_set_spacing(root, 8)
+    mw_set_padding(root, 16, 16, 16, 16)
+    mw_set_bg_color(root, 1.0, 1.0, 1.0, 1.0)
+
+    header = mw_create(MW_TEXT)
+    mw_set_text(header, "Todo List")
+    mw_set_font_size(header, 28)
+    mw_set_text_color(header, 0.2, 0.2, 0.2, 1.0)
+    mw_add_child(root, header)
+
+    input_row = mw_create(MW_ROW)
+    mw_set_spacing(input_row, 8)
+
+    input = mw_create(MW_INPUT)
+    mw_set_size(input, 280, 44)
+    mw_set_text(input, "Enter a task...")
+    mw_add_child(input_row, input)
+
+    add_btn = mw_create(MW_BUTTON)
+    mw_set_text(add_btn, "Add")
+    mw_set_size(add_btn, 80, 44)
+    mw_set_bg_color(add_btn, 0.3, 0.6, 1.0, 1.0)
+    mw_set_text_color(add_btn, 1.0, 1.0, 1.0, 1.0)
+    mw_add_child(input_row, add_btn)
+
+    mw_add_child(root, input_row)
+
+    list = mw_create(MW_LIST)
+    mw_set_size(list, 368, 400)
+    mw_add_child(root, list)
+
+    footer = mw_create(MW_ROW)
+    mw_set_spacing(footer, 8)
+
+    status_label = mw_create(MW_TEXT)
+    mw_set_text(status_label, "0 items")
+    mw_set_text_color(status_label, 0.5, 0.5, 0.5, 1.0)
+    mw_add_child(footer, status_label)
+
+    clear_btn = mw_create(MW_BUTTON)
+    mw_set_text(clear_btn, "Clear")
+    mw_set_size(clear_btn, 80, 36)
+    mw_set_bg_color(clear_btn, 0.8, 0.2, 0.2, 1.0)
+    mw_set_text_color(clear_btn, 1.0, 1.0, 1.0, 1.0)
+    mw_add_child(footer, clear_btn)
+
+    mw_add_child(root, footer)
+
+    item_count = 0
+
+    function on_add(widget, event, data)
+        if event == MW_EVENT_CLICK
+            text = mw_get_text(input)
+            if text != "" && text != "Enter a task..."
+                item_count = item_count + 1
+                mw_add_item(list, text)
+                mw_set_text(status_label, item_count + " items")
+                mw_set_text(input, "")
+                mw_layout(root)
+                mw_render(root)
+            end
+        end
+    end
+
+    function on_clear(widget, event, data)
+        if event == MW_EVENT_CLICK
+            mw_clear_items(list)
+            item_count = 0
+            mw_set_text(status_label, "0 items")
+            mw_render(root)
+        end
+    end
+
+    mw_set_callback(add_btn, on_add)
+    mw_set_callback(clear_btn, on_clear)
+
+    mw_layout(root)
+    mw_render(root)
+
+    output("Todo app running...")
+end

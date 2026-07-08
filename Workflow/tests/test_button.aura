@@ -1,0 +1,22 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_button_set_text(btn: pointer, text: cstring)
+extern function aurora_gui_button_get_text(btn: pointer) -> cstring
+
+function main()
+    output("button: start")
+    win = aurora_gui_window_new("BtnTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    btn = aurora_gui_button_new(win, "Click Me", 10, 10, 100, 30)
+    if btn == null
+        output("  note: button_new returned null (headless)")
+    end
+
+    aurora_gui_button_set_text(btn, "Pushed")
+    aurora_gui_window_destroy(win)
+    output("button: PASS")
+end

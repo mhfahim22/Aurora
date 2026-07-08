@@ -1,0 +1,85 @@
+# JSON Access Test
+# Verifies creating and accessing object fields
+
+extern function aurora_json_parse(json: string) -> ptr
+extern function aurora_json_serialize(val: ptr) -> string
+extern function aurora_json_type(val: ptr) -> int
+extern function aurora_json_new() -> ptr
+extern function aurora_json_new_num(n: double) -> ptr
+extern function aurora_json_new_str(s: string) -> ptr
+extern function aurora_json_new_array() -> ptr
+extern function aurora_json_new_object() -> ptr
+extern function aurora_json_set(obj: ptr, key: string, val: double)
+extern function aurora_json_set_str(obj: ptr, key: string, val: string)
+extern function aurora_json_set_obj(obj: ptr, key: string, val: ptr)
+extern function aurora_json_get_num(obj: ptr, key: string) -> double
+extern function aurora_json_get_str(obj: ptr, key: string) -> string
+extern function aurora_json_get_obj(obj: ptr, key: string) -> ptr
+extern function aurora_json_array_push(arr: ptr, val: ptr)
+extern function aurora_json_array_get(arr: ptr, idx: int) -> ptr
+extern function aurora_json_array_len(arr: ptr) -> int
+extern function aurora_json_free(val: ptr)
+
+function main()
+    obj = aurora_json_new_object()
+    if obj == 0
+        output("FAIL: new_object returned null")
+        return
+    end
+
+    aurora_json_set_str(obj, "name", "Bob")
+    aurora_json_set(obj, "score", 95.0)
+    aurora_json_set_str(obj, "city", "NYC")
+
+    name = aurora_json_get_str(obj, "name")
+    if name == 0
+        output("FAIL: name field not found")
+        aurora_json_free(obj)
+        return
+    end
+    if starts(name, "Bob")
+        if strlen(name) != 3
+            output("FAIL: name length expected 3 got " + str(strlen(name)))
+            aurora_json_free(obj)
+            return
+        end
+    else
+        output("FAIL: name expected Bob")
+        aurora_json_free(obj)
+        return
+    end
+
+    score = aurora_json_get_obj(obj, "score")
+    if score == 0
+        output("FAIL: score field not found")
+        aurora_json_free(obj)
+        return
+    end
+    score_type = aurora_json_type(score)
+    if score_type != 1
+        output("FAIL: score type expected 1 (num) got " + str(score_type))
+        aurora_json_free(obj)
+        return
+    end
+
+    city = aurora_json_get_str(obj, "city")
+    if city == 0
+        output("FAIL: city field not found")
+        aurora_json_free(obj)
+        return
+    end
+    if starts(city, "NYC")
+        if strlen(city) != 3
+            output("FAIL: city length expected 3 got " + str(strlen(city)))
+            aurora_json_free(obj)
+            return
+        end
+    else
+        output("FAIL: city expected NYC")
+        aurora_json_free(obj)
+        return
+    end
+
+    aurora_json_free(obj)
+    output("PASS")
+end

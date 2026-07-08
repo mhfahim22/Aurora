@@ -1,0 +1,53 @@
+# Theme Spacing Test
+# Verifies get_spacing returns positive values for all levels
+
+extern function aurora_app_theme_init() -> ptr
+extern function aurora_app_theme_destroy(theme: ptr)
+extern function aurora_app_theme_set_mode(theme: ptr, mode: int)
+extern function aurora_app_theme_get_mode(theme: ptr) -> int
+extern function aurora_app_theme_set_color(theme: ptr, key: int, color: int)
+extern function aurora_app_theme_get_color(theme: ptr, key: int) -> int
+extern function aurora_app_theme_set_font(theme: ptr, key: int, size: int)
+extern function aurora_app_theme_get_font(theme: ptr, key: int) -> int
+extern function aurora_app_theme_get_spacing(theme: ptr, level: int) -> double
+
+function main()
+    theme = aurora_app_theme_init()
+    if theme == 0
+        output("FAIL: theme_init returned null")
+        return
+    end
+
+    sp0 = aurora_app_theme_get_spacing(theme, 0)
+    if sp0 < 0.0
+        output("FAIL: spacing 0 negative")
+        return
+    end
+
+    sp1 = aurora_app_theme_get_spacing(theme, 1)
+    if sp1 < 0.0
+        output("FAIL: spacing 1 negative")
+        return
+    end
+
+    sp2 = aurora_app_theme_get_spacing(theme, 2)
+    if sp2 < 0.0
+        output("FAIL: spacing 2 negative")
+        return
+    end
+
+    sp3 = aurora_app_theme_get_spacing(theme, 3)
+    if sp3 < 0.0
+        output("FAIL: spacing 3 negative")
+        return
+    end
+
+    sp4 = aurora_app_theme_get_spacing(theme, 4)
+    if sp4 < 0.0
+        output("FAIL: spacing 4 negative")
+        return
+    end
+
+    aurora_app_theme_destroy(theme)
+    output("PASS")
+end

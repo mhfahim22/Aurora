@@ -1,0 +1,112 @@
+# Phase 7 — Mobile Widget Events Test
+# Verify touch handling and callbacks
+
+function main()
+    output("Mobile Events Test: Starting...")
+
+    # ── Test touch dispatch ──
+    root = mw_create(3)
+    mw_set_pos(root, 0.0, 0.0)
+    mw_set_size(root, 400.0, 600.0)
+
+    btn = mw_create(0)
+    mw_set_pos(btn, 10.0, 10.0)
+    mw_set_size(btn, 100.0, 36.0)
+    mw_set_text(btn, "Tap Me")
+    mw_add_child(root, btn)
+
+    # Touch hit test
+    handled = mw_handle_touch(root, 50.0, 25.0, 0)
+    if handled != 1
+        output("FAIL: mw_handle_touch button hit expected 1")
+        return
+    end
+    output("mw_handle_touch button hit: OK")
+
+    # Touch miss (outside)
+    handled2 = mw_handle_touch(root, 200.0, 200.0, 0)
+    if handled2 != 0
+        output("FAIL: mw_handle_touch miss expected 0")
+        return
+    end
+    output("mw_handle_touch miss: OK")
+
+    # ── Test callback invocation ──
+    clicked = 0
+    function on_click(w, ev, data)
+        clicked = 1
+        output("callback invoked!")
+    end
+    mw_set_callback(btn, on_click)
+    handled3 = mw_handle_touch(root, 50.0, 25.0, 0)
+    if handled3 != 1
+        output("FAIL: mw_handle_touch with callback expected 1")
+        return
+    end
+    if clicked != 1
+        output("FAIL: callback was not invoked")
+        return
+    end
+    output("mw_set_callback + dispatch: OK")
+
+    # ── Test disabled widget does not handle touch ──
+    mw_set_enabled(btn, 0)
+    handled4 = mw_handle_touch(root, 50.0, 25.0, 0)
+    if handled4 != 0
+        output("FAIL: disabled widget should not handle touch")
+        return
+    end
+    mw_set_enabled(btn, 1)
+    output("mw_set_enabled touch block: OK")
+
+    # ── Test invisible widget does not handle touch ──
+    mw_set_visible(btn, 0)
+    handled5 = mw_handle_touch(root, 50.0, 25.0, 0)
+    if handled5 != 0
+        output("FAIL: invisible widget should not handle touch")
+        return
+    end
+    mw_set_visible(btn, 1)
+    output("mw_set_visible touch block: OK")
+
+    # ── Test child Z-order (last child gets hit first) ──
+    btn2 = mw_create(0)
+    mw_set_pos(btn2, 10.0, 10.0)
+    mw_set_size(btn2, 100.0, 36.0)
+    mw_add_child(root, btn2)
+    handled6 = mw_handle_touch(root, 50.0, 25.0, 0)
+    if handled6 != 1
+        output("FAIL: overlapping widgets should hit topmost")
+        return
+    end
+    output("Z-order hit test: OK")
+
+    # ── Test align/spacing ──
+    col = mw_create(3)
+    mw_set_size(col, 200.0, 300.0)
+    a = mw_create(0)
+    mw_set_size(a, 50.0, 30.0)
+    b = mw_create(0)
+    mw_set_size(b, 50.0, 30.0)
+    mw_add_child(col, a)
+    mw_add_child(col, b)
+    mw_set_align(col, 0, 0)
+    mw_set_spacing(col, 8.0)
+    mw_layout(col)
+    output("mw_set_align/spacing/layout: OK")
+
+    # ── Test margin/padding ──
+    mw_set_padding(col, 10.0, 10.0, 10.0, 10.0)
+    mw_set_margin(a, 4.0, 4.0, 4.0, 4.0)
+    output("mw_set_padding/margin: OK")
+
+    # ── Test remove child ──
+    mw_remove_child(col, b)
+    output("mw_remove_child: OK")
+
+    # ── Test render (no-op on desktop without HDC) ──
+    mw_render(root)
+    output("mw_render: OK (no HDC set)")
+
+    output("Mobile Events Test: All PASS")
+end

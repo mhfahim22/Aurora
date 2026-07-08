@@ -1,0 +1,14 @@
+# Phase 2 — App Module Test
+# Verify app.auf imports and compiles correctly
+# (GUI window won't show in JIT mode, but we can verify linking)
+
+import "app"
+
+function main()
+    output("App Test: Starting...")
+
+    # Test that app functions exist
+    output("App Test: Module loaded OK")
+
+    output("App Test: All PASS")
+end

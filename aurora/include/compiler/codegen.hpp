@@ -316,6 +316,10 @@ private:
     llvm::Function* session_create_  { nullptr };
     llvm::Function* session_destroy_ { nullptr };
     llvm::Function* auth_login_      { nullptr };
+    llvm::Function* fn_orm_schema_define_ { nullptr };
+    llvm::Function* fn_orm_schema_column_ { nullptr };
+    llvm::Function* fn_orm_auto_migrate_  { nullptr };
+    llvm::Function* fn_rest_register_     { nullptr };
     llvm::Function* http_parse_req_  { nullptr };
     llvm::Function* http_resp_new_   { nullptr };
     llvm::Function* http_resp_status_{ nullptr };
@@ -329,6 +333,7 @@ private:
     llvm::Function* router_new_      { nullptr };
     llvm::Function* route_add_       { nullptr };
     llvm::Function* route_dispatch_  { nullptr };
+    llvm::Function* server_add_mw_   { nullptr };
 
     /* ── UI Framework runtime functions ── */
     llvm::Function* ui_init_        { nullptr };
@@ -408,6 +413,7 @@ private:
     void gen_cache    (const ASTNode* node);
     void gen_session  (const ASTNode* node);
     void gen_auth     (const ASTNode* node);
+    void gen_model    (const ASTNode* node);
 
     /* UI Framework */
     void gen_component  (const ASTNode* node);

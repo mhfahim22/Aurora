@@ -1,0 +1,54 @@
+extern function aurora_json_parse(json: str) -> ptr
+extern function aurora_json_serialize(val: ptr) -> str
+extern function aurora_json_new() -> ptr
+extern function aurora_json_set_str(obj: ptr, key: str, val: str)
+extern function aurora_json_get_str(val: ptr) -> str
+extern function aurora_json_new_num(n: double) -> ptr
+extern function aurora_json_new_str(s: str) -> ptr
+extern function aurora_json_new_object() -> ptr
+extern function aurora_json_set(obj: ptr, key: str, val: ptr)
+extern function aurora_json_get_obj(obj: ptr, key: str) -> ptr
+extern function aurora_json_free(val: ptr)
+
+function main()
+    output("═══ Stress JSON Test ═══")
+
+    for i in range(100)
+        obj = aurora_json_new_object()
+        if obj == 0
+            output("FAIL: json_new_object at " + str(i))
+            return
+        end
+
+        aurora_json_set_str(obj, "index", str(i))
+        val = aurora_json_new_str("value_" + str(i))
+        aurora_json_set(obj, "key", val)
+
+        inner = aurora_json_new_object()
+        aurora_json_set_str(inner, "inner_key", "inner_val")
+        aurora_json_set(obj, "nested", inner)
+
+        serial = aurora_json_serialize(obj)
+        if serial == 0
+            output("FAIL: serialize at " + str(i))
+            aurora_json_free(obj)
+            return
+        end
+
+        parsed = aurora_json_parse(serial)
+        if parsed == 0
+            output("FAIL: parse at " + str(i))
+            aurora_json_free(obj)
+            return
+        end
+
+        aurora_json_free(parsed)
+        aurora_json_free(obj)
+
+        if i % 10 == 0
+            output("  processed " + str(i) + " objects...")
+        end
+    end
+
+    output("PASS")
+end

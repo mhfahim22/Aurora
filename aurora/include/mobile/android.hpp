@@ -113,6 +113,15 @@ int aurora_android_surface_render(void);
 /* Destroy the rendering surface. */
 void aurora_android_surface_destroy(void);
 
+/* ── Widget Renderer ── */
+
+/* Initialize JNI method IDs for Canvas rendering (call once from JNI_OnLoad). */
+void aurora_android_renderer_init(void* env);
+
+/* Render the widget tree to an Android Canvas. */
+/* root_widget: pointer to root MwWidget. */
+void aurora_android_render_mw(void* env, void* canvas, void* root_widget);
+
 /* ── Utility ── */
 
 /* Show a toast message. */

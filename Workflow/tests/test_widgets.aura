@@ -1,0 +1,88 @@
+## Widget Unit Tests (Phase 12.3)
+
+import "gui"
+
+function main()
+    output("═══ Widget Unit Tests ═══")
+
+    output("  button: start")
+    win = aurora_gui_window_new("Test", 400, 300)
+    btn = aurora_gui_button_new(win, "Click", 10, 10, 100, 30)
+    txt = aurora_gui_button_get_text(btn)
+    if txt != "Click"
+        output("  FAIL: button text = " + txt)
+        return
+    end
+    output("  button: pass")
+
+    output("  label: start")
+    win2 = aurora_gui_window_new("Test", 400, 300)
+    lbl = aurora_gui_label_new(win2, "Hello World", 10, 50, 200, 24)
+    txt2 = aurora_gui_label_get_text(lbl)
+    if txt2 != "Hello World"
+        output("  FAIL: label text = " + txt2)
+        return
+    end
+    output("  label: pass")
+
+    output("  textbox: start")
+    win3 = aurora_gui_window_new("Test", 400, 300)
+    tb = aurora_gui_textbox_new(win3, 10, 90, 250, 30)
+    aurora_gui_textbox_set_text(tb, "test input")
+    txt3 = aurora_gui_textbox_get_text(tb)
+    if txt3 != "test input"
+        output("  FAIL: textbox text = " + txt3)
+        return
+    end
+    output("  textbox: pass")
+
+    output("  slider: start")
+    win4 = aurora_gui_window_new("Test", 400, 300)
+    sl = aurora_gui_slider_new(win4, 10, 130, 200, 30, 0, 100)
+    aurora_gui_slider_set_value(sl, 75)
+    val = aurora_gui_slider_get_value(sl)
+    if val != 75
+        output("  FAIL: slider value = " + str(val))
+        return
+    end
+    output("  slider: pass")
+
+    output("  switch: start")
+    win5 = aurora_gui_window_new("Test", 400, 300)
+    sw = aurora_gui_switch_new(win5, "Toggle", 10, 170, 60, 30)
+    aurora_gui_switch_set_on(sw, 1)
+    chk = aurora_gui_switch_is_on(sw)
+    if chk != 1
+        output("  FAIL: switch on = " + str(chk))
+        return
+    end
+    output("  switch: pass")
+
+    output("  progress: start")
+    win6 = aurora_gui_window_new("Test", 400, 300)
+    pb = aurora_gui_progressbar_new(win6, 10, 210, 200, 24)
+    aurora_gui_progressbar_set_value(pb, 50)
+    val2 = aurora_gui_progressbar_get_value(pb)
+    if val2 != 50
+        output("  FAIL: progress value = " + str(val2))
+        return
+    end
+    output("  progress: pass")
+
+    output("  checkbox: start")
+    win7 = aurora_gui_window_new("Test", 400, 300)
+    cb = aurora_gui_checkbox_new(win7, "Check", 10, 250, 100, 24)
+    aurora_gui_checkbox_set_checked(cb, 1)
+    if aurora_gui_checkbox_is_checked(cb) != 1
+        output("  FAIL: checkbox checked")
+        return
+    end
+    txt7 = aurora_gui_checkbox_get_text(cb)
+    if txt7 != "Check"
+        output("  FAIL: checkbox text = " + txt7)
+        return
+    end
+    output("  checkbox: pass")
+
+    output("═══ All widget tests PASS ═══")
+end

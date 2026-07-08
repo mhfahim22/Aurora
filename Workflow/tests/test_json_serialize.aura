@@ -1,0 +1,86 @@
+# JSON Serialize Test
+# Verifies serialize to string, parse back, structure preserved
+
+extern function aurora_json_parse(json: string) -> ptr
+extern function aurora_json_serialize(val: ptr) -> string
+extern function aurora_json_type(val: ptr) -> int
+extern function aurora_json_new() -> ptr
+extern function aurora_json_new_num(n: double) -> ptr
+extern function aurora_json_new_str(s: string) -> ptr
+extern function aurora_json_new_array() -> ptr
+extern function aurora_json_new_object() -> ptr
+extern function aurora_json_set(obj: ptr, key: string, val: double)
+extern function aurora_json_set_str(obj: ptr, key: string, val: string)
+extern function aurora_json_set_obj(obj: ptr, key: string, val: ptr)
+extern function aurora_json_get_num(obj: ptr, key: string) -> double
+extern function aurora_json_get_str(obj: ptr, key: string) -> string
+extern function aurora_json_get_obj(obj: ptr, key: string) -> ptr
+extern function aurora_json_array_push(arr: ptr, val: ptr)
+extern function aurora_json_array_get(arr: ptr, idx: int) -> ptr
+extern function aurora_json_array_len(arr: ptr) -> int
+extern function aurora_json_free(val: ptr)
+
+function main()
+    obj = aurora_json_new_object()
+    if obj == 0
+        output("FAIL: new_object returned null")
+        return
+    end
+
+    aurora_json_set_str(obj, "title", "Test")
+    aurora_json_set(obj, "value", 42.0)
+
+    s = aurora_json_serialize(obj)
+    if s == ""
+        output("FAIL: serialize returned empty string")
+        aurora_json_free(obj)
+        return
+    end
+
+    parsed = aurora_json_parse(s)
+    if parsed == 0
+        output("FAIL: parse back returned null")
+        aurora_json_free(obj)
+        return
+    end
+
+    title = aurora_json_get_str(parsed, "title")
+    if title == 0
+        output("FAIL: title field not found after roundtrip")
+        aurora_json_free(parsed)
+        aurora_json_free(obj)
+        return
+    end
+    if starts(title, "Test")
+        if strlen(title) != 4
+            output("FAIL: title length expected 4 got " + str(strlen(title)))
+            aurora_json_free(parsed)
+            aurora_json_free(obj)
+            return
+        end
+    else
+        output("FAIL: title mismatch after roundtrip")
+        aurora_json_free(parsed)
+        aurora_json_free(obj)
+        return
+    end
+
+    value = aurora_json_get_obj(parsed, "value")
+    if value == 0
+        output("FAIL: value field not found after roundtrip")
+        aurora_json_free(parsed)
+        aurora_json_free(obj)
+        return
+    end
+    value_type = aurora_json_type(value)
+    if value_type != 1
+        output("FAIL: value type expected 1 (num) got " + str(value_type))
+        aurora_json_free(parsed)
+        aurora_json_free(obj)
+        return
+    end
+
+    aurora_json_free(parsed)
+    aurora_json_free(obj)
+    output("PASS")
+end

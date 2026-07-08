@@ -1,0 +1,51 @@
+## Phase 8: Cross-Platform UI Example
+##
+## Demonstrates platform built-in constants and unified
+## cross-platform widget API.
+## Same source runs on Windows, Linux, macOS, Android, iOS.
+##
+## Build:  aurorac build examples/app/cross_platform.aura
+## Run:    aurorac --run examples/app/cross_platform.aura
+
+import "app"
+
+function main()
+    output("Platform: " + platform_name)
+    output("Family: " + platform_family)
+
+    if is_windows
+        output("Running on Windows")
+    elseif is_linux
+        output("Running on Linux")
+    elseif is_macos
+        output("Running on macOS")
+    elseif is_android
+        output("Running on Android")
+    elseif is_ios
+        output("Running on iOS")
+    end
+
+    if is_desktop
+        output("Desktop mode")
+    end
+
+    if is_mobile
+        output("Mobile mode")  
+    end
+
+    win = app_init("Cross-Platform Demo", 500, 400)
+
+    btn = app_button(win, "Click Me", 10, 60, 120, 40)
+
+    function on_btn(widget, event, p1, p2)
+        if event == 1
+            output("Button clicked!")
+        end
+    end
+
+    app_on_click(btn, on_btn)
+
+    lbl = app_label(win, "Aurora v1.0", 10, 10, 200, 30)
+
+    app_run(win)
+end

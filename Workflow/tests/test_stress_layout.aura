@@ -1,0 +1,25 @@
+# Phase 12 — Stress Layout Test (node creation + calculation)
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_x(node: ptr) -> double
+extern function aurora_app_layout_node_get_y(node: ptr) -> double
+
+function main()
+    output("═══ Stress Layout Test ═══")
+    lay = aurora_app_layout_create()
+    root = aurora_app_layout_node_new(lay, 0)
+    aurora_app_layout_node_set_direction(root, 0)
+    leaf = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(leaf, 100.0, 30.0)
+    aurora_app_layout_calculate(root, 400.0, 600.0)
+    x = aurora_app_layout_node_get_x(root)
+    y = aurora_app_layout_node_get_y(root)
+    output("  root x=" + str(x) + " y=" + str(y))
+    aurora_app_layout_destroy(lay)
+    output("PASS")
+end

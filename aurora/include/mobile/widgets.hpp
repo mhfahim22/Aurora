@@ -6,6 +6,39 @@
 extern "C" {
 #endif
 
+/* Callback type forward declaration needed by struct */
+typedef void (*MwEventCallback)(void* widget, int event_type, void* data);
+
+/* Internal widget structure — defined in header so renderers can access fields */
+typedef struct MwWidget {
+    int      type;
+    float    x, y, w, h;
+    char*    text;
+    int      enabled;
+    int      visible;
+    float    padding[4];
+    float    margin[4];
+    float    bg_color[4];
+    float    text_color[4];
+    float    font_size;
+    int      main_align;
+    int      cross_align;
+    float    spacing;
+    float    value;
+    int      selected_index;
+    float    scroll_x, scroll_y;
+    char*    image_path;
+    char**   items;
+    int      item_count;
+    int      item_capacity;
+    MwEventCallback callback;
+    int      has_focus;
+    struct MwWidget* parent;
+    struct MwWidget** children;
+    int      child_count;
+    int      child_capacity;
+} MwWidget;
+
 #define MW_BUTTON       0
 #define MW_TEXT         1
 #define MW_IMAGE        2
@@ -22,6 +55,18 @@ extern "C" {
 #define MW_DRAWER       13
 #define MW_FAB          14
 #define MW_SNACKBAR     15
+#define MW_SLIDER       16
+#define MW_SWITCH       17
+#define MW_CHECKBOX     18
+#define MW_RADIO        19
+#define MW_PROGRESS     20
+/* ── Phase 9: Advanced Widgets ── */
+#define MW_TABLE        21
+#define MW_TREEVIEW     22
+#define MW_CANVAS       23
+#define MW_WEBVIEW      24
+#define MW_MEDIA        25
+#define MW_MAP          26
 
 #define MW_EVENT_CLICK      0
 #define MW_EVENT_CHANGE     1
@@ -47,8 +92,6 @@ extern "C" {
 #define MW_TOUCH_UP        1
 #define MW_TOUCH_MOVE      2
 #define MW_TOUCH_CANCEL    3
-
-typedef void (*MwEventCallback)(void* widget, int event_type, void* data);
 
 void  mw_init(void);
 void  mw_shutdown(void);

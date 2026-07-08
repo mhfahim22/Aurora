@@ -1,0 +1,77 @@
+import "gui"
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
+extern function aurora_app_layout_node_set_align(node: ptr, align: int)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+extern function aurora_app_layout_node_get_h(node: ptr) -> double
+
+function main()
+    output("═══ Integration GUI + Layout Test ═══")
+
+    output("  gui: start")
+    win = aurora_gui_window_new("Integration Test", 400, 300)
+    if win == 0
+        output("FAIL: window creation")
+        return
+    end
+    btn = aurora_gui_button_new(win, "GUI Button", 10, 10, 100, 30)
+    if btn == 0
+        output("FAIL: button creation")
+        aurora_gui_window_destroy(win)
+        return
+    end
+    txt = aurora_gui_button_get_text(btn)
+    if txt != "GUI Button"
+        output("FAIL: button text = " + txt)
+        aurora_gui_window_destroy(win)
+        return
+    end
+    output("  gui: pass")
+
+    output("  layout: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create")
+        aurora_gui_window_destroy(win)
+        return
+    end
+    root = aurora_app_layout_node_new(0, 0)
+    if root == 0
+        output("FAIL: layout root")
+        aurora_app_layout_destroy(lay)
+        aurora_gui_window_destroy(win)
+        return
+    end
+    aurora_app_layout_node_set_direction(root, 0)
+    aurora_app_layout_node_set_justify(root, 0)
+    aurora_app_layout_node_set_align(root, 0)
+    aurora_app_layout_node_set_size(root, 200.0, 100.0)
+    aurora_app_layout_calculate(root, 200.0, 100.0)
+    w = aurora_app_layout_node_get_w(root)
+    h = aurora_app_layout_node_get_h(root)
+    if w < 0.0
+        output("FAIL: layout width negative " + str(w))
+        aurora_app_layout_destroy(lay)
+        aurora_gui_window_destroy(win)
+        return
+    end
+    if h < 0.0
+        output("FAIL: layout height negative " + str(h))
+        aurora_app_layout_destroy(lay)
+        aurora_gui_window_destroy(win)
+        return
+    end
+    output("  layout root w=" + str(w) + " h=" + str(h))
+    output("  layout: pass")
+
+    output("  both systems coexisting OK")
+    aurora_app_layout_destroy(lay)
+    aurora_gui_window_destroy(win)
+    output("PASS")
+end

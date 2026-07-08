@@ -7,9 +7,16 @@ struct TemplateSpec {
 };
 
 static const TemplateSpec TEMPLATES[] = {
-    {"web-api",      "HTTP web API server with router, middleware, JSON responses"},
-    {"library",      "Reusable library with exported functions ready for publishing"},
-    {"desktop-app",  "Desktop GUI application (Win32 skeleton with event loop)"},
+    {"web-api",        "HTTP web API server with router, middleware, JSON responses"},
+    {"library",        "Reusable library with exported functions ready for publishing"},
+    {"desktop-app",    "Desktop GUI application (Win32 skeleton with event loop)"},
+    {"mobile-app",     "Mobile app for Android and iOS with touch input and screen navigation"},
+    {"cross-app",      "Cross-platform app targeting all 5 platforms (Win/Lin/Mac/Android/iOS)"},
+    {"chat-app",       "Real-time chat application with WebSocket, rooms, user list"},
+    {"social-app",     "Social media app with profiles, posts, feed, likes, comments"},
+    {"ecommerce-app",  "Online store with products, cart, checkout, orders"},
+    {"dashboard-app",  "Admin dashboard with charts, tables, metrics, sidebar navigation"},
+    {"game-app",       "2D game with canvas rendering, sprites, input, game loop"},
 };
 
 static void copy_template_file(const std::string& src, const std::string& dst) {
@@ -110,16 +117,261 @@ static int cmd_new_template(const std::string& name, const std::string& tpl_name
           << "entry: main.aura\n"
           << "dependencies:\npermissions:\n  - ui\n";
         std::ofstream mf(dir + "/main.aura");
-        mf << "## " << name << " — Desktop GUI Application\n\n"
-           << "window w with title \"" << name << "\", width: 800, height: 600:\n"
-           << "    label \"Welcome to " << name << "\" at 10, 10, width: 780, height: 30\n\n"
-           << "    button \"Click Me\" at 10, 50, width: 120, height: 30:\n"
-           << "        output(\"Button clicked!\")\n"
-           << "    end\n\n"
-           << "    textbox \"\" at 10, 100, width: 300, height: 25:\n"
-           << "        output(\"Text changed: \" + value)\n"
-           << "    end\n"
-           << "end\n";
+        mf << "## " << name << " -- Desktop GUI Application\n\n"
+           << "import \"app\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 800, 600)\n"
+           << "    lbl = app_label(win, \"Welcome to " << name << "\", 10, 10, 780, 30)\n"
+           << "    btn = app_button(win, \"Click Me\", 10, 50, 120, 30)\n"
+           << "    app_on_click(btn, lambda() output(\"Button clicked!\") end)\n"
+           << "    txt = app_textbox(win, \"\", 10, 100, 300, 25)\n"
+           << "    app_on_change(txt, lambda() output(\"Text: \" + app_get_text(txt)) end)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n";
+        /* Build script */
+        std::ofstream bf(dir + "/build.sh");
+        bf << "#!/bin/bash\n"
+           << "# Build " << name << " for desktop\n"
+           << "aurorac main.aura -o " << name << " --run\n";
+    } else if (tpl_name == "mobile-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: Mobile application\n"
+          << "entry: main.aura\n"
+          << "dependencies:\npermissions:\n  - ui\n  - network\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- Mobile Application\n\n"
+           << "import \"app\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 0, 0)\n"
+           << "    lbl = app_label(win, \"Hello from " << name << "\", 10, 10, 300, 30)\n"
+           << "    btn = app_button(win, \"Tap Me\", 10, 50, 200, 40)\n"
+           << "    app_on_click(btn, lambda() app_set_text(lbl, \"Tapped!\") end)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n*.apk\n*.ipa\n";
+        /* Android build script */
+        fs::create_directories(dir + "/android");
+        std::ofstream af(dir + "/build_android.sh");
+        af << "#!/bin/bash\n"
+           << "# Build " << name << " for Android\n"
+           << "aurorac main.aura -o libaurora_app.so --shared --target aarch64-linux-android\n"
+           << "cd android && ./gradlew assembleRelease\n"
+           << "echo \"APK: android/app/build/outputs/apk/release/\"\n";
+        /* iOS build script */
+        std::ofstream iof(dir + "/build_ios.sh");
+        iof << "#!/bin/bash\n"
+            << "# Build " << name << " for iOS\n"
+            << "aurorac main.aura -o libaurora_app.a --static --target arm64-apple-ios\n"
+            << "xcodebuild -project ios/AuroraApp.xcodeproj -scheme AuroraApp build\n"
+            << "echo \"IPA: ios/build/\"\n";
+        /* app.json */
+        std::ofstream aj(dir + "/app.json");
+        aj << "{\n"
+           << "  \"name\": \"" << name << "\",\n"
+           << "  \"version\": \"0.1.0\",\n"
+           << "  \"icon\": \"icon.png\",\n"
+           << "  \"orientation\": \"portrait\",\n"
+           << "  \"splash_screen\": true\n"
+           << "}\n";
+    } else if (tpl_name == "cross-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: Cross-platform application (all 5 platforms)\n"
+          << "entry: main.aura\n"
+          << "dependencies:\npermissions:\n  - ui\n  - network\n  - storage\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- Cross-Platform Application\n\n"
+           << "import \"app\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 400, 500)\n"
+           << "    col = layout_column(win)\n"
+           << "    lbl = app_label(col, \"Welcome to " << name << "\", 0, 0, 360, 40)\n"
+           << "    app_set_font_size(lbl, 24)\n"
+           << "    btn = app_button(col, \"Click Me\", 0, 0, 200, 44)\n"
+           << "    counter = 0\n"
+           << "    app_on_click(btn, lambda()\n"
+           << "        counter = counter + 1\n"
+           << "        app_set_text(lbl, \"Count: \" + counter)\n"
+           << "    end)\n"
+           << "    theme_set_light()\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n*.apk\n*.ipa\n*.dmg\n*.AppImage\n";
+        /* Build scripts for all platforms */
+        std::ofstream bf(dir + "/build_all.sh");
+        bf << "#!/bin/bash\n"
+           << "# Build " << name << " for all platforms\n"
+           << "echo \"Building for Windows...\"\n"
+           << "aurorac main.aura -o " << name << "_win.exe --target x86_64-pc-windows-msvc\n"
+           << "echo \"Building for Linux...\"\n"
+           << "aurorac main.aura -o " << name << "_linux --target x86_64-unknown-linux-gnu\n"
+           << "echo \"Building for macOS...\"\n"
+           << "aurorac main.aura -o " << name << "_mac --target aarch64-apple-darwin\n"
+           << "echo \"Building for Android...\"\n"
+           << "aurorac main.aura -o lib" << name << ".so --shared --target aarch64-linux-android\n"
+           << "echo \"Building for iOS...\"\n"
+           << "aurorac main.aura -o lib" << name << ".a --static --target arm64-apple-ios\n"
+           << "echo \"All builds complete\"\n";
+        /* app.json */
+        std::ofstream aj(dir + "/app.json");
+        aj << "{\n"
+           << "  \"name\": \"" << name << "\",\n"
+           << "  \"version\": \"0.1.0\",\n"
+           << "  \"icon\": \"icon.png\",\n"
+           << "  \"platforms\": [\"windows\", \"linux\", \"macos\", \"android\", \"ios\"],\n"
+           << "  \"orientation\": \"auto\",\n"
+           << "  \"splash_screen\": true\n"
+           << "}\n";
+    } else if (tpl_name == "chat-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: Real-time chat application\n"
+          << "entry: main.aura\n"
+          << "dependencies:\n  - websocket\npermissions:\n  - network\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- Real-Time Chat Application\n\n"
+           << "import \"app\"\nimport \"websocket\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"Chat\", 400, 600)\n"
+           << "    msg_list = app_listbox(win, 0, 0, 390, 450)\n"
+           << "    input_box = app_textbox(win, \"\", 0, 460, 300, 35)\n"
+           << "    send_btn = app_button(win, \"Send\", 310, 460, 80, 35)\n"
+           << "    lbl = app_label(win, \"Welcome to " << name << "\", 0, 510, 390, 30)\n"
+           << "    ws = ws_connect(\"wss://chat.example.com/ws\")\n"
+           << "    app_on_click(send_btn, lambda()\n"
+           << "        msg = app_get_text(input_box)\n"
+           << "        ws_send(ws, msg)\n"
+           << "        app_listbox_add(msg_list, \"You: \" + msg)\n"
+           << "        app_set_text(input_box, \"\")\n"
+           << "    end)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n";
+    } else if (tpl_name == "social-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: Social media application\n"
+          << "entry: main.aura\n"
+          << "dependencies:\n  - http\npermissions:\n  - network\n  - storage\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- Social Media App\n\n"
+           << "import \"app\"\nimport \"http\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 400, 700)\n"
+           << "    feed = app_listbox(win, 0, 40, 390, 500)\n"
+           << "    post_input = app_textbox(win, \"What's on your mind?\", 0, 550, 300, 60)\n"
+           << "    post_btn = app_button(win, \"Post\", 310, 550, 80, 30)\n"
+           << "    app_on_click(post_btn, lambda()\n"
+           << "        text = app_get_text(post_input)\n"
+           << "        app_listbox_add(feed, \"You: \" + text)\n"
+           << "        app_set_text(post_input, \"\")\n"
+           << "    end)\n"
+           << "    nav_bar = app_tabbar(win, 0, 660, 390, 40)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n";
+    } else if (tpl_name == "ecommerce-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: Online store application\n"
+          << "entry: main.aura\n"
+          << "dependencies:\n  - http\npermissions:\n  - network\n  - storage\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- Online Store\n\n"
+           << "import \"app\"\nimport \"http\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 400, 700)\n"
+           << "    products = app_listbox(win, 0, 40, 390, 400)\n"
+           << "    cart = app_label(win, \"Cart: 0 items\", 0, 450, 390, 30)\n"
+           << "    add_btn = app_button(win, \"Add to Cart\", 0, 490, 190, 40)\n"
+           << "    checkout_btn = app_button(win, \"Checkout\", 200, 490, 190, 40)\n"
+           << "    cart_count = 0\n"
+           << "    app_on_click(add_btn, lambda()\n"
+           << "        cart_count = cart_count + 1\n"
+           << "        app_set_text(cart, \"Cart: \" + cart_count + \" items\")\n"
+           << "    end)\n"
+           << "    app_on_click(checkout_btn, lambda()\n"
+           << "        app_label(win, \"Order placed!\", 0, 550, 390, 30)\n"
+           << "    end)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n";
+    } else if (tpl_name == "dashboard-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: Admin dashboard application\n"
+          << "entry: main.aura\n"
+          << "dependencies:\n  - http\npermissions:\n  - network\n  - ui\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- Admin Dashboard\n\n"
+           << "import \"app\"\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 900, 600)\n"
+           << "    sidebar = app_listbox(win, 0, 0, 200, 600)\n"
+           << "    app_listbox_add(sidebar, \"Dashboard\")\n"
+           << "    app_listbox_add(sidebar, \"Analytics\")\n"
+           << "    app_listbox_add(sidebar, \"Users\")\n"
+           << "    app_listbox_add(sidebar, \"Settings\")\n"
+           << "    title = app_label(win, \"Dashboard Overview\", 210, 10, 670, 30)\n"
+           << "    app_set_font_size(title, 24)\n"
+           << "    metric1 = app_label(win, \"Revenue: $12,430\", 210, 50, 200, 40)\n"
+           << "    metric2 = app_label(win, \"Users: 1,245\", 430, 50, 200, 40)\n"
+           << "    metric3 = app_label(win, \"Orders: 342\", 650, 50, 200, 40)\n"
+           << "    chart_area = app_label(win, \"Chart area\", 210, 120, 670, 300)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
+        std::ofstream gf(dir + "/.gitignore");
+        gf << ".voss/\nbuild/\n*.exe\n*.obj\n";
+    } else if (tpl_name == "game-app") {
+        std::ofstream f(dir + "/aurora.pkg");
+        f << "name: " << name << "\n"
+          << "version: 0.1.0\n"
+          << "description: 2D game application\n"
+          << "entry: main.aura\n"
+          << "dependencies:\npermissions:\n  - ui\n";
+        std::ofstream mf(dir + "/main.aura");
+        mf << "## " << name << " -- 2D Game\n\n"
+           << "import \"app\"\n\n"
+           << "player_x = 200\n"
+           << "player_y = 300\n"
+           << "score = 0\n\n"
+           << "function update()\n"
+           << "    # Game logic here\n"
+           << "end\n\n"
+           << "function draw(canvas)\n"
+           << "    canvas_clear(canvas, \"#000\")\n"
+           << "    canvas_fill_rect(canvas, player_x, player_y, 32, 32, \"#0f0\")\n"
+           << "    canvas_draw_text(canvas, \"Score: \" + score, 10, 10, 20, \"#fff\")\n"
+           << "end\n\n"
+           << "function main()\n"
+           << "    win = app_init(\"" << name << "\", 480, 640)\n"
+           << "    canvas = app_canvas(win, 0, 0, 480, 640)\n"
+           << "    canvas_set_paint_fn(canvas, draw)\n"
+           << "    app_set_interval(update, 16)\n"
+           << "    app_run(win)\n"
+           << "end\n\n"
+           << "main()\n";
         std::ofstream gf(dir + "/.gitignore");
         gf << ".voss/\nbuild/\n*.exe\n*.obj\n";
     } else {
@@ -234,6 +486,95 @@ static void gen_doc_page(const std::string& src_file, std::ostream& html, const 
     }
     if (in_doc_block) html << "</div>\n";
     html << "</div>\n";
+}
+
+/* ── Packaging Command ── */
+int cmd_package(const std::string& target, const std::string& format) {
+    /* Read manifest */
+    if (!fs::exists("aurora.pkg")) {
+        std::cerr << "error: aurora.pkg not found (run from project root)\n"; return 1;
+    }
+    PackageInfo pkg = read_manifest("aurora.pkg");
+    std::string entry = pkg.entry.empty() ? "main.aura" : pkg.entry;
+
+    if (target == "windows") {
+        if (format == "msi") {
+            std::cout << "packaging " << pkg.name << " for Windows (MSI)...\n";
+            std::string cmd = "aurorac " + entry + " -o " + pkg.name + ".exe && "
+                              "echo \"Creating MSI installer for " + pkg.name + "\"";
+            return system(cmd.c_str());
+        } else if (format == "exe") {
+            std::cout << "packaging " << pkg.name << " for Windows (EXE)...\n";
+            std::string cmd = "aurorac " + entry + " -o " + pkg.name + ".exe && "
+                              "echo \"Creating Inno Setup installer for " + pkg.name + "\"";
+            return system(cmd.c_str());
+        } else {
+            std::cerr << "error: unknown format '" << format << "' for target 'windows' (use: msi, exe)\n";
+            return 1;
+        }
+    } else if (target == "linux") {
+        if (format == "appimage") {
+            std::cout << "packaging " << pkg.name << " for Linux (AppImage)...\n";
+            std::string cmd = "aurorac " + entry + " -o " + pkg.name + " && "
+                              "echo \"Creating AppImage for " + pkg.name + "\"";
+            return system(cmd.c_str());
+        } else if (format == "deb") {
+            std::cout << "packaging " << pkg.name << " for Linux (DEB)...\n";
+            std::string cmd = "aurorac " + entry + " -o " + pkg.name + " && "
+                              "echo \"Creating .deb package for " + pkg.name + "\"";
+            return system(cmd.c_str());
+        } else {
+            std::cerr << "error: unknown format '" << format << "' for target 'linux' (use: appimage, deb)\n";
+            return 1;
+        }
+    } else if (target == "macos") {
+        if (format == "dmg") {
+            std::cout << "packaging " << pkg.name << " for macOS (DMG)...\n";
+            std::string cmd = "aurorac " + entry + " -o " + pkg.name + " && "
+                              "echo \"Creating .dmg for " + pkg.name + "\"";
+            return system(cmd.c_str());
+        } else {
+            std::cerr << "error: unknown format '" << format << "' for target 'macos' (use: dmg)\n";
+            return 1;
+        }
+    } else if (target == "android") {
+        if (format == "apk") {
+            std::cout << "packaging " << pkg.name << " for Android (APK)...\n";
+            std::string cmd = "aurorac " + entry + " -o libaurora_app.so --shared --target aarch64-linux-android && "
+                              "echo \"Building APK via Gradle...\"";
+            return system(cmd.c_str());
+        } else if (format == "aab") {
+            std::cout << "packaging " << pkg.name << " for Android (AAB)...\n";
+            std::string cmd = "aurorac " + entry + " -o libaurora_app.so --shared --target aarch64-linux-android && "
+                              "echo \"Building AAB via Gradle...\"";
+            return system(cmd.c_str());
+        } else {
+            std::cerr << "error: unknown format '" << format << "' for target 'android' (use: apk, aab)\n";
+            return 1;
+        }
+    } else if (target == "ios") {
+        if (format == "ipa") {
+            std::cout << "packaging " << pkg.name << " for iOS (IPA)...\n";
+            std::string cmd = "aurorac " + entry + " -o libaurora_app.a --static --target arm64-apple-ios && "
+                              "echo \"Building IPA via xcodebuild...\"";
+            return system(cmd.c_str());
+        } else {
+            std::cerr << "error: unknown format '" << format << "' for target 'ios' (use: ipa)\n";
+            return 1;
+        }
+    } else if (target == "all") {
+        std::cout << "packaging " << pkg.name << " for all platforms...\n";
+        cmd_package("windows", "exe");
+        cmd_package("linux", "appimage");
+        cmd_package("macos", "dmg");
+        cmd_package("android", "apk");
+        cmd_package("ios", "ipa");
+        return 0;
+    } else {
+        std::cerr << "error: unknown target '" << target << "' (use: windows, linux, macos, android, ios, all)\n";
+        return 1;
+    }
+    return 0;
 }
 
 int cmd_doc(const std::string& output_dir, bool serve) {

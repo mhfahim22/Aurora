@@ -1,0 +1,56 @@
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+
+function main()
+    output("═══ Stress Create/Destroy Test ═══")
+
+    for iter in range(100)
+        lay = aurora_app_layout_create()
+        if lay == 0
+            output("FAIL: layout_create at iter " + str(iter))
+            return
+        end
+
+        root = aurora_app_layout_node_new(0, 0)
+        if root == 0
+            output("FAIL: root node at iter " + str(iter))
+            aurora_app_layout_destroy(lay)
+            return
+        end
+
+        prev = root
+        for depth in range(10)
+            child = aurora_app_layout_node_new(prev, 0)
+            if child == 0
+                output("FAIL: child node at depth " + str(depth))
+                aurora_app_layout_destroy(lay)
+                return
+            end
+            aurora_app_layout_node_set_direction(child, 0)
+            aurora_app_layout_node_set_size(child, 100.0 + depth * 10.0, 50.0 + depth * 5.0)
+            prev = child
+        end
+
+        aurora_app_layout_calculate(root, 800.0, 600.0)
+
+        w = aurora_app_layout_node_get_w(root)
+        if w < 0.0
+            output("FAIL: root width negative " + str(w))
+            aurora_app_layout_destroy(lay)
+            return
+        end
+
+        aurora_app_layout_destroy(lay)
+
+        if iter % 10 == 0
+            output("  completed " + str(iter) + " iterations...")
+        end
+    end
+
+    output("PASS")
+end

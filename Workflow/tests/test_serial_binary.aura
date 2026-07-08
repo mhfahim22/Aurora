@@ -1,0 +1,28 @@
+# Phase 14 — Binary Serialization Test (simplified)
+
+extern function aurora_json_parse(json: str) -> ptr
+extern function aurora_json_serialize(val: ptr) -> str
+extern function aurora_json_free(val: ptr)
+extern function aurora_serial_detect_format(filename: str) -> int
+
+function main()
+    output("serial_binary: start")
+    fmt = aurora_serial_detect_format("data.json")
+    output("  detect json: " + str(fmt))
+    if fmt != 0
+        output("FAIL: detect .json should be 0, got " + str(fmt))
+        return
+    end
+    fmt2 = aurora_serial_detect_format("data.bin")
+    output("  detect bin: " + str(fmt2))
+    if fmt2 != 1
+        output("FAIL: detect .bin should be 1, got " + str(fmt2))
+        return
+    end
+    val = aurora_json_parse("{\"x\":10,\"y\":20}")
+    if val == 0
+        output("FAIL: parse returned null")
+        return
+    end
+    output("serial_binary: PASS")
+end

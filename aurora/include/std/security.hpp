@@ -58,6 +58,19 @@ int         aurora_sec_token_verify(const char* token, const char* secret);
 char*       aurora_sec_basic_auth(const char* username, const char* password);
 char*       aurora_sec_bearer_auth(const char* token);
 
+/* ── JWT (3) ── */
+char*       aurora_jwt_encode(const char* payload_json, const char* secret);
+char*       aurora_jwt_decode(const char* token, const char* secret);
+char*       aurora_jwt_get_payload(const char* token);
+
+/* ── OAuth 2.0 (3) ── */
+char*       aurora_oauth_build_url(const char* provider, const char* client_id,
+                                    const char* redirect_uri, const char* scope);
+char*       aurora_oauth_exchange_code(const char* provider, const char* code,
+                                        const char* client_id, const char* client_secret,
+                                        const char* redirect_uri);
+char*       aurora_oauth_get_user_info(const char* provider, const char* access_token);
+
 #ifdef __cplusplus
 }
 #endif

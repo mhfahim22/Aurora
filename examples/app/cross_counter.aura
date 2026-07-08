@@ -1,0 +1,69 @@
+## Cross-Platform Counter App
+## Same code runs on Windows, Linux, macOS, Android, iOS
+
+import "app"
+
+function main()
+    win = app_init("Cross Counter", 400, 500)
+    theme = aurora_app_get_theme(win)
+
+    root = aurora_app_layout_node_new(null, 0)
+    aurora_app_layout_node_set_align(root, 3)
+    aurora_app_layout_node_set_justify(root, 1)
+    aurora_app_layout_node_set_gap(root, 16.0)
+    aurora_app_layout_node_set_padding(root, 32.0, 48.0, 32.0, 48.0)
+
+    title_node = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(title_node, 0.0, 40.0)
+
+    count_node = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(count_node, 0.0, 80.0)
+
+    btn_row = aurora_app_layout_node_new(root, 1)
+    aurora_app_layout_node_set_align(btn_row, 1)
+    aurora_app_layout_node_set_gap(btn_row, 24.0)
+    aurora_app_layout_node_set_size(btn_row, 0.0, 60.0)
+
+    btn_minus = aurora_app_layout_node_new(btn_row, 0)
+    aurora_app_layout_node_set_size(btn_minus, 80.0, 60.0)
+    btn_plus = aurora_app_layout_node_new(btn_row, 0)
+    aurora_app_layout_node_set_size(btn_plus, 80.0, 60.0)
+
+    aurora_app_layout_calculate(root, 400.0, 500.0)
+
+    lbl_title = app_label(win, "Counter", aurora_app_layout_node_get_x(title_node), aurora_app_layout_node_get_y(title_node), aurora_app_layout_node_get_w(title_node), aurora_app_layout_node_get_h(title_node))
+    app_set_font_size(lbl_title, 28)
+    app_set_text_align(lbl_title, 1)
+
+    lbl_count = app_label(win, "0", aurora_app_layout_node_get_x(count_node), aurora_app_layout_node_get_y(count_node), aurora_app_layout_node_get_w(count_node), aurora_app_layout_node_get_h(count_node))
+    app_set_font_size(lbl_count, 64)
+    app_set_text_align(lbl_count, 1)
+
+    btn_dec = app_button(win, "-", aurora_app_layout_node_get_x(btn_minus), aurora_app_layout_node_get_y(btn_minus), aurora_app_layout_node_get_w(btn_minus), aurora_app_layout_node_get_h(btn_minus))
+    app_set_bg(btn_dec, 0xFF5555)
+
+    btn_inc = app_button(win, "+", aurora_app_layout_node_get_x(btn_plus), aurora_app_layout_node_get_y(btn_plus), aurora_app_layout_node_get_w(btn_plus), aurora_app_layout_node_get_h(btn_plus))
+    app_set_bg(btn_inc, 0x55AA55)
+
+    count = 0
+
+    function on_dec(widget, event, p1, p2)
+        if event == 1
+            count = count - 1
+            app_set_text(lbl_count, count)
+        end
+    end
+
+    function on_inc(widget, event, p1, p2)
+        if event == 1
+            count = count + 1
+            app_set_text(lbl_count, count)
+        end
+    end
+
+    app_on_click(btn_dec, on_dec)
+    app_on_click(btn_inc, on_inc)
+
+    output("Cross-platform counter running...")
+    app_run(win)
+end

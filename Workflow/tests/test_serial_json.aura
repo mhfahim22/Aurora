@@ -1,0 +1,57 @@
+# Phase 14 — JSON Serialization Test
+
+extern function aurora_json_parse(json: str) -> ptr
+extern function aurora_json_serialize(val: ptr) -> str
+extern function aurora_json_free(val: ptr)
+extern function aurora_serialize_json(json_val: ptr) -> str
+extern function aurora_deserialize_json(json_str: str) -> ptr
+extern function aurora_serialize(json_val: ptr, format: int) -> str
+extern function aurora_deserialize(data: str, format: int) -> ptr
+
+function main()
+    output("serial_json: start")
+    val = aurora_json_parse("{\"name\":\"Alice\",\"age\":30}")
+    if val == null
+        output("FAIL: parse returned null")
+        return
+    end
+    output("  parse: ok")
+    serialized = aurora_json_serialize(val)
+    if serialized == ""
+        output("FAIL: serialize returned empty")
+        return
+    end
+    output("  serialize: " + serialized)
+    val2 = aurora_deserialize_json(serialized)
+    if val2 == null
+        output("FAIL: deserialize_json returned null")
+        return
+    end
+    output("  deserialize_json: ok")
+    serialized2 = aurora_serialize_json(val2)
+    output("  serialize_json: " + serialized2)
+    aurora_json_free(val)
+    aurora_json_free(val2)
+    val3 = aurora_json_parse("{\"x\":1,\"y\":2}")
+    if val3 == null
+        output("FAIL: parse2 returned null")
+        return
+    end
+    ser3 = aurora_serialize(val3, 0)
+    if ser3 == ""
+        output("FAIL: unified serialize returned empty")
+        return
+    end
+    output("  unified serialize: " + ser3)
+    val4 = aurora_deserialize(ser3, 0)
+    if val4 == null
+        output("FAIL: unified deserialize returned null")
+        return
+    end
+    output("  unified deserialize: ok")
+    ser4 = aurora_json_serialize(val4)
+    output("  round-trip: " + ser4)
+    aurora_json_free(val3)
+    aurora_json_free(val4)
+    output("serial_json: PASS")
+end

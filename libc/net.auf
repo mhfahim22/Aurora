@@ -70,6 +70,14 @@ extern function aurora_send_all(sock: i64, data: cstring, len: i32) -> i32
 ## ── IP resolution ──
 extern function aurora_net_resolve_host(hostname: cstring, buffer: cstring, buffer_size: i32) -> i32
 
+## ── Connection pool ──
+extern function aurora_net_conn_pool_new(max_per_host: i32, idle_timeout_sec: i32) -> pointer
+extern function aurora_net_conn_pool_free(pool: pointer)
+extern function aurora_net_conn_pool_get(pool: pointer, host: cstring, port: i32) -> i64
+extern function aurora_net_conn_pool_put(pool: pointer, sock: i64, host: cstring, port: i32)
+extern function aurora_net_conn_pool_clear_host(pool: pointer, host: cstring, port: i32)
+extern function aurora_net_conn_pool_idle_count(pool: pointer) -> i32
+
 ## ════════════════════════════════════════════════════════════
 ## Aurora-level convenience wrappers
 ## ════════════════════════════════════════════════════════════
@@ -303,4 +311,30 @@ function multipart_end(form, boundary):
     out_len = 0
     result = aurora_net_multipart_end(form, boundary, addr(out_len))
     return result
+end
+
+## ── Connection pool wrappers ──
+
+function conn_pool_new(max_per_host=8, idle_timeout_sec=30):
+    return aurora_net_conn_pool_new(max_per_host, idle_timeout_sec)
+end
+
+function conn_pool_free(pool):
+    aurora_net_conn_pool_free(pool)
+end
+
+function conn_pool_get(pool, host, port):
+    return aurora_net_conn_pool_get(pool, host, port)
+end
+
+function conn_pool_put(pool, sock, host, port):
+    aurora_net_conn_pool_put(pool, sock, host, port)
+end
+
+function conn_pool_clear_host(pool, host, port):
+    aurora_net_conn_pool_clear_host(pool, host, port)
+end
+
+function conn_pool_idle_count(pool):
+    return aurora_net_conn_pool_idle_count(pool)
 end

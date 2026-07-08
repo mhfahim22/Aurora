@@ -1,0 +1,50 @@
+## Todo App — Cross-platform
+## Runs on Windows, Linux, macOS with the same code
+
+import "app"
+
+function main()
+    # Create window
+    win = app_init("Todo App", 500, 400)
+    output("Todo App: Window created")
+
+    # Title field
+    title_in = app_textbox(win, 20, 20, 360, 30)
+    app_set_text(title_in, "Enter a task...")
+
+    # Buttons
+    btn_add = app_button(win, "Add", 390, 20, 90, 30)
+    btn_clear = app_button(win, "Clear", 20, 340, 90, 30)
+
+    # List
+    todo_list = app_listbox(win, 20, 60, 460, 270)
+
+    # Label
+    lbl = app_label(win, "Todos: 0", 120, 345, 200, 20)
+
+    # Counter
+    todo_count = 0
+
+    function on_add()
+        text = app_get_text(title_in)
+        if text != ""
+            app_listbox_add(todo_list, text)
+            todo_count = todo_count + 1
+            app_set_text(lbl, "Todos: " + todo_count)
+            app_set_text(title_in, "")
+        end
+    end
+
+    function on_clear()
+        app_listbox_clear(todo_list)
+        todo_count = 0
+        app_set_text(lbl, "Todos: 0")
+    end
+
+    app_on_click(btn_add, on_add)
+    app_on_click(btn_clear, on_clear)
+
+    output("Todo App: Running...")
+    app_run(win)
+    output("Todo App: Done")
+end

@@ -222,7 +222,7 @@ inline const BuiltinInfo all_builtins[] = {
     {"model",         "Define a data model",                            1},
     {"schema",        "Define a schema",                                1},
     {"validate",      "Validate data against schema",                   2},
-    {"sanitize",      "Sanitize input data",                            1},
+    {"sanitize",      "Sanitize input data (mode: 0=full, 1=HTML, 2=SQL)", 2},
 
     /* Throttle/Debounce */
     {"throttle",      "Throttle requests per second",                   1},
@@ -255,6 +255,10 @@ inline const BuiltinInfo all_builtins[] = {
     {"leader",        "Check if current node is leader",                0},
     {"shard",         "Shard data by key",                              1},
     {"replica",       "Get replica count / info",                       0},
+
+    /* Template */
+    {"template",      "Register a template",                            2},
+    {"render",        "Render a template",                              2},
 
     /* Backup */
     {"backup",        "Backup database",                                1},

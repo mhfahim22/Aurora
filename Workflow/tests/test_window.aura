@@ -1,0 +1,37 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_set_title(win: pointer, title: cstring)
+extern function aurora_gui_window_get_width(win: pointer) -> int
+extern function aurora_gui_window_get_height(win: pointer) -> int
+extern function aurora_gui_window_resize(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_min_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_max_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_resizable(win: pointer, resizable: int)
+extern function aurora_gui_window_destroy(win: pointer)
+
+function main()
+    output("window: start")
+    win = aurora_gui_window_new("TestWin", 640, 480)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    aurora_gui_window_set_title(win, "Updated Title")
+    w = aurora_gui_window_get_width(win)
+    if w < 0
+        output("FAIL: window width < 0")
+        return
+    end
+    h = aurora_gui_window_get_height(win)
+    if h < 0
+        output("FAIL: window height < 0")
+        return
+    end
+
+    aurora_gui_window_resize(win, 800, 600)
+    aurora_gui_window_set_min_size(win, 200, 150)
+    aurora_gui_window_set_max_size(win, 1600, 1200)
+    aurora_gui_window_set_resizable(win, 0)
+    aurora_gui_window_set_resizable(win, 1)
+    aurora_gui_window_destroy(win)
+    output("window: PASS")
+end

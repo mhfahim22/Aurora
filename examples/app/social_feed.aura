@@ -1,0 +1,59 @@
+import app
+
+function main()
+    win = app_init("Social Feed", 400, 600)
+    root = aurora_app_layout_node_new(null, 0)
+    aurora_app_layout_node_set_padding(root, 8.0, 8.0, 8.0, 8.0)
+    aurora_app_layout_node_set_gap(root, 8.0)
+    title_node = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(title_node, 0.0, 40.0)
+    feed_node = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_flex(feed_node, 1, 0, 0)
+    btn_row = aurora_app_layout_node_new(root, 1)
+    aurora_app_layout_node_set_gap(btn_row, 8.0)
+    aurora_app_layout_node_set_size(btn_row, 0.0, 40.0)
+    like_node = aurora_app_layout_node_new(btn_row, 0)
+    aurora_app_layout_node_set_flex(like_node, 1, 0, 0)
+    refresh_node = aurora_app_layout_node_new(btn_row, 0)
+    aurora_app_layout_node_set_flex(refresh_node, 1, 0, 0)
+    status_node = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(status_node, 0.0, 30.0)
+    aurora_app_layout_calculate(root, 384.0, 584.0)
+    lbl_title = app_label(win, "My Feed", aurora_app_layout_node_get_x(title_node), aurora_app_layout_node_get_y(title_node), aurora_app_layout_node_get_w(title_node), aurora_app_layout_node_get_h(title_node))
+    app_set_font_size(lbl_title, 24)
+    posts = app_listbox(win, aurora_app_layout_node_get_x(feed_node), aurora_app_layout_node_get_y(feed_node), aurora_app_layout_node_get_w(feed_node), aurora_app_layout_node_get_h(feed_node))
+    app_listbox_add(posts, "Alice: Had a great day at the park!")
+    app_listbox_add(posts, "Bob: Just finished my new project!")
+    app_listbox_add(posts, "Charlie: Beautiful sunset photo!")
+    app_listbox_add(posts, "Diana: Learning Aurora programming!")
+    app_listbox_add(posts, "Eve: Coffee and code, perfect morning")
+    btn_like = app_button(win, "Like", aurora_app_layout_node_get_x(like_node), aurora_app_layout_node_get_y(like_node), aurora_app_layout_node_get_w(like_node), aurora_app_layout_node_get_h(like_node))
+    btn_refresh = app_button(win, "Refresh", aurora_app_layout_node_get_x(refresh_node), aurora_app_layout_node_get_y(refresh_node), aurora_app_layout_node_get_w(refresh_node), aurora_app_layout_node_get_h(refresh_node))
+    lbl_status = app_label(win, "Select a post to like", aurora_app_layout_node_get_x(status_node), aurora_app_layout_node_get_y(status_node), aurora_app_layout_node_get_w(status_node), aurora_app_layout_node_get_h(status_node))
+    function on_like(widget, event, p1, p2)
+        if event == 1
+            idx = app_listbox_selected(posts)
+            if idx >= 0
+                app_set_text(lbl_status, "Liked!")
+            else
+                app_set_text(lbl_status, "No post selected")
+            end
+        end
+    end
+    function on_refresh(widget, event, p1, p2)
+        if event == 1
+            app_listbox_clear(posts)
+            app_listbox_add(posts, "Alice: Enjoying the weekend!")
+            app_listbox_add(posts, "Bob: New blog post coming soon")
+            app_listbox_add(posts, "Charlie: Hiking in the mountains")
+            app_listbox_add(posts, "Diana: Aurora v1.0 is amazing!")
+            app_set_text(lbl_status, "Feed refreshed")
+        end
+    end
+    app_on_click(btn_like, on_like)
+    app_on_click(btn_refresh, on_refresh)
+    output("Social feed running...")
+    app_run(win)
+end
+
+main()

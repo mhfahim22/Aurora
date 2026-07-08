@@ -1,0 +1,56 @@
+## Virtual Scroll Tests (Phase 12.1)
+
+extern function aurora_virtual_scroll_create(total_items: int, item_height: int, viewport_height: int) -> ptr
+extern function aurora_virtual_scroll_destroy(vs: ptr)
+extern function aurora_virtual_scroll_get_first_visible(vs: ptr) -> int
+extern function aurora_virtual_scroll_get_last_visible(vs: ptr) -> int
+extern function aurora_virtual_scroll_get_total_height(vs: ptr) -> int
+extern function aurora_virtual_scroll_set_scroll_offset(vs: ptr, offset: int)
+extern function aurora_virtual_scroll_get_scroll_offset(vs: ptr) -> int
+extern function aurora_virtual_scroll_item_at_y(vs: ptr, y: int) -> int
+extern function aurora_virtual_scroll_set_total_items(vs: ptr, total: int)
+extern function aurora_virtual_scroll_get_total_items(vs: ptr) -> int
+
+function main()
+    output("═══ Virtual Scroll Tests ═══")
+    vs = aurora_virtual_scroll_create(1000, 30, 600)
+    if vs == 0
+        output("  FAIL: create")
+        return
+    end
+    total = aurora_virtual_scroll_get_total_items(vs)
+    if total != 1000
+        output("  FAIL: total = " + str(total))
+        return
+    end
+    height = aurora_virtual_scroll_get_total_height(vs)
+    if height != 30000
+        output("  FAIL: total height = " + str(height))
+        return
+    end
+    first = aurora_virtual_scroll_get_first_visible(vs)
+    last = aurora_virtual_scroll_get_last_visible(vs)
+    output("  scroll 0: first=" + str(first) + " last=" + str(last))
+    if first != 0
+        output("  FAIL: first visible at 0 = " + str(first))
+        return
+    end
+    aurora_virtual_scroll_set_scroll_offset(vs, 1500)
+    offset = aurora_virtual_scroll_get_scroll_offset(vs)
+    output("  scroll offset: " + str(offset))
+    first = aurora_virtual_scroll_get_first_visible(vs)
+    last = aurora_virtual_scroll_get_last_visible(vs)
+    output("  scroll 1500: first=" + str(first) + " last=" + str(last))
+    if first != 50
+        output("  FAIL: first visible at 50 = " + str(first))
+        return
+    end
+    item = aurora_virtual_scroll_item_at_y(vs, 200)
+    output("  item at y=200: " + str(item))
+    if item < 56
+        output("  FAIL: item at y=200 = " + str(item))
+        return
+    end
+    aurora_virtual_scroll_destroy(vs)
+    output("═══ Virtual Scroll Tests PASS ═══")
+end

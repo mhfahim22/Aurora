@@ -1,0 +1,57 @@
+## Notes App — Cross-platform
+## Multi-line editor with save/load
+
+import "app"
+import "fs"
+
+function main()
+    win = app_init("Notes App", 600, 450)
+    current_file = ""
+
+    # Title
+    title_lbl = app_label(win, "Notes App", 20, 15, 200, 25)
+
+    # Editor
+    editor = app_textbox(win, 20, 50, 560, 320)
+    app_set_text(editor, "Type your notes here...")
+
+    # Buttons
+    btn_new = app_button(win, "New", 20, 390, 80, 30)
+    btn_save = app_button(win, "Save", 110, 390, 80, 30)
+    btn_load = app_button(win, "Open", 200, 390, 80, 30)
+
+    status = app_label(win, "Ready", 300, 395, 250, 20)
+
+    function new_note()
+        app_set_text(editor, "")
+        current_file = ""
+        app_set_text(status, "New note")
+    end
+
+    function save_note()
+        text = app_get_text(editor)
+        if current_file == ""
+            current_file = "note.txt"
+        end
+        write_file(current_file, text)
+        app_set_text(status, "Saved: " + current_file)
+    end
+
+    function load_note()
+        content = read_file(current_file)
+        if content != ""
+            app_set_text(editor, content)
+            app_set_text(status, "Loaded: " + current_file)
+        else
+            app_set_text(status, "No file loaded")
+        end
+    end
+
+    app_on_click(btn_new, new_note)
+    app_on_click(btn_save, save_note)
+    app_on_click(btn_load, load_note)
+
+    output("Notes App: Running...")
+    app_run(win)
+    output("Notes App: Done")
+end

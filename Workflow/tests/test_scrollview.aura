@@ -1,0 +1,59 @@
+## ScrollView and SplitView Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ ScrollView & SplitView Test ═══")
+
+    output("  scrollview new: start")
+    win = aurora_gui_window_new("Test", 400, 300)
+    sv = aurora_gui_scrollview_new(win, 10, 10, 200, 200)
+    if sv == 0
+        output("FAIL: scrollview_new returned null")
+        return
+    end
+    output("  scrollview new: pass")
+
+    output("  splitview new: start")
+    sv2 = aurora_gui_splitview_new(win, 10, 220, 380, 60, 0)
+    if sv2 == 0
+        output("FAIL: splitview_new returned null")
+        return
+    end
+    output("  splitview new: pass")
+
+    output("  splitview get_pane1 pane2: start")
+    p1 = aurora_gui_splitview_get_pane1(sv2)
+    if p1 == 0
+        output("FAIL: splitview_get_pane1 returned null")
+        return
+    end
+    p2 = aurora_gui_splitview_get_pane2(sv2)
+    if p2 == 0
+        output("FAIL: splitview_get_pane2 returned null")
+        return
+    end
+    output("  splitview get_pane1 pane2: pass")
+
+    output("  splitview set_position: start")
+    aurora_gui_splitview_set_position(sv2, 100)
+    pos = aurora_gui_splitview_get_position(sv2)
+    if pos != 100
+        if pos != 100
+            output("FAIL: splitview_get_position = " + str(pos))
+            return
+        end
+    end
+    output("  splitview set_position: pass")
+
+    output("  splitview set_position 0: start")
+    aurora_gui_splitview_set_position(sv2, 0)
+    pos2 = aurora_gui_splitview_get_position(sv2)
+    if pos2 != 0
+        output("FAIL: splitview_get_position after 0 = " + str(pos2))
+        return
+    end
+    output("  splitview set_position 0: pass")
+
+    output("PASS")
+end

@@ -724,10 +724,13 @@ static std::atomic<size_t>     gc_live_objects{0};
 static std::atomic<size_t>     gc_collected{0};
 static std::atomic<size_t>     gc_alloc_since_last{0};
 static std::atomic<size_t>     gc_auto_threshold{5000}; /* auto-collect every 5000 allocs */
+static thread_local bool       gc_in_progress = false; /* Phase 1: reentrancy guard */
 
 /* Internal collect — assumes LOCK_GC is held */
 static void gc_collect_impl(void) {
     if (gc_objects.empty()) return;
+    if (gc_in_progress) return; /* Phase 1: reentrancy guard — prevent deadlock if free() re-enters GC */
+    gc_in_progress = true;
 
     /* ── Mark phase ── */
     for (auto& obj : gc_objects) {
@@ -844,6 +847,7 @@ static void gc_collect_impl(void) {
     }
     gc_live_objects.store(gc_objects.size(), std::memory_order_relaxed);
     gc_collected.fetch_add(freed, std::memory_order_relaxed);
+    gc_in_progress = false;
 }
 
 /* Phase 28: SRWLock with shared read mode for GC */
@@ -874,6 +878,10 @@ void* aurora_gc_alloc(size_t size) {
     void* ptr = malloc(size);
     if (!ptr && size) {
         aurora_panic("aurora_gc_alloc: out of memory");
+    }
+    /* Phase 1: if GC is in progress, skip tracking to avoid deadlock on reentrancy */
+    if (gc_in_progress) {
+        return ptr;
     }
     LOCK_GC();
     gc_objects.push_back({ptr, size, 0, false});

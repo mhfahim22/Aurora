@@ -1,0 +1,37 @@
+# Theme Color Test
+# Verifies set_color and get_color roundtrip
+
+extern function aurora_app_theme_init() -> ptr
+extern function aurora_app_theme_destroy(theme: ptr)
+extern function aurora_app_theme_set_mode(theme: ptr, mode: int)
+extern function aurora_app_theme_get_mode(theme: ptr) -> int
+extern function aurora_app_theme_set_color(theme: ptr, key: int, color: int)
+extern function aurora_app_theme_get_color(theme: ptr, key: int) -> int
+extern function aurora_app_theme_set_font(theme: ptr, key: int, size: int)
+extern function aurora_app_theme_get_font(theme: ptr, key: int) -> int
+extern function aurora_app_theme_get_spacing(theme: ptr, level: int) -> double
+
+function main()
+    theme = aurora_app_theme_init()
+    if theme == 0
+        output("FAIL: theme_init returned null")
+        return
+    end
+
+    aurora_app_theme_set_color(theme, 0, 16711680)
+    color = aurora_app_theme_get_color(theme, 0)
+    if color != 16711680
+        output("FAIL: color expected 16711680 got " + str(color))
+        return
+    end
+
+    aurora_app_theme_set_color(theme, 1, 65280)
+    color = aurora_app_theme_get_color(theme, 1)
+    if color != 65280
+        output("FAIL: secondary color expected 65280 got " + str(color))
+        return
+    end
+
+    aurora_app_theme_destroy(theme)
+    output("PASS")
+end

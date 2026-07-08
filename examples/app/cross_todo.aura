@@ -1,0 +1,82 @@
+## Cross-Platform Todo App
+## Same code runs on Windows, Linux, macOS, Android, iOS
+
+import "app"
+
+function main()
+    win = app_init("Cross Todo", 420, 520)
+    theme = aurora_app_get_theme(win)
+
+    root = aurora_app_layout_node_new(null, 0)
+    aurora_app_layout_node_set_padding(root, 16.0, 16.0, 16.0, 16.0)
+    aurora_app_layout_node_set_gap(root, 8.0)
+
+    inp_row = aurora_app_layout_node_new(root, 1)
+    aurora_app_layout_node_set_gap(inp_row, 8.0)
+    aurora_app_layout_node_set_size(inp_row, 0.0, 40.0)
+
+    inp_field = aurora_app_layout_node_new(inp_row, 0)
+    aurora_app_layout_node_set_flex(inp_field, 1, 0, 0)
+    inp_btn = aurora_app_layout_node_new(inp_row, 0)
+    aurora_app_layout_node_set_size(inp_btn, 80.0, 40.0)
+
+    list_node = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_flex(list_node, 1, 0, 0)
+
+    foot_row = aurora_app_layout_node_new(root, 1)
+    aurora_app_layout_node_set_gap(foot_row, 8.0)
+    aurora_app_layout_node_set_size(foot_row, 0.0, 36.0)
+
+    status_node = aurora_app_layout_node_new(foot_row, 0)
+    aurora_app_layout_node_set_flex(status_node, 1, 0, 0)
+    clear_node = aurora_app_layout_node_new(foot_row, 0)
+    aurora_app_layout_node_set_size(clear_node, 80.0, 36.0)
+
+    aurora_app_layout_calculate(root, 388.0, 488.0)
+
+    title = app_label(win, "Todo List", aurora_app_layout_node_get_x(root), aurora_app_layout_node_get_y(root), 388.0, 36.0)
+    app_set_font_size(title, 24)
+
+    text_in = app_textbox(win, aurora_app_layout_node_get_x(inp_field), aurora_app_layout_node_get_y(inp_field), aurora_app_layout_node_get_w(inp_field), aurora_app_layout_node_get_h(inp_field))
+    app_set_text(text_in, "Add a task...")
+
+    add_btn = app_button(win, "Add", aurora_app_layout_node_get_x(inp_btn), aurora_app_layout_node_get_y(inp_btn), aurora_app_layout_node_get_w(inp_btn), aurora_app_layout_node_get_h(inp_btn))
+    app_set_bg(add_btn, aurora_app_theme_get_color(theme, 0))
+
+    listbox = app_listbox(win, aurora_app_layout_node_get_x(list_node), aurora_app_layout_node_get_y(list_node), aurora_app_layout_node_get_w(list_node), aurora_app_layout_node_get_h(list_node))
+
+    status_lbl = app_label(win, "0 items", aurora_app_layout_node_get_x(status_node), aurora_app_layout_node_get_y(status_node), aurora_app_layout_node_get_w(status_node), aurora_app_layout_node_get_h(status_node))
+
+    clear_btn = app_button(win, "Clear", aurora_app_layout_node_get_x(clear_node), aurora_app_layout_node_get_y(clear_node), aurora_app_layout_node_get_w(clear_node), aurora_app_layout_node_get_h(clear_node))
+    app_set_bg(clear_btn, 0xCC3333)
+
+    count = 0
+
+    function on_add(widget, event, p1, p2)
+        if event == 1
+            text = app_get_text(text_in)
+            if text != ""
+                if text != "Add a task..."
+                    app_listbox_add(listbox, text)
+                    count = count + 1
+                    app_set_text(status_lbl, count + " items")
+                    app_set_text(text_in, "")
+                end
+            end
+        end
+    end
+
+    function on_clear(widget, event, p1, p2)
+        if event == 1
+            app_listbox_clear(listbox)
+            count = 0
+            app_set_text(status_lbl, "0 items")
+        end
+    end
+
+    app_on_click(add_btn, on_add)
+    app_on_click(clear_btn, on_clear)
+
+    output("Cross-platform todo running...")
+    app_run(win)
+end

@@ -1,0 +1,77 @@
+# JSON Create Test
+# Verifies creating JSON values with manual constructors
+
+extern function aurora_json_parse(json: string) -> ptr
+extern function aurora_json_serialize(val: ptr) -> string
+extern function aurora_json_type(val: ptr) -> int
+extern function aurora_json_new() -> ptr
+extern function aurora_json_new_num(n: double) -> ptr
+extern function aurora_json_new_str(s: string) -> ptr
+extern function aurora_json_new_array() -> ptr
+extern function aurora_json_new_object() -> ptr
+extern function aurora_json_set(obj: ptr, key: string, val: double)
+extern function aurora_json_set_str(obj: ptr, key: string, val: string)
+extern function aurora_json_set_obj(obj: ptr, key: string, val: ptr)
+extern function aurora_json_get_num(obj: ptr, key: string) -> double
+extern function aurora_json_get_str(obj: ptr, key: string) -> string
+extern function aurora_json_get_obj(obj: ptr, key: string) -> ptr
+extern function aurora_json_array_push(arr: ptr, val: ptr)
+extern function aurora_json_array_get(arr: ptr, idx: int) -> ptr
+extern function aurora_json_array_len(arr: ptr) -> int
+extern function aurora_json_free(val: ptr)
+
+function main()
+    n = aurora_json_new_num(42.0)
+    if n == 0
+        output("FAIL: new_num returned null")
+        return
+    end
+    nt = aurora_json_type(n)
+    if nt != 1
+        output("FAIL: num type expected 1 got " + str(nt))
+        aurora_json_free(n)
+        return
+    end
+    aurora_json_free(n)
+
+    s = aurora_json_new_str("hello")
+    if s == 0
+        output("FAIL: new_str returned null")
+        return
+    end
+    st = aurora_json_type(s)
+    if st != 2
+        output("FAIL: str type expected 2 got " + str(st))
+        aurora_json_free(s)
+        return
+    end
+    aurora_json_free(s)
+
+    a = aurora_json_new_array()
+    if a == 0
+        output("FAIL: new_array returned null")
+        return
+    end
+    at = aurora_json_type(a)
+    if at != 3
+        output("FAIL: array type expected 3 got " + str(at))
+        aurora_json_free(a)
+        return
+    end
+    aurora_json_free(a)
+
+    o = aurora_json_new_object()
+    if o == 0
+        output("FAIL: new_object returned null")
+        return
+    end
+    ot = aurora_json_type(o)
+    if ot != 4
+        output("FAIL: object type expected 4 got " + str(ot))
+        aurora_json_free(o)
+        return
+    end
+    aurora_json_free(o)
+
+    output("PASS")
+end

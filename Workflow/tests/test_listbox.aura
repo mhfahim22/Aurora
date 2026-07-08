@@ -1,0 +1,35 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_listbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_listbox_add_item(lb: pointer, item: cstring)
+extern function aurora_gui_listbox_clear(lb: pointer)
+extern function aurora_gui_listbox_get_selected(lb: pointer) -> int
+extern function aurora_gui_listbox_get_item(lb: pointer, idx: int) -> cstring
+extern function aurora_gui_listbox_count(lb: pointer) -> int
+
+function main()
+    output("listbox: start")
+    win = aurora_gui_window_new("LbTest", 400, 300)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    lb = aurora_gui_listbox_new(win, 10, 10, 150, 200)
+    if lb == null
+        output("  note: listbox_new returned null (headless)")
+    end
+
+    aurora_gui_listbox_add_item(lb, "First")
+    aurora_gui_listbox_add_item(lb, "Second")
+    aurora_gui_listbox_add_item(lb, "Third")
+    cnt = aurora_gui_listbox_count(lb)
+    if cnt < 0
+        output("FAIL: listbox count < 0")
+        return
+    end
+
+    aurora_gui_listbox_clear(lb)
+
+    aurora_gui_window_destroy(win)
+    output("listbox: PASS")
+end

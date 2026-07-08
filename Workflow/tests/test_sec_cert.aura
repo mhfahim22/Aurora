@@ -1,0 +1,23 @@
+# Phase 27 — Certificate Test
+
+extern function aurora_sec_cert_load(path: str) -> ptr
+extern function aurora_sec_cert_info(cert: ptr) -> str
+extern function aurora_sec_cert_verify(cert: ptr, ca_path: str) -> int
+extern function aurora_sec_cert_free(cert: ptr)
+
+function main()
+    output("cert: start")
+    cert = aurora_sec_cert_load("test.crt")
+    if cert == null
+        output("  load non-existent cert returned null (expected)")
+    else
+        output("  load: ok")
+        info = aurora_sec_cert_info(cert)
+        output("  info: " + info)
+        ver = aurora_sec_cert_verify(cert, "")
+        output("  verify: " + str(ver))
+        aurora_sec_cert_free(cert)
+        output("  free: ok")
+    end
+    output("cert: PASS")
+end

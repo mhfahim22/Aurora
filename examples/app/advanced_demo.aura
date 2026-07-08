@@ -1,0 +1,54 @@
+## Phase 9: Advanced Widgets Demo
+## Demonstrates Canvas, Table, TreeView, WebView, Media, Map widgets.
+## Build: aurorac build examples/app/advanced_demo.aura
+## Run:   aurorac --run examples/app/advanced_demo.aura
+
+import "app"
+import "widgets_advanced"
+import "gui"
+
+function main()
+    win = app_init("Advanced Widgets Demo", 700, 500)
+
+    y = 10
+
+    ## ── Table ──
+    tbl = advanced_table(win, 10, y, 320, 150)
+    advanced_table_add_column(tbl, "Name")
+    advanced_table_add_column(tbl, "Value")
+    advanced_table_add_row(tbl)
+    advanced_table_set_cell(tbl, 0, 0, "Alpha")
+    advanced_table_set_cell(tbl, 0, 1, "100")
+    advanced_table_add_row(tbl)
+    advanced_table_set_cell(tbl, 1, 0, "Beta")
+    advanced_table_set_cell(tbl, 1, 1, "200")
+
+    y = y + 160
+
+    ## ── TreeView ──
+    tv = advanced_treeview(win, 10, y, 320, 150)
+    root = advanced_treeview_add_item(tv, null, "Root")
+    child1 = advanced_treeview_add_item(tv, root, "Child 1")
+    child2 = advanced_treeview_add_item(tv, root, "Child 2")
+    gchild = advanced_treeview_add_item(tv, child1, "Grandchild")
+    advanced_treeview_expand(tv, root)
+
+    ## ── Canvas ──
+    cv = advanced_canvas(win, 350, 10, 320, 200)
+
+    ## ── WebView ──
+    wv = advanced_webview(win, 350, 230, 320, 120)
+    advanced_webview_navigate(wv, "https://aurora-lang.org")
+
+    ## ── Media Player ──
+    mv = advanced_media(win, 10, 350, 320, 100)
+
+    ## ── Map ──
+    mp = advanced_map(win, 350, 370, 320, 100)
+    advanced_map_set_center(mp, 23.8103, 90.4125)
+    advanced_map_set_zoom(mp, 12)
+    advanced_map_add_marker(mp, 23.8103, 90.4125, "Dhaka")
+
+    output("Advanced widgets demo running...")
+    app_run(win)
+end

@@ -1,0 +1,35 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_textbox_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_textbox_set_text(tb: pointer, text: cstring)
+extern function aurora_gui_textbox_get_text(tb: pointer) -> cstring
+extern function aurora_gui_textbox_set_readonly(tb: pointer, readonly: int)
+extern function aurora_gui_textbox_set_placeholder(tb: pointer, text: cstring)
+extern function aurora_gui_textbox_set_multiline(tb: pointer, multiline: int)
+extern function aurora_gui_textbox_get_line_count(tb: pointer) -> int
+
+function main()
+    output("textbox: start")
+    win = aurora_gui_window_new("TbTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    tb = aurora_gui_textbox_new(win, 10, 10, 250, 30)
+    if tb == null
+        output("  note: textbox_new returned null (headless)")
+    end
+
+    aurora_gui_textbox_set_text(tb, "initial text")
+    aurora_gui_textbox_set_readonly(tb, 1)
+    aurora_gui_textbox_set_placeholder(tb, "Enter here")
+    aurora_gui_textbox_set_multiline(tb, 1)
+    lc = aurora_gui_textbox_get_line_count(tb)
+    if lc < 0
+        output("FAIL: textbox line count < 0")
+        return
+    end
+
+    aurora_gui_window_destroy(win)
+    output("textbox: PASS")
+end

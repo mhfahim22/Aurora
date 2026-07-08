@@ -1,0 +1,76 @@
+# Phase 15 — Database Type Binding Test
+
+extern function aurora_db_sqlite_open(path: str) -> ptr
+extern function aurora_db_sqlite_close(db: ptr)
+extern function aurora_db_sqlite_exec(db: ptr, sql: str) -> str
+extern function aurora_db_sqlite_prepare(db: ptr, sql: str) -> ptr
+extern function aurora_db_sqlite_bind_int(stmt: ptr, index: int, value: int)
+extern function aurora_db_sqlite_bind_double(stmt: ptr, index: int, value: f64)
+extern function aurora_db_sqlite_bind_text(stmt: ptr, index: int, value: str)
+extern function aurora_db_sqlite_bind_null(stmt: ptr, index: int)
+extern function aurora_db_sqlite_step(stmt: ptr) -> int
+extern function aurora_db_sqlite_column_type(stmt: ptr, col: int) -> int
+extern function aurora_db_sqlite_column_int(stmt: ptr, col: int) -> int
+extern function aurora_db_sqlite_column_double(stmt: ptr, col: int) -> f64
+extern function aurora_db_sqlite_column_text(stmt: ptr, col: int) -> str
+extern function aurora_db_sqlite_reset(stmt: ptr)
+extern function aurora_db_sqlite_finalize(stmt: ptr)
+
+function main()
+    output("db_types: start")
+    db = aurora_db_sqlite_open(":memory:")
+    if db == null
+        output("FAIL: open returned null")
+        return
+    end
+    output("  open: ok")
+    aurora_db_sqlite_exec(db, "CREATE TABLE t (a INT, b REAL, c TEXT, d BLOB)")
+    stmt = aurora_db_sqlite_prepare(db, "INSERT INTO t VALUES (?, ?, ?, ?)")
+    if stmt == null
+        output("FAIL: prepare returned null")
+        return
+    end
+    aurora_db_sqlite_bind_int(stmt, 1, 99)
+    aurora_db_sqlite_bind_double(stmt, 2, 3.14)
+    aurora_db_sqlite_bind_text(stmt, 3, "hello")
+    aurora_db_sqlite_bind_null(stmt, 4)
+    step = aurora_db_sqlite_step(stmt)
+    if step != 101
+        output("FAIL: insert step = " + str(step))
+        return
+    end
+    output("  insert: ok")
+    aurora_db_sqlite_finalize(stmt)
+    stmt2 = aurora_db_sqlite_prepare(db, "SELECT * FROM t")
+    step2 = aurora_db_sqlite_step(stmt2)
+    if step2 != 100
+        output("FAIL: select step = " + str(step2))
+        return
+    end
+    output("  select: ok")
+    ct1 = aurora_db_sqlite_column_type(stmt2, 0)
+    output("  col0 type: " + str(ct1))
+    ct2 = aurora_db_sqlite_column_type(stmt2, 1)
+    output("  col1 type: " + str(ct2))
+    ct3 = aurora_db_sqlite_column_type(stmt2, 2)
+    output("  col2 type: " + str(ct3))
+    ct4 = aurora_db_sqlite_column_type(stmt2, 3)
+    output("  col3 type: " + str(ct4))
+    iv = aurora_db_sqlite_column_int(stmt2, 0)
+    if iv != 99
+        output("FAIL: col int = " + str(iv))
+        return
+    end
+    output("  int: " + str(iv))
+    dv = aurora_db_sqlite_column_double(stmt2, 1)
+    output("  double: " + str(dv))
+    tv = aurora_db_sqlite_column_text(stmt2, 2)
+    if tv != "hello"
+        output("FAIL: col text = " + tv)
+        return
+    end
+    output("  text: " + tv)
+    aurora_db_sqlite_finalize(stmt2)
+    aurora_db_sqlite_close(db)
+    output("db_types: PASS")
+end

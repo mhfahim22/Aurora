@@ -1,0 +1,49 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_set_title(win: pointer, title: cstring)
+extern function aurora_gui_window_get_width(win: pointer) -> int
+extern function aurora_gui_window_get_height(win: pointer) -> int
+extern function aurora_gui_window_resize(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_min_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_max_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_resizable(win: pointer, resizable: int)
+extern function aurora_gui_window_destroy(win: pointer)
+
+function main()
+    output("window: start")
+    win = aurora_gui_window_new("TestWin", 640, 480)
+    if win == null
+        output("FAIL: window_new returned null")
+        return
+    end
+
+    aurora_gui_window_set_title(win, "Updated Title")
+    w = aurora_gui_window_get_width(win)
+    if w != 640
+        output("FAIL: window width = " + str(w))
+        return
+    end
+    h = aurora_gui_window_get_height(win)
+    if h != 480
+        output("FAIL: window height = " + str(h))
+        return
+    end
+
+    aurora_gui_window_resize(win, 800, 600)
+    w2 = aurora_gui_window_get_width(win)
+    if w2 != 800
+        output("FAIL: window width after resize = " + str(w2))
+        return
+    end
+    h2 = aurora_gui_window_get_height(win)
+    if h2 != 600
+        output("FAIL: window height after resize = " + str(h2))
+        return
+    end
+
+    aurora_gui_window_set_min_size(win, 200, 150)
+    aurora_gui_window_set_max_size(win, 1600, 1200)
+    aurora_gui_window_set_resizable(win, 0)
+    aurora_gui_window_set_resizable(win, 1)
+    aurora_gui_window_destroy(win)
+    output("window: PASS")
+end

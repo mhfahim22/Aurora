@@ -1,0 +1,49 @@
+## Auto-Update Module (Phase 11.2)
+## Check for updates, download, apply, rollback
+##
+## Usage: import "updater"
+
+extern function aurora_updater_init(app_name: str, current_version: str, update_url: str) -> int
+extern function aurora_updater_check() -> int
+extern function aurora_updater_get_latest_version() -> str
+extern function aurora_updater_get_download_url() -> str
+extern function aurora_updater_download() -> int
+extern function aurora_updater_download_progress() -> int
+extern function aurora_updater_apply() -> int
+extern function aurora_updater_rollback() -> int
+extern function aurora_updater_set_channel(channel: str) -> int
+extern function aurora_updater_get_channel() -> str
+extern function aurora_updater_shutdown()
+
+pub fn updater_init(app_name: str, current_version: str, update_url: str) -> int
+    aurora_updater_init(app_name, current_version, update_url)
+
+pub fn updater_check() -> int
+    aurora_updater_check()
+
+pub fn updater_get_latest_version() -> str
+    aurora_updater_get_latest_version()
+
+pub fn updater_get_download_url() -> str
+    aurora_updater_get_download_url()
+
+pub fn updater_download() -> int
+    aurora_updater_download()
+
+pub fn updater_download_progress() -> int
+    aurora_updater_download_progress()
+
+pub fn updater_apply() -> int
+    aurora_updater_apply()
+
+pub fn updater_rollback() -> int
+    aurora_updater_rollback()
+
+pub fn updater_set_channel(channel: str) -> int
+    aurora_updater_set_channel(channel)
+
+pub fn updater_get_channel() -> str
+    aurora_updater_get_channel()
+
+pub fn updater_shutdown()
+    aurora_updater_shutdown()

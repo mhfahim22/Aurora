@@ -1,0 +1,238 @@
+# Phase 7 — Mobile Widget Creation Test
+# Verify all 16 widget types can be created via mw_* API
+
+function main()
+    output("Mobile Widgets Test: Starting...")
+
+    # MW_BUTTON (0)
+    btn = mw_create(0)
+    if btn == null
+        output("FAIL: mw_create(MW_BUTTON) returned null")
+        return
+    end
+    mw_set_text(btn, "Click Me")
+    mw_set_font_size(btn, 16.0)
+    mw_set_bg_color(btn, 0.3, 0.6, 1.0, 1.0)
+    mw_set_text_color(btn, 1.0, 1.0, 1.0, 1.0)
+    mw_set_pos(btn, 10.0, 10.0)
+    mw_set_size(btn, 120.0, 36.0)
+    t = mw_get_text(btn)
+    if t != "Click Me"
+        output("FAIL: mw_get_text mismatch")
+        return
+    end
+    output("MW_BUTTON: OK")
+
+    # MW_TEXT (1)
+    txt = mw_create(1)
+    if txt == null
+        output("FAIL: mw_create(MW_TEXT) returned null")
+        return
+    end
+    mw_set_text(txt, "Hello World")
+    mw_set_font_size(txt, 14.0)
+    mw_set_pos(txt, 10.0, 60.0)
+    mw_set_size(txt, 200.0, 20.0)
+    output("MW_TEXT: OK")
+
+    # MW_IMAGE (2)
+    img = mw_create(2)
+    if img == null
+        output("FAIL: mw_create(MW_IMAGE) returned null")
+        return
+    end
+    mw_set_image(img, "photo.png")
+    mw_set_pos(img, 10.0, 90.0)
+    mw_set_size(img, 64.0, 64.0)
+    output("MW_IMAGE: OK")
+
+    # MW_COLUMN (3)
+    col = mw_create(3)
+    if col == null
+        output("FAIL: mw_create(MW_COLUMN) returned null")
+        return
+    end
+    mw_set_padding(col, 8.0, 8.0, 8.0, 8.0)
+    mw_set_spacing(col, 4.0)
+    mw_add_child(col, btn)
+    mw_add_child(col, txt)
+    output("MW_COLUMN: OK")
+
+    # MW_ROW (4)
+    row = mw_create(4)
+    if row == null
+        output("FAIL: mw_create(MW_ROW) returned null")
+        return
+    end
+    mw_set_padding(row, 4.0, 4.0, 4.0, 4.0)
+    mw_set_spacing(row, 8.0)
+    output("MW_ROW: OK")
+
+    # MW_GRID (5)
+    grid = mw_create(5)
+    if grid == null
+        output("FAIL: mw_create(MW_GRID) returned null")
+        return
+    end
+    mw_set_selected(grid, 2)
+    output("MW_GRID: OK")
+
+    # MW_LIST (6)
+    lst = mw_create(6)
+    if lst == null
+        output("FAIL: mw_create(MW_LIST) returned null")
+        return
+    end
+    mw_add_item(lst, "Item 1")
+    mw_add_item(lst, "Item 2")
+    mw_add_item(lst, "Item 3")
+    mw_remove_item(lst, 1)
+    mw_add_item(lst, "Item 4")
+    output("MW_LIST: OK")
+
+    # MW_SCROLL (7)
+    scr = mw_create(7)
+    if scr == null
+        output("FAIL: mw_create(MW_SCROLL) returned null")
+        return
+    end
+    mw_set_pos(scr, 0.0, 0.0)
+    mw_set_size(scr, 300.0, 400.0)
+    mw_set_scroll_pos(scr, 0.0, 50.0)
+    sx = 0.0
+    sy = 0.0
+    mw_get_scroll_pos(scr, sx, sy)
+    if sy != 50.0
+        output("FAIL: mw_get_scroll_pos mismatch")
+        return
+    end
+    output("MW_SCROLL: OK")
+
+    # MW_INPUT (8)
+    inp = mw_create(8)
+    if inp == null
+        output("FAIL: mw_create(MW_INPUT) returned null")
+        return
+    end
+    mw_set_text(inp, "type here")
+    output("MW_INPUT: OK")
+
+    # MW_DIALOG (9)
+    dlg = mw_create(9)
+    if dlg == null
+        output("FAIL: mw_create(MW_DIALOG) returned null")
+        return
+    end
+    mw_set_text(dlg, "Confirm?")
+    mw_set_size(dlg, 300.0, 200.0)
+    output("MW_DIALOG: OK")
+
+    # MW_BOTTOM_SHEET (10)
+    sheet = mw_create(10)
+    if sheet == null
+        output("FAIL: mw_create(MW_BOTTOM_SHEET) returned null")
+        return
+    end
+    mw_set_size(sheet, 400.0, 300.0)
+    output("MW_BOTTOM_SHEET: OK")
+
+    # MW_NAV_BAR (11)
+    nav = mw_create(11)
+    if nav == null
+        output("FAIL: mw_create(MW_NAV_BAR) returned null")
+        return
+    end
+    mw_set_text(nav, "Settings")
+    mw_set_size(nav, 400.0, 44.0)
+    output("MW_NAV_BAR: OK")
+
+    # MW_TAB_BAR (12)
+    tabs = mw_create(12)
+    if tabs == null
+        output("FAIL: mw_create(MW_TAB_BAR) returned null")
+        return
+    end
+    mw_add_item(tabs, "Home")
+    mw_add_item(tabs, "Search")
+    mw_add_item(tabs, "Profile")
+    mw_set_selected(tabs, 1)
+    output("MW_TAB_BAR: OK")
+
+    # MW_DRAWER (13)
+    drawer = mw_create(13)
+    if drawer == null
+        output("FAIL: mw_create(MW_DRAWER) returned null")
+        return
+    end
+    mw_set_size(drawer, 280.0, 600.0)
+    output("MW_DRAWER: OK")
+
+    # MW_FAB (14)
+    fab = mw_create(14)
+    if fab == null
+        output("FAIL: mw_create(MW_FAB) returned null")
+        return
+    end
+    mw_set_text(fab, "+")
+    mw_set_size(fab, 56.0, 56.0)
+    output("MW_FAB: OK")
+
+    # MW_SNACKBAR (15)
+    snack = mw_create(15)
+    if snack == null
+        output("FAIL: mw_create(MW_SNACKBAR) returned null")
+        return
+    end
+    mw_set_text(snack, "Saved successfully")
+    mw_set_size(snack, 300.0, 48.0)
+    output("MW_SNACKBAR: OK")
+
+    # ── Layout test ──
+    mw_set_size(col, 300.0, 200.0)
+    mw_set_pos(col, 10.0, 10.0)
+    mw_layout(col)
+    w2 = mw_get_width(col)
+    h2 = mw_get_height(col)
+    if w2 != 300.0
+        output("FAIL: mw_layout width mismatch")
+        return
+    end
+    output("mw_layout: OK")
+
+    # ── Enable/disable ──
+    mw_set_enabled(btn, 0)
+    mw_set_visible(txt, 0)
+    mw_set_enabled(btn, 1)
+    mw_set_visible(txt, 1)
+    output("mw_set_enabled/visible: OK")
+
+    # ── Value ──
+    sl = mw_create(5)
+    mw_set_value(sl, 50.0)
+    output("mw_set_value: OK")
+    mw_destroy(sl)
+
+    # ── Clear items ──
+    mw_clear_items(lst)
+    output("mw_clear_items: OK")
+
+    # ── Destroy ──
+    tmp = mw_create(0)
+    mw_destroy(tmp)
+    output("mw_destroy: OK")
+
+    # ── Type check ──
+    typ = mw_get_type(btn)
+    if typ != 0
+        output("FAIL: mw_get_type expected 0")
+        return
+    end
+    typ2 = mw_get_type(txt)
+    if typ2 != 1
+        output("FAIL: mw_get_type expected 1")
+        return
+    end
+    output("mw_get_type: OK")
+
+    output("Mobile Widgets Test: All PASS")
+end

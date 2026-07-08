@@ -1,0 +1,33 @@
+# Phase 15 — Database Exec Test
+
+extern function aurora_db_sqlite_open(path: str) -> ptr
+extern function aurora_db_sqlite_close(db: ptr)
+extern function aurora_db_sqlite_exec(db: ptr, sql: str) -> str
+extern function aurora_db_sqlite_execute(db: ptr, sql: str) -> int
+
+function main()
+    output("db_exec: start")
+    db = aurora_db_sqlite_open(":memory:")
+    if db == null
+        output("FAIL: open returned null")
+        return
+    end
+    output("  open: ok")
+    r1 = aurora_db_sqlite_exec(db, "CREATE TABLE test (id INT, name TEXT)")
+    output("  create: " + r1)
+    r2 = aurora_db_sqlite_execute(db, "INSERT INTO test VALUES (1, 'Alice')")
+    if r2 != 1
+        output("FAIL: execute insert = " + str(r2))
+        return
+    end
+    output("  insert: ok")
+    r3 = aurora_db_sqlite_exec(db, "SELECT * FROM test")
+    if r3 == ""
+        output("FAIL: select returned empty")
+        return
+    end
+    output("  select: " + r3)
+    aurora_db_sqlite_close(db)
+    output("  close: ok")
+    output("db_exec: PASS")
+end

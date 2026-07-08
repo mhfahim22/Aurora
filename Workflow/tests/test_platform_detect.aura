@@ -1,0 +1,45 @@
+function main()
+    output("═══ Platform Detect Test ═══")
+
+    w = is_windows
+    l = is_linux
+    m = is_macos
+    a = is_android
+    i = is_ios
+    mb = is_mobile
+    dk = is_desktop
+
+    output("  is_windows: " + str(w))
+    output("  is_linux: " + str(l))
+    output("  is_macos: " + str(m))
+    output("  is_android: " + str(a))
+    output("  is_ios: " + str(i))
+    output("  is_mobile: " + str(mb))
+    output("  is_desktop: " + str(dk))
+    output("  platform_name: " + platform_name)
+    output("  platform_family: " + platform_family)
+
+    if w != 0
+        if w != 1
+            output("FAIL: is_windows should be 0 or 1, got " + str(w))
+            return
+        end
+        output("  Running on Windows — correct")
+    end
+
+    if mb != 0
+        if mb != 1
+            output("FAIL: is_mobile should be 0 or 1")
+            return
+        end
+    end
+
+    if dk != 0
+        if dk != 1
+            output("FAIL: is_desktop should be 0 or 1")
+            return
+        end
+    end
+
+    output("PASS")
+end

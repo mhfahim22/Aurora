@@ -1,0 +1,27 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_checkbox_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_checkbox_set_text(cb: pointer, text: cstring)
+extern function aurora_gui_checkbox_get_text(cb: pointer) -> cstring
+extern function aurora_gui_checkbox_is_checked(cb: pointer) -> int
+extern function aurora_gui_checkbox_set_checked(cb: pointer, checked: int)
+
+function main()
+    output("checkbox: start")
+    win = aurora_gui_window_new("CbTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    cb = aurora_gui_checkbox_new(win, "Check Me", 10, 10, 100, 24)
+    if cb == null
+        output("  note: checkbox_new returned null (headless)")
+    end
+
+    aurora_gui_checkbox_set_text(cb, "Checked")
+    aurora_gui_checkbox_set_checked(cb, 1)
+    aurora_gui_checkbox_set_checked(cb, 0)
+
+    aurora_gui_window_destroy(win)
+    output("checkbox: PASS")
+end

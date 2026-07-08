@@ -1,0 +1,272 @@
+## Unified Desktop App API
+## Usage: import "app"
+##
+## Same code runs on Windows, Linux, macOS.
+##
+## Example:
+##   import "app"
+##   win = app_init("My App", 500, 400)
+##   btn = app_button(win, "Click", 10, 10, 100, 30)
+##   app_on_click(btn, fn() output("clicked!") end)
+##   app_run(win)
+
+## ── App Lifecycle ──
+
+extern function aurora_app_init(title: cstring, w: i32, h: i32) -> pointer
+extern function aurora_app_run(app: pointer)
+extern function aurora_app_quit(app: pointer)
+
+function app_init(title, w, h)
+    return aurora_app_init(title, w, h)
+end
+
+function app_run(app)
+    aurora_app_run(app)
+end
+
+function app_quit(app)
+    aurora_app_quit(app)
+end
+
+## ── Windows ──
+
+extern function aurora_app_window_new(app: pointer, title: cstring, x: i32, y: i32, w: i32, h: i32) -> pointer
+
+function app_window_new(app, title, x, y, w, h)
+    return aurora_app_window_new(app, title, x, y, w, h)
+end
+
+## ── Widgets ──
+
+extern function aurora_app_button_new(parent: pointer, text: cstring, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_label_new(parent: pointer, text: cstring, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_textbox_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_listbox_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_checkbox_new(parent: pointer, text: cstring, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_slider_new(parent: pointer, x: i32, y: i32, w: i32, h: i32, min: i32, max: i32) -> pointer
+extern function aurora_app_progressbar_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_image_new(parent: pointer, path: cstring, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_combobox_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_app_switch_new(parent: pointer, text: cstring, x: i32, y: i32, w: i32, h: i32) -> pointer
+
+function app_button(parent, text, x, y, w, h)
+    return aurora_app_button_new(parent, text, x, y, w, h)
+end
+
+function app_label(parent, text, x, y, w, h)
+    return aurora_app_label_new(parent, text, x, y, w, h)
+end
+
+function app_textbox(parent, x, y, w, h)
+    return aurora_app_textbox_new(parent, x, y, w, h)
+end
+
+function app_listbox(parent, x, y, w, h)
+    return aurora_app_listbox_new(parent, x, y, w, h)
+end
+
+function app_checkbox(parent, text, x, y, w, h)
+    return aurora_app_checkbox_new(parent, text, x, y, w, h)
+end
+
+function app_slider(parent, x, y, w, h, min, max)
+    return aurora_app_slider_new(parent, x, y, w, h, min, max)
+end
+
+function app_progressbar(parent, x, y, w, h)
+    return aurora_app_progressbar_new(parent, x, y, w, h)
+end
+
+function app_image(parent, path, x, y, w, h)
+    return aurora_app_image_new(parent, path, x, y, w, h)
+end
+
+function app_combobox(parent, x, y, w, h)
+    return aurora_app_combobox_new(parent, x, y, w, h)
+end
+
+function app_switch(parent, text, x, y, w, h)
+    return aurora_app_switch_new(parent, text, x, y, w, h)
+end
+
+## ── Widget Properties ──
+
+extern function aurora_app_set_text(widget: pointer, text: cstring)
+extern function aurora_app_get_text(widget: pointer) -> cstring
+
+function app_set_text(widget, text)
+    aurora_app_set_text(widget, text)
+end
+
+function app_get_text(widget)
+    return aurora_app_get_text(widget)
+end
+
+## ── ListBox ──
+
+extern function aurora_app_listbox_add(listbox: pointer, item: cstring)
+extern function aurora_app_listbox_clear(listbox: pointer)
+extern function aurora_app_listbox_count(listbox: pointer) -> i32
+extern function aurora_app_listbox_selected(listbox: pointer) -> i32
+
+function app_listbox_add(listbox, item)
+    aurora_app_listbox_add(listbox, item)
+end
+
+function app_listbox_clear(listbox)
+    aurora_app_listbox_clear(listbox)
+end
+
+function app_listbox_count(listbox)
+    return aurora_app_listbox_count(listbox)
+end
+
+function app_listbox_selected(listbox)
+    return aurora_app_listbox_selected(listbox)
+end
+
+## ── ComboBox ──
+
+extern function aurora_app_combobox_add(combobox: pointer, item: cstring)
+
+function app_combobox_add(combobox, item)
+    aurora_app_combobox_add(combobox, item)
+end
+
+## ── Slider ──
+
+extern function aurora_app_slider_value(slider: pointer) -> i32
+extern function aurora_app_slider_set(slider: pointer, value: i32)
+
+function app_slider_value(slider)
+    return aurora_app_slider_value(slider)
+end
+
+function app_slider_set(slider, value)
+    aurora_app_slider_set(slider, value)
+end
+
+## ── ProgressBar ──
+
+extern function aurora_app_progress_set(progress: pointer, value: i32)
+
+function app_progress_set(progress, value)
+    aurora_app_progress_set(progress, value)
+end
+
+## ── CheckBox ──
+
+extern function aurora_app_checkbox_checked(checkbox: pointer) -> i32
+extern function aurora_app_checkbox_set(checkbox: pointer, checked: i32)
+
+function app_checkbox_checked(checkbox)
+    return aurora_app_checkbox_checked(checkbox)
+end
+
+function app_checkbox_set(checkbox, checked)
+    aurora_app_checkbox_set(checkbox, checked)
+end
+
+## ── Switch ──
+
+extern function aurora_app_switch_on(sw: pointer) -> i32
+extern function aurora_app_switch_set(sw: pointer, on: i32)
+
+function app_switch_on(sw)
+    return aurora_app_switch_on(sw)
+end
+
+function app_switch_set(sw, on)
+    aurora_app_switch_set(sw, on)
+end
+
+## ── Style ──
+
+extern function aurora_app_set_bg(widget: pointer, color: i32)
+extern function aurora_app_set_font_size(widget: pointer, size: i32)
+extern function aurora_app_set_text_align(widget: pointer, align: i32)
+
+function app_set_bg(widget, color)
+    aurora_app_set_bg(widget, color)
+end
+
+function app_set_font_size(widget, size)
+    aurora_app_set_font_size(widget, size)
+end
+
+function app_set_text_align(widget, align)
+    aurora_app_set_text_align(widget, align)
+end
+
+function app_set_font_size(widget, size)
+    aurora_app_set_font_size(widget, size)
+end
+
+## ── Events ──
+
+extern function aurora_app_set_on_click(widget: pointer, cb: callback(i32, i32, i32, i32))
+extern function aurora_app_set_on_change(widget: pointer, cb: callback(i32, i32, i32, i32))
+
+function app_on_click(widget, cb)
+    aurora_app_set_on_click(widget, cb)
+end
+
+function app_on_change(widget, cb)
+    aurora_app_set_on_change(widget, cb)
+end
+
+## ════════════════════════════════════════════════════════════
+## Layout System — flexbox-style
+## ════════════════════════════════════════════════════════════
+
+## Layout: use aurora_app_layout_* directly from Aurora code.
+## Navigation: use aurora_app_nav_* directly from Aurora code.
+## Theme: use aurora_app_theme_* directly from Aurora code.
+
+## ── Layout System ──
+extern function aurora_app_layout_create() -> pointer
+extern function aurora_app_layout_destroy(layout: pointer)
+extern function aurora_app_layout_node_new(parent: pointer, type: i32) -> pointer
+extern function aurora_app_layout_node_set_flex(node: pointer, grow: i32, shrink: i32, basis: i32)
+extern function aurora_app_layout_node_set_direction(node: pointer, dir: i32)
+extern function aurora_app_layout_node_set_justify(node: pointer, justify: i32)
+extern function aurora_app_layout_node_set_align(node: pointer, align: i32)
+extern function aurora_app_layout_node_set_wrap(node: pointer, wrap: i32)
+extern function aurora_app_layout_node_set_gap(node: pointer, gap: f32)
+extern function aurora_app_layout_node_set_size(node: pointer, w: f32, h: f32)
+extern function aurora_app_layout_node_set_min_size(node: pointer, w: f32, h: f32)
+extern function aurora_app_layout_node_set_max_size(node: pointer, w: f32, h: f32)
+extern function aurora_app_layout_node_set_padding(node: pointer, l: f32, t: f32, r: f32, b: f32)
+extern function aurora_app_layout_node_set_margin(node: pointer, l: f32, t: f32, r: f32, b: f32)
+extern function aurora_app_layout_calculate(root: pointer, w: f32, h: f32)
+extern function aurora_app_layout_node_get_x(node: pointer) -> f32
+extern function aurora_app_layout_node_get_y(node: pointer) -> f32
+extern function aurora_app_layout_node_get_w(node: pointer) -> f32
+extern function aurora_app_layout_node_get_h(node: pointer) -> f32
+
+## ── Navigation System ──
+extern function aurora_app_nav_init() -> pointer
+extern function aurora_app_nav_destroy(nav: pointer)
+extern function aurora_app_nav_register(nav: pointer, name: cstring, screen: pointer)
+extern function aurora_app_nav_push(nav: pointer, name: cstring) -> i32
+extern function aurora_app_nav_pop(nav: pointer) -> i32
+extern function aurora_app_nav_replace(nav: pointer, name: cstring) -> i32
+extern function aurora_app_nav_current(nav: pointer) -> cstring
+extern function aurora_app_nav_depth(nav: pointer) -> i32
+extern function aurora_app_nav_set_on_change(nav: pointer, cb: callback(i32, i32, i32, i32))
+
+## ── Theme System ──
+extern function aurora_app_theme_init() -> pointer
+extern function aurora_app_theme_destroy(theme: pointer)
+extern function aurora_app_theme_set_mode(theme: pointer, mode: i32)
+extern function aurora_app_theme_get_mode(theme: pointer) -> i32
+extern function aurora_app_theme_set_color(theme: pointer, key: i32, color: i32)
+extern function aurora_app_theme_get_color(theme: pointer, key: i32) -> i32
+extern function aurora_app_theme_set_font(theme: pointer, key: i32, size: i32)
+extern function aurora_app_theme_get_font(theme: pointer, key: i32) -> i32
+extern function aurora_app_theme_get_spacing(theme: pointer, level: i32) -> f32
+
+## ── Sub-system accessors ──
+extern function aurora_app_get_layout(app: pointer) -> pointer
+extern function aurora_app_get_nav(app: pointer) -> pointer
+extern function aurora_app_get_theme(app: pointer) -> pointer

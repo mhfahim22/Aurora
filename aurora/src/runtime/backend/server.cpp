@@ -1,4 +1,7 @@
 #include "runtime/backend.hpp"
+#include "runtime/event_loop.hpp"
+#include "runtime/h2_server.hpp"
+#include "runtime/webhook.hpp"
 #include "common/platform.hpp"
 #include "runtime/memory.hpp"
 #include "runtime/tls.hpp"
@@ -34,6 +37,13 @@
 #endif
 
 #include "miniz.h"
+
+/* ── Case-insensitive string comparison helpers ── */
+#ifdef _WIN32
+#define aurora_strncasecmp _strnicmp
+#else
+#define aurora_strncasecmp strncasecmp
+#endif
 
 extern "C" {
 
@@ -117,6 +127,28 @@ void aurora_server_start(AuroraServer* srv) {
     printf("[server] started on port %d\n", srv->port);
 }
 
+/* ── Global worker pool for server (lazily created) ── */
+static AuroraWorkerPool* g_server_pool = nullptr;
+static std::mutex g_pool_mutex;
+
+/* ── Thread-local request/response for builtins ── */
+static thread_local AuroraHttpRequest* g_aurora_current_req = nullptr;
+static thread_local AuroraHttpResponse* g_aurora_current_res = nullptr;
+
+/* ── Active connection tracking (used by stop/accept loops) ── */
+static std::atomic<int> g_active_connections{0};
+static std::atomic<int64_t> g_total_connections{0};
+
+/* ── Forward declarations ── */
+static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer* srv, AuroraRouter* router);
+static int64_t try_tls_accept(int64_t client_sock, AuroraServer* srv);
+
+/* ── Thread-local request/response accessors (called from backend_builtins) ── */
+extern "C" {
+    AuroraHttpRequest* aurora_get_current_req() { return g_aurora_current_req; }
+    AuroraHttpResponse* aurora_get_current_res() { return g_aurora_current_res; }
+}
+
 void aurora_server_stop(AuroraServer* srv) {
     if (!srv) return;
     srv->running = 0;
@@ -128,7 +160,88 @@ void aurora_server_stop(AuroraServer* srv) {
 #endif
         srv->handle = nullptr;
     }
+    /* Graceful drain: wait for active connections to finish */
+    printf("[server] draining %d active connections...\n", g_active_connections.load());
+    auto drain_start = std::chrono::steady_clock::now();
+    while (g_active_connections.load() > 0) {
+        auto elapsed = std::chrono::steady_clock::now() - drain_start;
+        if (elapsed > std::chrono::seconds(30)) {
+            printf("[server] drain timeout (%d still active)\n", g_active_connections.load());
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    /* Free thread pool */
+    {
+        std::lock_guard<std::mutex> lock(g_pool_mutex);
+        if (g_server_pool) {
+            aurora_worker_pool_free(g_server_pool);
+            g_server_pool = nullptr;
+        }
+    }
     printf("[server] stopped\n");
+}
+
+/* ── Thread pool accept loop (bounded concurrency) ── */
+static std::atomic<int> g_accept_loop_running{0};
+
+void aurora_server_start_with_pool(AuroraServer* srv, AuroraRouter* router, int pool_size) {
+    if (!srv || !srv->running) return;
+    {
+        std::lock_guard<std::mutex> lock(g_pool_mutex);
+        if (!g_server_pool)
+            g_server_pool = aurora_worker_pool_new(pool_size > 0 ? pool_size : (int)std::thread::hardware_concurrency());
+    }
+    if (g_accept_loop_running.load()) return;
+    g_accept_loop_running.store(1);
+    printf("[server] thread-pool accept loop started on port %d\n", srv->port);
+    std::thread([srv, router]() {
+        while (srv->running) {
+#ifdef _WIN32
+            SOCKET listen_sock = (SOCKET)(intptr_t)srv->handle;
+            struct sockaddr_in client_addr;
+            int addr_len = sizeof(client_addr);
+            SOCKET client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
+            if (client == INVALID_SOCKET) { if (!srv->running) break; continue; }
+#else
+            int listen_sock = (int)(intptr_t)srv->handle;
+            struct sockaddr_in client_addr;
+            socklen_t addr_len = sizeof(client_addr);
+            int client = accept(listen_sock, (struct sockaddr*)&client_addr, &addr_len);
+            if (client < 0) { if (!srv->running) break; continue; }
+#endif
+            int64_t client_sock = (int64_t)(intptr_t)client;
+            int64_t tls = try_tls_accept(client_sock, srv);
+            if (tls < 0) {
+#ifdef _WIN32
+                closesocket(client); continue;
+#else
+                close(client); continue;
+#endif
+            }
+            g_active_connections.fetch_add(1);
+            g_total_connections.fetch_add(1);
+            struct ClientTask { int64_t sock; int64_t tls; AuroraServer* srv; AuroraRouter* router; };
+            ClientTask* task = (ClientTask*)malloc(sizeof(ClientTask));
+            if (task) {
+                task->sock = client_sock;
+                task->tls = tls;
+                task->srv = srv;
+                task->router = router;
+                aurora_worker_pool_enqueue(g_server_pool, [](void* arg) {
+                    ClientTask* t = (ClientTask*)arg;
+                    handle_client(t->sock, t->tls, t->srv, t->router);
+                    g_active_connections.fetch_sub(1);
+                    free(t);
+                }, task);
+            } else {
+                handle_client(client_sock, tls, srv, router);
+                g_active_connections.fetch_sub(1);
+            }
+        }
+        g_accept_loop_running.store(0);
+        printf("[server] accept loop ended\n");
+    }).detach();
 }
 
 void aurora_server_add_middleware(AuroraServer* srv, void* handler) {
@@ -233,6 +346,311 @@ const char* aurora_http_get_param(AuroraHttpRequest* req, const char* name) {
     return nullptr;
 }
 
+const char* aurora_http_get_cookie(AuroraHttpRequest* req, const char* name) {
+    if (!req || !name) return nullptr;
+    for (int i = 0; i < req->cookie_count; i++) {
+        if (strcmp(req->cookie_names[i], name) == 0)
+            return req->cookie_values[i];
+    }
+    return nullptr;
+}
+
+/* ── URL decode in-place (handles %XX and +) ── */
+static char* url_decode(const char* src, size_t src_len) {
+    if (!src || src_len == 0) return strdup("");
+    char* out = (char*)malloc(src_len + 1);
+    if (!out) return nullptr;
+    size_t j = 0;
+    for (size_t i = 0; i < src_len; i++) {
+        if (src[i] == '+') {
+            out[j++] = ' ';
+        } else if (src[i] == '%' && i + 2 < src_len) {
+            char hex[3] = {src[i+1], src[i+2], '\0'};
+            out[j++] = (char)strtol(hex, nullptr, 16);
+            i += 2;
+        } else {
+            out[j++] = src[i];
+        }
+    }
+    out[j] = '\0';
+    return out;
+}
+
+/* ── Form body parser (application/x-www-form-urlencoded) ── */
+AuroraFormData* aurora_parse_form_body(const char* body, size_t len) {
+    if (!body || len == 0) return nullptr;
+    AuroraFormData* form = (AuroraFormData*)calloc(1, sizeof(AuroraFormData));
+    if (!form) return nullptr;
+    form->cap = 16;
+    form->names = (char**)calloc((size_t)form->cap, sizeof(char*));
+    form->values = (char**)calloc((size_t)form->cap, sizeof(char*));
+
+    char* buf = (char*)malloc(len + 1);
+    if (!buf) { free(form->names); free(form->values); free(form); return nullptr; }
+    memcpy(buf, body, len);
+    buf[len] = '\0';
+
+    char* save;
+    char* token = AURORA_STRTOK(buf, "&", &save);
+    while (token) {
+        char* eq = strchr(token, '=');
+        const char* pname = token;
+        const char* pval = "";
+        size_t pname_len, pval_len;
+        if (eq) {
+            pname_len = (size_t)(eq - token);
+            pval = eq + 1;
+            pval_len = strlen(pval);
+            *eq = '\0';
+        } else {
+            pname_len = strlen(token);
+            pval_len = 0;
+        }
+        char* decoded_name = url_decode(pname, pname_len);
+        char* decoded_val = url_decode(pval, pval_len);
+
+        if (form->count >= form->cap) {
+            form->cap *= 2;
+            char** new_names = (char**)realloc(form->names, (size_t)form->cap * sizeof(char*));
+            char** new_values = (char**)realloc(form->values, (size_t)form->cap * sizeof(char*));
+            if (!new_names || !new_values) {
+                free(decoded_name); free(decoded_val);
+                if (new_names) form->names = new_names;
+                if (new_values) form->values = new_values;
+                break;
+            }
+            form->names = new_names;
+            form->values = new_values;
+        }
+        form->names[form->count] = decoded_name;
+        form->values[form->count] = decoded_val;
+        form->count++;
+        token = AURORA_STRTOK(nullptr, "&", &save);
+    }
+    free(buf);
+    return form;
+}
+
+const char* aurora_form_get(AuroraFormData* form, const char* key) {
+    if (!form || !key) return nullptr;
+    for (int i = 0; i < form->count; i++) {
+        if (strcmp(form->names[i], key) == 0)
+            return form->values[i];
+    }
+    return nullptr;
+}
+
+int aurora_form_count(AuroraFormData* form) {
+    return form ? form->count : 0;
+}
+
+const char* aurora_form_key(AuroraFormData* form, int index) {
+    if (!form || index < 0 || index >= form->count) return nullptr;
+    return form->names[index];
+}
+
+const char* aurora_form_value(AuroraFormData* form, int index) {
+    if (!form || index < 0 || index >= form->count) return nullptr;
+    return form->values[index];
+}
+
+void aurora_form_free(AuroraFormData* form) {
+    if (!form) return;
+    for (int i = 0; i < form->count; i++) {
+        free(form->names[i]);
+        free(form->values[i]);
+    }
+    free(form->names);
+    free(form->values);
+    free(form);
+}
+
+/* ── Extract boundary from Content-Type header ── */
+static char* extract_boundary(const char* content_type) {
+    if (!content_type) return nullptr;
+    const char* b = strstr(content_type, "boundary=");
+    if (!b) return nullptr;
+    b += 9;
+    const char* end = strchr(b, ';');
+    size_t len = end ? (size_t)(end - b) : strlen(b);
+    while (len > 0 && (b[len-1] == ' ' || b[len-1] == '\t' || b[len-1] == '"')) len--;
+    while (*b == ' ' || *b == '\t' || *b == '"') { b++; len--; }
+    if (len == 0) return nullptr;
+    char* boundary = (char*)malloc(len + 3);
+    boundary[0] = '-'; boundary[1] = '-';
+    memcpy(boundary + 2, b, len);
+    boundary[len + 2] = '\0';
+    return boundary;
+}
+
+/* ── Multipart form-data parser ── */
+AuroraMultipartData* aurora_parse_multipart(const char* body, size_t len, const char* boundary) {
+    if (!body || len == 0 || !boundary) return nullptr;
+    AuroraMultipartData* mp = (AuroraMultipartData*)calloc(1, sizeof(AuroraMultipartData));
+    if (!mp) return nullptr;
+    mp->cap = 8;
+    mp->parts = (AuroraMultipartPart*)calloc((size_t)mp->cap, sizeof(AuroraMultipartPart));
+
+    size_t blen = strlen(boundary);
+    const char* p = body;
+    const char* end = body + len;
+
+    while (p < end) {
+        const char* bstart = strstr(p, boundary);
+        if (!bstart || bstart > end) break;
+        const char* part_start = bstart + blen;
+        if (part_start + 2 <= end && part_start[0] == '-' && part_start[1] == '-')
+            break;
+        if (part_start + 2 <= end && part_start[0] == '\r' && part_start[1] == '\n')
+            part_start += 2;
+        else if (part_start + 1 <= end && part_start[0] == '\n')
+            part_start += 1;
+
+        const char* next_b = strstr(part_start, boundary);
+        if (!next_b || next_b > end) break;
+        const char* part_end = next_b;
+        while (part_end > part_start && (part_end[-1] == '\r' || part_end[-1] == '\n'))
+            part_end--;
+
+        const char* hdr_end = strstr(part_start, "\r\n\r\n");
+        if (!hdr_end || hdr_end > part_end) continue;
+        const char* data_start = hdr_end + 4;
+        size_t data_size = (size_t)(part_end - data_start);
+
+        const char* name = "";
+        const char* filename = nullptr;
+        const char* ct = "text/plain";
+
+        const char* hl = part_start;
+        while (hl < hdr_end) {
+            const char* nl = strstr(hl, "\r\n");
+            if (!nl || nl > hdr_end) nl = hdr_end;
+            size_t hlen = (size_t)(nl - hl);
+
+            if (aurora_strncasecmp(hl, "Content-Disposition:", 20) == 0) {
+                const char* dp = hl + 20;
+                while (*dp == ' ') dp++;
+                const char* nstart = strstr(dp, "name=");
+                if (nstart) {
+                    nstart += 5;
+                    if (*nstart == '"') {
+                        nstart++;
+                        const char* nend = strchr(nstart, '"');
+                        if (nend && (size_t)(nend - nstart) < 1000) {
+                            char* tmp = (char*)malloc((size_t)(nend - nstart) + 1);
+                            memcpy(tmp, nstart, (size_t)(nend - nstart));
+                            tmp[nend - nstart] = '\0';
+                            name = tmp;
+                        }
+                    } else {
+                        const char* nend = nstart;
+                        while (*nend && *nend != ';' && *nend != ' ' && *nend != '\r') nend++;
+                        char* tmp = (char*)malloc((size_t)(nend - nstart) + 1);
+                        memcpy(tmp, nstart, (size_t)(nend - nstart));
+                        tmp[nend - nstart] = '\0';
+                        name = tmp;
+                    }
+                }
+                const char* fstart = strstr(dp, "filename=");
+                if (fstart) {
+                    fstart += 9;
+                    if (*fstart == '"') {
+                        fstart++;
+                        const char* fend = strchr(fstart, '"');
+                        if (fend && (size_t)(fend - fstart) < 1000) {
+                            char* tmp = (char*)malloc((size_t)(fend - fstart) + 1);
+                            memcpy(tmp, fstart, (size_t)(fend - fstart));
+                            tmp[fend - fstart] = '\0';
+                            filename = tmp;
+                        }
+                    }
+                }
+            }
+
+            if (aurora_strncasecmp(hl, "Content-Type:", 13) == 0) {
+                const char* cv = hl + 13;
+                while (*cv == ' ') cv++;
+                size_t cvl = hlen - (size_t)(cv - hl);
+                char* tmp = (char*)malloc(cvl + 1);
+                memcpy(tmp, cv, cvl);
+                tmp[cvl] = '\0';
+                ct = tmp;
+            }
+
+            hl = nl + 2;
+            if (hl > hdr_end) break;
+        }
+
+        if (mp->count >= mp->cap) {
+            mp->cap *= 2;
+            AuroraMultipartPart* new_parts = (AuroraMultipartPart*)realloc(mp->parts, (size_t)mp->cap * sizeof(AuroraMultipartPart));
+            if (!new_parts) break;
+            mp->parts = new_parts;
+        }
+        AuroraMultipartPart* part = &mp->parts[mp->count];
+        part->name = strdup(name);
+        part->filename = filename ? strdup(filename) : nullptr;
+        part->content_type = strdup(ct);
+        if (data_size > 0) {
+            part->data = (char*)malloc(data_size + 1);
+            memcpy(part->data, data_start, data_size);
+            part->data[data_size] = '\0';
+        } else {
+            part->data = strdup("");
+        }
+        part->data_size = data_size;
+        mp->count++;
+
+        if (name && name != (const char*)"" && name != (const char*)part->name) free((void*)name);
+        if (filename && filename != (const char*)part->filename) free((void*)filename);
+        if (ct && ct != (const char*)"text/plain" && ct != (const char*)part->content_type) free((void*)ct);
+
+        p = next_b;
+    }
+    return mp;
+}
+
+int aurora_multipart_part_count(AuroraMultipartData* mp) {
+    return mp ? mp->count : 0;
+}
+
+const char* aurora_multipart_part_name(AuroraMultipartData* mp, int index) {
+    if (!mp || index < 0 || index >= mp->count) return nullptr;
+    return mp->parts[index].name;
+}
+
+const char* aurora_multipart_part_filename(AuroraMultipartData* mp, int index) {
+    if (!mp || index < 0 || index >= mp->count) return nullptr;
+    return mp->parts[index].filename;
+}
+
+const char* aurora_multipart_part_content_type(AuroraMultipartData* mp, int index) {
+    if (!mp || index < 0 || index >= mp->count) return nullptr;
+    return mp->parts[index].content_type;
+}
+
+const char* aurora_multipart_part_data(AuroraMultipartData* mp, int index) {
+    if (!mp || index < 0 || index >= mp->count) return nullptr;
+    return mp->parts[index].data;
+}
+
+size_t aurora_multipart_part_size(AuroraMultipartData* mp, int index) {
+    if (!mp || index < 0 || index >= mp->count) return 0;
+    return mp->parts[index].data_size;
+}
+
+void aurora_multipart_free(AuroraMultipartData* mp) {
+    if (!mp) return;
+    for (int i = 0; i < mp->count; i++) {
+        free(mp->parts[i].name);
+        free(mp->parts[i].filename);
+        free(mp->parts[i].content_type);
+        free(mp->parts[i].data);
+    }
+    free(mp->parts);
+    free(mp);
+}
+
 /* ── HTTP Request Parser ── */
 AuroraHttpRequest* aurora_http_parse_request(const char* raw) {
     if (!raw) return nullptr;
@@ -277,6 +695,12 @@ AuroraHttpRequest* aurora_http_parse_request(const char* raw) {
     req->param_names = nullptr;
     req->param_values = nullptr;
     req->param_count = 0;
+    req->cookie_names = nullptr;
+    req->cookie_values = nullptr;
+    req->cookie_count = 0;
+    req->content_type = nullptr;
+    req->form = nullptr;
+    req->files = nullptr;
 
     char* hdr_line = end ? end + 2 : nullptr;
     while (hdr_line && *hdr_line) {
@@ -298,6 +722,32 @@ AuroraHttpRequest* aurora_http_parse_request(const char* raw) {
             req->header_values = (char**)aurora_safe_realloc(req->header_values, (size_t)req->header_count * sizeof(char*));
             req->header_names[req->header_count - 1] = strdup(hdr_name);
             req->header_values[req->header_count - 1] = strdup(hdr_val);
+
+            /* Capture Content-Type */
+            if (aurora_strncasecmp(hdr_name, "Content-Type", 12) == 0) {
+                req->content_type = strdup(hdr_val);
+            }
+
+            /* Parse Cookie header */
+            if (aurora_strncasecmp(hdr_name, "Cookie", 6) == 0) {
+                char* cbuf = strdup(hdr_val);
+                char* csave;
+                char* ctoken = AURORA_STRTOK(cbuf, ";", &csave);
+                while (ctoken) {
+                    while (*ctoken == ' ') ctoken++;
+                    char* ceq = strchr(ctoken, '=');
+                    if (ceq) {
+                        *ceq = '\0';
+                        req->cookie_count++;
+                        req->cookie_names = (char**)aurora_safe_realloc(req->cookie_names, (size_t)req->cookie_count * sizeof(char*));
+                        req->cookie_values = (char**)aurora_safe_realloc(req->cookie_values, (size_t)req->cookie_count * sizeof(char*));
+                        req->cookie_names[req->cookie_count - 1] = strdup(ctoken);
+                        req->cookie_values[req->cookie_count - 1] = strdup(ceq + 1);
+                    }
+                    ctoken = AURORA_STRTOK(nullptr, ";", &csave);
+                }
+                free(cbuf);
+            }
         }
         hdr_line = hdr_end + 2;
     }
@@ -338,6 +788,15 @@ void aurora_http_request_free(AuroraHttpRequest* req) {
     }
     free(req->param_names);
     free(req->param_values);
+    for (int i = 0; i < req->cookie_count; i++) {
+        free(req->cookie_names[i]);
+        free(req->cookie_values[i]);
+    }
+    free(req->cookie_names);
+    free(req->cookie_values);
+    free(req->content_type);
+    if (req->form) aurora_form_free(req->form);
+    if (req->files) aurora_multipart_free(req->files);
     free(req->body);
     free(req);
 }
@@ -590,6 +1049,108 @@ int aurora_http_response_send_chunked(AuroraHttpResponse* res, int64_t sock, int
     return 0;
 }
 
+/* ── SSE (Server-Sent Events) ── */
+
+int aurora_sse_start(AuroraHttpResponse* res) {
+    if (!res || res->sent) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    char hdr[1024];
+    int len = snprintf(hdr, sizeof(hdr),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/event-stream\r\n"
+        "Cache-Control: no-cache\r\n"
+        "Connection: keep-alive\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "\r\n");
+    if (send_raw(sock, tls, hdr, len) != len) return -1;
+    res->sent = 1;
+    return 0;
+}
+
+int aurora_sse_send_event(AuroraHttpResponse* res, const char* event, const char* data) {
+    if (!res || !data) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    char buf[8192];
+    int len = 0;
+    if (event && event[0])
+        len += snprintf(buf + len, sizeof(buf) - (size_t)len - 1, "event: %s\r\n", event);
+    /* Split data into lines prefixed with "data: " */
+    const char* p = data;
+    while (*p) {
+        const char* nl = strchr(p, '\n');
+        if (nl) {
+            len += snprintf(buf + len, sizeof(buf) - (size_t)len - 1, "data: %.*s\r\n", (int)(nl - p), p);
+            p = nl + 1;
+        } else {
+            len += snprintf(buf + len, sizeof(buf) - (size_t)len - 1, "data: %s\r\n", p);
+            break;
+        }
+    }
+    len += snprintf(buf + len, sizeof(buf) - (size_t)len - 1, "\r\n");
+    return send_raw(sock, tls, buf, len);
+}
+
+int aurora_sse_send_comment(AuroraHttpResponse* res, const char* comment) {
+    if (!res || !comment) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    char buf[2048];
+    int len = snprintf(buf, sizeof(buf), ": %s\r\n\r\n", comment);
+    return send_raw(sock, tls, buf, len);
+}
+
+int aurora_sse_end(AuroraHttpResponse* res) {
+    if (!res) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    const char* term = "data: [CLOSED]\r\n\r\n";
+    send_raw(sock, tls, term, (int)strlen(term));
+    return 0;
+}
+
+/* ── Streaming (chunked transfer) ── */
+
+int aurora_response_start_stream(AuroraHttpResponse* res) {
+    if (!res || res->sent) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    char hdr[4096];
+    int len = snprintf(hdr, sizeof(hdr),
+        "HTTP/1.1 %d %s\r\n", res->status_code, res->status_text ? res->status_text : "OK");
+    for (int i = 0; i < res->header_count; i++) {
+        if (strcmp(res->header_names[i], "Content-Length") == 0) continue;
+        len += snprintf(hdr + len, sizeof(hdr) - (size_t)len - 1,
+            "%s: %s\r\n", res->header_names[i], res->header_values[i]);
+    }
+    len += snprintf(hdr + len, sizeof(hdr) - (size_t)len - 1,
+        "Transfer-Encoding: chunked\r\n\r\n");
+    if (send_raw(sock, tls, hdr, len) != len) return -1;
+    res->sent = 1;
+    return 0;
+}
+
+int aurora_response_stream_chunk(AuroraHttpResponse* res, const char* data, int len) {
+    if (!res || !data || len <= 0) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    char size_buf[32];
+    int size_len = snprintf(size_buf, sizeof(size_buf), "%x\r\n", len);
+    if (send_raw(sock, tls, size_buf, size_len) != size_len) return -1;
+    if (send_raw(sock, tls, data, len) != len) return -1;
+    if (send_raw(sock, tls, "\r\n", 2) != 2) return -1;
+    return 0;
+}
+
+int aurora_response_end_stream(AuroraHttpResponse* res) {
+    if (!res) return -1;
+    int64_t sock = res->sock;
+    int64_t tls = res->tls_handle;
+    const char* term = "0\r\n\r\n";
+    return send_raw(sock, tls, term, 5);
+}
+
 /* ── CORS ── */
 void aurora_cors_apply(AuroraHttpResponse* res, const char* origin, const char* methods, const char* headers) {
     if (!res) return;
@@ -605,6 +1166,18 @@ void aurora_cors_apply_default(AuroraHttpResponse* res) {
 
 void aurora_cors_apply_with_origin(AuroraHttpResponse* res, const char* origin) {
     aurora_cors_apply(res, origin, nullptr, nullptr);
+}
+
+/* ── Security headers ── */
+
+void aurora_add_security_headers(AuroraHttpResponse* res) {
+    if (!res) return;
+    aurora_http_response_set_header(res, "Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    aurora_http_response_set_header(res, "X-Content-Type-Options", "nosniff");
+    aurora_http_response_set_header(res, "X-Frame-Options", "DENY");
+    aurora_http_response_set_header(res, "Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+    aurora_http_response_set_header(res, "X-XSS-Protection", "0");
+    aurora_http_response_set_header(res, "Referrer-Policy", "strict-origin-when-cross-origin");
 }
 
 /* ── Middleware chain ── */
@@ -764,12 +1337,6 @@ int aurora_route_dispatch(AuroraRouter* router, AuroraHttpRequest* req, AuroraHt
 }
 
 /* ── Check a header value in raw HTTP request (case-insensitive name) ── */
-#ifdef _WIN32
-#define aurora_strncasecmp _strnicmp
-#else
-#define aurora_strncasecmp strncasecmp
-#endif
-
 static int has_header_value(const char* raw, const char* header_name, const char* expected_val) {
     if (!raw || !header_name || !expected_val) return 0;
     size_t hdr_len = strlen(header_name);
@@ -830,6 +1397,7 @@ static void set_recv_timeout(int64_t client_sock, int timeout_sec) {
 static unsigned int gzip_crc32(const unsigned char* buf, size_t len);
 static unsigned char* gzip_compress(const unsigned char* input, size_t input_len, size_t* out_len);
 
+/* ── Global counters for connection tracking ── */
 /* ── HTTP/2 cleartext (h2c) upgrade detection ── */
 /* Returns 1 if the client sent an HTTP/2 upgrade request */
 int aurora_h2_is_upgrade(const char* raw_request) {
@@ -849,7 +1417,17 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
     int client = (int)client_sock;
 #endif
     set_recv_timeout(client_sock, 5);
-    char raw[65536];
+    int raw_cap = 65536;
+    int raw_len = 0;
+    char* raw = (char*)malloc((size_t)raw_cap);
+    if (!raw) {
+#ifdef _WIN32
+        closesocket(client);
+#else
+        close(client);
+#endif
+        return;
+    }
     int keep_alive_max = 100;
 
     /* ── Recv helper: read from raw socket or TLS ── */
@@ -864,14 +1442,30 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
 #endif
     };
 
+    /* ── Ensure buffer has space for at least `needed` bytes ── */
+    bool oom = false;
+    auto ensure_cap = [&](int needed) {
+        if (needed > raw_cap) {
+            raw_cap = needed + 65536;
+            char* new_raw = (char*)realloc(raw, (size_t)raw_cap);
+            if (!new_raw) {
+                oom = true;
+                return;
+            }
+            raw = new_raw;
+        }
+    };
+
     for (int ka_count = 0; ka_count < keep_alive_max; ka_count++) {
-        int n = recv_data(raw, (int)sizeof(raw) - 1);
-        if (n <= 0) break;
-        raw[n] = '\0';
+        raw_len = recv_data(raw, raw_cap - 1);
+        if (raw_len <= 0) break;
+        raw[raw_len] = '\0';
+        ensure_cap(raw_cap); /* ensure at least raw_cap available */
+        if (oom) break;
 
         /* ── Check for HTTP/2 (h2c) upgrade ── */
         if (aurora_h2_is_upgrade(raw)) {
-            /* Accept h2c upgrade, then speak minimal HTTP/2 frames */
+            /* Accept h2c upgrade, then handle full HTTP/2 */
             const char* resp = "HTTP/1.1 101 Switching Protocols\r\n"
                                "Upgrade: h2c\r\n"
                                "Connection: Upgrade\r\n"
@@ -892,86 +1486,49 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
                     remaining -= n;
                 }
             }
-            fprintf(stderr, "[h2c] upgrade accepted, reading HTTP/2 frames\n");
-            /* After upgrade, read HTTP/2 connection preface + SETTINGS frame
-               (minimal frame reader, emits a basic response via GOAWAY) */
-            uint8_t frame[64];
-            int fn = tls_handle > 0
-                ? aurora_tls_read(tls_handle, (char*)frame, 24)
-#ifdef _WIN32
-                : recv((SOCKET)(intptr_t)client_sock, (char*)frame, 24, 0);
-#else
-                : (int)recv((int)client_sock, (char*)frame, 24, 0);
-#endif
-            if (fn == 24) {
-                /* Send a minimal SETTINGS frame (empty = use defaults) */
-                uint8_t settings[9] = {0x00,0x00,0x00, 0x04, 0x00,0x00,0x00,0x00,0x00};
-                if (tls_handle > 0)
-                    aurora_tls_write(tls_handle, (char*)settings, 9);
-                else {
-#ifdef _WIN32
-                    send((SOCKET)(intptr_t)client_sock, (char*)settings, 9, 0);
-#else
-                    send((int)client_sock, (char*)settings, 9, MSG_NOSIGNAL);
-#endif
-                }
-                /* Read a few more frames (we skip full parsing) */
-                for (int i = 0; i < 5; i++) {
-                    fn = tls_handle > 0
-                        ? aurora_tls_read(tls_handle, (char*)frame, 9)
-#ifdef _WIN32
-                        : recv((SOCKET)(intptr_t)client_sock, (char*)frame, 9, 0);
-#else
-                        : (int)recv((int)client_sock, (char*)frame, 9, 0);
-#endif
-                    if (fn != 9) break;
-                    int payload_len = ((int)frame[0] << 16) | ((int)frame[1] << 8) | frame[2];
-                    int frame_type = frame[3];
-                    if (frame_type == 0x04) {
-                        /* SETTINGS — send SETTINGS ack */
-                        uint8_t ack[9] = {0x00,0x00,0x00, 0x04, 0x01,0x00,0x00,0x00,0x00};
-                        if (tls_handle > 0)
-                            aurora_tls_write(tls_handle, (char*)ack, 9);
-                        else {
-#ifdef _WIN32
-                            send((SOCKET)(intptr_t)client_sock, (char*)ack, 9, 0);
-#else
-                            send((int)client_sock, (char*)ack, 9, MSG_NOSIGNAL);
-#endif
-                        }
-                    }
-                    /* Drain payload */
-                    uint8_t drain[4096];
-                    while (payload_len > 0) {
-                        int chunk = (payload_len > 4096) ? 4096 : payload_len;
-                        fn = tls_handle > 0
-                            ? aurora_tls_read(tls_handle, (char*)drain, chunk)
-#ifdef _WIN32
-                            : recv((SOCKET)(intptr_t)client_sock, (char*)drain, chunk, 0);
-#else
-                            : (int)recv((int)client_sock, (char*)drain, chunk, 0);
-#endif
-                        if (fn <= 0) break;
-                        payload_len -= fn;
-                    }
-                }
-                /* Send GOAWAY (no support for full HTTP/2 yet) */
-                uint8_t goaway[17] = {
-                    0x00,0x00,0x08, 0x07, 0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,  /* last stream ID = 0 */
-                    0x00,0x00,0x00,0x0C   /* error code = INTERNAL_ERROR */
-                };
-                if (tls_handle > 0)
-                    aurora_tls_write(tls_handle, (char*)goaway, 17);
-                else {
-#ifdef _WIN32
-                    send((SOCKET)(intptr_t)client_sock, (char*)goaway, 17, 0);
-#else
-                    send((int)client_sock, (char*)goaway, 17, MSG_NOSIGNAL);
-#endif
-                }
-                fprintf(stderr, "[h2c] minimal handshake done, closing\n");
+            fprintf(stderr, "[h2c] upgrade accepted, starting HTTP/2\n");
+
+            /* Create H2 connection */
+            AuroraH2Connection* h2 = aurora_h2_new(client_sock, tls_handle, 1);
+            if (!h2) break;
+
+            /* Read client preface */
+            if (aurora_h2_read_preface(h2) < 0) {
+                aurora_h2_free(h2);
+                break;
             }
+
+            /* Send server preface */
+            if (aurora_h2_send_preface(h2) < 0) {
+                aurora_h2_free(h2);
+                break;
+            }
+
+            /* Set up request handler */
+            struct H2Ctx { AuroraServer* srv; AuroraRouter* router; AuroraH2Connection* h2; };
+            H2Ctx* ctx = new H2Ctx();
+            ctx->srv = srv;
+            ctx->router = router;
+            ctx->h2 = h2;
+
+            auto h2_handler = +[](int32_t stream_id, const char** headers,
+                                    int header_count, const char* body,
+                                    int body_len, void* user_data) {
+                auto* c = static_cast<H2Ctx*>(user_data);
+                const char* rh[] = {"content-type", "text/plain"};
+                aurora_h2_send_response(c->h2, stream_id, 200, rh, 1,
+                                         "Hello from HTTP/2", 17);
+            };
+            aurora_h2_set_handler(h2, h2_handler, ctx);
+
+            /* Process frames until connection closes */
+            while (aurora_h2_is_open(h2)) {
+                if (aurora_h2_process_frames(h2) < 0) break;
+            }
+
+            delete ctx;
+            aurora_h2_free(h2);
+            fprintf(stderr, "[h2c] connection closed\n");
             break;
         }
 
@@ -1019,13 +1576,14 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
                 content_length = atoi(cl);
             }
             int needed = header_end + content_length;
-            if (needed > (int)sizeof(raw) - 1)
-                needed = (int)sizeof(raw) - 1;
-            while (n < needed) {
-                int r = recv_data(raw + n, needed - n);
+            if (needed > raw_cap - 1)
+                ensure_cap(needed + 1);
+            if (oom) break;
+            while (raw_len < needed) {
+                int r = recv_data(raw + raw_len, needed - raw_len);
                 if (r <= 0) break;
-                n += r;
-                raw[n] = '\0';
+                raw_len += r;
+                raw[raw_len] = '\0';
             }
         }
         int ka = has_keep_alive(raw);
@@ -1033,12 +1591,30 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
         AuroraHttpRequest* req = aurora_http_parse_request(raw);
         AuroraHttpResponse* res = aurora_http_response_new();
         res->tls_handle = tls_handle;
+        res->sock = client_sock;
         aurora_http_response_set_header(res, "Content-Type", "text/plain");
         if (ka) {
             aurora_http_response_set_header(res, "Connection", "keep-alive");
             aurora_http_response_set_header(res, "Keep-Alive", "timeout=5, max=100");
         }
         if (req) {
+            /* ── Parse form body (application/x-www-form-urlencoded) ── */
+            if (!req->form && req->body && req->content_type &&
+                aurora_strncasecmp(req->content_type, "application/x-www-form-urlencoded", 33) == 0) {
+                req->form = aurora_parse_form_body(req->body, strlen(req->body));
+            }
+            /* ── Parse multipart upload ── */
+            if (!req->files && req->body && req->content_type &&
+                aurora_strncasecmp(req->content_type, "multipart/form-data", 19) == 0) {
+                char* boundary = extract_boundary(req->content_type);
+                if (boundary) {
+                    req->files = aurora_parse_multipart(req->body, strlen(req->body), boundary);
+                    free(boundary);
+                }
+            }
+            /* ── Set thread-local context for builtins (session/cookie) ── */
+            g_aurora_current_req = req;
+            g_aurora_current_res = res;
             int mw_result = aurora_middleware_run_chain(
                 srv->middleware_handlers, srv->middleware_count, req, res);
             if (mw_result == 0) {
@@ -1070,6 +1646,7 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
         aurora_http_response_free(res);
         if (!ka) break;
     }
+    free(raw);
     if (tls_handle > 0)
         aurora_tls_close(tls_handle);
     else {
@@ -1118,8 +1695,6 @@ void aurora_server_accept_and_handle(AuroraServer* srv, AuroraRouter* router) {
 }
 
 /* ── Thread-per-connection accept loop ── */
-static std::atomic<int> g_active_connections{0};
-static std::atomic<int64_t> g_total_connections{0};
 
 void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
     if (!srv || !srv->handle || !srv->running) return;
@@ -1435,8 +2010,10 @@ static void dev_server_handle_request(AuroraHttpRequest* req, AuroraHttpResponse
 /* ── Global router + route_register (used by codegen) ── */
 static AuroraRouter* g_global_router = nullptr;
 static AuroraServer* g_global_server = nullptr;
+static std::mutex g_global_mutex;
 
 void aurora_route_register(const char* method, const char* path, void* handler) {
+    std::lock_guard<std::mutex> lock(g_global_mutex);
     if (!g_global_router) {
         g_global_router = aurora_router_new();
     }
@@ -1444,16 +2021,21 @@ void aurora_route_register(const char* method, const char* path, void* handler) 
 }
 
 void aurora_server_set_router(AuroraServer* srv, AuroraRouter* router) {
+    std::lock_guard<std::mutex> lock(g_global_mutex);
     g_global_server = srv;
     if (router) g_global_router = router;
 }
 
 void aurora_server_run(AuroraServer* srv) {
     if (!srv) return;
-    if (!g_global_router) g_global_router = aurora_router_new();
+    {
+        std::lock_guard<std::mutex> lock(g_global_mutex);
+        if (!g_global_router) g_global_router = aurora_router_new();
+    }
     aurora_server_start(srv);
     if (srv->running) {
         printf("[server] running on port %d\n", srv->port);
+        std::lock_guard<std::mutex> lock(g_global_mutex);
         aurora_server_accept_loop(srv, g_global_router);
     }
 }
@@ -1510,16 +2092,25 @@ void aurora_dev_server(int64_t port, const char* src_dir) {
         int client = accept(listen_sock, (struct sockaddr*)&client_addr, (socklen_t*)&addr_len);
         if (client < 0) continue;
 #endif
-        char raw[32768];
+        int dev_buf_cap = 131072;
+        char* dev_raw = (char*)malloc((size_t)dev_buf_cap);
+        if (!dev_raw) {
 #ifdef _WIN32
-        int n = recv(client, raw, sizeof(raw) - 1, 0);
+            closesocket(client);
 #else
-        int n = (int)recv(client, raw, sizeof(raw) - 1, 0);
+            close(client);
+#endif
+            continue;
+        }
+#ifdef _WIN32
+        int n = recv(client, dev_raw, dev_buf_cap - 1, 0);
+#else
+        int n = (int)recv(client, dev_raw, dev_buf_cap - 1, 0);
 #endif
         if (n > 0) {
-            raw[n] = '\0';
+            dev_raw[n] = '\0';
             /* Check for live-reload event-stream request */
-            if (strstr(raw, "/__aurora_livereload")) {
+            if (strstr(dev_raw, "/__aurora_livereload")) {
                 /* Send SSE response and keep connection open; poll for changes */
                 const char* sse_hdr = "HTTP/1.1 200 OK\r\n"
                     "Content-Type: text/event-stream\r\n"
@@ -1556,9 +2147,23 @@ void aurora_dev_server(int64_t port, const char* src_dir) {
 #endif
                 continue;
             }
-            AuroraHttpRequest* req = aurora_http_parse_request(raw);
+            AuroraHttpRequest* req = aurora_http_parse_request(dev_raw);
             AuroraHttpResponse* res = aurora_http_response_new();
+            res->sock = (int64_t)(intptr_t)client;
             if (req) {
+                /* ── Parse form body and uploads in dev server too ── */
+                if (!req->form && req->body && req->content_type &&
+                    aurora_strncasecmp(req->content_type, "application/x-www-form-urlencoded", 33) == 0) {
+                    req->form = aurora_parse_form_body(req->body, strlen(req->body));
+                }
+                if (!req->files && req->body && req->content_type &&
+                    aurora_strncasecmp(req->content_type, "multipart/form-data", 19) == 0) {
+                    char* boundary = extract_boundary(req->content_type);
+                    if (boundary) {
+                        req->files = aurora_parse_multipart(req->body, strlen(req->body), boundary);
+                        free(boundary);
+                    }
+                }
                 dev_server_handle_request(req, res, srv);
             } else {
                 aurora_http_response_set_status(res, 400, "Bad Request");
@@ -1573,6 +2178,7 @@ void aurora_dev_server(int64_t port, const char* src_dir) {
             aurora_http_request_free(req);
             aurora_http_response_free(res);
         }
+        free(dev_raw);
 #ifdef _WIN32
         closesocket(client);
 #else
@@ -2089,16 +2695,15 @@ static int aurora_const_time_cmp(const char* a, const char* b) {
 
 static unsigned int gzip_crc32(const unsigned char* buf, size_t len) {
     static unsigned int table[256];
-    static int init = 0;
-    if (!init) {
+    static std::once_flag crc_init_flag;
+    std::call_once(crc_init_flag, [&]() {
         for (unsigned int i = 0; i < 256; i++) {
             unsigned int crc = i;
             for (int j = 0; j < 8; j++)
                 crc = (crc >> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
             table[i] = crc;
         }
-        init = 1;
-    }
+    });
     unsigned int crc = 0xFFFFFFFF;
     for (size_t i = 0; i < len; i++)
         crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >> 8);

@@ -1,0 +1,59 @@
+name: Nightly Build (Phase 12.5)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Every day at 06:00 UTC
+  workflow_dispatch:      # Manual trigger
+
+jobs:
+  nightly:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup LLVM 19
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows)
+              curl -fsSL -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.0/clang+llvm-19.1.0-x86_64-pc-windows-msvc.tar.xz
+              tar -xf llvm.tar.xz
+              echo "$(pwd)/clang+llvm-19.1.0-x86_64-pc-windows-msvc/bin" >> $GITHUB_PATH
+              ;;
+            Linux)
+              wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+              sudo add-apt-repository 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main'
+              sudo apt-get update && sudo apt-get install -y clang-19 lld-19 llvm-19-dev
+              ;;
+            macOS)
+              brew install llvm@19
+              ;;
+          esac
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Run Pre-commit Checks
+        shell: pwsh
+        run: scripts/pre-commit.ps1
+
+      - name: Package
+        shell: pwsh
+        run: |
+          if ("${{ runner.os }}" -eq "Windows") {
+            & release/package_release.ps1
+          } else {
+            & release/package_release.sh
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aurora-nightly-${{ runner.os }}
+          path: release/out/

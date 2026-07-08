@@ -1,0 +1,36 @@
+# Phase 27 — Sandbox Test
+
+extern function aurora_sec_sandbox_init() -> int
+extern function aurora_sec_sandbox_allow_path(path: str) -> int
+extern function aurora_sec_sandbox_check_path(path: str) -> int
+extern function aurora_sec_sandbox_destroy()
+
+function main()
+    output("sandbox: start")
+    ret = aurora_sec_sandbox_init()
+    if ret != 0
+        output("FAIL: sandbox_init returned " + str(ret))
+        return
+    end
+    output("  init: ok")
+    ret = aurora_sec_sandbox_allow_path("/tmp")
+    if ret != 0
+        output("FAIL: allow_path returned " + str(ret))
+        return
+    end
+    output("  allow_path: ok")
+    checked = aurora_sec_sandbox_check_path("/tmp")
+    if checked != 1
+        output("FAIL: allowed path check = " + str(checked))
+        return
+    end
+    output("  allowed path: 1 (ok)")
+    checked = aurora_sec_sandbox_check_path("/etc")
+    if checked != 0
+        output("FAIL: non-allowed path check = " + str(checked))
+        return
+    end
+    output("  non-allowed path: 0 (ok)")
+    aurora_sec_sandbox_destroy()
+    output("sandbox: PASS")
+end

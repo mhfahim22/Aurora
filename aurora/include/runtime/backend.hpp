@@ -28,6 +28,7 @@ typedef struct AuroraServer {
 AuroraServer* aurora_server_init(int64_t port);
 void          aurora_server_start(AuroraServer* srv);
 void          aurora_server_stop(AuroraServer* srv);
+void          aurora_server_start_with_pool(AuroraServer* srv, struct AuroraRouter* router, int pool_size);
 void          aurora_server_add_middleware(AuroraServer* srv, void* handler);
 void          aurora_server_clear_middleware(AuroraServer* srv);
 
@@ -45,10 +46,19 @@ typedef struct AuroraHttpRequest {
     char** query_param_values;
     int    query_param_count;
     char*  body;
+    char*  content_type;
     /* Route path parameters (e.g. :id, :name) */
     char** param_names;
     char** param_values;
     int    param_count;
+    /* Parsed cookie header */
+    char** cookie_names;
+    char** cookie_values;
+    int    cookie_count;
+    /* Parsed form body (application/x-www-form-urlencoded) */
+    struct AuroraFormData* form;
+    /* Parsed multipart upload data */
+    struct AuroraMultipartData* files;
 } AuroraHttpRequest;
 
 /* ── HTTP Response ── */
@@ -63,6 +73,7 @@ typedef struct AuroraHttpResponse {
     size_t   body_len;
     int      sent;
     int64_t  tls_handle;  /* 0 = raw socket, >0 = TLS connection handle */
+    int64_t  sock;        /* socket fd, set before route dispatch */
 } AuroraHttpResponse;
 
 /* ── HTTP Router entry ── */
@@ -87,6 +98,46 @@ const char*         aurora_http_get_query_param(AuroraHttpRequest* req, const ch
 const char*         aurora_http_get_header(AuroraHttpRequest* req, const char* name);
 const char*         aurora_http_get_field(AuroraHttpRequest* req, const char* field);
 const char*         aurora_http_get_param(AuroraHttpRequest* req, const char* name);
+const char*         aurora_http_get_cookie(AuroraHttpRequest* req, const char* name);
+
+/* ── Form data (application/x-www-form-urlencoded body) ── */
+typedef struct AuroraFormData {
+    char** names;
+    char** values;
+    int    count;
+    int    cap;
+} AuroraFormData;
+
+AuroraFormData* aurora_parse_form_body(const char* body, size_t len);
+const char*     aurora_form_get(AuroraFormData* form, const char* key);
+int             aurora_form_count(AuroraFormData* form);
+const char*     aurora_form_key(AuroraFormData* form, int index);
+const char*     aurora_form_value(AuroraFormData* form, int index);
+void            aurora_form_free(AuroraFormData* form);
+
+/* ── Multipart file upload ── */
+typedef struct AuroraMultipartPart {
+    char* name;
+    char* filename;
+    char* content_type;
+    char* data;
+    size_t data_size;
+} AuroraMultipartPart;
+
+typedef struct AuroraMultipartData {
+    AuroraMultipartPart* parts;
+    int count;
+    int cap;
+} AuroraMultipartData;
+
+AuroraMultipartData* aurora_parse_multipart(const char* body, size_t len, const char* boundary);
+int                  aurora_multipart_part_count(AuroraMultipartData* mp);
+const char*          aurora_multipart_part_name(AuroraMultipartData* mp, int index);
+const char*          aurora_multipart_part_filename(AuroraMultipartData* mp, int index);
+const char*          aurora_multipart_part_content_type(AuroraMultipartData* mp, int index);
+const char*          aurora_multipart_part_data(AuroraMultipartData* mp, int index);
+size_t               aurora_multipart_part_size(AuroraMultipartData* mp, int index);
+void                 aurora_multipart_free(AuroraMultipartData* mp);
 
 /* ── Response builder ── */
 AuroraHttpResponse* aurora_http_response_new(void);
@@ -115,6 +166,9 @@ int                 aurora_middleware_run_chain(void** handlers, int count, Auro
 void aurora_cors_apply(AuroraHttpResponse* res, const char* origin, const char* methods, const char* headers);
 void aurora_cors_apply_default(AuroraHttpResponse* res);
 void aurora_cors_apply_with_origin(AuroraHttpResponse* res, const char* origin);
+
+/* ── Security headers ── */
+void aurora_add_security_headers(AuroraHttpResponse* res);
 
 /* ── Database ── */
 typedef struct AuroraDB {
@@ -230,6 +284,23 @@ const char* aurora_todo_create(const char* title);
 const char* aurora_todo_get(const char* id_str);
 const char* aurora_todo_update(const char* id_str, const char* title, int64_t done);
 const char* aurora_todo_delete(const char* id_str);
+
+/* ── SSE (Server-Sent Events) ── */
+int  aurora_sse_start(AuroraHttpResponse* res);
+int  aurora_sse_send_event(AuroraHttpResponse* res, const char* event, const char* data);
+int  aurora_sse_send_comment(AuroraHttpResponse* res, const char* comment);
+int  aurora_sse_end(AuroraHttpResponse* res);
+
+/* ── Streaming (chunked transfer) ── */
+int  aurora_response_start_stream(AuroraHttpResponse* res);
+int  aurora_response_stream_chunk(AuroraHttpResponse* res, const char* data, int len);
+int  aurora_response_end_stream(AuroraHttpResponse* res);
+
+/* ── Webhook system ── */
+int  aurora_webhook_register(const char* event, const char* url, const char* secret);
+int  aurora_webhook_unregister(const char* event, const char* url);
+int  aurora_webhook_trigger(const char* event, const char* payload_json);
+int  aurora_webhook_verify(const char* payload, const char* signature, const char* secret);
 
 #ifdef __cplusplus
 }

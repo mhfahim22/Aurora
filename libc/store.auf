@@ -1,0 +1,37 @@
+## In-App Purchases & Subscriptions Module (Phase 11.4)
+## StoreKit, Google Play Billing, Microsoft Store IAP
+##
+## Usage: import "store"
+
+extern function aurora_store_init() -> ptr
+extern function aurora_store_products(handle: ptr, product_ids_json: str) -> int
+extern function aurora_store_purchase(handle: ptr, product_id: str) -> int
+extern function aurora_store_restore_purchases(handle: ptr) -> int
+extern function aurora_store_is_purchased(handle: ptr, product_id: str) -> int
+extern function aurora_store_get_receipt(handle: ptr) -> str
+extern function aurora_store_consume(handle: ptr, product_id: str) -> int
+extern function aurora_store_shutdown(handle: ptr)
+
+pub fn store_init() -> ptr
+    aurora_store_init()
+
+pub fn store_products(handle: ptr, product_ids_json: str) -> int
+    aurora_store_products(handle, product_ids_json)
+
+pub fn store_purchase(handle: ptr, product_id: str) -> int
+    aurora_store_purchase(handle, product_id)
+
+pub fn store_restore_purchases(handle: ptr) -> int
+    aurora_store_restore_purchases(handle)
+
+pub fn store_is_purchased(handle: ptr, product_id: str) -> int
+    aurora_store_is_purchased(handle, product_id)
+
+pub fn store_get_receipt(handle: ptr) -> str
+    aurora_store_get_receipt(handle)
+
+pub fn store_consume(handle: ptr, product_id: str) -> int
+    aurora_store_consume(handle, product_id)
+
+pub fn store_shutdown(handle: ptr)
+    aurora_store_shutdown(handle)

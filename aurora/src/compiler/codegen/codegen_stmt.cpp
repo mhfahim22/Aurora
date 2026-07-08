@@ -1441,11 +1441,55 @@ void Codegen::gen_server(const ASTNode* node) {
 
     /* Route counter for generating unique handler function names */
     static uint64_t route_counter = 0;
+    static uint64_t middleware_counter = 0;
 
-    /* Process body: for each route node, generate a handler function and register it */
+    /* Process body: for each route/middleware node, generate handler functions and register them */
     const ASTNode* child = node->body.get();
     while (child) {
-        if (child->type == NodeType::Route) {
+        if (child->type == NodeType::Middleware) {
+            /* Create middleware handler function: int(i8* req, i8* res, i8* userdata) */
+            std::string mw_name = "_middleware_hdl_" + std::to_string(middleware_counter++);
+            auto* mw_fn_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(ctx_), { i8ptr_ty(), i8ptr_ty(), i8ptr_ty() }, false);
+            auto* mw_fn = llvm::Function::Create(
+                mw_fn_type, llvm::Function::InternalLinkage, mw_name, module_.get());
+            auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", mw_fn);
+
+            auto* saved_fn = cur_fn_;
+            auto saved_ip = builder_->saveIP();
+
+            builder_->SetInsertPoint(entry_bb);
+            cur_fn_ = mw_fn;
+
+            literal_aurora_cache_.clear();
+
+            auto arg_it = mw_fn->arg_begin();
+            llvm::Value* req_param = arg_it++;
+            llvm::Value* res_param = arg_it++;
+            req_param->setName("req");
+            res_param->setName("res");
+
+            push_scope();
+            declare_var("__http_req", create_entry_alloca("__http_req", i8ptr_ty()), OwnershipState::Borrowed);
+            declare_var("__http_res", create_entry_alloca("__http_res", i8ptr_ty()), OwnershipState::Borrowed);
+            builder_->CreateStore(req_param, lookup_var("__http_req")->alloca_ptr);
+            builder_->CreateStore(res_param, lookup_var("__http_res")->alloca_ptr);
+
+            /* Generate the middleware body */
+            if (child->body) gen_block(child->body.get());
+
+            pop_scope_and_drop();
+            /* Return 0 to continue the middleware chain */
+            builder_->CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx_), 0));
+
+            cur_fn_ = saved_fn;
+            builder_->restoreIP(saved_ip);
+
+            /* Register the middleware handler with the server */
+            if (server_add_mw_) {
+                llvm::Value* hdl_ptr = builder_->CreateBitCast(mw_fn, i8ptr_ty(), "mwhdl");
+                builder_->CreateCall(server_add_mw_, { srv, hdl_ptr });
+            }
+        } else if (child->type == NodeType::Route) {
             /* Create handler function: void(i8* req, i8* res) */
             std::string handler_name = "_route_hdl_" + std::to_string(route_counter++);
             auto* hdl_fn_type = llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i8ptr_ty() }, false);
@@ -1590,6 +1634,19 @@ void Codegen::gen_session(const ASTNode* node) {
     gen_block(node->body.get());
     if (session_destroy_)
         builder_->CreateCall(session_destroy_, { sess });
+}
+
+void Codegen::gen_model(const ASTNode* node) {
+    if (!fn_orm_schema_define_) return;
+    if (!node->left) return;
+    llvm::Value* name = gen_expr(node->left.get());
+    llvm::Value* schema = builder_->CreateCall(fn_orm_schema_define_, { name }, "schema");
+    if (node->body) {
+        /* Body contains field definitions via builtin_schema()
+           which we emit as a call to aurora_orm_schema_column.
+           Children use the builtin model()/schema() functions. */
+        gen_block(node->body.get());
+    }
 }
 
 void Codegen::gen_auth(const ASTNode* node) {

@@ -76,6 +76,16 @@ int aurora_send_all(int64_t sock, const char* data, int len);
 /* ── IP address resolution (returns first IPv4 as string) ── */
 int aurora_net_resolve_host(const char* hostname, char* buffer, int buffer_size);
 
+/* ── Connection Pool ── */
+typedef struct AuroraConnPool AuroraConnPool;
+
+AuroraConnPool* aurora_net_conn_pool_new(int max_per_host, int idle_timeout_sec);
+void            aurora_net_conn_pool_free(AuroraConnPool* pool);
+int64_t         aurora_net_conn_pool_get(AuroraConnPool* pool, const char* host, int port);
+void            aurora_net_conn_pool_put(AuroraConnPool* pool, int64_t sock, const char* host, int port);
+void            aurora_net_conn_pool_clear_host(AuroraConnPool* pool, const char* host, int port);
+int             aurora_net_conn_pool_idle_count(AuroraConnPool* pool);
+
 #ifdef __cplusplus
 }
 #endif

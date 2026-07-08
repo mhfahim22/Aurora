@@ -1,0 +1,41 @@
+## Push Notifications Module (Phase 11.5)
+## WNS, APNs, FCM, D-Bus — cross-platform push
+##
+## Usage: import "push"
+
+extern function aurora_push_init() -> int
+extern function aurora_push_register() -> int
+extern function aurora_push_unregister() -> int
+extern function aurora_push_is_registered() -> int
+extern function aurora_push_set_callback(callback: ptr) -> int
+extern function aurora_push_get_token() -> str
+extern function aurora_push_send_local(title: str, body: str, delay_ms: int) -> int
+extern function aurora_push_cancel_local(notification_id: int) -> int
+extern function aurora_push_shutdown()
+
+pub fn push_init() -> int
+    aurora_push_init()
+
+pub fn push_register() -> int
+    aurora_push_register()
+
+pub fn push_unregister() -> int
+    aurora_push_unregister()
+
+pub fn push_is_registered() -> int
+    aurora_push_is_registered()
+
+pub fn push_set_callback(callback: ptr) -> int
+    aurora_push_set_callback(callback)
+
+pub fn push_get_token() -> str
+    aurora_push_get_token()
+
+pub fn push_send_local(title: str, body: str, delay_ms: int) -> int
+    aurora_push_send_local(title, body, delay_ms)
+
+pub fn push_cancel_local(notification_id: int) -> int
+    aurora_push_cancel_local(notification_id)
+
+pub fn push_shutdown()
+    aurora_push_shutdown()

@@ -78,4 +78,15 @@ JNIEXPORT void JNICALL Java_aurora_AuroraActivity_nativeOnPermissionResult(
     }
 }
 
+JNIEXPORT void JNICALL Java_aurora_AuroraActivity_nativeRenderWidgets(
+    JNIEnv* env, jclass cls, jobject canvas, jlong rootWidgetPtr) {
+    (void)cls;
+    aurora_android_render_mw(env, canvas, (void*)rootWidgetPtr);
+}
+
+JNIEXPORT void JNICALL Java_aurora_AuroraActivity_nativeInitRenderer(
+    JNIEnv* env, jclass cls) {
+    aurora_android_renderer_init(env);
+}
+
 } /* extern "C" */

@@ -1,0 +1,44 @@
+# Phase 15 — Database Metadata Test
+
+extern function aurora_db_sqlite_open(path: str) -> ptr
+extern function aurora_db_sqlite_close(db: ptr)
+extern function aurora_db_sqlite_exec(db: ptr, sql: str) -> str
+extern function aurora_db_sqlite_last_insert_rowid(db: ptr) -> int
+extern function aurora_db_sqlite_changes(db: ptr) -> int
+extern function aurora_db_sqlite_errcode(db: ptr) -> int
+extern function aurora_db_sqlite_errmsg(db: ptr) -> str
+
+function main()
+    output("db_meta: start")
+    db = aurora_db_sqlite_open(":memory:")
+    if db == null
+        output("FAIL: open returned null")
+        return
+    end
+    output("  open: ok")
+    aurora_db_sqlite_exec(db, "CREATE TABLE items (id INTEGER PRIMARY KEY, val TEXT)")
+    aurora_db_sqlite_exec(db, "INSERT INTO items VALUES (NULL, 'hello')")
+    rid = aurora_db_sqlite_last_insert_rowid(db)
+    if rid <= 0
+        output("FAIL: last_insert_rowid = " + str(rid))
+        return
+    end
+    output("  last_rowid: " + str(rid))
+    chg = aurora_db_sqlite_changes(db)
+    if chg <= 0
+        output("FAIL: changes = " + str(chg))
+        return
+    end
+    output("  changes: " + str(chg))
+    err = aurora_db_sqlite_errcode(db)
+    if err != 0
+        output("FAIL: errcode = " + str(err))
+        return
+    end
+    output("  errcode: 0 (ok)")
+    msg = aurora_db_sqlite_errmsg(db)
+    output("  errmsg: " + msg)
+    aurora_db_sqlite_close(db)
+    output("  close: ok")
+    output("db_meta: PASS")
+end

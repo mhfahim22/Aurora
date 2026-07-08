@@ -469,6 +469,14 @@ DepNode build_tree(const std::string& name, const std::string& version,
     return node;
 }
 
+std::string read_file_str(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f.is_open()) return "";
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
 void print_tree(const DepNode& node, const std::string& prefix, bool is_last) {
     std::cout << prefix << (is_last ? "└── " : "├── ") << node.name;
     if (!node.version.empty()) std::cout << "@" << node.version;

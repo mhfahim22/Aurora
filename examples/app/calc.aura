@@ -1,0 +1,103 @@
+## Calculator App — Cross-platform
+## Simple 4-function calculator using numeric state
+
+import "app"
+
+function main()
+    win = app_init("Calculator", 300, 350)
+    output("Calc App: Window created")
+
+    current = 0
+    prev_num = 0
+    cur_op = ""
+    fresh = 1
+
+    lbl = app_label(win, "0", 20, 20, 260, 40)
+
+    function refresh()
+        app_set_text(lbl, "" + current)
+    end
+
+    function press(n)
+        if fresh == 1
+            current = n
+            fresh = 0
+        else
+            current = current * 10 + n
+        end
+        refresh()
+    end
+
+    function set_op(op)
+        prev_num = current
+        cur_op = op
+        fresh = 1
+    end
+
+    function calc()
+        if cur_op == "+"
+            current = prev_num + current
+        elseif cur_op == "-"
+            current = prev_num - current
+        elseif cur_op == "*"
+            current = prev_num * current
+        elseif cur_op == "/"
+            if current != 0
+                current = prev_num / current
+            else
+                current = 0
+            end
+        end
+        cur_op = ""
+        fresh = 1
+        refresh()
+    end
+
+    function clear_all()
+        current = 0
+        prev_num = 0
+        cur_op = ""
+        fresh = 1
+        refresh()
+    end
+
+    n1 = app_button(win, "1", 20, 70, 60, 40)
+    n2 = app_button(win, "2", 85, 70, 60, 40)
+    n3 = app_button(win, "3", 150, 70, 60, 40)
+    n4 = app_button(win, "4", 20, 115, 60, 40)
+    n5 = app_button(win, "5", 85, 115, 60, 40)
+    n6 = app_button(win, "6", 150, 115, 60, 40)
+    n7 = app_button(win, "7", 20, 160, 60, 40)
+    n8 = app_button(win, "8", 85, 160, 60, 40)
+    n9 = app_button(win, "9", 150, 160, 60, 40)
+    n0 = app_button(win, "0", 85, 205, 60, 40)
+
+    app_on_click(n0, lambda() press(0))
+    app_on_click(n1, lambda() press(1))
+    app_on_click(n2, lambda() press(2))
+    app_on_click(n3, lambda() press(3))
+    app_on_click(n4, lambda() press(4))
+    app_on_click(n5, lambda() press(5))
+    app_on_click(n6, lambda() press(6))
+    app_on_click(n7, lambda() press(7))
+    app_on_click(n8, lambda() press(8))
+    app_on_click(n9, lambda() press(9))
+
+    b_add = app_button(win, "+", 220, 70, 60, 40)
+    b_sub = app_button(win, "-", 220, 115, 60, 40)
+    b_mul = app_button(win, "*", 220, 160, 60, 40)
+    b_div = app_button(win, "/", 220, 205, 60, 40)
+    b_eq = app_button(win, "=", 150, 205, 60, 40)
+    b_clr = app_button(win, "C", 20, 205, 60, 40)
+
+    app_on_click(b_add, lambda() set_op("+"))
+    app_on_click(b_sub, lambda() set_op("-"))
+    app_on_click(b_mul, lambda() set_op("*"))
+    app_on_click(b_div, lambda() set_op("/"))
+    app_on_click(b_eq, calc)
+    app_on_click(b_clr, clear_all)
+
+    output("Calc App: Running...")
+    app_run(win)
+    output("Calc App: Done")
+end

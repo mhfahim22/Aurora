@@ -1,0 +1,37 @@
+# Theme Basic Test
+# Verifies init, set_mode, get_mode, destroy
+
+extern function aurora_app_theme_init() -> ptr
+extern function aurora_app_theme_destroy(theme: ptr)
+extern function aurora_app_theme_set_mode(theme: ptr, mode: int)
+extern function aurora_app_theme_get_mode(theme: ptr) -> int
+extern function aurora_app_theme_set_color(theme: ptr, key: int, color: int)
+extern function aurora_app_theme_get_color(theme: ptr, key: int) -> int
+extern function aurora_app_theme_set_font(theme: ptr, key: int, size: int)
+extern function aurora_app_theme_get_font(theme: ptr, key: int) -> int
+extern function aurora_app_theme_get_spacing(theme: ptr, level: int) -> double
+
+function main()
+    theme = aurora_app_theme_init()
+    if theme == 0
+        output("FAIL: theme_init returned null")
+        return
+    end
+
+    aurora_app_theme_set_mode(theme, 0)
+    mode = aurora_app_theme_get_mode(theme)
+    if mode != 0
+        output("FAIL: mode expected 0 got " + str(mode))
+        return
+    end
+
+    aurora_app_theme_set_mode(theme, 1)
+    mode = aurora_app_theme_get_mode(theme)
+    if mode != 1
+        output("FAIL: mode expected 1 got " + str(mode))
+        return
+    end
+
+    aurora_app_theme_destroy(theme)
+    output("PASS")
+end

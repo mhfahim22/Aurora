@@ -483,8 +483,17 @@ int cmd_telemetry_submit();
 /* ── Package Templates (voss new) ── */
 int cmd_new(int argc, char** argv);
 
+/* ── Packaging (voss package) ── */
+int cmd_package(const std::string& target, const std::string& format);
+
 /* ── Documentation Generator (voss doc) ── */
 int cmd_doc(const std::string& output_dir, bool serve);
+
+/* ── Theme Store ── */
+int cmd_theme(int argc, char** argv);
+
+/* ── File helpers (used by theme and other commands) ── */
+std::string read_file_str(const std::string& path);
 
 /* ── AI Package Generator ── */
 int cmd_ai_generate(const std::string& description);

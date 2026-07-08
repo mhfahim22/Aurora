@@ -1,0 +1,41 @@
+# Phase 1.4 — Threading Test
+# Verify mutex, thread, condvar, atomic work
+
+import "thread"
+
+function worker()
+    output("Thread Test: worker running")
+end
+
+function main()
+    output("Thread Test: Starting...")
+
+    # Test mutex
+    m = mutex_create()
+    mutex_lock(m)
+    output("Thread Test: Mutex lock OK")
+    mutex_unlock(m)
+    mutex_destroy(m)
+    output("Thread Test: Mutex OK")
+
+    # Test thread create + join
+    t1 = thread_create(worker, 0)
+    t2 = thread_create(worker, 0)
+    thread_join(t1)
+    thread_join(t2)
+    output("Thread Test: Thread join OK")
+
+    # Test atomic
+    a = atomic_create(0)
+    atomic_store(a, 42)
+    v = atomic_load(a)
+    output("Thread Test: Atomic value = " + v)
+    if v == 42
+        output("Thread Test: Atomic OK")
+    else
+        output("Thread Test: FAIL — wrong atomic value")
+    end
+    atomic_destroy(a)
+
+    output("Thread Test: All PASS")
+end

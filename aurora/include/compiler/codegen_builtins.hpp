@@ -194,6 +194,10 @@ struct BuiltinFunctions {
     llvm::Function* validate_fn         { nullptr };
     llvm::Function* sanitize_fn         { nullptr };
 
+    /* Template */
+    llvm::Function* template_fn          { nullptr };
+    llvm::Function* render_fn            { nullptr };
+
     /* Throttle/Debounce */
     llvm::Function* throttle_fn         { nullptr };
     llvm::Function* debounce_fn         { nullptr };

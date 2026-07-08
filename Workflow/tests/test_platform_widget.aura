@@ -1,0 +1,52 @@
+import "gui"
+
+function main()
+    output("═══ Platform Widget Test ═══")
+
+    win = aurora_gui_window_new("Widget Type Test", 400, 300)
+    if win == 0
+        output("FAIL: window creation")
+        return
+    end
+
+    win_type = aurora_gui_widget_get_type(win)
+    output("  window type: " + str(win_type))
+    if win_type < 0
+        output("FAIL: window type negative")
+        aurora_gui_window_destroy(win)
+        return
+    end
+
+    btn = aurora_gui_button_new(win, "Test Button", 50, 50, 100, 30)
+    if btn == 0
+        output("FAIL: button creation")
+        aurora_gui_window_destroy(win)
+        return
+    end
+
+    btn_type = aurora_gui_widget_get_type(btn)
+    output("  button type: " + str(btn_type))
+    if btn_type < 0
+        output("FAIL: button type negative")
+        aurora_gui_window_destroy(win)
+        return
+    end
+
+    lbl = aurora_gui_label_new(win, "Test Label", 50, 100, 100, 24)
+    if lbl == 0
+        output("FAIL: label creation")
+        aurora_gui_window_destroy(win)
+        return
+    end
+
+    lbl_type = aurora_gui_widget_get_type(lbl)
+    output("  label type: " + str(lbl_type))
+    if lbl_type < 0
+        output("FAIL: label type negative")
+        aurora_gui_window_destroy(win)
+        return
+    end
+
+    aurora_gui_window_destroy(win)
+    output("PASS")
+end

@@ -1,0 +1,18 @@
+import "gui"
+
+function main()
+    output("window: start")
+    win = gui_window_new("TestWin", 640, 480)
+    if win == null
+        output("FAIL: window_new null")
+        return
+    end
+
+    gui_window_set_title(win, "Updated Title")
+    gui_window_set_min_size(win, 200, 150)
+    gui_window_set_max_size(win, 1600, 1200)
+    gui_window_set_resizable(win, 0)
+    gui_window_set_resizable(win, 1)
+    gui_window_destroy(win)
+    output("window: PASS")
+end

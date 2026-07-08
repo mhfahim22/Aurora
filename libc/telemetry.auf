@@ -1,0 +1,49 @@
+## Telemetry Module (Phase 11.3)
+## Crash reporting & analytics with GDPR-compliant opt-in
+##
+## Usage: import "telemetry"
+
+extern function aurora_telemetry_init(endpoint: str, enable_crash: int, enable_analytics: int) -> int
+extern function aurora_telemetry_set_user_id(user_id: str) -> int
+extern function aurora_telemetry_set_app_version(version: str) -> int
+extern function aurora_telemetry_track_event(category: str, action: str, label: str) -> int
+extern function aurora_telemetry_track_error(message: str, stack_trace: str) -> int
+extern function aurora_telemetry_opt_in() -> int
+extern function aurora_telemetry_opt_out() -> int
+extern function aurora_telemetry_is_opted_in() -> int
+extern function aurora_telemetry_send_now() -> int
+extern function aurora_telemetry_get_endpoint() -> str
+extern function aurora_telemetry_shutdown()
+
+pub fn telemetry_init(endpoint: str, enable_crash: int, enable_analytics: int) -> int
+    aurora_telemetry_init(endpoint, enable_crash, enable_analytics)
+
+pub fn telemetry_set_user_id(user_id: str) -> int
+    aurora_telemetry_set_user_id(user_id)
+
+pub fn telemetry_set_app_version(version: str) -> int
+    aurora_telemetry_set_app_version(version)
+
+pub fn telemetry_track_event(category: str, action: str, label: str) -> int
+    aurora_telemetry_track_event(category, action, label)
+
+pub fn telemetry_track_error(message: str, stack_trace: str) -> int
+    aurora_telemetry_track_error(message, stack_trace)
+
+pub fn telemetry_opt_in() -> int
+    aurora_telemetry_opt_in()
+
+pub fn telemetry_opt_out() -> int
+    aurora_telemetry_opt_out()
+
+pub fn telemetry_is_opted_in() -> int
+    aurora_telemetry_is_opted_in()
+
+pub fn telemetry_send_now() -> int
+    aurora_telemetry_send_now()
+
+pub fn telemetry_get_endpoint() -> str
+    aurora_telemetry_get_endpoint()
+
+pub fn telemetry_shutdown()
+    aurora_telemetry_shutdown()

@@ -1,0 +1,27 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_radiobutton_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int, group_id: int) -> pointer
+extern function aurora_gui_radiobutton_set_text(rb: pointer, text: cstring)
+extern function aurora_gui_radiobutton_get_text(rb: pointer) -> cstring
+extern function aurora_gui_radiobutton_is_checked(rb: pointer) -> int
+extern function aurora_gui_radiobutton_set_checked(rb: pointer, checked: int)
+
+function main()
+    output("radio: start")
+    win = aurora_gui_window_new("RbTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    rb = aurora_gui_radiobutton_new(win, "Option A", 10, 10, 120, 24, 1)
+    if rb == null
+        output("  note: radiobutton_new returned null (headless)")
+    end
+
+    aurora_gui_radiobutton_set_text(rb, "Option B")
+    aurora_gui_radiobutton_set_checked(rb, 1)
+    aurora_gui_radiobutton_set_checked(rb, 0)
+
+    aurora_gui_window_destroy(win)
+    output("radio: PASS")
+end

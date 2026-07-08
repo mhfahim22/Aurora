@@ -1,0 +1,78 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 13 — Theme Store
+//  Search, install, apply, publish themes for Aurora apps
+// ═══════════════════════════════════════════════════════════════════
+
+module "theme_store"
+
+// ── Extern Functions ──
+extern function aurora_theme_store_search(query: str, results: ptr, count: ptr) -> int
+extern function aurora_theme_store_install(name: str) -> int
+extern function aurora_theme_store_uninstall(name: str) -> int
+extern function aurora_theme_store_list_installed(names: ptr, count: ptr) -> int
+extern function aurora_theme_store_apply(name: str) -> int
+extern function aurora_theme_store_publish(path: str) -> int
+extern function aurora_theme_store_get_current() -> str
+extern function aurora_theme_store_export_json(name: str) -> str
+extern function aurora_theme_store_import_json(json: str) -> int
+extern function aurora_theme_store_validate(path: str) -> int
+
+// ── Wrappers ──
+
+pub fn theme_search(query: str) -> [str]
+    results: ptr; count: int = 0
+    if aurora_theme_store_search(query, &results, &count) <> 0
+        arr: [str] = []
+        i: int = 0
+        while i < count
+            ptr_item: ptr = results[i]
+            if ptr_item <> nil
+                arr.push(ptr_item)
+            end
+            i = i + 1
+        end
+        arr
+    else
+        []
+    end
+
+pub fn theme_install(name: str) -> int
+    aurora_theme_store_install(name)
+
+pub fn theme_uninstall(name: str) -> int
+    aurora_theme_store_uninstall(name)
+
+pub fn theme_list_installed() -> [str]
+    names: ptr; count: int = 0
+    if aurora_theme_store_list_installed(&names, &count) <> 0
+        arr: [str] = []
+        i: int = 0
+        while i < count
+            ptr_item: ptr = names[i]
+            if ptr_item <> nil
+                arr.push(ptr_item)
+            end
+            i = i + 1
+        end
+        arr
+    else
+        []
+    end
+
+pub fn theme_apply(name: str) -> int
+    aurora_theme_store_apply(name)
+
+pub fn theme_publish(path: str) -> int
+    aurora_theme_store_publish(path)
+
+pub fn theme_get_current() -> str
+    aurora_theme_store_get_current()
+
+pub fn theme_export_json(name: str) -> str
+    aurora_theme_store_export_json(name)
+
+pub fn theme_import_json(json: str) -> int
+    aurora_theme_store_import_json(json)
+
+pub fn theme_validate(path: str) -> int
+    aurora_theme_store_validate(path)

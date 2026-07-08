@@ -87,3 +87,69 @@ end
 function async_dispatch(ev, callback, arg):
     aurora_async_dispatch(ev, callback, arg)
 end
+
+## ── Low-level event loop (poll-based) ──
+
+extern function aurora_event_loop_new() -> pointer
+extern function aurora_event_loop_free(loop: pointer)
+extern function aurora_event_loop_add(loop: pointer, fd: i64, events: i32) -> i32
+extern function aurora_event_loop_remove(loop: pointer, fd: i64)
+extern function aurora_event_loop_wait(loop: pointer, timeout_ms: i32) -> i32
+extern function aurora_event_loop_stop(loop: pointer)
+extern function aurora_event_loop_is_running(loop: pointer) -> i32
+
+function event_loop_new():
+    return aurora_event_loop_new()
+end
+
+function event_loop_free(loop):
+    aurora_event_loop_free(loop)
+end
+
+function event_loop_add(loop, fd, events):
+    return aurora_event_loop_add(loop, fd, events)
+end
+
+function event_loop_remove(loop, fd):
+    aurora_event_loop_remove(loop, fd)
+end
+
+function event_loop_wait(loop, timeout_ms):
+    return aurora_event_loop_wait(loop, timeout_ms)
+end
+
+function event_loop_stop(loop):
+    aurora_event_loop_stop(loop)
+end
+
+function event_loop_is_running(loop):
+    return aurora_event_loop_is_running(loop) == 1
+end
+
+## ── Worker pool (for server & async tasks) ──
+
+extern function aurora_worker_pool_new(thread_count: i32) -> pointer
+extern function aurora_worker_pool_free(pool: pointer)
+extern function aurora_worker_pool_enqueue(pool: pointer, task: pointer, arg: pointer) -> i32
+extern function aurora_worker_pool_busy_count(pool: pointer) -> i32
+extern function aurora_worker_pool_wait_idle(pool: pointer, timeout_ms: i32) -> i32
+
+function worker_pool_new(thread_count):
+    return aurora_worker_pool_new(thread_count)
+end
+
+function worker_pool_free(pool):
+    aurora_worker_pool_free(pool)
+end
+
+function worker_pool_enqueue(pool, task, arg):
+    return aurora_worker_pool_enqueue(pool, task, arg) == 1
+end
+
+function worker_pool_busy_count(pool):
+    return aurora_worker_pool_busy_count(pool)
+end
+
+function worker_pool_wait_idle(pool, timeout_ms):
+    return aurora_worker_pool_wait_idle(pool, timeout_ms) == 1
+end

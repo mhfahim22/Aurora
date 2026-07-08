@@ -1,0 +1,41 @@
+# Phase 27 — Token/Auth Test
+
+extern function aurora_sec_token_generate(payload: str, secret: str) -> str
+extern function aurora_sec_token_verify(token: str, secret: str) -> int
+extern function aurora_sec_basic_auth(username: str, password: str) -> str
+extern function aurora_sec_bearer_auth(token: str) -> str
+
+function main()
+    output("token: start")
+    tok = aurora_sec_token_generate("user=alice", "mysecret")
+    if strlen(tok) == 0
+        output("FAIL: token_generate returned empty")
+        return
+    end
+    output("  token: " + tok)
+    ver = aurora_sec_token_verify(tok, "mysecret")
+    if ver != 1
+        output("FAIL: token_verify = " + str(ver))
+        return
+    end
+    output("  verify: ok")
+    ver2 = aurora_sec_token_verify(tok, "wrongsecret")
+    if ver2 != 0
+        output("FAIL: wrong secret verify = " + str(ver2))
+        return
+    end
+    output("  wrong secret rejected: ok")
+    basic = aurora_sec_basic_auth("alice", "pass123")
+    if strlen(basic) == 0
+        output("FAIL: basic_auth returned empty")
+        return
+    end
+    output("  basic: " + basic)
+    bearer = aurora_sec_bearer_auth(tok)
+    if strlen(bearer) == 0
+        output("FAIL: bearer_auth returned empty")
+        return
+    end
+    output("  bearer: " + bearer)
+    output("token: PASS")
+end

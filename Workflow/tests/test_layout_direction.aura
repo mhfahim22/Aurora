@@ -1,0 +1,111 @@
+## Layout Column vs Row Direction Unit Tests
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
+extern function aurora_app_layout_node_set_align(node: ptr, align: int)
+extern function aurora_app_layout_node_set_wrap(node: ptr, wrap: int)
+extern function aurora_app_layout_node_set_gap(node: ptr, gap: double)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_min_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_max_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_padding(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_node_set_margin(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_x(node: ptr) -> double
+extern function aurora_app_layout_node_get_y(node: ptr) -> double
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+extern function aurora_app_layout_node_get_h(node: ptr) -> double
+extern function aurora_app_layout_node_set_flex(node: ptr, grow: int, shrink: int, basis: int)
+
+function main()
+    output("═══ Layout Direction Test ═══")
+
+    output("  setup row layout: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create returned null")
+        return
+    end
+    row_root = aurora_app_layout_node_new(0, 0)
+    if row_root == 0
+        output("FAIL: node_new row_root returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(row_root, 0)
+    aurora_app_layout_node_set_size(row_root, 300.0, 200.0)
+    r1 = aurora_app_layout_node_new(row_root, 0)
+    aurora_app_layout_node_set_size(r1, 60.0, 30.0)
+    r2 = aurora_app_layout_node_new(row_root, 0)
+    aurora_app_layout_node_set_size(r2, 60.0, 30.0)
+    output("  setup row layout: pass")
+
+    output("  setup column layout: start")
+    col_root = aurora_app_layout_node_new(0, 0)
+    if col_root == 0
+        output("FAIL: node_new col_root returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(col_root, 1)
+    aurora_app_layout_node_set_size(col_root, 300.0, 200.0)
+    c1 = aurora_app_layout_node_new(col_root, 0)
+    aurora_app_layout_node_set_size(c1, 60.0, 30.0)
+    c2 = aurora_app_layout_node_new(col_root, 0)
+    aurora_app_layout_node_set_size(c2, 60.0, 30.0)
+    output("  setup column layout: pass")
+
+    output("  calculate both: start")
+    aurora_app_layout_calculate(row_root, 300.0, 200.0)
+    aurora_app_layout_calculate(col_root, 300.0, 200.0)
+    output("  calculate both: pass")
+
+    output("  verify row children laid out horizontally: start")
+    rx1 = aurora_app_layout_node_get_x(r1)
+    rx2 = aurora_app_layout_node_get_x(r2)
+    ry1 = aurora_app_layout_node_get_y(r1)
+    ry2 = aurora_app_layout_node_get_y(r2)
+    output("  row: r1x=" + str(rx1) + " r1y=" + str(ry1) + " r2x=" + str(rx2) + " r2y=" + str(ry2))
+    if rx1 == rx2
+        if ry1 == ry2
+            output("FAIL: row children have same position")
+            aurora_app_layout_destroy(lay)
+            return
+        end
+    end
+    output("  verify row children laid out horizontally: pass")
+
+    output("  verify column children laid out vertically: start")
+    cx1 = aurora_app_layout_node_get_x(c1)
+    cx2 = aurora_app_layout_node_get_x(c2)
+    cy1 = aurora_app_layout_node_get_y(c1)
+    cy2 = aurora_app_layout_node_get_y(c2)
+    output("  col: c1x=" + str(cx1) + " c1y=" + str(cy1) + " c2x=" + str(cx2) + " c2y=" + str(cy2))
+    if cy1 == cy2
+        if cx1 == cx2
+            output("FAIL: column children have same position")
+            aurora_app_layout_destroy(lay)
+            return
+        end
+    end
+    output("  verify column children laid out vertically: pass")
+
+    output("  verify row and column differ: start")
+    if rx1 == cx1
+        if ry1 == cy1
+            output("FAIL: row and column first child same position")
+            aurora_app_layout_destroy(lay)
+            return
+        end
+    end
+    output("  verify row and column differ: pass")
+
+    output("  destroy: start")
+    aurora_app_layout_destroy(lay)
+    output("  destroy: pass")
+
+    output("PASS")
+end

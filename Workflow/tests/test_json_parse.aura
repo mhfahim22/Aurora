@@ -1,0 +1,83 @@
+# JSON Parse Test
+# Verifies parsing a JSON string and accessing fields
+
+extern function aurora_json_parse(json: string) -> ptr
+extern function aurora_json_serialize(val: ptr) -> string
+extern function aurora_json_type(val: ptr) -> int
+extern function aurora_json_new() -> ptr
+extern function aurora_json_new_num(n: double) -> ptr
+extern function aurora_json_new_str(s: string) -> ptr
+extern function aurora_json_new_array() -> ptr
+extern function aurora_json_new_object() -> ptr
+extern function aurora_json_set(obj: ptr, key: string, val: double)
+extern function aurora_json_set_str(obj: ptr, key: string, val: string)
+extern function aurora_json_set_obj(obj: ptr, key: string, val: ptr)
+extern function aurora_json_get_num(obj: ptr, key: string) -> double
+extern function aurora_json_get_str(obj: ptr, key: string) -> string
+extern function aurora_json_get_obj(obj: ptr, key: string) -> ptr
+extern function aurora_json_array_push(arr: ptr, val: ptr)
+extern function aurora_json_array_get(arr: ptr, idx: int) -> ptr
+extern function aurora_json_array_len(arr: ptr) -> int
+extern function aurora_json_free(val: ptr)
+
+function main()
+    val = aurora_json_parse('{"name":"Alice","age":30,"active":true}')
+    if val == 0
+        output("FAIL: parse returned null")
+        return
+    end
+
+    t = aurora_json_type(val)
+    if t != 4
+        output("FAIL: type expected 4 (object) got " + str(t))
+        aurora_json_free(val)
+        return
+    end
+
+    name = aurora_json_get_str(val, "name")
+    if name == 0
+        output("FAIL: name field not found")
+        aurora_json_free(val)
+        return
+    end
+    if starts(name, "Alice")
+        if strlen(name) != 5
+            output("FAIL: name length expected 5 got " + str(strlen(name)))
+            aurora_json_free(val)
+            return
+        end
+    else
+        output("FAIL: name expected Alice")
+        aurora_json_free(val)
+        return
+    end
+
+    age = aurora_json_get_obj(val, "age")
+    if age == 0
+        output("FAIL: age field not found")
+        aurora_json_free(val)
+        return
+    end
+    age_type = aurora_json_type(age)
+    if age_type != 1
+        output("FAIL: age type expected 1 (num) got " + str(age_type))
+        aurora_json_free(val)
+        return
+    end
+
+    active = aurora_json_get_obj(val, "active")
+    if active == 0
+        output("FAIL: active field not found")
+        aurora_json_free(val)
+        return
+    end
+    at = aurora_json_type(active)
+    if at != 5
+        output("FAIL: active type expected 5 (bool) got " + str(at))
+        aurora_json_free(val)
+        return
+    end
+
+    aurora_json_free(val)
+    output("PASS")
+end

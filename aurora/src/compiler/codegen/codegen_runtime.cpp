@@ -653,6 +653,24 @@ void Codegen::declare_domain_runtime_helpers() {
         llvm::FunctionType::get(i64, { ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_auth_login", mod);
 
+    /* ── ORM runtime declarations ── */
+    /* aurora_orm_schema_define(i8*) → i8* */
+    fn_orm_schema_define_ = llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_orm_schema_define", mod);
+    /* aurora_orm_schema_column(i8*, i8*, i32, i32, i8*) */
+    fn_orm_schema_column_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, i64, i64, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_orm_schema_column", mod);
+    /* aurora_orm_auto_migrate(i8*, i8*) → i32 */
+    fn_orm_auto_migrate_ = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_orm_auto_migrate", mod);
+    /* aurora_rest_register(i8*, i8*, i8*, i8*) → i32 */
+    fn_rest_register_ = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_rest_register", mod);
+
     /* http_parse_request(i8*) → i8* */
     http_parse_req_ = llvm::Function::Create(
         llvm::FunctionType::get(ptr, { ptr }, false),
@@ -689,6 +707,10 @@ void Codegen::declare_domain_runtime_helpers() {
     server_run_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_server_run", mod);
+    /* server_add_middleware(i8*, i8*) */
+    server_add_mw_ = llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_server_add_middleware", mod);
     /* router_new() → i8* */
     router_new_ = llvm::Function::Create(
         llvm::FunctionType::get(ptr, {}, false),
@@ -1274,6 +1296,232 @@ void Codegen::declare_domain_runtime_helpers() {
     /* ptr aurora_pkg_cache_path() */
     llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
         llvm::Function::ExternalLinkage, "aurora_pkg_cache_path", mod);
+
+    /* ══════════════════════════════════════════
+       Phase 11 — App Distribution & Store Ecosystem
+       ══════════════════════════════════════════ */
+
+    /* ── 11.2 Auto-Update (11) ── */
+    /* i32 aurora_updater_init(ptr, ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_init", mod);
+    /* i32 aurora_updater_check() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_check", mod);
+    /* ptr aurora_updater_get_latest_version() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_get_latest_version", mod);
+    /* ptr aurora_updater_get_download_url() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_get_download_url", mod);
+    /* i32 aurora_updater_download() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_download", mod);
+    /* i32 aurora_updater_download_progress() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_download_progress", mod);
+    /* i32 aurora_updater_apply() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_apply", mod);
+    /* i32 aurora_updater_rollback() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_rollback", mod);
+    /* i32 aurora_updater_set_channel(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_set_channel", mod);
+    /* ptr aurora_updater_get_channel() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_get_channel", mod);
+    /* void aurora_updater_shutdown() */
+    llvm::Function::Create(llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_updater_shutdown", mod);
+
+    /* ── 11.3 Crash Reporting & Analytics (11) ── */
+    /* i32 aurora_telemetry_init(ptr, i32, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_init", mod);
+    /* i32 aurora_telemetry_set_user_id(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_set_user_id", mod);
+    /* i32 aurora_telemetry_set_app_version(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_set_app_version", mod);
+    /* i32 aurora_telemetry_track_event(ptr, ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_track_event", mod);
+    /* i32 aurora_telemetry_track_error(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_track_error", mod);
+    /* i32 aurora_telemetry_opt_in() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_opt_in", mod);
+    /* i32 aurora_telemetry_opt_out() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_opt_out", mod);
+    /* i32 aurora_telemetry_is_opted_in() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_is_opted_in", mod);
+    /* i32 aurora_telemetry_send_now() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_send_now", mod);
+    /* ptr aurora_telemetry_get_endpoint() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_get_endpoint", mod);
+    /* void aurora_telemetry_shutdown() */
+    llvm::Function::Create(llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_telemetry_shutdown", mod);
+
+    /* ── 11.4 In-App Purchases & Subscriptions (8) ── */
+    /* ptr aurora_store_init() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_store_init", mod);
+    /* i32 aurora_store_products(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_products", mod);
+    /* i32 aurora_store_purchase(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_purchase", mod);
+    /* i32 aurora_store_restore_purchases(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_restore_purchases", mod);
+    /* i32 aurora_store_is_purchased(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_is_purchased", mod);
+    /* ptr aurora_store_get_receipt(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_get_receipt", mod);
+    /* i32 aurora_store_consume(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_consume", mod);
+    /* void aurora_store_shutdown(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_store_shutdown", mod);
+
+    /* ── 11.5 Push Notifications (9) ── */
+    /* i32 aurora_push_init() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_push_init", mod);
+    /* i32 aurora_push_register() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_push_register", mod);
+    /* i32 aurora_push_unregister() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_push_unregister", mod);
+    /* i32 aurora_push_is_registered() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_push_is_registered", mod);
+    /* i32 aurora_push_set_callback(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_push_set_callback", mod);
+    /* ptr aurora_push_get_token() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_push_get_token", mod);
+    /* i32 aurora_push_send_local(ptr, ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_push_send_local", mod);
+    /* i32 aurora_push_cancel_local(i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_push_cancel_local", mod);
+    /* void aurora_push_shutdown() */
+    llvm::Function::Create(llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_push_shutdown", mod);
+
+    /* ══════════════════════════════════════════
+       Phase 12 — Production Hardening & Quality
+       ══════════════════════════════════════════ */
+
+    /* ── 12.1 GUI Performance — Virtual Scroll (10) ── */
+    /* ptr aurora_virtual_scroll_create(i32, i32, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { i32, i32, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_create", mod);
+    /* void aurora_virtual_scroll_destroy(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_destroy", mod);
+    /* i32 aurora_virtual_scroll_get_first_visible(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_get_first_visible", mod);
+    /* i32 aurora_virtual_scroll_get_last_visible(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_get_last_visible", mod);
+    /* i32 aurora_virtual_scroll_get_total_height(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_get_total_height", mod);
+    /* void aurora_virtual_scroll_set_scroll_offset(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_set_scroll_offset", mod);
+    /* i32 aurora_virtual_scroll_get_scroll_offset(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_get_scroll_offset", mod);
+    /* i32 aurora_virtual_scroll_item_at_y(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_item_at_y", mod);
+    /* void aurora_virtual_scroll_set_total_items(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_set_total_items", mod);
+    /* i32 aurora_virtual_scroll_get_total_items(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_virtual_scroll_get_total_items", mod);
+
+    /* ── 12.1 GUI Performance — Widget Tree Diff (7) ── */
+    /* i32 aurora_widget_diff_init() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_init", mod);
+    /* i32 aurora_widget_diff_snapshot() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_snapshot", mod);
+    /* i32 aurora_widget_diff_compute() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_compute", mod);
+    /* i32 aurora_widget_diff_get_change_count() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_get_change_count", mod);
+    /* i32 aurora_widget_diff_has_changed(i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_has_changed", mod);
+    /* void aurora_widget_diff_apply() */
+    llvm::Function::Create(llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_apply", mod);
+    /* void aurora_widget_diff_clear() */
+    llvm::Function::Create(llvm::FunctionType::get(v, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_diff_clear", mod);
+
+    /* ── 12.2 Security Hardening (12) ── */
+    /* i32 aurora_app_sec_init() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_init", mod);
+    /* i32 aurora_app_sec_declare_permission(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_declare_permission", mod);
+    /* i32 aurora_app_sec_check_permission(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_check_permission", mod);
+    /* i32 aurora_app_sec_enforce_permissions(i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_enforce_permissions", mod);
+    /* i32 aurora_app_sec_verify_signature(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_verify_signature", mod);
+    /* i32 aurora_app_sec_sign_app(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_sign_app", mod);
+    /* i32 aurora_app_sec_sanitize_input(ptr, ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_sanitize_input", mod);
+    /* i32 aurora_app_sec_validate_path(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_validate_path", mod);
+    /* i32 aurora_app_sec_csp_set(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_csp_set", mod);
+    /* ptr aurora_app_sec_csp_get() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_csp_get", mod);
+    /* i32 aurora_app_sec_csp_check_url(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_csp_check_url", mod);
+    /* i32 aurora_app_sec_csp_reset() */
+    llvm::Function::Create(llvm::FunctionType::get(i32, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_app_sec_csp_reset", mod);
 
     /* ── Phase 23: Hot Reload (22) ── */
 
@@ -2719,6 +2967,108 @@ void Codegen::declare_domain_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(i32, {}, false),
         llvm::Function::ExternalLinkage, "aurora_ui_win32_event_data", mod);
+
+    /* ── Template Engine ── */
+    /* AuroraTemplate* aurora_template_compile(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_template_compile", mod);
+    /* i8* aurora_template_render(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_template_render", mod);
+    /* i8* aurora_template_render_to_string(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_template_render_to_string", mod);
+    /* void aurora_template_free(i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_template_free", mod);
+    /* AuroraTemplate* aurora_template_register_string(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_template_register_string", mod);
+    /* i8* aurora_template_render_string(i8*, i8*) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_template_render_string", mod);
+
+    /* ══════════════════════════════════════════
+       Phase 13 — Widget Plugin System (12)
+       ══════════════════════════════════════════ */
+
+    /* i32 aurora_widget_plugin_register(ptr, ptr, ptr, ptr, ptr, ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr, ptr, ptr, ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_register", mod);
+    /* i32 aurora_widget_plugin_load(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_load", mod);
+    /* ptr aurora_widget_plugin_create(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_create", mod);
+    /* i32 aurora_widget_plugin_destroy(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_destroy", mod);
+    /* i32 aurora_widget_plugin_render(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_render", mod);
+    /* i32 aurora_widget_plugin_handle_event(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_handle_event", mod);
+    /* i32 aurora_widget_plugin_list(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_list", mod);
+    /* ptr aurora_widget_plugin_get_name(i32) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_get_name", mod);
+    /* ptr aurora_widget_plugin_get_version(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_get_version", mod);
+    /* i32 aurora_widget_plugin_get_type_count(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_get_type_count", mod);
+    /* ptr aurora_widget_plugin_get_type_name(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_get_type_name", mod);
+    /* i32 aurora_widget_plugin_is_loaded(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_widget_plugin_is_loaded", mod);
+
+    /* ══════════════════════════════════════════
+       Phase 13 — Theme Store (10)
+       ══════════════════════════════════════════ */
+
+    /* i32 aurora_theme_store_search(ptr, ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_search", mod);
+    /* i32 aurora_theme_store_install(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_install", mod);
+    /* i32 aurora_theme_store_uninstall(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_uninstall", mod);
+    /* i32 aurora_theme_store_list_installed(ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_list_installed", mod);
+    /* i32 aurora_theme_store_apply(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_apply", mod);
+    /* i32 aurora_theme_store_publish(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_publish", mod);
+    /* ptr aurora_theme_store_get_current() */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, {}, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_get_current", mod);
+    /* ptr aurora_theme_store_export_json(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_export_json", mod);
+    /* i32 aurora_theme_store_import_json(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_import_json", mod);
+    /* i32 aurora_theme_store_validate(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_theme_store_validate", mod);
 
     /* ── Utility ── */
     /* aurora_sleep(i64 ms) */

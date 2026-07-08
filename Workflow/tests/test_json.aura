@@ -1,0 +1,36 @@
+# Phase 1.3 — JSON Bindings Test
+# Verify JSON parse, build, access, serialize
+
+import "json"
+
+function main()
+    output("JSON Test: Starting...")
+
+    # Test 1: Parse JSON
+    val = json_parse('{"name":"Alice","age":30,"ok":true}')
+    if val == 0
+        output("JSON Test: FAIL — parse returned null")
+        return
+    end
+    output("JSON Test: Parse OK")
+
+    # Test 2: Build JSON
+    obj = json_new_object()
+    json_set_str(obj, "status", "ok")
+    json_set_num(obj, "code", 200)
+    arr = json_new_array()
+    json_array_push(arr, json_new_str("a"))
+    json_set(obj, "items", arr)
+
+    serialized = json_serialize(obj)
+    output("JSON Test: Built = " + serialized)
+
+    # Test 3: Type checks
+    if json_is_object(obj)
+        output("JSON Test: Type check OK")
+    end
+
+    json_free(val)
+    json_free(obj)
+    output("JSON Test: All PASS")
+end

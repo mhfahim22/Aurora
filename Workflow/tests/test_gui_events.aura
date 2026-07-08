@@ -1,0 +1,25 @@
+# Phase 6 — Desktop GUI Events Test
+
+import "gui"
+
+function main()
+    output("GUI Events Test: Starting...")
+    w = aurora_gui_window_new("Events", 400, 300)
+    if w == null
+        output("  window_new null (expected in headless)")
+    end
+    btn = aurora_gui_button_new(w, "Click", 50, 50, 100, 30)
+    if btn == null
+        output("  button_new null (expected in headless)")
+    end
+    label = aurora_gui_label_new(w, "Event output here", 50, 100, 200, 20)
+    if label == null
+        output("  label_new null (expected in headless)")
+    end
+    visible = aurora_gui_get_visible(btn)
+    output("  button visible = " + str(visible))
+    aurora_gui_set_visible(label, 1)
+    txt = aurora_gui_button_get_text(btn)
+    output("  button text: " + txt)
+    output("PASS")
+end

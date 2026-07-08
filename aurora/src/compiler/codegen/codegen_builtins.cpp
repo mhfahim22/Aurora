@@ -484,8 +484,16 @@ void register_builtins(llvm::Module* module, llvm::LLVMContext& ctx,
         llvm::FunctionType::get(i64, { ptr, i64 }, false),
         llvm::Function::ExternalLinkage, "builtin_validate", module);
     builtins.sanitize_fn = llvm::Function::Create(
-        llvm::FunctionType::get(ptr, { ptr }, false),
+        llvm::FunctionType::get(ptr, { ptr, i64 }, false),
         llvm::Function::ExternalLinkage, "builtin_sanitize", module);
+
+    /* Template */
+    builtins.template_fn = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "builtin_template", module);
+    builtins.render_fn = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "builtin_render", module);
 
     /* Throttle/Debounce */
     builtins.throttle_fn = llvm::Function::Create(

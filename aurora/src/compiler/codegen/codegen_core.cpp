@@ -839,13 +839,8 @@ void Codegen::gen_stmt(const ASTNode* node) {
         }
         case NodeType::Api:           gen_api(node);           break;
         case NodeType::Middleware: {
-            /* Middleware: register a middleware function in the pipeline */
+            /* Middleware: generate body block (handler creation done in gen_server / standalone) */
             if (node->body) gen_block(node->body.get());
-            auto* fn_auth = module_->getFunction("aurora_auth_login");
-            if (fn_auth && node->left) {
-                llvm::Value* req = gen_expr(node->left.get());
-                builder_->CreateCall(fn_auth, { req, llvm::ConstantPointerNull::get(i8ptr_ty()) });
-            }
             break;
         }
         case NodeType::Database:      gen_database(node);      break;
@@ -861,8 +856,7 @@ void Codegen::gen_stmt(const ASTNode* node) {
             break;
         }
         case NodeType::Model: {
-            /* Model: define data model with schema */
-            if (node->body) gen_block(node->body.get());
+            gen_model(node);
             break;
         }
         case NodeType::Cache:         gen_cache(node);         break;

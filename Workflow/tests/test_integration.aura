@@ -1,0 +1,104 @@
+# Phase 12.3 — Integration Test: Layout + Nav + Theme
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+
+extern function aurora_app_nav_init() -> ptr
+extern function aurora_app_nav_destroy(nav: ptr)
+extern function aurora_app_nav_register(nav: ptr, name: str, screen: ptr)
+extern function aurora_app_nav_push(nav: ptr, name: str) -> int
+extern function aurora_app_nav_pop(nav: ptr) -> int
+extern function aurora_app_nav_current(nav: ptr) -> str
+extern function aurora_app_nav_depth(nav: ptr) -> int
+
+extern function aurora_app_theme_init() -> ptr
+extern function aurora_app_theme_destroy(theme: ptr)
+extern function aurora_app_theme_set_mode(theme: ptr, mode: int)
+extern function aurora_app_theme_get_mode(theme: ptr) -> int
+extern function aurora_app_theme_set_color(theme: ptr, key: int, color: int)
+extern function aurora_app_theme_get_color(theme: ptr, key: int) -> int
+
+function main()
+    output("═══ Integration Test ═══")
+
+    output("  layout: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create")
+        return
+    end
+    root = aurora_app_layout_node_new(0, 0)
+    if root == 0
+        output("FAIL: layout node")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(root, 0)
+    aurora_app_layout_node_set_size(root, 200.0, 100.0)
+    aurora_app_layout_calculate(root, 200.0, 100.0)
+    output("  layout: pass")
+
+    output("  nav: start")
+    nav = aurora_app_nav_init()
+    if nav == 0
+        output("FAIL: nav_init")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_nav_register(nav, "home", 0)
+    result = aurora_app_nav_push(nav, "home")
+    if result != 0
+        output("FAIL: nav_push " + str(result))
+        aurora_app_nav_destroy(nav)
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    depth = aurora_app_nav_depth(nav)
+    if depth != 1
+        output("FAIL: nav depth " + str(depth))
+        aurora_app_nav_destroy(nav)
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    cur = aurora_app_nav_current(nav)
+    output("  nav current: " + cur)
+    aurora_app_nav_pop(nav)
+    output("  nav: pass")
+
+    output("  theme: start")
+    theme = aurora_app_theme_init()
+    if theme == 0
+        output("FAIL: theme_init")
+        aurora_app_nav_destroy(nav)
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_theme_set_mode(theme, 1)
+    mode = aurora_app_theme_get_mode(theme)
+    if mode != 1
+        output("FAIL: theme mode " + str(mode))
+        aurora_app_theme_destroy(theme)
+        aurora_app_nav_destroy(nav)
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_theme_set_color(theme, 0, 16711680)
+    color = aurora_app_theme_get_color(theme, 0)
+    if color != 16711680
+        output("FAIL: theme color " + str(color))
+        aurora_app_theme_destroy(theme)
+        aurora_app_nav_destroy(nav)
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    output("  theme: pass")
+
+    aurora_app_theme_destroy(theme)
+    aurora_app_nav_destroy(nav)
+    aurora_app_layout_destroy(lay)
+    output("PASS")
+end

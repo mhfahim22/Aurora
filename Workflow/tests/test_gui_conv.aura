@@ -1,0 +1,10 @@
+import "gui"
+
+function main()
+    win = gui_window_new("Test", 400, 300)
+    if win == null
+        output("FAIL: gui_window_new null")
+        return
+    end
+    output("PASS: gui_window_new OK")
+end

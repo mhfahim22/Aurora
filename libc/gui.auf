@@ -27,6 +27,11 @@ extern function aurora_gui_get_visible(widget: pointer) -> int
 extern function aurora_gui_set_focus(widget: pointer)
 extern function aurora_gui_move(widget: pointer, x: int, y: int, w: int, h: int)
 extern function aurora_gui_get_native_handle(widget: pointer) -> pointer
+extern function aurora_gui_widget_get_text(widget: pointer) -> cstring
+extern function aurora_gui_widget_get_type(widget: pointer) -> int
+extern function aurora_gui_widget_get_id(widget: pointer) -> int
+extern function aurora_gui_widget_count() -> int
+extern function aurora_gui_widget_get_by_index(idx: int) -> pointer
 
 extern function aurora_gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
 extern function aurora_gui_label_set_text(lbl: pointer, text: cstring)

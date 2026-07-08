@@ -1,0 +1,72 @@
+## TabView Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ TabView Test ═══")
+
+    output("  tabview new: start")
+    win = aurora_gui_window_new("Test", 400, 300)
+    tv = aurora_gui_tabview_new(win, 10, 10, 380, 280)
+    if tv == 0
+        output("FAIL: tabview_new returned null")
+        return
+    end
+    output("  tabview new: pass")
+
+    output("  tabview add_page: start")
+    p1 = aurora_gui_tabview_add_page(tv, "Tab 1")
+    if p1 == 0
+        output("FAIL: tabview_add_page 1 returned null")
+        return
+    end
+    p2 = aurora_gui_tabview_add_page(tv, "Tab 2")
+    if p2 == 0
+        output("FAIL: tabview_add_page 2 returned null")
+        return
+    end
+    p3 = aurora_gui_tabview_add_page(tv, "Tab 3")
+    if p3 == 0
+        output("FAIL: tabview_add_page 3 returned null")
+        return
+    end
+    output("  tabview add_page: pass")
+
+    output("  tabview page_count: start")
+    cnt = aurora_gui_tabview_page_count(tv)
+    if cnt != 3
+        output("FAIL: page_count = " + str(cnt) + ", expected 3")
+        return
+    end
+    output("  tabview page_count: pass")
+
+    output("  tabview get_selected default: start")
+    sel = aurora_gui_tabview_get_selected(tv)
+    if sel != 0
+        if sel != 0
+            output("FAIL: get_selected default = " + str(sel))
+            return
+        end
+    end
+    output("  tabview get_selected default: pass")
+
+    output("  tabview set_selected: start")
+    aurora_gui_tabview_set_selected(tv, 1)
+    sel2 = aurora_gui_tabview_get_selected(tv)
+    if sel2 != 1
+        output("FAIL: set_selected 1 got " + str(sel2))
+        return
+    end
+    output("  tabview set_selected: pass")
+
+    output("  tabview set_selected last: start")
+    aurora_gui_tabview_set_selected(tv, 2)
+    sel3 = aurora_gui_tabview_get_selected(tv)
+    if sel3 != 2
+        output("FAIL: set_selected 2 got " + str(sel3))
+        return
+    end
+    output("  tabview set_selected last: pass")
+
+    output("PASS")
+end

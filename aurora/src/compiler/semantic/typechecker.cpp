@@ -459,6 +459,10 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["batch"]           = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Array};
     functions_["paginate"]        = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Array};
 
+    /* Template */
+    functions_["template"]        = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
+    functions_["render"]          = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
+
     /* DB/ORM */
     functions_["index"]           = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["migrate"]         = FunctionTypeInfo{{}, AuroraType::Bool};
@@ -894,6 +898,92 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["aurora_pkg_cache_clear"]    = FunctionTypeInfo{{}, AuroraType::Void};
     functions_["aurora_pkg_cache_path"]     = FunctionTypeInfo{{}, AuroraType::String};
 
+    /* ── Phase 11: App Distribution & Store Ecosystem ── */
+
+    /* 11.2 Auto-Update (11) */
+    functions_["aurora_updater_init"]               = FunctionTypeInfo{{AuroraType::String, AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_updater_check"]              = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_updater_get_latest_version"] = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_updater_get_download_url"]   = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_updater_download"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_updater_download_progress"]  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_updater_apply"]              = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_updater_rollback"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_updater_set_channel"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_updater_get_channel"]        = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_updater_shutdown"]           = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* 11.3 Crash Reporting & Analytics (11) */
+    functions_["aurora_telemetry_init"]             = FunctionTypeInfo{{AuroraType::String, AuroraType::Int, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_telemetry_set_user_id"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_telemetry_set_app_version"]  = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_telemetry_track_event"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_telemetry_track_error"]      = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_telemetry_opt_in"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_telemetry_opt_out"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_telemetry_is_opted_in"]      = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_telemetry_send_now"]          = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_telemetry_get_endpoint"]      = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_telemetry_shutdown"]          = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* 11.4 In-App Purchases & Subscriptions (8) */
+    functions_["aurora_store_init"]                 = FunctionTypeInfo{{}, AuroraType::Pointer};
+    functions_["aurora_store_products"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_store_purchase"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_store_restore_purchases"]    = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_store_is_purchased"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_store_get_receipt"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::String};
+    functions_["aurora_store_consume"]              = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_store_shutdown"]             = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* 11.5 Push Notifications (9) */
+    functions_["aurora_push_init"]                  = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_push_register"]              = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_push_unregister"]            = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_push_is_registered"]         = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_push_set_callback"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_push_get_token"]             = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_push_send_local"]            = FunctionTypeInfo{{AuroraType::String, AuroraType::String, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_push_cancel_local"]          = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_push_shutdown"]             = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* ── Phase 12: Production Hardening & Quality ── */
+
+    /* 12.1 GUI Performance — Virtual Scroll (10) */
+    functions_["aurora_virtual_scroll_create"]          = FunctionTypeInfo{{AuroraType::Int, AuroraType::Int, AuroraType::Int}, AuroraType::Pointer};
+    functions_["aurora_virtual_scroll_destroy"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+    functions_["aurora_virtual_scroll_get_first_visible"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_virtual_scroll_get_last_visible"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_virtual_scroll_get_total_height"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_virtual_scroll_set_scroll_offset"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_virtual_scroll_get_scroll_offset"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_virtual_scroll_item_at_y"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_virtual_scroll_set_total_items"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["aurora_virtual_scroll_get_total_items"] = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+
+    /* 12.1 GUI Performance — Widget Tree Diff (7) */
+    functions_["aurora_widget_diff_init"]               = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_widget_diff_snapshot"]           = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_widget_diff_compute"]            = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_widget_diff_get_change_count"]   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_widget_diff_has_changed"]         = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_widget_diff_apply"]              = FunctionTypeInfo{{}, AuroraType::Void};
+    functions_["aurora_widget_diff_clear"]              = FunctionTypeInfo{{}, AuroraType::Void};
+
+    /* 12.2 Security Hardening (12) */
+    functions_["aurora_app_sec_init"]                   = FunctionTypeInfo{{}, AuroraType::Int};
+    functions_["aurora_app_sec_declare_permission"]     = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_check_permission"]       = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_enforce_permissions"]    = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_app_sec_verify_signature"]       = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_sign_app"]               = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_sanitize_input"]         = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Int}, AuroraType::Int};
+    functions_["aurora_app_sec_validate_path"]          = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_csp_set"]                = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_csp_get"]                = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_app_sec_csp_check_url"]          = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_app_sec_csp_reset"]              = FunctionTypeInfo{{}, AuroraType::Int};
+
     /* ── Phase 23: Hot Reload (22) ── */
 
     /* File Watching (4) */
@@ -1316,6 +1406,32 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["aurora_ios_os_version"]                = FunctionTypeInfo{{}, AuroraType::Pointer};
     functions_["aurora_ios_is_ipad"]                   = FunctionTypeInfo{{}, AuroraType::Int};
     functions_["aurora_ios_haptic"]                    = FunctionTypeInfo{{AuroraType::Int}, AuroraType::Void};
+
+    /* ── Phase 13: Widget Plugin System (12) ── */
+    functions_["aurora_widget_plugin_register"]        = FunctionTypeInfo{{AuroraType::String, AuroraType::String, AuroraType::String, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_widget_plugin_load"]             = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_widget_plugin_create"]           = FunctionTypeInfo{{AuroraType::String, AuroraType::String}, AuroraType::Pointer};
+    functions_["aurora_widget_plugin_destroy"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_widget_plugin_render"]           = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_widget_plugin_handle_event"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_widget_plugin_list"]             = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_widget_plugin_get_name"]         = FunctionTypeInfo{{AuroraType::Int}, AuroraType::String};
+    functions_["aurora_widget_plugin_get_version"]      = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_widget_plugin_get_type_count"]   = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_widget_plugin_get_type_name"]    = FunctionTypeInfo{{AuroraType::String, AuroraType::Int}, AuroraType::String};
+    functions_["aurora_widget_plugin_is_loaded"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+
+    /* ── Phase 13: Theme Store (10) ── */
+    functions_["aurora_theme_store_search"]             = FunctionTypeInfo{{AuroraType::String, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_theme_store_install"]            = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_theme_store_uninstall"]          = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_theme_store_list_installed"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Int};
+    functions_["aurora_theme_store_apply"]              = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_theme_store_publish"]            = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_theme_store_get_current"]        = FunctionTypeInfo{{}, AuroraType::String};
+    functions_["aurora_theme_store_export_json"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::String};
+    functions_["aurora_theme_store_import_json"]        = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
+    functions_["aurora_theme_store_validate"]           = FunctionTypeInfo{{AuroraType::String}, AuroraType::Int};
 
     while (node) {
         if (node->type == NodeType::Function || node->type == NodeType::PerformanceFn) {

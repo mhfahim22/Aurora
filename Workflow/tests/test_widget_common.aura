@@ -1,0 +1,77 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_button_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_set_enabled(widget: pointer, enabled: int)
+extern function aurora_gui_get_enabled(widget: pointer) -> int
+extern function aurora_gui_set_visible(widget: pointer, visible: int)
+extern function aurora_gui_get_visible(widget: pointer) -> int
+extern function aurora_gui_set_focus(widget: pointer)
+extern function aurora_gui_move(widget: pointer, x: int, y: int, w: int, h: int)
+extern function aurora_gui_widget_get_text(widget: pointer) -> cstring
+extern function aurora_gui_widget_get_type(widget: pointer) -> int
+extern function aurora_gui_widget_get_id(widget: pointer) -> int
+extern function aurora_gui_widget_count() -> int
+extern function aurora_gui_widget_get_by_index(idx: int) -> pointer
+
+function main()
+    output("widget_common: start")
+    win = aurora_gui_window_new("WcTest", 400, 300)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    btn = aurora_gui_button_new(win, "TestBtn", 10, 10, 100, 30)
+    if btn == null
+        output("  note: button_new returned null (headless)")
+    end
+
+    aurora_gui_set_enabled(btn, 0)
+    en = aurora_gui_get_enabled(btn)
+    if en < 0
+        output("FAIL: get_enabled < 0")
+        return
+    end
+    aurora_gui_set_enabled(btn, 1)
+    en2 = aurora_gui_get_enabled(btn)
+    if en2 < 0
+        output("FAIL: get_enabled after set < 0")
+        return
+    end
+
+    aurora_gui_set_visible(btn, 0)
+    vis = aurora_gui_get_visible(btn)
+    if vis < 0
+        output("FAIL: get_visible < 0")
+        return
+    end
+    aurora_gui_set_visible(btn, 1)
+    vis2 = aurora_gui_get_visible(btn)
+    if vis2 < 0
+        output("FAIL: get_visible after set < 0")
+        return
+    end
+
+    aurora_gui_set_focus(btn)
+    aurora_gui_move(btn, 20, 30, 120, 40)
+
+    typ = aurora_gui_widget_get_type(btn)
+    if typ < 0
+        output("FAIL: widget type < 0")
+        return
+    end
+
+    wid = aurora_gui_widget_get_id(btn)
+    if wid < 0
+        output("FAIL: widget id < 0")
+        return
+    end
+
+    cnt = aurora_gui_widget_count()
+    if cnt < 0
+        output("FAIL: widget count < 0")
+        return
+    end
+
+    aurora_gui_window_destroy(win)
+    output("widget_common: PASS")
+end

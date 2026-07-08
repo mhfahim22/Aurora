@@ -1,0 +1,24 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_switch_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_switch_is_on(sw: pointer) -> int
+extern function aurora_gui_switch_set_on(sw: pointer, on: int)
+
+function main()
+    output("switch: start")
+    win = aurora_gui_window_new("SwTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    sw = aurora_gui_switch_new(win, "Toggle", 10, 10, 60, 30)
+    if sw == null
+        output("  note: switch_new returned null (headless)")
+    end
+
+    aurora_gui_switch_set_on(sw, 1)
+    aurora_gui_switch_set_on(sw, 0)
+
+    aurora_gui_window_destroy(win)
+    output("switch: PASS")
+end

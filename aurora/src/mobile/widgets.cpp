@@ -5,39 +5,6 @@
 #include <cmath>
 
 /* ════════════════════════════════════════════════════════════
-   Internal structures
-   ════════════════════════════════════════════════════════════ */
-
-struct MwWidget {
-    int      type;
-    float    x, y, w, h;
-    char*    text;
-    int      enabled;
-    int      visible;
-    float    padding[4];
-    float    margin[4];
-    float    bg_color[4];
-    float    text_color[4];
-    float    font_size;
-    int      main_align;
-    int      cross_align;
-    float    spacing;
-    float    value;
-    int      selected_index;
-    float    scroll_x, scroll_y;
-    char*    image_path;
-    char**   items;
-    int      item_count;
-    int      item_capacity;
-    MwEventCallback callback;
-    int      has_focus;
-    MwWidget* parent;
-    MwWidget** children;
-    int      child_count;
-    int      child_capacity;
-};
-
-/* ════════════════════════════════════════════════════════════
    Helpers
    ════════════════════════════════════════════════════════════ */
 
@@ -445,9 +412,24 @@ void mw_get_scroll_pos(void* widget, float* x, float* y) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Render — platform-specific; stubbed for now
+   Render — platform-specific dispatch
    ════════════════════════════════════════════════════════════ */
 
+#if defined(__ANDROID__)
+/* Android render is called from JNI (Java → aurora_android_render_mw);
+   mw_render can be invoked from C/C++ if a JNIEnv is cached */
 void mw_render(void* widget) {
     (void)widget;
 }
+#elif defined(__APPLE__)
+extern void aurora_ios_widgets_render(void* widget);
+void mw_render(void* widget) {
+    aurora_ios_widgets_render(widget);
+}
+#else
+/* Desktop — use the desktop emulator renderer */
+extern void mw_desktop_render(void* widget);
+void mw_render(void* widget) {
+    mw_desktop_render(widget);
+}
+#endif

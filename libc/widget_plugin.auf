@@ -1,0 +1,64 @@
+// ═══════════════════════════════════════════════════════════════════
+//  Phase 13 — Widget Plugin System
+//  Dynamic widget plugins built on Phase 20 native plugin loading
+// ═══════════════════════════════════════════════════════════════════
+
+module "widget_plugin"
+
+// ── Extern Functions ──
+extern function aurora_widget_plugin_register(plugin_name: str, version: str,
+    widget_type: str, create_fn: ptr, destroy_fn: ptr,
+    render_fn: ptr, event_fn: ptr) -> int
+extern function aurora_widget_plugin_load(path: str) -> int
+extern function aurora_widget_plugin_create(plugin_name: str, widget_type: str) -> ptr
+extern function aurora_widget_plugin_destroy(widget: ptr) -> int
+extern function aurora_widget_plugin_render(widget: ptr, ctx: ptr) -> int
+extern function aurora_widget_plugin_handle_event(widget: ptr, event: ptr) -> int
+extern function aurora_widget_plugin_list(plugins: ptr, count: ptr) -> int
+extern function aurora_widget_plugin_get_name(index: int) -> str
+extern function aurora_widget_plugin_get_version(plugin_name: str) -> str
+extern function aurora_widget_plugin_get_type_count(plugin_name: str) -> int
+extern function aurora_widget_plugin_get_type_name(plugin_name: str, type_index: int) -> str
+extern function aurora_widget_plugin_is_loaded(plugin_name: str) -> int
+
+// ── Wrappers ──
+
+pub fn widget_plugin_register(plugin_name: str, version: str, widget_type: str,
+    create_fn: ptr, destroy_fn: ptr, render_fn: ptr, event_fn: ptr) -> int
+    aurora_widget_plugin_register(plugin_name, version, widget_type,
+        create_fn, destroy_fn, render_fn, event_fn)
+
+pub fn widget_plugin_load(path: str) -> int
+    aurora_widget_plugin_load(path)
+
+pub fn widget_plugin_create(plugin_name: str, widget_type: str) -> ptr
+    aurora_widget_plugin_create(plugin_name, widget_type)
+
+pub fn widget_plugin_destroy(widget: ptr) -> int
+    aurora_widget_plugin_destroy(widget)
+
+pub fn widget_plugin_render(widget: ptr, ctx: ptr) -> int
+    aurora_widget_plugin_render(widget, ctx)
+
+pub fn widget_plugin_handle_event(widget: ptr, event: ptr) -> int
+    aurora_widget_plugin_handle_event(widget, event)
+
+pub fn widget_plugin_list() -> int
+    plugins: ptr; count: int = 0
+    aurora_widget_plugin_list(&plugins, &count)
+    count
+
+pub fn widget_plugin_get_name(index: int) -> str
+    aurora_widget_plugin_get_name(index)
+
+pub fn widget_plugin_get_version(plugin_name: str) -> str
+    aurora_widget_plugin_get_version(plugin_name)
+
+pub fn widget_plugin_get_type_count(plugin_name: str) -> int
+    aurora_widget_plugin_get_type_count(plugin_name)
+
+pub fn widget_plugin_get_type_name(plugin_name: str, type_index: int) -> str
+    aurora_widget_plugin_get_type_name(plugin_name, type_index)
+
+pub fn widget_plugin_is_loaded(plugin_name: str) -> int
+    aurora_widget_plugin_is_loaded(plugin_name)

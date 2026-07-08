@@ -1,0 +1,29 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_label_new(parent: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_label_set_text(lbl: pointer, text: cstring)
+extern function aurora_gui_label_get_text(lbl: pointer) -> cstring
+extern function aurora_gui_label_set_font_size(lbl: pointer, size: int)
+extern function aurora_gui_label_set_color(lbl: pointer, color: int)
+extern function aurora_gui_label_set_align(lbl: pointer, align: int)
+
+function main()
+    output("label: start")
+    win = aurora_gui_window_new("LblTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    lbl = aurora_gui_label_new(win, "Hello World", 10, 10, 200, 24)
+    if lbl == null
+        output("  note: label_new returned null (headless)")
+    end
+
+    aurora_gui_label_set_text(lbl, "Goodbye")
+    aurora_gui_label_set_font_size(lbl, 18)
+    aurora_gui_label_set_color(lbl, 16711680)
+    aurora_gui_label_set_align(lbl, 1)
+
+    aurora_gui_window_destroy(win)
+    output("label: PASS")
+end

@@ -1,0 +1,141 @@
+## Phase 9: Advanced Widgets — Canvas, Table, TreeView, WebView, Media, Map
+## Usage: import "widgets_advanced"
+
+## ── Extern functions from widgets_advanced.hpp ──
+
+## Canvas
+extern function aurora_advanced_canvas_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_advanced_canvas_set_paint(w: pointer, fn: callback(i32, i32, i32, i32), user: pointer)
+extern function aurora_advanced_canvas_repaint(w: pointer)
+
+## Table
+extern function aurora_advanced_table_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_advanced_table_add_column(tbl: pointer, heading: cstring)
+extern function aurora_advanced_table_add_row(tbl: pointer)
+extern function aurora_advanced_table_set_cell(tbl: pointer, row: i32, col: i32, text: cstring)
+extern function aurora_advanced_table_selected_row(tbl: pointer) -> i32
+extern function aurora_advanced_table_clear(tbl: pointer)
+
+## TreeView
+extern function aurora_advanced_treeview_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_advanced_treeview_add_item(tv: pointer, parent_item: pointer, text: cstring) -> pointer
+extern function aurora_advanced_treeview_remove_item(tv: pointer, item: pointer)
+extern function aurora_advanced_treeview_expand(tv: pointer, item: pointer)
+extern function aurora_advanced_treeview_collapse(tv: pointer, item: pointer)
+extern function aurora_advanced_treeview_selected(tv: pointer) -> pointer
+extern function aurora_advanced_treeview_set_on_select(tv: pointer, cb: callback(pointer, cstring))
+
+## WebView
+extern function aurora_advanced_webview_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_advanced_webview_navigate(wv: pointer, url: cstring)
+extern function aurora_advanced_webview_go_back(wv: pointer)
+extern function aurora_advanced_webview_go_forward(wv: pointer)
+extern function aurora_advanced_webview_reload(wv: pointer)
+extern function aurora_advanced_webview_set_on_title(wv: pointer, cb: callback(cstring))
+
+## Media Player
+extern function aurora_advanced_media_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_advanced_media_open(mw: pointer, src: cstring)
+extern function aurora_advanced_media_play(mw: pointer)
+extern function aurora_advanced_media_pause(mw: pointer)
+extern function aurora_advanced_media_stop(mw: pointer)
+extern function aurora_advanced_media_set_volume(mw: pointer, vol: f32)
+extern function aurora_advanced_media_set_looping(mw: pointer, loop: i32)
+extern function aurora_advanced_media_is_playing(mw: pointer) -> i32
+
+## Map
+extern function aurora_advanced_map_new(parent: pointer, x: i32, y: i32, w: i32, h: i32) -> pointer
+extern function aurora_advanced_map_set_center(mp: pointer, lat: f64, lon: f64)
+extern function aurora_advanced_map_set_zoom(mp: pointer, zoom: i32)
+extern function aurora_advanced_map_add_marker(mp: pointer, lat: f64, lon: f64, title: cstring)
+extern function aurora_advanced_map_clear_markers(mp: pointer)
+
+## ── High-level convenience wrappers ──
+
+function advanced_canvas(parent, x, y, w, h)
+    return aurora_advanced_canvas_new(parent, x, y, w, h)
+end
+
+function advanced_canvas_set_paint(cv, fn)
+    aurora_advanced_canvas_set_paint(cv, fn, null)
+end
+
+function advanced_canvas_repaint(cv)
+    aurora_advanced_canvas_repaint(cv)
+end
+
+function advanced_table(parent, x, y, w, h)
+    return aurora_advanced_table_new(parent, x, y, w, h)
+end
+
+function advanced_table_add_column(tbl, heading)
+    aurora_advanced_table_add_column(tbl, heading)
+end
+
+function advanced_table_add_row(tbl)
+    aurora_advanced_table_add_row(tbl)
+end
+
+function advanced_table_set_cell(tbl, row, col, text)
+    aurora_advanced_table_set_cell(tbl, row, col, text)
+end
+
+function advanced_table_selected_row(tbl)
+    return aurora_advanced_table_selected_row(tbl)
+end
+
+function advanced_treeview(parent, x, y, w, h)
+    return aurora_advanced_treeview_new(parent, x, y, w, h)
+end
+
+function advanced_treeview_add_item(tv, parent_item, text)
+    return aurora_advanced_treeview_add_item(tv, parent_item, text)
+end
+
+function advanced_treeview_expand(tv, item)
+    aurora_advanced_treeview_expand(tv, item)
+end
+
+function advanced_treeview_collapse(tv, item)
+    aurora_advanced_treeview_collapse(tv, item)
+end
+
+function advanced_webview(parent, x, y, w, h)
+    return aurora_advanced_webview_new(parent, x, y, w, h)
+end
+
+function advanced_webview_navigate(wv, url)
+    aurora_advanced_webview_navigate(wv, url)
+end
+
+function advanced_media(parent, x, y, w, h)
+    return aurora_advanced_media_new(parent, x, y, w, h)
+end
+
+function advanced_media_open(mw, src)
+    aurora_advanced_media_open(mw, src)
+end
+
+function advanced_media_play(mw)
+    aurora_advanced_media_play(mw)
+end
+
+function advanced_media_pause(mw)
+    aurora_advanced_media_pause(mw)
+end
+
+function advanced_map(parent, x, y, w, h)
+    return aurora_advanced_map_new(parent, x, y, w, h)
+end
+
+function advanced_map_set_center(mp, lat, lon)
+    aurora_advanced_map_set_center(mp, lat, lon)
+end
+
+function advanced_map_set_zoom(mp, zoom)
+    aurora_advanced_map_set_zoom(mp, zoom)
+end
+
+function advanced_map_add_marker(mp, lat, lon, title)
+    aurora_advanced_map_add_marker(mp, lat, lon, title)
+end

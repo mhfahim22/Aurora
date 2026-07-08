@@ -1,0 +1,32 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_slider_new(parent: pointer, x: int, y: int, w: int, h: int, min: int, max: int) -> pointer
+extern function aurora_gui_slider_get_value(sl: pointer) -> int
+extern function aurora_gui_slider_set_value(sl: pointer, value: int)
+extern function aurora_gui_slider_set_range(sl: pointer, min: int, max: int)
+
+function main()
+    output("slider: start")
+    win = aurora_gui_window_new("SlTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    sl = aurora_gui_slider_new(win, 10, 10, 200, 30, 0, 100)
+    if sl == null
+        output("  note: slider_new returned null (headless)")
+    end
+
+    aurora_gui_slider_set_value(sl, 75)
+    val = aurora_gui_slider_get_value(sl)
+    if val < 0
+        output("FAIL: slider value < 0")
+        return
+    end
+
+    aurora_gui_slider_set_range(sl, 10, 50)
+    aurora_gui_slider_set_value(sl, 25)
+
+    aurora_gui_window_destroy(win)
+    output("slider: PASS")
+end

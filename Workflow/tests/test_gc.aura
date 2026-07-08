@@ -1,0 +1,21 @@
+# Phase 1.1 — GC Stability Test
+# Verify GC handles many allocations without crashing
+
+import "pool"
+
+extern function aurora_gc_collect()
+
+function main()
+    output("GC Test: Starting 10000 allocations...")
+
+    for i in 100
+        ptrs = []
+        for j in 100
+            ptrs.push(j)
+        end
+    end
+
+    aurora_gc_collect()
+
+    output("GC Test: PASS")
+end

@@ -1,0 +1,47 @@
+## ═══════════════════════════════════════════════════════════════════
+##  Phase 10 — GUI Hot Reload
+##  Widget tree diff, state preservation, event reconnection
+## ═══════════════════════════════════════════════════════════════════
+
+module "hot_reload_gui"
+
+extern function aurora_hot_reload_gui_init() -> i32
+extern function aurora_hot_reload_gui_shutdown() -> i32
+extern function aurora_hot_reload_gui_diff() -> i32
+extern function aurora_hot_reload_gui_apply() -> i32
+extern function aurora_hot_reload_gui_diff_tree() -> cstring
+extern function aurora_hot_reload_gui_preserve_state() -> i32
+extern function aurora_hot_reload_gui_restore_state() -> i32
+extern function aurora_hot_reload_gui_get_preserved_state() -> cstring
+
+function hot_reload_gui_init()
+    return aurora_hot_reload_gui_init()
+end
+
+function hot_reload_gui_shutdown()
+    return aurora_hot_reload_gui_shutdown()
+end
+
+function hot_reload_gui_diff()
+    return aurora_hot_reload_gui_diff()
+end
+
+function hot_reload_gui_apply()
+    return aurora_hot_reload_gui_apply()
+end
+
+function hot_reload_gui_diff_tree()
+    return aurora_hot_reload_gui_diff_tree()
+end
+
+function hot_reload_gui_preserve_state()
+    return aurora_hot_reload_gui_preserve_state()
+end
+
+function hot_reload_gui_restore_state()
+    return aurora_hot_reload_gui_restore_state()
+end
+
+function hot_reload_gui_get_preserved_state()
+    return aurora_hot_reload_gui_get_preserved_state()
+end

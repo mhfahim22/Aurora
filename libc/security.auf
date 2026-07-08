@@ -148,3 +148,31 @@ pub fn basic_auth(username: str, password: str) -> str
 
 pub fn bearer_auth(token: str) -> str
     aurora_sec_bearer_auth(token)
+
+// ── JWT (3) ──
+extern function aurora_jwt_encode(payload: str, secret: str) -> str
+extern function aurora_jwt_decode(token: str, secret: str) -> str
+extern function aurora_jwt_get_payload(token: str) -> str
+
+pub fn jwt_encode(payload: str, secret: str) -> str
+    aurora_jwt_encode(payload, secret)
+
+pub fn jwt_decode(token: str, secret: str) -> str
+    aurora_jwt_decode(token, secret)
+
+pub fn jwt_get_payload(token: str) -> str
+    aurora_jwt_get_payload(token)
+
+// ── OAuth 2.0 (3) ──
+extern function aurora_oauth_build_url(provider: str, client_id: str, redirect_uri: str, scope: str) -> str
+extern function aurora_oauth_exchange_code(provider: str, code: str, client_id: str, client_secret: str, redirect_uri: str) -> str
+extern function aurora_oauth_get_user_info(provider: str, access_token: str) -> str
+
+pub fn oauth_build_url(provider: str, client_id: str, redirect_uri: str, scope: str) -> str
+    aurora_oauth_build_url(provider, client_id, redirect_uri, scope)
+
+pub fn oauth_exchange_code(provider: str, code: str, client_id: str, client_secret: str, redirect_uri: str) -> str
+    aurora_oauth_exchange_code(provider, code, client_id, client_secret, redirect_uri)
+
+pub fn oauth_get_user_info(provider: str, access_token: str) -> str
+    aurora_oauth_get_user_info(provider, access_token)

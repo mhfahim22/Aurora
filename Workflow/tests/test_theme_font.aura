@@ -1,0 +1,37 @@
+# Theme Font Test
+# Verifies set_font and get_font for headline and body
+
+extern function aurora_app_theme_init() -> ptr
+extern function aurora_app_theme_destroy(theme: ptr)
+extern function aurora_app_theme_set_mode(theme: ptr, mode: int)
+extern function aurora_app_theme_get_mode(theme: ptr) -> int
+extern function aurora_app_theme_set_color(theme: ptr, key: int, color: int)
+extern function aurora_app_theme_get_color(theme: ptr, key: int) -> int
+extern function aurora_app_theme_set_font(theme: ptr, key: int, size: int)
+extern function aurora_app_theme_get_font(theme: ptr, key: int) -> int
+extern function aurora_app_theme_get_spacing(theme: ptr, level: int) -> double
+
+function main()
+    theme = aurora_app_theme_init()
+    if theme == 0
+        output("FAIL: theme_init returned null")
+        return
+    end
+
+    aurora_app_theme_set_font(theme, 0, 24)
+    font = aurora_app_theme_get_font(theme, 0)
+    if font != 24
+        output("FAIL: headline font expected 24 got " + str(font))
+        return
+    end
+
+    aurora_app_theme_set_font(theme, 1, 16)
+    font = aurora_app_theme_get_font(theme, 1)
+    if font != 16
+        output("FAIL: body font expected 16 got " + str(font))
+        return
+    end
+
+    aurora_app_theme_destroy(theme)
+    output("PASS")
+end

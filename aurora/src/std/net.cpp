@@ -6,6 +6,10 @@
 #include <atomic>
 #include <vector>
 #include <string>
+#include <mutex>
+#include <unordered_map>
+#include <chrono>
+#include <thread>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -907,4 +911,125 @@ static int winhttp_request(const char* url, LPCWSTR method,
 }
 #endif
 
+} // extern "C"
+
+/* ═══════════════════════════════════════════════════════════════
+   Connection Pool (C++ helpers + C-exported functions)
+   ═══════════════════════════════════════════════════════════════ */
+
+static std::string host_key(const char* host, int port) {
+    return std::string(host) + ":" + std::to_string(port);
 }
+
+struct PooledConn {
+    int64_t sock;
+    std::chrono::steady_clock::time_point idle_since;
+};
+
+struct HostPool {
+    std::vector<PooledConn> idle;
+};
+
+struct AuroraConnPool {
+    std::unordered_map<std::string, HostPool> hosts;
+    std::mutex mtx;
+    int max_per_host;
+    int idle_timeout_sec;
+};
+
+extern "C" {
+
+AuroraConnPool* aurora_net_conn_pool_new(int max_per_host, int idle_timeout_sec) {
+    AuroraConnPool* pool = new AuroraConnPool();
+    if (!pool) return nullptr;
+    pool->max_per_host = max_per_host > 0 ? max_per_host : 8;
+    pool->idle_timeout_sec = idle_timeout_sec > 0 ? idle_timeout_sec : 30;
+    return pool;
+}
+
+void aurora_net_conn_pool_free(AuroraConnPool* pool) {
+    if (!pool) return;
+    std::lock_guard<std::mutex> lock(pool->mtx);
+    for (auto& hp : pool->hosts) {
+        for (auto& c : hp.second.idle) {
+#ifdef _WIN32
+            closesocket((SOCKET)(intptr_t)c.sock);
+#else
+            close((int)c.sock);
+#endif
+        }
+    }
+    delete pool;
+}
+
+int64_t aurora_net_conn_pool_get(AuroraConnPool* pool, const char* host, int port) {
+    if (!pool || !host) return -1;
+    std::string key = host_key(host, port);
+    std::lock_guard<std::mutex> lock(pool->mtx);
+    auto it = pool->hosts.find(key);
+    if (it == pool->hosts.end() || it->second.idle.empty()) return -1;
+    int64_t sock = it->second.idle.back().sock;
+    it->second.idle.pop_back();
+    return sock;
+}
+
+void aurora_net_conn_pool_put(AuroraConnPool* pool, int64_t sock, const char* host, int port) {
+    if (!pool || !host || sock < 0) return;
+    std::string key = host_key(host, port);
+    std::lock_guard<std::mutex> lock(pool->mtx);
+    auto now = std::chrono::steady_clock::now();
+    auto& host_pool = pool->hosts[key];
+    auto& idle = host_pool.idle;
+    for (auto it = idle.begin(); it != idle.end();) {
+        auto age = std::chrono::duration_cast<std::chrono::seconds>(now - it->idle_since).count();
+        if (age >= pool->idle_timeout_sec) {
+#ifdef _WIN32
+            closesocket((SOCKET)(intptr_t)it->sock);
+#else
+            close((int)it->sock);
+#endif
+            it = idle.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    if ((int)idle.size() >= pool->max_per_host) {
+#ifdef _WIN32
+        closesocket((SOCKET)(intptr_t)idle.front().sock);
+#else
+        close((int)idle.front().sock);
+#endif
+        idle.erase(idle.begin());
+    }
+    PooledConn pc;
+    pc.sock = sock;
+    pc.idle_since = now;
+    idle.push_back(pc);
+}
+
+void aurora_net_conn_pool_clear_host(AuroraConnPool* pool, const char* host, int port) {
+    if (!pool || !host) return;
+    std::string key = host_key(host, port);
+    std::lock_guard<std::mutex> lock(pool->mtx);
+    auto it = pool->hosts.find(key);
+    if (it != pool->hosts.end()) {
+        for (auto& c : it->second.idle) {
+#ifdef _WIN32
+            closesocket((SOCKET)(intptr_t)c.sock);
+#else
+            close((int)c.sock);
+#endif
+        }
+        pool->hosts.erase(it);
+    }
+}
+
+int aurora_net_conn_pool_idle_count(AuroraConnPool* pool) {
+    if (!pool) return 0;
+    std::lock_guard<std::mutex> lock(pool->mtx);
+    int count = 0;
+    for (auto& hp : pool->hosts) count += (int)hp.second.idle.size();
+    return count;
+}
+
+} // extern "C"

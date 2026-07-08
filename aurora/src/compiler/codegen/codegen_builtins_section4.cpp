@@ -269,10 +269,27 @@ llvm::Value* codegen_builtin_section4(
         return builder.CreateCall(builtins.validate_fn, { s, d }, "validate_ret");
     }
 
-    /* ── sanitize(data) ── */
+    /* ── sanitize(data) / sanitize(data, mode) ── */
     if (name == "sanitize" && node->args) {
         llvm::Value* d = to_ptr(builder, ctx, gen_expr(node->args.get()));
-        return builder.CreateCall(builtins.sanitize_fn, { d }, "sanitize_ret");
+        llvm::Value* mode = llvm::ConstantInt::get(i64, 0, true);
+        if (node->args->next)
+            mode = gen_expr(node->args->next.get());
+        return builder.CreateCall(builtins.sanitize_fn, { d, mode }, "sanitize_ret");
+    }
+
+    /* ── template(name, source) ── */
+    if (name == "template" && node->args && node->args->next) {
+        llvm::Value* n = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* s = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        return builder.CreateCall(builtins.template_fn, { n, s }, "template_ret");
+    }
+
+    /* ── render(name, context) ── */
+    if (name == "render" && node->args && node->args->next) {
+        llvm::Value* n = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* c = to_ptr(builder, ctx, gen_expr(node->args->next.get()));
+        return builder.CreateCall(builtins.render_fn, { n, c }, "render_ret");
     }
 
     /* ── throttle(limit) ── */

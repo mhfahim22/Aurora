@@ -1,0 +1,35 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_progressbar_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_progressbar_set_value(pb: pointer, value: int)
+extern function aurora_gui_progressbar_get_value(pb: pointer) -> int
+extern function aurora_gui_progressbar_set_range(pb: pointer, min: int, max: int)
+extern function aurora_gui_progressbar_set_marquee(pb: pointer, on: int)
+
+function main()
+    output("progress: start")
+    win = aurora_gui_window_new("PrTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    pb = aurora_gui_progressbar_new(win, 10, 10, 200, 24)
+    if pb == null
+        output("  note: progressbar_new returned null (headless)")
+    end
+
+    aurora_gui_progressbar_set_value(pb, 50)
+    val = aurora_gui_progressbar_get_value(pb)
+    if val < 0
+        output("FAIL: progress value < 0")
+        return
+    end
+
+    aurora_gui_progressbar_set_range(pb, 0, 200)
+    aurora_gui_progressbar_set_value(pb, 100)
+    aurora_gui_progressbar_set_marquee(pb, 1)
+    aurora_gui_progressbar_set_marquee(pb, 0)
+
+    aurora_gui_window_destroy(win)
+    output("progress: PASS")
+end

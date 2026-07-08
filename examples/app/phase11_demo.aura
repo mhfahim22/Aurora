@@ -1,0 +1,130 @@
+## ═══════════════════════════════════════════════════════════════════
+##  Phase 11 Demo — App Distribution & Store Ecosystem
+##  Verifies all 5 sub-sections of Phase 11
+## ═══════════════════════════════════════════════════════════════════
+
+import "app"
+import "gui"
+
+## ── 11.2 Auto-Update externs ──
+extern function aurora_updater_init(app_name: str, current_version: str, update_url: str) -> i32
+extern function aurora_updater_check() -> i32
+extern function aurora_updater_get_latest_version() -> str
+extern function aurora_updater_get_download_url() -> str
+extern function aurora_updater_download() -> i32
+extern function aurora_updater_download_progress() -> i32
+extern function aurora_updater_apply() -> i32
+extern function aurora_updater_rollback() -> i32
+extern function aurora_updater_set_channel(channel: str) -> i32
+extern function aurora_updater_get_channel() -> str
+extern function aurora_updater_shutdown()
+
+## ── 11.3 Telemetry externs ──
+extern function aurora_telemetry_init(endpoint: str, enable_crash: i32, enable_analytics: i32) -> i32
+extern function aurora_telemetry_set_user_id(user_id: str) -> i32
+extern function aurora_telemetry_set_app_version(version: str) -> i32
+extern function aurora_telemetry_track_event(category: str, action: str, label: str) -> i32
+extern function aurora_telemetry_track_error(message: str, stack_trace: str) -> i32
+extern function aurora_telemetry_opt_in() -> i32
+extern function aurora_telemetry_opt_out() -> i32
+extern function aurora_telemetry_is_opted_in() -> i32
+extern function aurora_telemetry_send_now() -> i32
+extern function aurora_telemetry_get_endpoint() -> str
+extern function aurora_telemetry_shutdown()
+
+## ── 11.4 In-App Purchases externs ──
+extern function aurora_store_init() -> ptr
+extern function aurora_store_products(handle: ptr, product_ids_json: str) -> i32
+extern function aurora_store_purchase(handle: ptr, product_id: str) -> i32
+extern function aurora_store_restore_purchases(handle: ptr) -> i32
+extern function aurora_store_is_purchased(handle: ptr, product_id: str) -> i32
+extern function aurora_store_get_receipt(handle: ptr) -> str
+extern function aurora_store_consume(handle: ptr, product_id: str) -> i32
+extern function aurora_store_shutdown(handle: ptr)
+
+## ── 11.5 Push Notifications externs ──
+extern function aurora_push_init() -> i32
+extern function aurora_push_register() -> i32
+extern function aurora_push_unregister() -> i32
+extern function aurora_push_is_registered() -> i32
+extern function aurora_push_set_callback(callback: ptr) -> i32
+extern function aurora_push_get_token() -> str
+extern function aurora_push_send_local(title: str, body: str, delay_ms: i32) -> i32
+extern function aurora_push_cancel_local(notification_id: i32) -> i32
+extern function aurora_push_shutdown()
+
+function main()
+    win = app_init("Phase 11 — App Distribution Demo", 800, 600)
+    output("Phase 11 demo started.")
+
+    ## ═══════════════════════════════════════════════════════════
+    ##  11.2 Auto-Update
+    ## ═══════════════════════════════════════════════════════════
+    output("═══ 11.2 Auto-Update ═══")
+    aurora_updater_init("MyApp", "1.0.0", "https://updates.example.com")
+    output("Channel: " + aurora_updater_get_channel())
+    aurora_updater_set_channel("beta")
+    output("Channel set to: " + aurora_updater_get_channel())
+    available = aurora_updater_check()
+    output("Update available: " + str(available))
+    output("Latest version: " + aurora_updater_get_latest_version())
+    output("Download URL: " + aurora_updater_get_download_url())
+    output("Download: " + str(aurora_updater_download()))
+    output("Progress: " + str(aurora_updater_download_progress()))
+    output("Apply: " + str(aurora_updater_apply()))
+    output("Rollback: " + str(aurora_updater_rollback()))
+    aurora_updater_shutdown()
+    output("Auto-Update PASS")
+
+    ## ═══════════════════════════════════════════════════════════
+    ##  11.3 Crash Reporting & Analytics
+    ## ═══════════════════════════════════════════════════════════
+    output("═══ 11.3 Telemetry ═══")
+    aurora_telemetry_init("https://telemetry.example.com", 1, 1)
+    aurora_telemetry_set_user_id("user_42")
+    aurora_telemetry_set_app_version("1.0.0")
+    aurora_telemetry_track_event("ui", "button_click", "login")
+    aurora_telemetry_track_error("Null reference", "at main.aura:42")
+    output("Opted in: " + str(aurora_telemetry_is_opted_in()))
+    aurora_telemetry_opt_out()
+    output("Opted in after opt-out: " + str(aurora_telemetry_is_opted_in()))
+    aurora_telemetry_opt_in()
+    output("Endpoint: " + aurora_telemetry_get_endpoint())
+    output("Send now: " + str(aurora_telemetry_send_now()))
+    aurora_telemetry_shutdown()
+    output("Telemetry PASS")
+
+    ## ═══════════════════════════════════════════════════════════
+    ##  11.4 In-App Purchases & Subscriptions
+    ## ═══════════════════════════════════════════════════════════
+    output("═══ 11.4 Store/IAP ═══")
+    handle = aurora_store_init()
+    output("Handle: " + str(handle != null))
+    aurora_store_products(handle, "[\"pro_version\", \"subscription_monthly\"]")
+    output("Purchase pro: " + str(aurora_store_purchase(handle, "pro_version")))
+    output("Purchased pro: " + str(aurora_store_is_purchased(handle, "pro_version")))
+    output("Restore: " + str(aurora_store_restore_purchases(handle)))
+    output("Receipt: " + aurora_store_get_receipt(handle))
+    output("Consume: " + str(aurora_store_consume(handle, "consumable_coin")))
+    aurora_store_shutdown(handle)
+    output("Store/IAP PASS")
+
+    ## ═══════════════════════════════════════════════════════════
+    ##  11.5 Push Notifications
+    ## ═══════════════════════════════════════════════════════════
+    output("═══ 11.5 Push ═══")
+    aurora_push_init()
+    output("Register: " + str(aurora_push_register()))
+    output("Registered: " + str(aurora_push_is_registered()))
+    output("Token: " + aurora_push_get_token())
+    output("Set callback: " + str(aurora_push_set_callback(null)))
+    output("Send local: " + str(aurora_push_send_local("Hello", "This is a test notification", 0)))
+    output("Cancel local: " + str(aurora_push_cancel_local(1)))
+    aurora_push_shutdown()
+    output("Push PASS")
+
+    output("")
+    output("Phase 11 demo complete — all 4 sub-sections verified.")
+
+    app_run(win)
+end

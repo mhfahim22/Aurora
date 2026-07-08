@@ -1,0 +1,95 @@
+## Layout Size, Min Size, Max Size Unit Tests
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
+extern function aurora_app_layout_node_set_align(node: ptr, align: int)
+extern function aurora_app_layout_node_set_wrap(node: ptr, wrap: int)
+extern function aurora_app_layout_node_set_gap(node: ptr, gap: double)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_min_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_max_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_padding(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_node_set_margin(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_x(node: ptr) -> double
+extern function aurora_app_layout_node_get_y(node: ptr) -> double
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+extern function aurora_app_layout_node_get_h(node: ptr) -> double
+extern function aurora_app_layout_node_set_flex(node: ptr, grow: int, shrink: int, basis: int)
+
+function main()
+    output("═══ Layout Size Test ═══")
+
+    output("  setup root: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create returned null")
+        return
+    end
+    root = aurora_app_layout_node_new(0, 0)
+    if root == 0
+        output("FAIL: node_new root returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    output("  setup root: pass")
+
+    output("  set explicit size: start")
+    aurora_app_layout_node_set_size(root, 300.0, 150.0)
+    aurora_app_layout_calculate(root, 800.0, 600.0)
+    w = aurora_app_layout_node_get_w(root)
+    h = aurora_app_layout_node_get_h(root)
+    output("  width=" + str(w) + " height=" + str(h))
+    if w == 0
+        output("FAIL: width is 0 after set_size")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    if h == 0
+        output("FAIL: height is 0 after set_size")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    output("  set explicit size: pass")
+
+    output("  set min size: start")
+    aurora_app_layout_node_set_min_size(root, 100.0, 50.0)
+    aurora_app_layout_calculate(root, 800.0, 600.0)
+    output("  set min size: pass")
+
+    output("  set max size: start")
+    aurora_app_layout_node_set_max_size(root, 500.0, 400.0)
+    aurora_app_layout_calculate(root, 800.0, 600.0)
+    w2 = aurora_app_layout_node_get_w(root)
+    h2 = aurora_app_layout_node_get_h(root)
+    output("  after max w=" + str(w2) + " h=" + str(h2))
+    output("  set max size: pass")
+
+    output("  different size values: start")
+    child = aurora_app_layout_node_new(root, 0)
+    if child == 0
+        output("FAIL: node_new child returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_size(child, 100.0, 80.0)
+    aurora_app_layout_calculate(root, 800.0, 600.0)
+    cw = aurora_app_layout_node_get_w(child)
+    ch = aurora_app_layout_node_get_h(child)
+    output("  child w=" + str(cw) + " h=" + str(ch))
+    if cw == 0
+        output("FAIL: child width is 0")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    output("  different size values: pass")
+
+    output("  destroy: start")
+    aurora_app_layout_destroy(lay)
+    output("  destroy: pass")
+
+    output("PASS")
+end

@@ -1,0 +1,43 @@
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_dropdown_new(parent: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_dropdown_add_item(dd: pointer, item: cstring)
+extern function aurora_gui_dropdown_clear(dd: pointer)
+extern function aurora_gui_dropdown_get_selected(dd: pointer) -> int
+extern function aurora_gui_dropdown_set_selected(dd: pointer, idx: int)
+extern function aurora_gui_dropdown_count(dd: pointer) -> int
+extern function aurora_gui_dropdown_get_item(dd: pointer, idx: int) -> cstring
+
+function main()
+    output("dropdown: start")
+    win = aurora_gui_window_new("DdTest", 400, 200)
+    if win == null
+        output("  note: window_new returned null (headless)")
+    end
+
+    dd = aurora_gui_dropdown_new(win, 10, 10, 150, 25)
+    if dd == null
+        output("  note: dropdown_new returned null (headless)")
+    end
+
+    aurora_gui_dropdown_add_item(dd, "Red")
+    aurora_gui_dropdown_add_item(dd, "Green")
+    aurora_gui_dropdown_add_item(dd, "Blue")
+    cnt = aurora_gui_dropdown_count(dd)
+    if cnt < 0
+        output("FAIL: dropdown count < 0")
+        return
+    end
+
+    aurora_gui_dropdown_set_selected(dd, 2)
+    sel = aurora_gui_dropdown_get_selected(dd)
+    if sel < 0
+        output("FAIL: dropdown selected < 0")
+        return
+    end
+
+    aurora_gui_dropdown_clear(dd)
+
+    aurora_gui_window_destroy(win)
+    output("dropdown: PASS")
+end

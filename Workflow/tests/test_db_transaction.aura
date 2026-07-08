@@ -1,0 +1,48 @@
+# Phase 15 — Database Transaction Test
+
+extern function aurora_db_sqlite_open(path: str) -> ptr
+extern function aurora_db_sqlite_close(db: ptr)
+extern function aurora_db_sqlite_exec(db: ptr, sql: str) -> str
+extern function aurora_db_sqlite_begin(db: ptr) -> int
+extern function aurora_db_sqlite_commit(db: ptr) -> int
+extern function aurora_db_sqlite_rollback(db: ptr) -> int
+
+function main()
+    output("db_transaction: start")
+    db = aurora_db_sqlite_open(":memory:")
+    if db == null
+        output("FAIL: open returned null")
+        return
+    end
+    output("  open: ok")
+    aurora_db_sqlite_exec(db, "CREATE TABLE t (x INT)")
+    beg = aurora_db_sqlite_begin(db)
+    if beg != 0
+        output("FAIL: begin = " + str(beg))
+        return
+    end
+    output("  begin: ok")
+    aurora_db_sqlite_exec(db, "INSERT INTO t VALUES (1)")
+    com = aurora_db_sqlite_commit(db)
+    if com != 0
+        output("FAIL: commit = " + str(com))
+        return
+    end
+    output("  commit: ok")
+    beg2 = aurora_db_sqlite_begin(db)
+    if beg2 != 0
+        output("FAIL: begin2 = " + str(beg2))
+        return
+    end
+    output("  begin2: ok")
+    aurora_db_sqlite_exec(db, "INSERT INTO t VALUES (2)")
+    rb = aurora_db_sqlite_rollback(db)
+    if rb != 0
+        output("FAIL: rollback = " + str(rb))
+        return
+    end
+    output("  rollback: ok")
+    aurora_db_sqlite_close(db)
+    output("  close: ok")
+    output("db_transaction: PASS")
+end

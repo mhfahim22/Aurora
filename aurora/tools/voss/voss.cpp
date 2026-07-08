@@ -367,6 +367,52 @@ int main(int argc, char* argv[]) {
         }
         return cmd_doc(out_dir, serve);
     }
+    if (cmd == "bundle" || cmd == "bnd") {
+        std::string target, format;
+        for (int i = off; i < argc; i++) {
+            if (strcmp(argv[i], "--target") == 0 || strcmp(argv[i], "-t") == 0) { if (i + 1 < argc) target = argv[++i]; }
+            else if (strcmp(argv[i], "--format") == 0 || strcmp(argv[i], "-f") == 0) { if (i + 1 < argc) format = argv[++i]; }
+        }
+        if (target.empty()) {
+            std::cerr << "usage: voss bundle --target <windows|linux|macos|android|ios|all> [--format <format>]\n"
+                      << "  Creates platform-specific installer/bundle for distribution\n"
+                      << "formats:\n"
+                      << "  windows: exe (Inno Setup), msi (WiX)\n"
+                      << "  linux: appimage, deb\n"
+                      << "  macos: dmg\n"
+                      << "  android: apk, aab\n"
+                      << "  ios: ipa\n";
+            return 1;
+        }
+        if (format.empty()) {
+            if (target == "windows") format = "exe";
+            else if (target == "linux") format = "appimage";
+            else if (target == "macos") format = "dmg";
+            else if (target == "android") format = "apk";
+            else if (target == "ios") format = "ipa";
+            else { std::cerr << "error: unknown target '" << target << "'\n"; return 1; }
+        }
+        return cmd_package(target, format);
+    }
+    if (cmd == "package" || cmd == "pkg") {
+        std::string target, format;
+        for (int i = off; i < argc; i++) {
+            if (strcmp(argv[i], "--target") == 0 || strcmp(argv[i], "-t") == 0) { if (i + 1 < argc) target = argv[++i]; }
+            else if (strcmp(argv[i], "--format") == 0 || strcmp(argv[i], "-f") == 0) { if (i + 1 < argc) format = argv[++i]; }
+        }
+        if (target.empty()) {
+            std::cerr << "usage: voss package --target <windows|linux|macos|android|ios|all> --format <format>\n"
+                      << "formats:\n"
+                      << "  windows: msi, exe\n"
+                      << "  linux: appimage, deb\n"
+                      << "  macos: dmg\n"
+                      << "  android: apk, aab\n"
+                      << "  ios: ipa\n";
+            return 1;
+        }
+        return cmd_package(target, format);
+    }
+    if (cmd == "theme") return cmd_theme(argc - 2, argv + 2);
     if (cmd == "help" || cmd == "--help" || cmd == "-h") return cmd_help();
 
     std::cerr << "unknown command '" << cmd << "'\n";

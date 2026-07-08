@@ -1,0 +1,36 @@
+## GroupBox Widget Unit Tests
+
+import "gui"
+
+function main()
+    output("═══ GroupBox Test ═══")
+
+    output("  groupbox new with title: start")
+    win = aurora_gui_window_new("Test", 400, 300)
+    gb = aurora_gui_groupbox_new(win, "Settings", 10, 10, 200, 150)
+    if gb == 0
+        output("FAIL: groupbox_new with title returned null")
+        return
+    end
+    output("  groupbox new with title: pass")
+
+    output("  groupbox new empty title: start")
+    win2 = aurora_gui_window_new("Test", 400, 300)
+    gb2 = aurora_gui_groupbox_new(win2, "", 10, 170, 200, 100)
+    if gb2 == 0
+        output("FAIL: groupbox_new empty title returned null")
+        return
+    end
+    output("  groupbox new empty title: pass")
+
+    output("  groupbox new at different position: start")
+    win3 = aurora_gui_window_new("Test", 400, 300)
+    gb3 = aurora_gui_groupbox_new(win3, "Options", 220, 10, 150, 120)
+    if gb3 == 0
+        output("FAIL: groupbox_new at position returned null")
+        return
+    end
+    output("  groupbox new at different position: pass")
+
+    output("PASS")
+end

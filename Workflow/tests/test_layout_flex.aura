@@ -1,0 +1,82 @@
+## Layout Flex Grow/Shrink Unit Tests
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
+extern function aurora_app_layout_node_set_align(node: ptr, align: int)
+extern function aurora_app_layout_node_set_wrap(node: ptr, wrap: int)
+extern function aurora_app_layout_node_set_gap(node: ptr, gap: double)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_min_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_max_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_padding(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_node_set_margin(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_x(node: ptr) -> double
+extern function aurora_app_layout_node_get_y(node: ptr) -> double
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+extern function aurora_app_layout_node_get_h(node: ptr) -> double
+extern function aurora_app_layout_node_set_flex(node: ptr, grow: int, shrink: int, basis: int)
+
+function main()
+    output("═══ Layout Flex Test ═══")
+
+    output("  setup: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create returned null")
+        return
+    end
+    root = aurora_app_layout_node_new(0, 0)
+    if root == 0
+        output("FAIL: node_new root returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(root, 0)
+    aurora_app_layout_node_set_size(root, 400.0, 100.0)
+    output("  setup: pass")
+
+    output("  create child1 flex=1: start")
+    c1 = aurora_app_layout_node_new(root, 0)
+    if c1 == 0
+        output("FAIL: node_new child1 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_flex(c1, 1, 0, 0)
+    output("  create child1 flex=1: pass")
+
+    output("  create child2 flex=2: start")
+    c2 = aurora_app_layout_node_new(root, 0)
+    if c2 == 0
+        output("FAIL: node_new child2 returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_flex(c2, 2, 0, 0)
+    output("  create child2 flex=2: pass")
+
+    output("  calculate: start")
+    aurora_app_layout_calculate(root, 400.0, 100.0)
+    output("  calculate: pass")
+
+    output("  verify widths differ: start")
+    w1 = aurora_app_layout_node_get_w(c1)
+    w2 = aurora_app_layout_node_get_w(c2)
+    if w1 == w2
+        output("FAIL: flex widths equal w1=" + str(w1) + " w2=" + str(w2))
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    output("  w1=" + str(w1) + " w2=" + str(w2))
+    output("  verify widths differ: pass")
+
+    output("  destroy: start")
+    aurora_app_layout_destroy(lay)
+    output("  destroy: pass")
+
+    output("PASS")
+end

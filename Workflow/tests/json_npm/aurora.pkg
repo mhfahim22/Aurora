@@ -1,0 +1,6 @@
+name: json-npm
+version: 11.0.0
+description: "npm bridge: a 'json' command for massaging and processing JSON on the command line"
+entry: json.auf
+dependencies:
+  - quickjs

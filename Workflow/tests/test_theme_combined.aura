@@ -1,0 +1,62 @@
+# Theme Combined Test
+# Verifies mode, color, and font settings all persist together
+
+extern function aurora_app_theme_init() -> ptr
+extern function aurora_app_theme_destroy(theme: ptr)
+extern function aurora_app_theme_set_mode(theme: ptr, mode: int)
+extern function aurora_app_theme_get_mode(theme: ptr) -> int
+extern function aurora_app_theme_set_color(theme: ptr, key: int, color: int)
+extern function aurora_app_theme_get_color(theme: ptr, key: int) -> int
+extern function aurora_app_theme_set_font(theme: ptr, key: int, size: int)
+extern function aurora_app_theme_get_font(theme: ptr, key: int) -> int
+extern function aurora_app_theme_get_spacing(theme: ptr, level: int) -> double
+
+function main()
+    theme = aurora_app_theme_init()
+    if theme == 0
+        output("FAIL: theme_init returned null")
+        return
+    end
+
+    aurora_app_theme_set_mode(theme, 1)
+    mode = aurora_app_theme_get_mode(theme)
+    if mode != 1
+        output("FAIL: mode expected 1 got " + str(mode))
+        return
+    end
+
+    aurora_app_theme_set_color(theme, 0, 65280)
+    color = aurora_app_theme_get_color(theme, 0)
+    if color != 65280
+        output("FAIL: color expected 65280 got " + str(color))
+        return
+    end
+
+    aurora_app_theme_set_font(theme, 0, 32)
+    font = aurora_app_theme_get_font(theme, 0)
+    if font != 32
+        output("FAIL: font expected 32 got " + str(font))
+        return
+    end
+
+    mode = aurora_app_theme_get_mode(theme)
+    if mode != 1
+        output("FAIL: mode changed after set_color/set_font expected 1 got " + str(mode))
+        return
+    end
+
+    color = aurora_app_theme_get_color(theme, 0)
+    if color != 65280
+        output("FAIL: color changed after set_font expected 65280 got " + str(color))
+        return
+    end
+
+    font = aurora_app_theme_get_font(theme, 0)
+    if font != 32
+        output("FAIL: font changed after get_color expected 32 got " + str(font))
+        return
+    end
+
+    aurora_app_theme_destroy(theme)
+    output("PASS")
+end

@@ -1,0 +1,63 @@
+## ═══════════════════════════════════════════════════════════════════
+##  Phase 10 — Internationalization (i18n)
+##  Locale detection, translations, string formatting, RTL support
+## ═══════════════════════════════════════════════════════════════════
+
+module "i18n"
+
+extern function aurora_i18n_locale(out: pointer) -> i32
+extern function aurora_i18n_set_locale(lang: cstring)
+extern function aurora_i18n_get_locale() -> cstring
+extern function aurora_i18n_get_system_locale() -> cstring
+extern function aurora_i18n_translate(key: cstring, domain: cstring) -> cstring
+extern function aurora_i18n_load(domain: cstring, filepath: cstring) -> i32
+extern function aurora_i18n_load_json(domain: cstring, json_data: cstring) -> i32
+extern function aurora_i18n_add(domain: cstring, lang: cstring, key: cstring, value: cstring) -> i32
+extern function aurora_i18n_format(pattern: cstring, argc: i32, args: pointer) -> cstring
+extern function aurora_i18n_rtl(locale: cstring) -> i32
+extern function aurora_i18n_language_name(lang: cstring, buf: cstring, bufsize: i32) -> i32
+extern function aurora_i18n_available_locales(buf: cstring, bufsize: i32) -> i32
+
+function i18n_detect_locale()
+    return aurora_i18n_get_system_locale()
+end
+
+function i18n_set_locale(lang)
+    aurora_i18n_set_locale(lang)
+end
+
+function i18n_get_locale()
+    return aurora_i18n_get_locale()
+end
+
+function i18n_tr(key, domain)
+    return aurora_i18n_translate(key, domain)
+end
+
+function i18n_load_json(domain, data)
+    return aurora_i18n_load_json(domain, data)
+end
+
+function i18n_load(domain, filepath)
+    return aurora_i18n_load(domain, filepath)
+end
+
+function i18n_add(domain, lang, key, value)
+    return aurora_i18n_add(domain, lang, key, value)
+end
+
+function i18n_format(pattern, argc, args)
+    return aurora_i18n_format(pattern, argc, args)
+end
+
+function i18n_is_rtl(locale)
+    return aurora_i18n_rtl(locale)
+end
+
+function i18n_language_name(lang, buf, bufsize)
+    return aurora_i18n_language_name(lang, buf, bufsize)
+end
+
+function i18n_available_locales(buf, bufsize)
+    return aurora_i18n_available_locales(buf, bufsize)
+end

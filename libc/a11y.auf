@@ -1,0 +1,87 @@
+## ═══════════════════════════════════════════════════════════════════
+##  Phase 10 — Accessibility (a11y)
+##  ARIA labels, roles, focus management, keyboard shortcuts
+## ═══════════════════════════════════════════════════════════════════
+
+module "a11y"
+
+extern function aurora_a11y_set_label(widget: pointer, label: cstring) -> i32
+extern function aurora_a11y_get_label(widget: pointer) -> cstring
+extern function aurora_a11y_set_role(widget: pointer, role: cstring) -> i32
+extern function aurora_a11y_get_role(widget: pointer) -> cstring
+extern function aurora_a11y_set_focusable(widget: pointer, focusable: i32) -> i32
+extern function aurora_a11y_is_focusable(widget: pointer) -> i32
+extern function aurora_a11y_set_tab_index(widget: pointer, index: i32) -> i32
+extern function aurora_a11y_get_tab_index(widget: pointer) -> i32
+extern function aurora_a11y_focus_next() -> i32
+extern function aurora_a11y_focus_prev() -> i32
+extern function aurora_a11y_get_focused() -> pointer
+extern function aurora_a11y_announce(text: cstring) -> i32
+extern function aurora_a11y_set_hint(widget: pointer, hint: cstring) -> i32
+extern function aurora_a11y_register_shortcut(shortcut: cstring, fn: pointer) -> i32
+extern function aurora_a11y_unregister_shortcut(shortcut: cstring) -> i32
+extern function aurora_a11y_screen_reader_active() -> i32
+
+function a11y_set_label(widget, label)
+    aurora_a11y_set_label(widget, label)
+end
+
+function a11y_get_label(widget)
+    return aurora_a11y_get_label(widget)
+end
+
+function a11y_set_role(widget, role)
+    aurora_a11y_set_role(widget, role)
+end
+
+function a11y_get_role(widget)
+    return aurora_a11y_get_role(widget)
+end
+
+function a11y_set_focusable(widget, focusable)
+    aurora_a11y_set_focusable(widget, focusable)
+end
+
+function a11y_is_focusable(widget)
+    return aurora_a11y_is_focusable(widget)
+end
+
+function a11y_set_tab_index(widget, index)
+    aurora_a11y_set_tab_index(widget, index)
+end
+
+function a11y_get_tab_index(widget)
+    return aurora_a11y_get_tab_index(widget)
+end
+
+function a11y_focus_next()
+    return aurora_a11y_focus_next()
+end
+
+function a11y_focus_prev()
+    return aurora_a11y_focus_prev()
+end
+
+function a11y_get_focused()
+    return aurora_a11y_get_focused()
+end
+
+function a11y_announce(text)
+    aurora_a11y_announce(text)
+end
+
+function a11y_set_hint(widget, hint)
+    aurora_a11y_set_hint(widget, hint)
+end
+
+function a11y_register_shortcut(shortcut, fn)
+    aurora_a11y_register_shortcut(shortcut, fn)
+end
+
+function a11y_unregister_shortcut(shortcut)
+    aurora_a11y_unregister_shortcut(shortcut)
+end
+
+function a11y_screen_reader_active()
+    return aurora_a11y_screen_reader_active()
+end

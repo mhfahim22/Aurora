@@ -1,5 +1,6 @@
 #include "std/security.hpp"
 #include "std/crypto.hpp"
+#include "std/net.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -550,4 +551,182 @@ char* aurora_sec_bearer_auth(const char* token) {
     if (!token) return nullptr;
     std::string result = "Bearer " + std::string(token);
     return strdup_c(result.c_str());
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   JWT (RFC 7519) — HS256
+   ═══════════════════════════════════════════════════════════════ */
+
+static char* base64url_encode(const unsigned char* data, int len) {
+    if (!data || len < 0) return nullptr;
+    int encoded_len = ((len + 2) / 3) * 4 + 1;
+    char* out = (char*)malloc(encoded_len);
+    if (!out) return nullptr;
+    int ret = aurora_base64_encode(data, (size_t)len, out, (size_t)encoded_len);
+    if (!ret) { free(out); return nullptr; }
+    for (char* p = out; *p; p++) {
+        if (*p == '+') *p = '-';
+        else if (*p == '/') *p = '_';
+    }
+    char* pad = strchr(out, '=');
+    if (pad) *pad = '\0';
+    return out;
+}
+
+static unsigned char* base64url_decode(const char* in, int* out_len) {
+    if (!in || !out_len) return nullptr;
+    int len = (int)strlen(in);
+    int padded_len = ((len + 3) / 4) * 4;
+    char* padded = (char*)malloc(padded_len + 1);
+    if (!padded) return nullptr;
+    for (int i = 0; i < len; i++) {
+        if (in[i] == '-') padded[i] = '+';
+        else if (in[i] == '_') padded[i] = '/';
+        else padded[i] = in[i];
+    }
+    while (len < padded_len) padded[len++] = '=';
+    padded[padded_len] = '\0';
+    unsigned char* out = (unsigned char*)malloc((size_t)padded_len);
+    if (!out) { free(padded); return nullptr; }
+    *out_len = aurora_base64_decode(padded, out, (size_t)padded_len);
+    free(padded);
+    if (*out_len <= 0) { free(out); return nullptr; }
+    return out;
+}
+
+char* aurora_jwt_encode(const char* payload_json, const char* secret) {
+    if (!payload_json || !secret) return nullptr;
+    const char header_json[] = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+    char* header_b64 = base64url_encode((const unsigned char*)header_json, (int)strlen(header_json));
+    if (!header_b64) return nullptr;
+    char* payload_b64 = base64url_encode((const unsigned char*)payload_json, (int)strlen(payload_json));
+    if (!payload_b64) { free(header_b64); return nullptr; }
+    std::string signing_input = std::string(header_b64) + "." + std::string(payload_b64);
+    unsigned char sig[32];
+    aurora_hmac_sha256((const unsigned char*)secret, strlen(secret),
+                       (const unsigned char*)signing_input.data(), signing_input.size(), sig);
+    char* sig_b64 = base64url_encode(sig, 32);
+    if (!sig_b64) { free(header_b64); free(payload_b64); return nullptr; }
+    std::string token = signing_input + "." + std::string(sig_b64);
+    free(header_b64); free(payload_b64); free(sig_b64);
+    return strdup_c(token.c_str());
+}
+
+char* aurora_jwt_decode(const char* token, const char* secret) {
+    if (!token || !secret) return nullptr;
+    const char* first_dot = strchr(token, '.');
+    if (!first_dot) return nullptr;
+    const char* second_dot = strchr(first_dot + 1, '.');
+    if (!second_dot) return nullptr;
+    std::string header_b64(token, first_dot - token);
+    std::string payload_b64(first_dot + 1, second_dot - first_dot - 1);
+    std::string sig_b64(second_dot + 1);
+    std::string signing_input = header_b64 + "." + payload_b64;
+    unsigned char computed_sig[32];
+    aurora_hmac_sha256((const unsigned char*)secret, strlen(secret),
+                       (const unsigned char*)signing_input.data(), signing_input.size(), computed_sig);
+    char* computed_sig_b64 = base64url_encode(computed_sig, 32);
+    if (!computed_sig_b64) return nullptr;
+    bool valid = (sig_b64 == computed_sig_b64);
+    free(computed_sig_b64);
+    if (!valid) return nullptr;
+    int payload_len = 0;
+    unsigned char* payload_data = base64url_decode(payload_b64.c_str(), &payload_len);
+    if (!payload_data) return nullptr;
+    char* result = strdup_c((const char*)payload_data);
+    free(payload_data);
+    return result;
+}
+
+char* aurora_jwt_get_payload(const char* token) {
+    if (!token) return nullptr;
+    const char* first_dot = strchr(token, '.');
+    if (!first_dot) return nullptr;
+    const char* second_dot = strchr(first_dot + 1, '.');
+    if (!second_dot) return nullptr;
+    std::string payload_b64(first_dot + 1, second_dot - first_dot - 1);
+    int payload_len = 0;
+    unsigned char* payload_data = base64url_decode(payload_b64.c_str(), &payload_len);
+    if (!payload_data) return nullptr;
+    char* result = strdup_c((const char*)payload_data);
+    free(payload_data);
+    return result;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   OAuth 2.0
+   ═══════════════════════════════════════════════════════════════ */
+
+struct OAuthProviderInfo {
+    const char* auth_url;
+    const char* token_url;
+    const char* userinfo_url;
+};
+
+static OAuthProviderInfo get_oauth_provider(const char* provider) {
+    if (strcmp(provider, "google") == 0)
+        return { "https://accounts.google.com/o/oauth2/v2/auth",
+                 "https://oauth2.googleapis.com/token",
+                 "https://www.googleapis.com/oauth2/v3/userinfo" };
+    if (strcmp(provider, "github") == 0)
+        return { "https://github.com/login/oauth/authorize",
+                 "https://github.com/login/oauth/access_token",
+                 "https://api.github.com/user" };
+    if (strcmp(provider, "facebook") == 0)
+        return { "https://www.facebook.com/v19.0/dialog/oauth",
+                 "https://graph.facebook.com/v19.0/oauth/access_token",
+                 "https://graph.facebook.com/me" };
+    return { nullptr, nullptr, nullptr };
+}
+
+char* aurora_oauth_build_url(const char* provider, const char* client_id,
+                              const char* redirect_uri, const char* scope) {
+    if (!provider || !client_id) return nullptr;
+    OAuthProviderInfo info = get_oauth_provider(provider);
+    if (!info.auth_url) return nullptr;
+    std::string url = std::string(info.auth_url)
+        + "?client_id=" + (client_id ? client_id : "")
+        + "&redirect_uri=" + (redirect_uri ? redirect_uri : "")
+        + "&scope=" + (scope ? scope : "")
+        + "&response_type=code";
+    return strdup_c(url.c_str());
+}
+
+char* aurora_oauth_exchange_code(const char* provider, const char* code,
+                                  const char* client_id, const char* client_secret,
+                                  const char* redirect_uri) {
+    if (!provider || !code || !client_id || !client_secret) return nullptr;
+    OAuthProviderInfo info = get_oauth_provider(provider);
+    if (!info.token_url) return nullptr;
+    std::string body = "code=" + std::string(code)
+        + "&client_id=" + std::string(client_id)
+        + "&client_secret=" + std::string(client_secret)
+        + "&redirect_uri=" + (redirect_uri ? redirect_uri : "")
+        + "&grant_type=authorization_code";
+    char resp_buf[8192];
+    int ret = aurora_net_http_post_ex(info.token_url, "Accept: application/json\r\n",
+                                       body.c_str(), "application/x-www-form-urlencoded",
+                                       resp_buf, sizeof(resp_buf));
+    if (ret <= 0) return nullptr;
+    /* Extract body after headers */
+    char* body_start = strstr(resp_buf, "\r\n\r\n");
+    if (!body_start) return nullptr;
+    body_start += 4;
+    /* Parse JSON to extract access_token */
+    return strdup_c(body_start);
+}
+
+char* aurora_oauth_get_user_info(const char* provider, const char* access_token) {
+    if (!provider || !access_token) return nullptr;
+    OAuthProviderInfo info = get_oauth_provider(provider);
+    if (!info.userinfo_url) return nullptr;
+    std::string auth_header = std::string("Authorization: Bearer ") + access_token + "\r\n";
+    char resp_buf[8192];
+    int ret = aurora_net_http_get_ex(info.userinfo_url, auth_header.c_str(),
+                                      resp_buf, sizeof(resp_buf));
+    if (ret <= 0) return nullptr;
+    char* body_start = strstr(resp_buf, "\r\n\r\n");
+    if (!body_start) return nullptr;
+    body_start += 4;
+    return strdup_c(body_start);
 }

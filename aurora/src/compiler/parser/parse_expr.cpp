@@ -1,4 +1,5 @@
 #include "compiler/parser.hpp"
+#include "common/platform.hpp"
 #include <stdexcept>
 #include <sstream>
 
@@ -172,6 +173,30 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
     if (t.is_keyword("true"))  { idx++; return make_node(NodeType::Num, "1", t.line); }
     if (t.is_keyword("false")) { idx++; return make_node(NodeType::Num, "0", t.line); }
     if (t.is_keyword("null"))  { idx++; return make_node(NodeType::Num, "0", t.line); }
+
+    /* ── Phase 8: Platform built-in constants ── */
+    if (t.is_keyword("is_windows"))   { idx++; return make_node(NodeType::Num, AURORA_PLATFORM_WINDOWS ? "1" : "0", t.line); }
+    if (t.is_keyword("is_linux"))     { idx++; return make_node(NodeType::Num, AURORA_PLATFORM_LINUX   ? "1" : "0", t.line); }
+    if (t.is_keyword("is_macos"))     { idx++; return make_node(NodeType::Num, AURORA_PLATFORM_MACOS   ? "1" : "0", t.line); }
+    if (t.is_keyword("is_android"))   { idx++; return make_node(NodeType::Num, AURORA_PLATFORM_ANDROID ? "1" : "0", t.line); }
+    if (t.is_keyword("is_ios"))       { idx++; return make_node(NodeType::Num, AURORA_PLATFORM_IOS     ? "1" : "0", t.line); }
+    if (t.is_keyword("is_mobile"))    { idx++; int v = (AURORA_PLATFORM_ANDROID || AURORA_PLATFORM_IOS); return make_node(NodeType::Num, v ? "1" : "0", t.line); }
+    if (t.is_keyword("is_desktop"))   { idx++; int v = (AURORA_PLATFORM_WINDOWS || AURORA_PLATFORM_LINUX || AURORA_PLATFORM_MACOS); return make_node(NodeType::Num, v ? "1" : "0", t.line); }
+    if (t.is_keyword("platform_name")) {
+        idx++;
+        const char* name =
+            AURORA_PLATFORM_WINDOWS ? "windows" :
+            AURORA_PLATFORM_LINUX   ? "linux"   :
+            AURORA_PLATFORM_MACOS   ? "macos"   :
+            AURORA_PLATFORM_ANDROID ? "android" :
+            AURORA_PLATFORM_IOS     ? "ios"     : "unknown";
+        return make_node(NodeType::Str, name, t.line);
+    }
+    if (t.is_keyword("platform_family")) {
+        idx++;
+        const char* family = AURORA_PLATFORM_ANDROID || AURORA_PLATFORM_IOS ? "mobile" : "desktop";
+        return make_node(NodeType::Str, family, t.line);
+    }
 
     /* ── new Constructor(args) ── */
     if (t.is_keyword("new")) {

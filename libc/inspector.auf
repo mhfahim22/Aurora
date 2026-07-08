@@ -1,0 +1,67 @@
+## ═══════════════════════════════════════════════════════════════════
+##  Phase 10 — GUI Inspector / Debugger
+##  Overlay rendering, property panel, layout debug visualization
+## ═══════════════════════════════════════════════════════════════════
+
+module "inspector"
+
+extern function aurora_inspector_init() -> i32
+extern function aurora_inspector_shutdown() -> i32
+extern function aurora_inspector_set_enabled(enabled: i32)
+extern function aurora_inspector_is_enabled() -> i32
+extern function aurora_inspector_highlight_widget(widget: pointer)
+extern function aurora_inspector_select_widget(widget: pointer)
+extern function aurora_inspector_get_selected() -> pointer
+extern function aurora_inspector_render_overlay()
+extern function aurora_inspector_get_property_str(widget: pointer, key: cstring) -> cstring
+extern function aurora_inspector_get_property_int(widget: pointer, key: cstring) -> i32
+extern function aurora_inspector_set_property_str(widget: pointer, key: cstring, value: cstring)
+extern function aurora_inspector_set_property_int(widget: pointer, key: cstring, value: i32)
+
+function inspector_init()
+    return aurora_inspector_init()
+end
+
+function inspector_shutdown()
+    return aurora_inspector_shutdown()
+end
+
+function inspector_set_enabled(enabled)
+    aurora_inspector_set_enabled(enabled)
+end
+
+function inspector_is_enabled()
+    return aurora_inspector_is_enabled()
+end
+
+function inspector_highlight_widget(widget)
+    aurora_inspector_highlight_widget(widget)
+end
+
+function inspector_select_widget(widget)
+    aurora_inspector_select_widget(widget)
+end
+
+function inspector_get_selected()
+    return aurora_inspector_get_selected()
+end
+
+function inspector_render_overlay()
+    aurora_inspector_render_overlay()
+end
+
+function inspector_get_property_str(widget, key)
+    return aurora_inspector_get_property_str(widget, key)
+end
+
+function inspector_get_property_int(widget, key)
+    return aurora_inspector_get_property_int(widget, key)
+end
+
+function inspector_set_property_str(widget, key, value)
+    aurora_inspector_set_property_str(widget, key, value)
+end
+
+function inspector_set_property_int(widget, key, value)
+    aurora_inspector_set_property_int(widget, key, value)
+end

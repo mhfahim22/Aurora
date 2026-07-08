@@ -1,0 +1,94 @@
+## Layout Gap, Padding, Margin Unit Tests
+
+extern function aurora_app_layout_create() -> ptr
+extern function aurora_app_layout_destroy(layout: ptr)
+extern function aurora_app_layout_node_new(parent: ptr, typ: int) -> ptr
+extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
+extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
+extern function aurora_app_layout_node_set_align(node: ptr, align: int)
+extern function aurora_app_layout_node_set_wrap(node: ptr, wrap: int)
+extern function aurora_app_layout_node_set_gap(node: ptr, gap: double)
+extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_min_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_max_size(node: ptr, w: double, h: double)
+extern function aurora_app_layout_node_set_padding(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_node_set_margin(node: ptr, l: double, t: double, r: double, b: double)
+extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
+extern function aurora_app_layout_node_get_x(node: ptr) -> double
+extern function aurora_app_layout_node_get_y(node: ptr) -> double
+extern function aurora_app_layout_node_get_w(node: ptr) -> double
+extern function aurora_app_layout_node_get_h(node: ptr) -> double
+extern function aurora_app_layout_node_set_flex(node: ptr, grow: int, shrink: int, basis: int)
+
+function main()
+    output("═══ Layout Gap Test ═══")
+
+    output("  setup with row: start")
+    lay = aurora_app_layout_create()
+    if lay == 0
+        output("FAIL: layout_create returned null")
+        return
+    end
+    root = aurora_app_layout_node_new(0, 0)
+    if root == 0
+        output("FAIL: node_new root returned null")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    aurora_app_layout_node_set_direction(root, 0)
+    aurora_app_layout_node_set_size(root, 400.0, 100.0)
+    output("  setup with row: pass")
+
+    output("  create children: start")
+    c1 = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(c1, 80.0, 40.0)
+    c2 = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(c2, 80.0, 40.0)
+    c3 = aurora_app_layout_node_new(root, 0)
+    aurora_app_layout_node_set_size(c3, 80.0, 40.0)
+    output("  create children: pass")
+
+    output("  calculate without gap: start")
+    aurora_app_layout_calculate(root, 400.0, 100.0)
+    x1_no = aurora_app_layout_node_get_x(c1)
+    x2_no = aurora_app_layout_node_get_x(c2)
+    x3_no = aurora_app_layout_node_get_x(c3)
+    diff_no = x2_no - x1_no
+    output("  no gap x1=" + str(x1_no) + " x2=" + str(x2_no) + " diff=" + str(diff_no))
+    output("  calculate without gap: pass")
+
+    output("  calculate with gap 10: start")
+    aurora_app_layout_node_set_gap(root, 10.0)
+    aurora_app_layout_calculate(root, 400.0, 100.0)
+    x1_gap = aurora_app_layout_node_get_x(c1)
+    x2_gap = aurora_app_layout_node_get_x(c2)
+    diff_gap = x2_gap - x1_gap
+    output("  with gap x1=" + str(x1_gap) + " x2=" + str(x2_gap) + " diff=" + str(diff_gap))
+    if diff_gap == diff_no
+        output("FAIL: gap did not affect spacing")
+        aurora_app_layout_destroy(lay)
+        return
+    end
+    output("  calculate with gap 10: pass")
+
+    output("  set padding on root: start")
+    aurora_app_layout_node_set_padding(root, 10.0, 10.0, 10.0, 10.0)
+    aurora_app_layout_calculate(root, 400.0, 100.0)
+    x1_pad = aurora_app_layout_node_get_x(c1)
+    y1_pad = aurora_app_layout_node_get_y(c1)
+    output("  padding x1=" + str(x1_pad) + " y1=" + str(y1_pad))
+    output("  set padding on root: pass")
+
+    output("  set margin on child: start")
+    aurora_app_layout_node_set_margin(c1, 5.0, 5.0, 5.0, 5.0)
+    aurora_app_layout_calculate(root, 400.0, 100.0)
+    x1_margin = aurora_app_layout_node_get_x(c1)
+    output("  margin x1=" + str(x1_margin))
+    output("  set margin on child: pass")
+
+    output("  destroy: start")
+    aurora_app_layout_destroy(lay)
+    output("  destroy: pass")
+
+    output("PASS")
+end

@@ -1,0 +1,53 @@
+# Phase 27 — Permissions Test
+
+extern function aurora_sec_permission_check(perm: str) -> int
+extern function aurora_sec_permission_request(perm: str) -> int
+extern function aurora_sec_permission_list() -> str
+extern function aurora_sec_permission_revoke(perm: str) -> int
+
+function main()
+    output("permissions: start")
+    chk = aurora_sec_permission_check("camera")
+    if chk != 0
+        output("FAIL: camera initial check = " + str(chk))
+        return
+    end
+    output("  camera initial: 0 (ok)")
+    chk2 = aurora_sec_permission_check("storage")
+    if chk2 != 0
+        output("FAIL: storage initial check = " + str(chk2))
+        return
+    end
+    output("  storage initial: 0 (ok)")
+    lst = aurora_sec_permission_list()
+    if strlen(lst) > 0
+        output("FAIL: list not empty: len=" + str(strlen(lst)))
+        return
+    end
+    output("  list empty: ok")
+    req = aurora_sec_permission_request("camera")
+    if req != 1
+        output("FAIL: request camera = " + str(req))
+        return
+    end
+    output("  request camera: ok")
+    chk3 = aurora_sec_permission_check("camera")
+    if chk3 != 1
+        output("FAIL: camera after request = " + str(chk3))
+        return
+    end
+    output("  camera after request: 1 (ok)")
+    rev = aurora_sec_permission_revoke("camera")
+    if rev != 1
+        output("FAIL: revoke camera = " + str(rev))
+        return
+    end
+    output("  revoke camera: ok")
+    chk4 = aurora_sec_permission_check("camera")
+    if chk4 != 0
+        output("FAIL: camera after revoke = " + str(chk4))
+        return
+    end
+    output("  camera after revoke: 0 (ok)")
+    output("permissions: PASS")
+end

@@ -1,0 +1,51 @@
+import "gui"
+
+function main()
+    output("═══ Stress Widgets Test ═══")
+
+    count = aurora_gui_widget_count()
+    output("  initial count: " + str(count))
+
+    output("Creating 50 windows with 10 buttons each...")
+    for i in range(50)
+        win = aurora_gui_window_new("Window " + str(i), 200, 150)
+        if win == 0
+            output("FAIL: window creation at " + str(i))
+            return
+        end
+        for j in range(10)
+            label = "btn_" + str(i) + "_" + str(j)
+            btn = aurora_gui_button_new(win, label, 10, j * 20, 120, 18)
+            if btn == 0
+                output("FAIL: button creation at " + str(i) + "," + str(j))
+                return
+            end
+        end
+        if i % 10 == 0
+            output("  created window " + str(i) + " ...")
+        end
+    end
+
+    count = aurora_gui_widget_count()
+    output("  widget count after creation: " + str(count))
+    if count == 0
+        output("FAIL: widget count is 0 after creating widgets")
+        return
+    end
+
+    output("Destroying all windows...")
+    for i in range(50)
+        win = aurora_gui_widget_get_by_index(0)
+        if win != 0
+            aurora_gui_window_destroy(win)
+        end
+        if i % 10 == 0
+            output("  destroyed window " + str(i) + " ...")
+        end
+    end
+
+    count = aurora_gui_widget_count()
+    output("  widget count after cleanup: " + str(count))
+
+    output("PASS")
+end

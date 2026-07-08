@@ -29,6 +29,17 @@ float aurora_ios_screen_scale(void);
 int aurora_ios_orientation(void);
 void aurora_ios_set_orientation(int orient);
 
+/* ── Widget Renderer ── */
+
+/* Set the root UIView for widget rendering. */
+void aurora_ios_widgets_set_root_view(void* view);
+
+/* Render the widget tree to iOS UIKit views. */
+void aurora_ios_widgets_render_tree(void* root);
+
+/* Render a single widget (dispatched from mw_render). */
+void aurora_ios_widgets_render(void* widget);
+
 /* ── Touch / Input ── */
 
 /* Touch event data */

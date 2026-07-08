@@ -48,6 +48,10 @@ extern "C" {
 #define AURORA_WIDGET_CONTAINER   39
 #define AURORA_WIDGET_DIVIDER     40
 #define AURORA_WIDGET_ASPECT_RATIO 41
+/* ── Phase 9: Advanced Widgets ── */
+#define AURORA_WIDGET_WEBVIEW      42
+#define AURORA_WIDGET_MEDIA        43
+#define AURORA_WIDGET_MAP          44
 
 /* ── Layout alignment constants ── */
 #define AURORA_MAIN_START          0
@@ -119,6 +123,16 @@ typedef void* AuroraWidget;
 
 /* ── Event callback ── */
 typedef void (*AuroraEventCallback)(int widget_id, int event_type, int param1, int param2);
+
+/* ── Widget introspection (for inspector, hot-reload) ── */
+AURORA_EXPORT int          aurora_gui_widget_get_type(void* widget);
+AURORA_EXPORT void*        aurora_gui_widget_get_parent(void* widget);
+AURORA_EXPORT const char*  aurora_gui_widget_get_text(void* widget);
+AURORA_EXPORT void         aurora_gui_widget_get_bounds(void* widget, int* x, int* y, int* w, int* h);
+AURORA_EXPORT int          aurora_gui_widget_get_id(void* widget);
+AURORA_EXPORT void*        aurora_gui_widget_find_at(int x, int y);
+AURORA_EXPORT int          aurora_gui_widget_count(void);
+AURORA_EXPORT void*        aurora_gui_widget_get_by_index(int idx);
 
 /* ── Font info (returned by font picker) ── */
 typedef struct {
@@ -353,6 +367,37 @@ typedef void (*AuroraPaintCallback)(void* user_data, int x, int y, int w, int h)
 AURORA_EXPORT AuroraWidget aurora_gui_canvas_new(AuroraWidget parent, int x, int y, int w, int h);
 AURORA_EXPORT void         aurora_gui_canvas_set_paint_callback(AuroraWidget cv, AuroraPaintCallback cb, void* user_data);
 AURORA_EXPORT void         aurora_gui_canvas_repaint(AuroraWidget cv);
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: WebView
+   ════════════════════════════════════════════════════════════ */
+AURORA_EXPORT AuroraWidget aurora_gui_webview_new(AuroraWidget parent, int x, int y, int w, int h);
+AURORA_EXPORT void         aurora_gui_webview_navigate(AuroraWidget wv, const char* url);
+AURORA_EXPORT void         aurora_gui_webview_go_back(AuroraWidget wv);
+AURORA_EXPORT void         aurora_gui_webview_go_forward(AuroraWidget wv);
+AURORA_EXPORT void         aurora_gui_webview_reload(AuroraWidget wv);
+AURORA_EXPORT void         aurora_gui_webview_set_on_title(AuroraWidget wv, AuroraEventCallback cb);
+AURORA_EXPORT void         aurora_gui_webview_set_on_navigate(AuroraWidget wv, AuroraEventCallback cb);
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: Media Player
+   ════════════════════════════════════════════════════════════ */
+AURORA_EXPORT AuroraWidget aurora_gui_media_new(AuroraWidget parent, int x, int y, int w, int h);
+AURORA_EXPORT void         aurora_gui_media_open(AuroraWidget mw, const char* src);
+AURORA_EXPORT void         aurora_gui_media_play(AuroraWidget mw);
+AURORA_EXPORT void         aurora_gui_media_pause(AuroraWidget mw);
+AURORA_EXPORT void         aurora_gui_media_stop(AuroraWidget mw);
+AURORA_EXPORT void         aurora_gui_media_set_volume(AuroraWidget mw, float vol);
+AURORA_EXPORT void         aurora_gui_media_set_looping(AuroraWidget mw, int loop);
+AURORA_EXPORT int          aurora_gui_media_is_playing(AuroraWidget mw);
+
+/* ════════════════════════════════════════════════════════════
+   Phase 9: Map
+   ════════════════════════════════════════════════════════════ */
+AURORA_EXPORT AuroraWidget aurora_gui_map_new(AuroraWidget parent, int x, int y, int w, int h);
+AURORA_EXPORT void         aurora_gui_map_set_center(AuroraWidget mp, double lat, double lon);
+AURORA_EXPORT void         aurora_gui_map_set_zoom(AuroraWidget mp, int zoom);
+AURORA_EXPORT void         aurora_gui_map_add_marker(AuroraWidget mp, double lat, double lon, const char* title);
 
 /* ════════════════════════════════════════════════════════════
    Menu Bar

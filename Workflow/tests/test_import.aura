@@ -1,0 +1,5 @@
+import "stdio"
+
+function main()
+    output("hello")
+end
