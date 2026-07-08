@@ -601,6 +601,43 @@ void aurora_gui_container_set_bg(AuroraWidget c, unsigned int clr) { (void)c;(vo
 AuroraWidget aurora_gui_divider_new(AuroraWidget p, int o, int t, int x, int y, int w, int h) { (void)p;(void)o;(void)t;(void)x;(void)y;(void)w;(void)h; return nullptr; }
 AuroraWidget aurora_gui_aspect_ratio_new(AuroraWidget p, AuroraWidget c, float r) { (void)p;(void)c;(void)r; return nullptr; }
 
+/* ── Widget introspection (Linux) ── */
+int aurora_gui_widget_get_type(void* widget) {
+    GuiWidget* w = (GuiWidget*)widget;
+    return w ? w->type : 0;
+}
+void* aurora_gui_widget_get_parent(void* widget) {
+    GuiWidget* w = (GuiWidget*)widget;
+    return w ? w->parent : nullptr;
+}
+const char* aurora_gui_widget_get_text(void* widget) {
+    if (!widget) return nullptr;
+    GuiWidget* w = (GuiWidget*)widget;
+    static std::string result;
+    result = w->text;
+    return result.c_str();
+}
+void aurora_gui_widget_get_bounds(void* widget, int* x, int* y, int* w, int* h) {
+    GuiWidget* gw = (GuiWidget*)widget;
+    if (gw) { if(x)*x=gw->x; if(y)*y=gw->y; if(w)*w=gw->w; if(h)*h=gw->h; }
+}
+int aurora_gui_widget_get_id(void* widget) {
+    GuiWidget* w = (GuiWidget*)widget;
+    return w ? w->id : -1;
+}
+void* aurora_gui_widget_find_at(int x, int y) {
+    for (auto* w : g_widgets) {
+        if (!w) continue;
+        if (x >= w->x && x < w->x + w->w && y >= w->y && y < w->y + w->h) return w;
+    }
+    return nullptr;
+}
+int aurora_gui_widget_count(void) { return (int)g_widgets.size(); }
+void* aurora_gui_widget_get_by_index(int idx) {
+    if (idx < 0 || idx >= (int)g_widgets.size()) return nullptr;
+    return g_widgets[idx];
+}
+
 #else /* macOS / unknown platform stubs */
 
 #include "../../include/std/gui.hpp"
@@ -835,42 +872,15 @@ void aurora_gui_map_set_zoom(AuroraWidget m,int z) { (void)m;(void)z; }
 void aurora_gui_map_add_marker(AuroraWidget m,double la,double lo,const char* t) { (void)m;(void)la;(void)lo;(void)t; }
 
 /* ════════════════════════════════════════════════════════════
-   Phase 10: Widget Introspection (Inspector support)
+   Phase 10: Widget Introspection stubs (non-Win32/non-Linux)
    ════════════════════════════════════════════════════════════ */
-int aurora_gui_widget_get_type(void* widget) {
-    GuiWidget* w = (GuiWidget*)widget;
-    return w ? w->type : 0;
-}
-void* aurora_gui_widget_get_parent(void* widget) {
-    GuiWidget* w = (GuiWidget*)widget;
-    return w ? w->parent : nullptr;
-}
-const char* aurora_gui_widget_get_text(void* widget) {
-    if (!widget) return nullptr;
-    GuiWidget* w = (GuiWidget*)widget;
-    static std::string result;
-    result = w->text;
-    return result.c_str();
-}
-void aurora_gui_widget_get_bounds(void* widget, int* x, int* y, int* w, int* h) {
-    GuiWidget* gw = (GuiWidget*)widget;
-    if (gw) { if(x)*x=gw->x; if(y)*y=gw->y; if(w)*w=gw->w; if(h)*h=gw->h; }
-}
-int aurora_gui_widget_get_id(void* widget) {
-    GuiWidget* w = (GuiWidget*)widget;
-    return w ? w->id : -1;
-}
-void* aurora_gui_widget_find_at(int x, int y) {
-    for (auto* w : g_widgets) {
-        if (!w) continue;
-        if (x >= w->x && x < w->x + w->w && y >= w->y && y < w->y + w->h) return w;
-    }
-    return nullptr;
-}
-int aurora_gui_widget_count(void) { return (int)g_widgets.size(); }
-void* aurora_gui_widget_get_by_index(int idx) {
-    if (idx < 0 || idx >= (int)g_widgets.size()) return nullptr;
-    return g_widgets[idx];
-}
+int aurora_gui_widget_get_type(void* widget) { (void)widget; return 0; }
+void* aurora_gui_widget_get_parent(void* widget) { (void)widget; return nullptr; }
+const char* aurora_gui_widget_get_text(void* widget) { (void)widget; return nullptr; }
+void aurora_gui_widget_get_bounds(void* widget, int* x, int* y, int* w, int* h) { (void)widget;(void)x;(void)y;(void)w;(void)h; }
+int aurora_gui_widget_get_id(void* widget) { (void)widget; return -1; }
+void* aurora_gui_widget_find_at(int x, int y) { (void)x;(void)y; return nullptr; }
+int aurora_gui_widget_count(void) { return 0; }
+void* aurora_gui_widget_get_by_index(int idx) { (void)idx; return nullptr; }
 
 #endif /* _WIN32 / __linux__ / else */
