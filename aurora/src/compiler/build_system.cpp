@@ -74,12 +74,7 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
 
     std::string features_str;
     if (cfg.target_triple.empty()) {
-#if defined(_MSC_VER)
-        llvm::StringMap<bool> host_features;
-        llvm::sys::getHostCPUFeatures(host_features);
-#else
         auto host_features = llvm::sys::getHostCPUFeatures();
-#endif
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
             features_str += f.second ? "+" : "-";
