@@ -1,0 +1,73 @@
+# Phase 35.1 — Full Web DSL Integration Test
+# Comprehensive test combining all web DSL features
+
+import "server"
+
+server full_test
+    cors
+    template "layout" "<html><body>{{content}}</body></html>"
+    template "card" "<div class=\"card\">{{title}}: {{body}}</div>"
+
+    websocket "/realtime"
+        on_open
+            output("Realtime: client connected")
+        on_message
+            output("Realtime: message")
+        on_close
+            output("Realtime: client disconnected")
+
+    sse "/events"
+        output("Events: client connected")
+
+    route "GET" "/"
+        response.html("<h1>Home</h1>")
+
+    route "GET" "/api/status"
+        response.json("{\"version\": \"1.0.0\", \"status\": \"healthy\"}")
+
+    route "GET" "/hello/:name"
+        response.html("<h1>Hello " + request.params.name + "</h1>")
+
+    route "GET" "/search"
+        q = request.query.q
+        page = request.query.page
+        if q == ""
+            response.status(400)
+            response.json("{\"error\": \"missing query\"}")
+        else
+            response.json("{\"query\": \"" + q + "\", \"page\": \"" + page + "\"}")
+        end
+
+    route "POST" "/data"
+        name = request.form.name
+        email = request.form.email
+        if name == "" || email == ""
+            response.status(400)
+            response.json("{\"error\": \"name and email required\"}")
+        else
+            response.status(201)
+            response.json("{\"name\": \"" + name + "\", \"email\": \"" + email + "\"}")
+        end
+
+    route "GET" "/check"
+        t = request.cookie.session
+        if t == ""
+            response.json("{\"session\": \"none\"}")
+        else
+            response.json("{\"session\": \"" + t + "\"}")
+        end
+
+    route "GET" "/old-page"
+        redirect("/new-page", 301)
+
+    route "POST" "/users"
+        response.status(201)
+        response.header("Location", "/users/1")
+        response.json("{\"id\": 1}")
+        response.cookie("token", "abc123", 3600)
+
+    validate
+        output("Full test: validation block registered")
+
+output("Full DSL Test: All features compiled OK")
+output("Full DSL Test: PASS")

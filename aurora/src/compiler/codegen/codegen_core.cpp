@@ -78,9 +78,9 @@ void Codegen::generate(const ASTNode* root) {
     ensure_llvm_init();
 
     /* Step 0 — set target info for LLVM optimization */
-    auto triple = llvm::sys::getProcessTriple();
-    module_->setTargetTriple(triple);
-    module_->setDataLayout(llvm_target_data_layout(triple));
+    auto triple_str = llvm::sys::getProcessTriple();
+    module_->setTargetTriple(llvm::Triple(triple_str));
+    module_->setDataLayout(llvm_target_data_layout(triple_str));
 
     /* Step 0a — initialize DWARF debug info */
     if (debug_enabled_ && !source_file_path_.empty())
@@ -825,15 +825,89 @@ void Codegen::gen_stmt(const ASTNode* node) {
             } else if (http_resp_new_) {
                 resp = builder_->CreateCall(http_resp_new_, {}, "resp");
             }
-            if (resp && node->left && http_resp_body_) {
-                llvm::Value* body = gen_expr(node->left.get());
-                if (body->getType() != i8ptr_ty())
-                    body = builder_->CreateBitCast(body, i8ptr_ty());
-                /* Convert AuroraStr* to const char* before setting body */
-                llvm::Function* str_to_c = module_->getFunction("aurora_str_as_cstr");
-                if (str_to_c)
-                    body = builder_->CreateCall(str_to_c, { body }, "cstr");
-                builder_->CreateCall(http_resp_body_, { resp, body });
+            if (!resp) break;
+
+            const std::string& method = node->value;
+            llvm::Function* str_to_c = module_->getFunction("aurora_str_as_cstr");
+
+            if (method.empty()) {
+                /* response(body) — set body with existing content-type */
+                if (node->left && http_resp_body_) {
+                    llvm::Value* body = gen_expr(node->left.get());
+                    if (body->getType() != i8ptr_ty())
+                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                    if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
+                    builder_->CreateCall(http_resp_body_, { resp, body });
+                }
+            } else if (method == "json") {
+                /* response.json(body) */
+                if (node->args && http_set_json_) {
+                    llvm::Value* body = gen_expr(node->args.get());
+                    if (body->getType() != i8ptr_ty())
+                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                    if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
+                    builder_->CreateCall(http_set_json_, { resp, body });
+                }
+            } else if (method == "html") {
+                /* response.html(body) */
+                if (node->args && http_resp_ct_ && http_resp_body_) {
+                    llvm::Value* ct = builder_->CreateGlobalStringPtr("text/html", "html_ct");
+                    builder_->CreateCall(http_resp_ct_, { resp, ct });
+                    llvm::Value* body = gen_expr(node->args.get());
+                    if (body->getType() != i8ptr_ty())
+                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                    if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
+                    builder_->CreateCall(http_resp_body_, { resp, body });
+                }
+            } else if (method == "status") {
+                /* response.status(code) */
+                if (node->args) {
+                    llvm::Value* code = gen_expr(node->args.get());
+                    auto* fn = module_->getFunction("aurora_http_response_set_status_code");
+                    if (fn) builder_->CreateCall(fn, { resp, code });
+                }
+            } else if (method == "redirect") {
+                /* response.redirect(url, code) */
+                if (node->args) {
+                    llvm::Value* url = gen_expr(node->args.get());
+                    if (url->getType() != i8ptr_ty())
+                        url = builder_->CreateBitCast(url, i8ptr_ty());
+                    if (str_to_c) url = builder_->CreateCall(str_to_c, { url }, "cstr");
+                    llvm::Value* code_val = llvm::ConstantInt::get(i64_ty(), 302);
+                    if (node->args->next)
+                        code_val = gen_expr(node->args->next.get());
+                    auto* fn = module_->getFunction("aurora_http_response_redirect");
+                    if (fn) builder_->CreateCall(fn, { resp, url, code_val });
+                }
+            } else if (method == "cookie") {
+                /* response.cookie(name, value, ttl) */
+                if (node->args && node->args->next) {
+                    llvm::Value* name = gen_expr(node->args.get());
+                    if (name->getType() != i8ptr_ty())
+                        name = builder_->CreateBitCast(name, i8ptr_ty());
+                    if (str_to_c) name = builder_->CreateCall(str_to_c, { name }, "cstr");
+                    llvm::Value* value = gen_expr(node->args->next.get());
+                    if (value->getType() != i8ptr_ty())
+                        value = builder_->CreateBitCast(value, i8ptr_ty());
+                    if (str_to_c) value = builder_->CreateCall(str_to_c, { value }, "cstr");
+                    auto* fn = module_->getFunction("aurora_http_response_set_header");
+                    if (fn) {
+                        /* Build Set-Cookie header value: name=value */
+                        std::vector<llvm::Value*> indices = {
+                            llvm::ConstantInt::get(i64_ty(), 0),
+                            llvm::ConstantInt::get(i64_ty(), 0)
+                        };
+                        llvm::Value* eq = builder_->CreateGlobalStringPtr("=", "eq_str");
+                        llvm::Function* strcat_fn = module_->getFunction("aurora_str_concat");
+                        if (strcat_fn) {
+                            llvm::Value* cookie_val = builder_->CreateCall(strcat_fn, { name, eq }, "cookie_prefix");
+                            cookie_val = builder_->CreateCall(strcat_fn, { cookie_val, value }, "cookie_full");
+                            builder_->CreateCall(fn, { resp,
+                                builder_->CreateGlobalStringPtr("Set-Cookie", "setcookie_name"),
+                                cookie_val });
+                        }
+                    }
+                }
             }
             break;
         }
@@ -871,6 +945,32 @@ void Codegen::gen_stmt(const ASTNode* node) {
             break;
         }
         case NodeType::Auth:          gen_auth(node);          break;
+        case NodeType::Cors:          gen_block(node->body.get()); break;
+        case NodeType::WebSocket:     gen_block(node->body.get()); break;
+        case NodeType::Sse:           gen_block(node->body.get()); break;
+        case NodeType::Tpl: {
+            /* template name "source" — compile + render */
+            auto* fn_compile = module_->getFunction("aurora_template_compile");
+            auto* fn_render = module_->getFunction("aurora_template_render");
+            if (fn_compile && !node->value.empty()) {
+                llvm::Value* name = builder_->CreateGlobalStringPtr(node->value, "tpl_name");
+                llvm::Value* source = nullptr;
+                if (node->left) source = gen_expr(node->left.get());
+                else source = llvm::ConstantPointerNull::get(i8ptr_ty());
+                llvm::Value* tpl = builder_->CreateCall(fn_compile, { name, source }, "tpl");
+                if (fn_render && tpl) {
+                    llvm::Value* ctx = llvm::ConstantPointerNull::get(i8ptr_ty());
+                    if (node->body) {
+                        /* body may set up context as JSON string */
+                        ctx = gen_expr(node->body.get());
+                    }
+                    if (!ctx) ctx = llvm::ConstantPointerNull::get(i8ptr_ty());
+                    builder_->CreateCall(fn_render, { name, ctx });
+                }
+            }
+            break;
+        }
+        case NodeType::Validate:      gen_block(node->body.get()); break;
         case NodeType::Ai:            gen_ai(node);            break;
         case NodeType::Train: {
             /* Train: execute training loop */

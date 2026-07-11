@@ -1,0 +1,21 @@
+# Phase 35.4 — Profiler Test
+# Verify profiler C API compiles
+
+extern function aurora_profiler_start()
+extern function aurora_profiler_stop()
+extern function aurora_profiler_get_report(): str
+
+function main()
+    output("Profiler Test: Starting...")
+
+    aurora_profiler_start()
+    output("Profiler Test: profiler_start OK")
+
+    aurora_profiler_stop()
+    output("Profiler Test: profiler_stop OK")
+
+    report = aurora_profiler_get_report()
+    output("Profiler Test: report returned")
+
+    output("Profiler Test: PASS")
+end

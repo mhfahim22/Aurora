@@ -7,6 +7,7 @@
 #include "runtime/tls.hpp"
 #include "runtime/websocket.hpp"
 #include "std/json.hpp"
+#include "std/crypto.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -914,6 +915,17 @@ void aurora_http_response_set_json(AuroraHttpResponse* res, const char* body) {
     aurora_http_response_set_body(res, body);
 }
 
+void aurora_http_response_redirect(AuroraHttpResponse* res, const char* url, int64_t code) {
+    if (!res) return;
+    aurora_http_response_set_status_code(res, (int)code);
+    aurora_http_response_set_header(res, "Location", url);
+}
+
+const char* aurora_http_get_form_param(AuroraHttpRequest* req, const char* name) {
+    if (!req || !name || !req->form) return nullptr;
+    return aurora_form_get(req->form, name);
+}
+
 /* ── Send bytes via raw socket or TLS ── */
 static int send_raw(int64_t sock, int64_t tls_handle, const char* data, int len) {
     if (tls_handle > 0) {
@@ -1186,6 +1198,7 @@ int aurora_middleware_run_chain(void** handlers, int count,
     if (!handlers || count <= 0) return 0;
     for (int i = 0; i < count; i++) {
         if (!handlers[i]) continue;
+        aurora_middleware_set_context(handlers, count, i, req, res);
         AuroraMiddlewareFn fn = (AuroraMiddlewareFn)handlers[i];
         int result = fn(req, res, nullptr);
         if (result != 0) {
@@ -2908,6 +2921,130 @@ const char* aurora_auth_hash_password(const char* password) {
         hash[r % 16] ^= 0xA5;
     }
     return to_hex(hash, 16);
+}
+
+/* ── JWT token creation and verification ── */
+
+static std::string base64url_encode(const unsigned char* data, size_t len) {
+    static const char* b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    std::string r;
+    for (size_t i = 0; i < len; i += 3) {
+        unsigned int n = (unsigned int)data[i] << 16;
+        if (i + 1 < len) n |= (unsigned int)data[i + 1] << 8;
+        if (i + 2 < len) n |= data[i + 2];
+        r += b64[(n >> 18) & 0x3F];
+        r += b64[(n >> 12) & 0x3F];
+        r += b64[(n >> 6) & 0x3F];
+        if (i + 2 < len) r += b64[n & 0x3F];
+    }
+    return r;
+}
+
+static void hmac_sha256(const unsigned char* key, size_t klen,
+                        const unsigned char* msg, size_t mlen,
+                        unsigned char* out) {
+    unsigned char k[64] = {0};
+    unsigned char ipad[64], opad[64];
+    for (size_t i = 0; i < 64; i++) k[i] = (i < klen) ? key[i] : 0;
+    for (size_t i = 0; i < 64; i++) { ipad[i] = k[i] ^ 0x36; opad[i] = k[i] ^ 0x5C; }
+    unsigned char inner[128] = {0};
+    memcpy(inner, ipad, 64);
+    memcpy(inner + 64, msg, mlen);
+    unsigned char h1[32]; aurora_sha256(inner, 64 + mlen, h1);
+    unsigned char outer[96] = {0};
+    memcpy(outer, opad, 64);
+    memcpy(outer + 64, h1, 32);
+    aurora_sha256(outer, 96, out);
+}
+
+/* aurora_auth_jwt_sign(payload_json, secret) → JWT string (caller frees) */
+char* aurora_auth_jwt_sign(const char* payload, const char* secret) {
+    if (!payload || !secret) return nullptr;
+    /* Header: {"alg":"HS256","typ":"JWT"} */
+    std::string header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+    std::string h_b64 = base64url_encode((const unsigned char*)header.c_str(), header.size());
+    std::string p_b64 = base64url_encode((const unsigned char*)payload, strlen(payload));
+    std::string message = h_b64 + "." + p_b64;
+    unsigned char sig[32];
+    hmac_sha256((const unsigned char*)secret, strlen(secret),
+                (const unsigned char*)message.c_str(), message.size(), sig);
+    std::string s_b64 = base64url_encode(sig, 32);
+    std::string jwt = message + "." + s_b64;
+    return strdup(jwt.c_str());
+}
+
+/* aurora_auth_jwt_verify(jwt, secret, &out_payload) → 1 if valid, 0 otherwise */
+int aurora_auth_jwt_verify(const char* jwt, const char* secret, char** out_payload) {
+    if (!jwt || !secret) return 0;
+    std::string s(jwt);
+    size_t dot1 = s.find('.');
+    if (dot1 == std::string::npos) return 0;
+    size_t dot2 = s.find('.', dot1 + 1);
+    if (dot2 == std::string::npos) return 0;
+    std::string message = s.substr(0, dot2);
+    std::string sig_b64 = s.substr(dot2 + 1);
+    unsigned char sig[32];
+    memset(sig, 0, 32);
+    /* Decode base64url signature */
+    const char* b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    int sig_idx = 0;
+    for (size_t i = 0; i + 3 < sig_b64.size() && sig_idx < 32; i += 4) {
+        unsigned int n = 0;
+        for (int j = 0; j < 4; j++) {
+            const char* p = strchr(b64chars, sig_b64[i + j]);
+            if (p) n = (n << 6) | (unsigned int)(p - b64chars);
+        }
+        if (sig_idx < 32) sig[sig_idx++] = (n >> 16) & 0xFF;
+        if (sig_idx < 32) sig[sig_idx++] = (n >> 8) & 0xFF;
+        if (sig_idx < 32) sig[sig_idx++] = n & 0xFF;
+    }
+    unsigned char expected[32];
+    hmac_sha256((const unsigned char*)secret, strlen(secret),
+                (const unsigned char*)message.c_str(), message.size(), expected);
+    if (memcmp(sig, expected, 32) != 0) return 0;
+    if (out_payload) {
+        std::string payload_hex;
+        size_t pd = message.find('.');
+        if (pd != std::string::npos) {
+            std::string p_b64 = message.substr(pd + 1);
+            std::string decoded;
+            for (size_t i = 0; i + 3 < p_b64.size(); i += 4) {
+                unsigned int n = 0;
+                for (int j = 0; j < 4; j++) {
+                    const char* p = strchr(b64chars, p_b64[i + j]);
+                    if (p) n = (n << 6) | (unsigned int)(p - b64chars);
+                }
+                decoded += (char)((n >> 16) & 0xFF);
+                decoded += (char)((n >> 8) & 0xFF);
+                decoded += (char)(n & 0xFF);
+            }
+            *out_payload = strdup(decoded.c_str());
+        } else {
+            *out_payload = strdup("");
+        }
+    }
+    return 1;
+}
+
+/* aurora_auth_check_role(jwt_payload_json, required_role) → 1 if authorized */
+int aurora_auth_check_role(const char* payload_json, const char* required_role) {
+    if (!payload_json || !required_role) return 0;
+    JsonValue* jv = aurora_json_parse(payload_json);
+    if (!jv) return 0;
+    char* role = aurora_json_get_str(jv, "role");
+    int result = (role && strcmp(role, required_role) == 0) ? 1 : 0;
+    free(role);
+    aurora_json_free(jv);
+    return result;
+}
+
+/* ── Session cleanup ── */
+static std::mutex g_session_cleanup_mtx;
+static int g_session_cleanup_running = 0;
+static int64_t g_session_default_ttl = 3600000; /* 1 hour in ms */
+
+void aurora_session_set_default_ttl(int64_t ttl_ms) {
+    g_session_default_ttl = ttl_ms > 0 ? ttl_ms : 3600000;
 }
 
 /* ════════════════════════════════════════════════════════════

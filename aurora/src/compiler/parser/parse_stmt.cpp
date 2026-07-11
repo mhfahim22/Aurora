@@ -457,16 +457,116 @@ ASTNode::Ptr Parser::parse_stmt() {
         return stmt;
     }
 
+    /* request(expr) / response(expr) — only match when followed by '(' or ':' */
     if ((t0.is_keyword("request") || t0.is_keyword("response") ||
-         t0.is_keyword("query") || t0.is_keyword("token"))) {
+         t0.is_keyword("query") || t0.is_keyword("token")) &&
+        cnt > 1 && (toks[1].is_operator('(') || toks[1].is_operator(':'))) {
         NodeType nt = t0.is_keyword("request") ? NodeType::Request :
                       t0.is_keyword("response") ? NodeType::Response :
                       t0.is_keyword("query") ? NodeType::Query : NodeType::Token;
         auto stmt = make_node(nt, "", ln);
         int idx = 1;
-        if (idx < cnt) stmt->left = parse_expr(toks, idx);
+        if (idx < cnt && toks[idx].is_operator('(')) {
+            stmt->left = parse_expr(toks, idx);
+        }
+        if (idx < cnt && toks[idx].is_operator(':')) idx++;
         require_token_end(toks, idx, (t0.value + " declaration").c_str());
         advance();
+        return stmt;
+    }
+
+    /* response.method(args) / request.method(args) — expression statement */
+    if ((t0.is_keyword("response") || t0.is_keyword("request")) &&
+        cnt > 2 && toks[1].is_operator('.') &&
+        (toks[2].is_identifier() || toks[2].is(TokenKind::Keyword))) {
+        NodeType nt = t0.is_keyword("response") ? NodeType::Response : NodeType::Request;
+        auto stmt = make_node(nt, toks[2].value, ln);  /* method name in value */
+        int idx = 3;
+        if (idx < cnt && toks[idx].is_operator('(')) {
+            idx++;
+            ASTNode* tail = nullptr;
+            while (idx < cnt && !toks[idx].is_operator(')')) {
+                if (toks[idx].is_operator(',')) { idx++; continue; }
+                auto arg = parse_expr(toks, idx);
+                ASTNode* raw = arg.get();
+                if (!stmt->args) { stmt->args = std::move(arg); tail = raw; }
+                else             { tail->next = std::move(arg); tail = raw; }
+            }
+            if (idx < cnt) idx++;
+            else throw std::runtime_error("Line " + std::to_string(ln) + ": missing ')' in " + t0.value + "." + toks[2].value + " call");
+        }
+        require_token_end(toks, idx, (t0.value + "." + toks[2].value + " call").c_str());
+        advance();
+        return stmt;
+    }
+
+    /* ── cors — CORS configuration ── */
+    if (t0.is_keyword("cors")) {
+        auto stmt = make_node(NodeType::Cors, "", ln);
+        int idx = 1;
+        if (idx < cnt && !toks[idx].is_operator(':')) {
+            stmt->left = parse_expr(toks, idx);
+        }
+        if (idx < cnt && toks[idx].is_operator(':')) idx++;
+        require_token_end(toks, idx, "cors declaration");
+        advance();
+        if (cur_indent() > ci) stmt->body = parse_block(ci);
+        return stmt;
+    }
+
+    /* ── websocket path: body — WebSocket endpoint ── */
+    if (t0.is_keyword("websocket") && cnt > 1 && toks[1].is_string()) {
+        auto stmt = make_node(NodeType::WebSocket, toks[1].value, ln);
+        int idx = 2;
+        if (idx < cnt && toks[idx].is_operator(':')) idx++;
+        require_token_end(toks, idx, "websocket declaration");
+        advance();
+        if (cur_indent() > ci) stmt->body = parse_block(ci);
+        return stmt;
+    }
+
+    /* ── sse path: body — Server-Sent Events endpoint ── */
+    if (t0.is_keyword("sse") && cnt > 1 && toks[1].is_string()) {
+        auto stmt = make_node(NodeType::Sse, toks[1].value, ln);
+        int idx = 2;
+        if (idx < cnt && toks[idx].is_operator(':')) idx++;
+        require_token_end(toks, idx, "sse declaration");
+        advance();
+        if (cur_indent() > ci) stmt->body = parse_block(ci);
+        return stmt;
+    }
+
+    /* ── template name "source" — template compilation ── */
+    if (t0.is_keyword("template") && cnt > 1 && toks[1].is_string()) {
+        auto stmt = make_node(NodeType::Tpl, toks[1].value, ln);
+        int idx = 2;
+        if (idx < cnt && toks[idx].is_string()) {
+            stmt->left = make_node(NodeType::Str, toks[idx].value, ln);
+            idx++;
+        } else if (idx < cnt && toks[idx].is_keyword("from") && idx + 1 < cnt && toks[idx + 1].is_string()) {
+            /* template "name" from "./file.html" */
+            idx++;
+            stmt->left = make_node(NodeType::Str, toks[idx].value, ln);
+            stmt->right = make_node(NodeType::Str, "file", ln);
+            idx++;
+        }
+        if (idx < cnt && toks[idx].is_operator(':')) idx++;
+        require_token_end(toks, idx, "template declaration");
+        advance();
+        return stmt;
+    }
+
+    /* ── validate: body — request validation block ── */
+    if (t0.is_keyword("validate")) {
+        auto stmt = make_node(NodeType::Validate, "", ln);
+        int idx = 1;
+        if (idx < cnt && !toks[idx].is_operator(':')) {
+            stmt->left = parse_expr(toks, idx);
+        }
+        if (idx < cnt && toks[idx].is_operator(':')) idx++;
+        require_token_end(toks, idx, "validate declaration");
+        advance();
+        if (cur_indent() > ci) stmt->body = parse_block(ci);
         return stmt;
     }
 
@@ -1468,6 +1568,25 @@ ASTNode::Ptr Parser::parse_stmt() {
             advance();
             return call;
         }
+    }
+
+    /* ── redirect(url, code) — shortcut for response.redirect ── */
+    if (t0.is_keyword("redirect") && cnt > 2 && toks[1].is_operator('(')) {
+        auto stmt = make_node(NodeType::Response, "redirect", ln);
+        int idx = 2;
+        ASTNode* tail = nullptr;
+        while (idx < cnt && !toks[idx].is_operator(')')) {
+            if (toks[idx].is_operator(',')) { idx++; continue; }
+            auto arg = parse_expr(toks, idx);
+            ASTNode* raw = arg.get();
+            if (!stmt->args) { stmt->args = std::move(arg); tail = raw; }
+            else             { tail->next = std::move(arg); tail = raw; }
+        }
+        if (idx < cnt) idx++;
+        else throw std::runtime_error("Line " + std::to_string(ln) + ": missing ')' in redirect call");
+        require_token_end(toks, idx, "redirect call");
+        advance();
+        return stmt;
     }
 
     /* ── function call as statement ── */

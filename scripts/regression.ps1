@@ -166,6 +166,51 @@ foreach ($test in $errorTests) {
 }
 Pop-Location
 
+# Stage 7: Phase 35 Web framework test compilation
+Write-Step "Stage 7: Phase 35 Web framework test compilation"
+$webTestDir = Join-Path $Root "Workflow/tests"
+$webTests = @(
+    @{ File = "test_web_server.aura";       Desc = "Web server lifecycle" },
+    @{ File = "test_web_routes.aura";       Desc = "Web route registration" },
+    @{ File = "test_web_params.aura";       Desc = "Web param accessors" },
+    @{ File = "test_web_cors.aura";         Desc = "Web CORS" },
+    @{ File = "test_web_csrf.aura";         Desc = "Web CSRF" },
+    @{ File = "test_web_session.aura";      Desc = "Web session management" },
+    @{ File = "test_web_auth.aura";         Desc = "Web auth" },
+    @{ File = "test_web_websocket.aura";    Desc = "Web websocket/SSE" },
+    @{ File = "test_web_template.aura";     Desc = "Web template engine" },
+    @{ File = "test_web_validation.aura";   Desc = "Web request validation" },
+    @{ File = "test_web_rate_limit.aura";   Desc = "Web rate limiting" },
+    @{ File = "test_web_middleware.aura";   Desc = "Web middleware" },
+    @{ File = "test_web_dsl_full.aura";     Desc = "Web full DSL integration" },
+    @{ File = "test_webview.aura";          Desc = "WebView widget" },
+    @{ File = "test_media.aura";            Desc = "Media widget" },
+    @{ File = "test_map.aura";              Desc = "Map widget" },
+    @{ File = "test_formatter.aura";        Desc = "Code formatter" },
+    @{ File = "test_linter.aura";           Desc = "Code linter" },
+    @{ File = "test_debugger.aura";         Desc = "Debugger" },
+    @{ File = "test_profiler.aura";         Desc = "Profiler" }
+)
+
+Push-Location $Root
+foreach ($test in $webTests) {
+    $src = Join-Path $webTestDir $test.File
+    if (-not (Test-Path $src)) { Test-Result "$($test.Desc) - source not found" $false; continue }
+
+    $outDir = Join-Path $Root "output/ir"
+    if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
+
+    $compOut = & $Compiler $src 2>&1
+    if ($LASTEXITCODE -ne 0) { Test-Result "$($test.Desc) - compile" $false; continue }
+
+    $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
+    if (-not $llFile) { Test-Result "$($test.Desc) - no .ll output" $false; continue }
+
+    $verifyOut = & $OptPath -passes=verify -o nul $llFile.FullName 2>&1
+    Test-Result $test.Desc ($LASTEXITCODE -eq 0)
+}
+Pop-Location
+
 # Cleanup
 if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue }
 

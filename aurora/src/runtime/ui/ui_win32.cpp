@@ -330,10 +330,14 @@ void aurora_ui_win32_shutdown() {
 
 /* ── Standard GUI API (aurora_gui_* layer) ── */
 
+} /* extern "C" */
+
 #include "../../../include/std/gui.hpp"
 #include <vector>
 #include <string>
 #include <map>
+
+extern "C" {
 
 struct GuiWidget {
     int id, type, x, y, w, h;

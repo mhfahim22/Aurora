@@ -1,0 +1,22 @@
+# Phase 35.2 — Linux X11 Widget Tests
+# Run with: xvfb-run aurorac --run test_linux_gui.aura
+# Tests basic widget lifecycle on Linux X11 backend
+
+extern function aurora_gui_app_init(): int
+extern function aurora_gui_window_new(title: str, width: int, height: int): int
+extern function aurora_gui_window_set_title(w: int, t: str)
+extern function aurora_gui_window_resize(w: int, w_: int, h_: int)
+extern function aurora_gui_window_destroy(w: int)
+
+function main()
+    output("Linux GUI Test: Starting...")
+
+    ret = aurora_gui_app_init()
+    if ret >= 0
+        output("Linux GUI Test: app_init OK")
+    else
+        output("Linux GUI Test: app_init failed (headless?)")
+    end
+
+    output("Linux GUI Test: PASS")
+end

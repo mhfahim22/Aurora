@@ -1,0 +1,19 @@
+# Phase 35.1 — Request Validation Test
+# Verify validate blocks compile
+
+server test_validate
+    route "POST" "/user"
+        validate
+            output("validation: checking request...")
+
+        response.json("{\"status\": \"ok\"}")
+
+    route "POST" "/product"
+        validate
+            output("validation: checking product...")
+
+        response.status(201)
+        response.json("{\"created\": true}")
+
+output("Validation Test: Validate blocks compiled OK")
+output("Validation Test: PASS")

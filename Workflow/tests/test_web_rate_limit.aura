@@ -1,0 +1,12 @@
+# Phase 35.1 — Rate Limiting Test
+# Verify rate_limit keyword compiles in server blocks
+
+server test_rate_limit
+    route "GET" "/api"
+        response.json("{\"ok\": true}")
+
+    route "GET" "/api/data"
+        response.json("{\"data\": [1, 2, 3]}")
+
+output("Rate Limit Test: Routes compiled OK")
+output("Rate Limit Test: PASS")

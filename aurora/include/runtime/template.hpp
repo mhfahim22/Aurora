@@ -27,6 +27,9 @@ AuroraTemplate* aurora_template_register_string(const char* name, const char* so
 /* ── Render directly from source string (no caching) ── */
 char* aurora_template_render_string(const char* source, const char* context_json);
 
+/* ── Compile and register a template from file (supports auto-reload) ── */
+int aurora_template_compile_from_file(const char* name, const char* filepath);
+
 #ifdef __cplusplus
 }
 #endif

@@ -148,7 +148,7 @@ void* aurora_desktop_tray_create(const char* tooltip) {
     td->nid.uID                  = 1;
     td->nid.uFlags               = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     td->nid.uCallbackMessage     = WM_APP;
-    td->nid.hIcon                = LoadIconW(nullptr, IDI_APPLICATION);
+    td->nid.hIcon                = LoadIconW(nullptr, (LPCWSTR)IDI_APPLICATION);
     td->menu                     = CreatePopupMenu();
     td->visible                  = 1;
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)td);

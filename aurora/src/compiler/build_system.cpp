@@ -51,7 +51,7 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
     std::string triple = cfg.target_triple.empty()
         ? llvm::sys::getProcessTriple()
         : cfg.target_triple;
-    module->setTargetTriple(triple);
+    module->setTargetTriple(llvm::Triple(triple));
 
     std::string error;
     const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple, error);

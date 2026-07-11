@@ -7,6 +7,8 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <sys/stat.h>
+#include <ctime>
 
 #if defined(_MSC_VER) && !defined(strdup)
 #define strdup _strdup
@@ -35,9 +37,17 @@ struct AuroraTemplate {
     std::vector<TplNode> nodes;
 };
 
+/* ── File-backed template tracking for auto-reload ── */
+struct TemplateFileInfo {
+    std::string filepath;
+    time_t mtime;
+};
+
 /* ── Global template registry ── */
 static std::mutex g_tpl_mutex;
 static std::unordered_map<std::string, AuroraTemplate*> g_templates;
+static std::unordered_map<std::string, TemplateFileInfo> g_template_files;
+static time_t g_template_cache_ttl = 5; /* seconds */
 
 /* ── Forward declarations ── */
 static std::vector<TplNode> parse_template(const char* src, size_t len, size_t& pos);
@@ -398,6 +408,32 @@ static std::string render_node(const TplNode& node, JsonValue* ctx) {
 
 extern "C" {
 
+static bool check_template_reload(const char* name) {
+    auto it = g_template_files.find(name);
+    if (it == g_template_files.end()) return false;
+    struct stat st;
+    if (stat(it->second.filepath.c_str(), &st) != 0) return false;
+    if (st.st_mtime <= it->second.mtime) return false;
+    FILE* f = fopen(it->second.filepath.c_str(), "rb");
+    if (!f) return false;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    std::string data((size_t)len, '\0');
+    fread(&data[0], 1, (size_t)len, f);
+    fclose(f);
+    it->second.mtime = st.st_mtime;
+    size_t pos = 0;
+    auto nodes = parse_template(data.c_str(), data.size(), pos);
+    AuroraTemplate* tpl = new AuroraTemplate();
+    tpl->name = name;
+    tpl->nodes = std::move(nodes);
+    auto old = g_templates.find(name);
+    if (old != g_templates.end()) delete old->second;
+    g_templates[name] = tpl;
+    return true;
+}
+
 AuroraTemplate* aurora_template_compile(const char* name, const char* source) {
     if (!name || !source) return nullptr;
     size_t len = strlen(source);
@@ -418,6 +454,26 @@ AuroraTemplate* aurora_template_compile(const char* name, const char* source) {
     return tpl;
 }
 
+int aurora_template_compile_from_file(const char* name, const char* filepath) {
+    if (!name || !filepath) return 0;
+    FILE* f = fopen(filepath, "rb");
+    if (!f) return 0;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    std::string data((size_t)len, '\0');
+    fread(&data[0], 1, (size_t)len, f);
+    fclose(f);
+    AuroraTemplate* tpl = aurora_template_compile(name, data.c_str());
+    if (!tpl) return 0;
+    struct stat st;
+    if (stat(filepath, &st) == 0) {
+        std::lock_guard<std::mutex> lock(g_tpl_mutex);
+        g_template_files[name] = {filepath, st.st_mtime};
+    }
+    return 1;
+}
+
 char* aurora_template_render(const char* name, const char* context_json) {
     if (!name) return nullptr;
 
@@ -430,6 +486,14 @@ char* aurora_template_render(const char* name, const char* context_json) {
         }
     }
     if (!tpl) return nullptr;
+
+    /* Auto-reload: check file mtime */
+    {
+        std::lock_guard<std::mutex> lock(g_tpl_mutex);
+        check_template_reload(name);
+        auto it = g_templates.find(name);
+        if (it != g_templates.end()) tpl = it->second;
+    }
 
     JsonValue* ctx = nullptr;
     if (context_json && context_json[0] != '\0') {
@@ -461,6 +525,7 @@ void aurora_template_free(const char* name) {
         delete it->second;
         g_templates.erase(it);
     }
+    g_template_files.erase(name);
 }
 
 AuroraTemplate* aurora_template_register_string(const char* name, const char* source) {

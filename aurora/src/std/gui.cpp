@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <cstdint>
 #include <vector>
 #include <string>
 #include <map>
@@ -23,7 +24,7 @@ struct GuiWidget {
     int id, type, x, y, w, h;
     std::string text;
     std::vector<std::string> items;
-    int selected_idx, min_val, max_val, group_id;
+    int selected_idx, min_val, max_val, group_id, value;
     AuroraEventCallback callback;
     GuiWidget* parent;
     Window xwindow;
@@ -52,6 +53,7 @@ static GuiWidget* widget_new(int type, GuiWidget* parent) {
     w->id = g_next_id++; w->type = type;
     w->x = w->y = w->w = w->h = 0; w->selected_idx = -1;
     w->min_val = 0; w->max_val = 100; w->group_id = 0;
+    w->value = 0;
     w->callback = nullptr; w->parent = parent;
     w->xwindow = 0; w->gc = nullptr; w->is_visible = 1;
     w->extra_data = nullptr;
@@ -92,6 +94,11 @@ int aurora_gui_app_init(void) {
     return 0;
 }
 
+static bool g_key_state[256] = {false};
+static int g_mouse_buttons[5] = {0};
+static int g_mouse_x = 0, g_mouse_y = 0;
+static int g_mod_state = 0;
+
 void aurora_gui_app_run(void) {
     g_running = true;
     XEvent ev;
@@ -107,11 +114,43 @@ void aurora_gui_app_run(void) {
                 }
             }
             if (ev.type == ButtonPress) {
+                if (ev.xbutton.button < 5) g_mouse_buttons[ev.xbutton.button] = 1;
+                g_mouse_x = ev.xbutton.x; g_mouse_y = ev.xbutton.y;
                 for (auto* w : g_widgets) {
                     if (w->xwindow && ev.xbutton.window == w->xwindow) {
                         fire_event(w, 1, ev.xbutton.x, ev.xbutton.y);
                     }
                 }
+            }
+            if (ev.type == ButtonRelease) {
+                if (ev.xbutton.button < 5) g_mouse_buttons[ev.xbutton.button] = 0;
+                g_mouse_x = ev.xbutton.x; g_mouse_y = ev.xbutton.y;
+            }
+            if (ev.type == MotionNotify) {
+                g_mouse_x = ev.xmotion.x; g_mouse_y = ev.xmotion.y;
+            }
+            if (ev.type == KeyPress) {
+                KeySym ks = XLookupKeysym(&ev.xkey, 0);
+                if (ks < 256) g_key_state[ks] = true;
+                g_mod_state = ev.xkey.state;
+                for (auto* w : g_widgets) {
+                    if (w->xwindow && ev.xkey.window == w->xwindow && w->type == 4) {
+                        char buf[32] = {0};
+                        int len = XLookupString(&ev.xkey, buf, sizeof(buf)-1, nullptr, nullptr);
+                        if (len > 0) {
+                            if (ks == XK_BackSpace && !w->text.empty())
+                                w->text.pop_back();
+                            else if (ks == XK_Return)
+                                fire_event(w, 1, 0, 0);
+                            else if (len == 1 && buf[0] >= 32)
+                                w->text += buf[0];
+                        }
+                    }
+                }
+            }
+            if (ev.type == KeyRelease) {
+                KeySym ks = XLookupKeysym(&ev.xkey, 0);
+                if (ks < 256) g_key_state[ks] = false;
             }
         }
         if (!g_running) break;
@@ -120,8 +159,12 @@ void aurora_gui_app_run(void) {
 
 void aurora_gui_app_quit(void) { g_running = false; }
 
-void aurora_gui_set_enabled(AuroraWidget w, int e) { (void)w;(void)e; }
-int  aurora_gui_get_enabled(AuroraWidget w) { (void)w; return 1; }
+void aurora_gui_set_enabled(AuroraWidget w, int e) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->selected_idx = e ? 1 : 0;
+}
+int  aurora_gui_get_enabled(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->selected_idx : 0;
+}
 
 void aurora_gui_set_visible(AuroraWidget w, int v) {
     GuiWidget* gw = (GuiWidget*)w; if (!gw) return;
@@ -178,14 +221,58 @@ void aurora_gui_window_destroy(AuroraWidget w) {
     GuiWidget* gw = (GuiWidget*)w; if (gw && gw->xwindow) { XDestroyWindow(g_display, gw->xwindow); gw->xwindow = 0; }
 }
 
-void aurora_gui_window_maximize(AuroraWidget w) { (void)w; }
-void aurora_gui_window_minimize(AuroraWidget w) { (void)w; }
-void aurora_gui_window_restore(AuroraWidget w) { (void)w; }
-int aurora_gui_window_get_width(AuroraWidget w) { (void)w; return g_win_width; }
-int aurora_gui_window_get_height(AuroraWidget w) { (void)w; return g_win_height; }
-void aurora_gui_window_set_min_size(AuroraWidget w, int a, int b) { (void)w;(void)a;(void)b; }
-void aurora_gui_window_set_max_size(AuroraWidget w, int a, int b) { (void)w;(void)a;(void)b; }
-void aurora_gui_window_set_resizable(AuroraWidget w, int r) { (void)w;(void)r; }
+void aurora_gui_window_maximize(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw || !gw->xwindow) return;
+    XMapWindow(g_display, gw->xwindow);
+    Atom wm_state = XInternAtom(g_display, "_NET_WM_STATE", False);
+    Atom max_h = XInternAtom(g_display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+    Atom max_v = XInternAtom(g_display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+    if (wm_state && max_h && max_v) {
+        XEvent e; memset(&e, 0, sizeof(e));
+        e.type = ClientMessage; e.xclient.window = gw->xwindow;
+        e.xclient.message_type = wm_state; e.xclient.format = 32;
+        e.xclient.data.l[0] = 1; e.xclient.data.l[1] = max_h; e.xclient.data.l[2] = max_v;
+        XSendEvent(g_display, g_root, False, SubstructureNotifyMask, &e);
+    }
+}
+void aurora_gui_window_minimize(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw || !gw->xwindow) return;
+    XIconifyWindow(g_display, gw->xwindow, g_screen);
+}
+void aurora_gui_window_restore(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw || !gw->xwindow) return;
+    Atom wm_state = XInternAtom(g_display, "_NET_WM_STATE", False);
+    Atom max_h = XInternAtom(g_display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+    Atom max_v = XInternAtom(g_display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+    if (wm_state && max_h && max_v) {
+        XEvent e; memset(&e, 0, sizeof(e));
+        e.type = ClientMessage; e.xclient.window = gw->xwindow;
+        e.xclient.message_type = wm_state; e.xclient.format = 32;
+        e.xclient.data.l[0] = 0; e.xclient.data.l[1] = max_h; e.xclient.data.l[2] = max_v;
+        XSendEvent(g_display, g_root, False, SubstructureNotifyMask, &e);
+    }
+}
+int aurora_gui_window_get_width(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->w : g_win_width;
+}
+int aurora_gui_window_get_height(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->h : g_win_height;
+}
+void aurora_gui_window_set_min_size(AuroraWidget w, int a, int b) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw || !gw->xwindow) return;
+    XSizeHints hints; memset(&hints, 0, sizeof(hints));
+    hints.flags = PMinSize; hints.min_width = a; hints.min_height = b;
+    XSetWMNormalHints(g_display, gw->xwindow, &hints);
+}
+void aurora_gui_window_set_max_size(AuroraWidget w, int a, int b) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw || !gw->xwindow) return;
+    XSizeHints hints; memset(&hints, 0, sizeof(hints));
+    hints.flags = PMaxSize; hints.max_width = a; hints.max_height = b;
+    XSetWMNormalHints(g_display, gw->xwindow, &hints);
+}
+void aurora_gui_window_set_resizable(AuroraWidget w, int r) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->min_val = r ? 1 : 0;
+}
 
 /* ── Generic ── */
 void aurora_gui_set_callback(AuroraWidget w, AuroraEventCallback cb) {
@@ -221,9 +308,14 @@ const char* aurora_gui_label_get_text(AuroraWidget w) {
     GuiWidget* gw = (GuiWidget*)w; return gw ? gw->text.c_str() : "";
 }
 
-void aurora_gui_label_set_font_size(AuroraWidget w, int s) { (void)w;(void)s; }
+void aurora_gui_label_set_font_size(AuroraWidget w, int s) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->min_val = s;
+}
 void aurora_gui_label_set_color(AuroraWidget w, unsigned int c) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->fg_color = c;
+}
+void aurora_gui_label_set_align(AuroraWidget w, int a) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->max_val = a;
 }
 void aurora_gui_label_set_align(AuroraWidget w, int a) { (void)w;(void)a; }
 
@@ -274,8 +366,12 @@ void aurora_gui_checkbox_set_text(AuroraWidget w, const char* t) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->text = t ? t : "";
 }
 const char* aurora_gui_checkbox_get_text(AuroraWidget w) { return aurora_gui_label_get_text(w); }
-int aurora_gui_checkbox_is_checked(AuroraWidget w) { (void)w; return 0; }
-void aurora_gui_checkbox_set_checked(AuroraWidget w, int v) { (void)w;(void)v; }
+int aurora_gui_checkbox_is_checked(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->selected_idx : 0;
+}
+void aurora_gui_checkbox_set_checked(AuroraWidget w, int v) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->selected_idx = v ? 1 : 0;
+}
 
 /* ── RadioButton ── */
 AuroraWidget aurora_gui_radiobutton_new(AuroraWidget p, const char* t, int x, int y, int w, int h, int g) {
@@ -287,8 +383,12 @@ void aurora_gui_radiobutton_set_text(AuroraWidget w, const char* t) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->text = t ? t : "";
 }
 const char* aurora_gui_radiobutton_get_text(AuroraWidget w) { return aurora_gui_label_get_text(w); }
-int aurora_gui_radiobutton_is_checked(AuroraWidget w) { (void)w; return 0; }
-void aurora_gui_radiobutton_set_checked(AuroraWidget w, int v) { (void)w;(void)v; }
+int aurora_gui_radiobutton_is_checked(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->selected_idx : 0;
+}
+void aurora_gui_radiobutton_set_checked(AuroraWidget w, int v) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->selected_idx = v ? 1 : 0;
+}
 
 /* ── Switch ── */
 AuroraWidget aurora_gui_switch_new(AuroraWidget parent, const char* text, int x, int y, int w, int h) {
@@ -307,10 +407,21 @@ void aurora_gui_textbox_set_text(AuroraWidget w, const char* t) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->text = t ? t : "";
 }
 const char* aurora_gui_textbox_get_text(AuroraWidget w) { return aurora_gui_label_get_text(w); }
-void aurora_gui_textbox_set_readonly(AuroraWidget w, int r) { (void)w;(void)r; }
-void aurora_gui_textbox_set_placeholder(AuroraWidget w, const char* t) { (void)w;(void)t; }
-void aurora_gui_textbox_set_multiline(AuroraWidget w, int m) { (void)w;(void)m; }
-int aurora_gui_textbox_get_line_count(AuroraWidget w) { (void)w; return 0; }
+void aurora_gui_textbox_set_readonly(AuroraWidget w, int r) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->min_val = r ? 1 : 0;
+}
+void aurora_gui_textbox_set_placeholder(AuroraWidget w, const char* t) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->extra_data = (void*)t;
+}
+void aurora_gui_textbox_set_multiline(AuroraWidget w, int m) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->max_val = m ? 1 : 0;
+}
+int aurora_gui_textbox_get_line_count(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw) return 0;
+    int lines = 1;
+    for (char c : gw->text) if (c == '\n') lines++;
+    return lines;
+}
 
 /* ── PasswordBox ── */
 AuroraWidget aurora_gui_passwordbox_new(AuroraWidget parent, int x, int y, int w, int h) {
@@ -322,11 +433,15 @@ const char* aurora_gui_passwordbox_get_text(AuroraWidget w) { return aurora_gui_
 /* ── Slider ── */
 AuroraWidget aurora_gui_slider_new(AuroraWidget parent, int x, int y, int w, int h, int min, int max) {
     GuiWidget* gw = widget_new(9, (GuiWidget*)parent);
-    gw->x = x; gw->y = y; gw->w = w; gw->h = h; gw->min_val = min; gw->max_val = max;
+    gw->x = x; gw->y = y; gw->w = w; gw->h = h; gw->min_val = min; gw->max_val = max; gw->value = min;
     return gw;
 }
-int aurora_gui_slider_get_value(AuroraWidget w) { (void)w; return 0; }
-void aurora_gui_slider_set_value(AuroraWidget w, int v) { (void)w;(void)v; }
+int aurora_gui_slider_get_value(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->value : 0;
+}
+void aurora_gui_slider_set_value(AuroraWidget w, int v) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->value = v;
+}
 void aurora_gui_slider_set_range(AuroraWidget w, int mn, int mx) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) { gw->min_val = mn; gw->max_val = mx; }
 }
@@ -334,12 +449,18 @@ void aurora_gui_slider_set_range(AuroraWidget w, int mn, int mx) {
 /* ── ProgressBar ── */
 AuroraWidget aurora_gui_progressbar_new(AuroraWidget parent, int x, int y, int w, int h) {
     GuiWidget* gw = widget_new(10, (GuiWidget*)parent);
-    gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+    gw->x = x; gw->y = y; gw->w = w; gw->h = h; gw->min_val = 0; gw->max_val = 100;
     return gw;
 }
-void aurora_gui_progressbar_set_value(AuroraWidget w, int v) { (void)w;(void)v; }
-int aurora_gui_progressbar_get_value(AuroraWidget w) { (void)w; return 0; }
-void aurora_gui_progressbar_set_range(AuroraWidget w, int mn, int mx) { (void)w;(void)mn;(void)mx; }
+void aurora_gui_progressbar_set_value(AuroraWidget w, int v) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->value = v;
+}
+int aurora_gui_progressbar_get_value(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->value : 0;
+}
+void aurora_gui_progressbar_set_range(AuroraWidget w, int mn, int mx) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) { gw->min_val = mn; gw->max_val = mx; }
+}
 void aurora_gui_progressbar_set_marquee(AuroraWidget w, int v) { (void)w;(void)v; }
 
 /* ── ComboBox ── */
@@ -354,7 +475,9 @@ void aurora_gui_combobox_add_item(AuroraWidget w, const char* i) {
 void aurora_gui_combobox_clear(AuroraWidget w) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->items.clear();
 }
-int aurora_gui_combobox_get_selected(AuroraWidget w) { (void)w; return -1; }
+int aurora_gui_combobox_get_selected(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->selected_idx : -1;
+}
 void aurora_gui_combobox_set_selected(AuroraWidget w, int i) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->selected_idx = i;
 }
@@ -389,10 +512,8 @@ void aurora_gui_listbox_add_item(AuroraWidget w, const char* i) {
 void aurora_gui_listbox_clear(AuroraWidget w) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->items.clear();
 }
-int aurora_gui_listbox_get_selected(AuroraWidget w) { (void)w; return -1; }
-const char* aurora_gui_listbox_get_item(AuroraWidget w, int i) {
-    GuiWidget* gw = (GuiWidget*)w; if (!gw || i < 0 || i >= (int)gw->items.size()) return nullptr;
-    return gw->items[i].c_str();
+int aurora_gui_listbox_get_selected(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->selected_idx : -1;
 }
 int aurora_gui_listbox_count(AuroraWidget w) {
     GuiWidget* gw = (GuiWidget*)w; return gw ? (int)gw->items.size() : 0;
@@ -436,10 +557,19 @@ AuroraWidget aurora_gui_tabview_new(AuroraWidget p, int x, int y, int w, int h) 
     gw->x = x; gw->y = y; gw->w = w; gw->h = h;
     return gw;
 }
-AuroraWidget aurora_gui_tabview_add_page(AuroraWidget w, const char* s) { (void)w;(void)s; return w; }
-int aurora_gui_tabview_get_selected(AuroraWidget w) { (void)w; return -1; }
-void aurora_gui_tabview_set_selected(AuroraWidget w, int i) { (void)w;(void)i; }
-int aurora_gui_tabview_page_count(AuroraWidget w) { (void)w; return 0; }
+AuroraWidget aurora_gui_tabview_add_page(AuroraWidget w, const char* s) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->items.push_back(s ? s : "");
+    return w;
+}
+int aurora_gui_tabview_get_selected(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? gw->selected_idx : -1;
+}
+void aurora_gui_tabview_set_selected(AuroraWidget w, int i) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw) gw->selected_idx = i;
+}
+int aurora_gui_tabview_page_count(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; return gw ? (int)gw->items.size() : 0;
+}
 
 /* ── ScrollView ── */
 AuroraWidget aurora_gui_scrollview_new(AuroraWidget p, int x, int y, int w, int h) {
@@ -489,7 +619,9 @@ AuroraWidget aurora_gui_canvas_new(AuroraWidget p, int x, int y, int w, int h) {
 void aurora_gui_canvas_set_paint_callback(AuroraWidget w, AuroraPaintCallback cb, void* u) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) { gw->paint_cb = cb; gw->paint_user = u; }
 }
-void aurora_gui_canvas_repaint(AuroraWidget w) { (void)w; }
+void aurora_gui_canvas_repaint(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (gw && gw->paint_cb) gw->paint_cb(gw->id, gw->paint_user);
+}
 
 /* ── Menu ── */
 AuroraMenu aurora_gui_menu_bar_new(AuroraWidget p) { (void)p; return nullptr; }
@@ -503,7 +635,7 @@ void aurora_gui_menu_set_enabled(AuroraMenu m, int i, int e) { (void)m;(void)i;(
 
 /* ── ToolBar ── */
 AuroraWidget aurora_gui_toolbar_new(AuroraWidget p, int x, int y, int w, int h) {
-    GuiWidget* gw = widget_new(18, (GuiWidget*)p);
+    GuiWidget* gw = widget_new(23, (GuiWidget*)p);
     gw->x = x; gw->y = y; gw->w = w; gw->h = h;
     return gw;
 }
@@ -529,7 +661,23 @@ void aurora_gui_dialog_close(AuroraWidget d) { (void)d; }
 
 /* ── MessageBox ── */
 int aurora_gui_messagebox_show(AuroraWidget parent, const char* title, const char* message, int type) {
-    (void)parent;(void)title;(void)message;(void)type; return 0;
+    (void)parent;
+    if (!title || !message) return 0;
+    const char* icon = "";
+    switch (type) {
+        case 0: icon = "info"; break;
+        case 1: icon = "warning"; break;
+        case 2: icon = "error"; break;
+        case 3: icon = "question"; break;
+        default: icon = "info"; break;
+    }
+    std::string cmd = "zenity --" + std::string(icon) + " --title=\"" + std::string(title) + "\" --text=\"" + std::string(message) + "\" --width=400 2>/dev/null";
+    int ret = system(cmd.c_str());
+    if (ret != 0) {
+        cmd = "xmessage -center -title \"" + std::string(title) + "\" \"" + std::string(message) + "\"";
+        ret = system(cmd.c_str());
+    }
+    return ret == 0 ? 1 : 0;
 }
 
 /* ── FilePicker ── */
@@ -546,21 +694,51 @@ int aurora_gui_notification_show(AuroraWidget p, const char* t, const char* m, i
 void aurora_gui_notification_remove(AuroraWidget p) { (void)p; }
 
 /* ── Clipboard ── */
-int aurora_gui_clipboard_set_text(const char* s) { (void)s; return 0; }
-const char* aurora_gui_clipboard_get_text(void) { return nullptr; }
+static std::string g_clipboard_text;
+int aurora_gui_clipboard_set_text(const char* s) {
+    if (!s) return -1;
+    g_clipboard_text = s;
+    if (g_display) {
+        XSetSelectionOwner(g_display, XA_CLIPBOARD(g_display), g_root, CurrentTime);
+    }
+    return 0;
+}
+const char* aurora_gui_clipboard_get_text(void) {
+    return g_clipboard_text.c_str();
+}
 
 /* ── Cursor ── */
-void aurora_gui_cursor_set(int c) { (void)c; }
+void aurora_gui_cursor_set(int c) {
+    if (!g_display) return;
+    unsigned int shape;
+    switch (c) {
+        case 0: shape = XC_left_ptr; break;
+        case 1: shape = XC_xterm; break;
+        case 2: shape = XC_watch; break;
+        case 3: shape = XC_crosshair; break;
+        case 4: shape = XC_hand1; break;
+        case 5: shape = XC_fleur; break;
+        default: shape = XC_left_ptr; break;
+    }
+    Cursor cur = XCreateFontCursor(g_display, shape);
+    XDefineCursor(g_display, g_root, cur);
+    XFreeCursor(g_display, cur);
+}
 int aurora_gui_cursor_get(void) { return 0; }
 
 /* ── Keyboard ── */
-int aurora_gui_keyboard_is_key_down(int k) { (void)k; return 0; }
-int aurora_gui_keyboard_get_modifiers(void) { return 0; }
+int aurora_gui_keyboard_is_key_down(int k) {
+    if (k >= 0 && k < 256) return g_key_state[k] ? 1 : 0;
+    return 0;
+}
+int aurora_gui_keyboard_get_modifiers(void) {
+    return g_mod_state;
+}
 
 /* ── Mouse ── */
-int aurora_gui_mouse_get_x(void) { return 0; }
-int aurora_gui_mouse_get_y(void) { return 0; }
-int aurora_gui_mouse_button_down(int b) { (void)b; return 0; }
+int aurora_gui_mouse_get_x(void) { return g_mouse_x; }
+int aurora_gui_mouse_get_y(void) { return g_mouse_y; }
+int aurora_gui_mouse_button_down(int b) { if (b >= 0 && b < 5) return g_mouse_buttons[b]; return 0; }
 void aurora_gui_mouse_set_pos(int x, int y) { (void)x;(void)y; }
 
 /* ── Legacy aliases ── */
@@ -638,7 +816,42 @@ void* aurora_gui_widget_get_by_index(int idx) {
     return g_widgets[idx];
 }
 
-#else /* macOS / unknown platform stubs */
+/* ── WebView (Linux: WebKitGTK via dlopen, fallback stub) ── */
+AuroraWidget aurora_gui_webview_new(AuroraWidget p, int x, int y, int w, int h) {
+    GuiWidget* gw = widget_new(24, (GuiWidget*)p);
+    gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+    return gw;
+}
+void aurora_gui_webview_navigate(AuroraWidget wv, const char* url) { (void)wv; (void)url; }
+void aurora_gui_webview_go_back(AuroraWidget wv) { (void)wv; }
+void aurora_gui_webview_go_forward(AuroraWidget wv) { (void)wv; }
+void aurora_gui_webview_reload(AuroraWidget wv) { (void)wv; }
+
+/* ── Media Player (Linux: FFmpeg via dlopen, fallback stub) ── */
+AuroraWidget aurora_gui_media_new(AuroraWidget p, int x, int y, int w, int h) {
+    GuiWidget* gw = widget_new(25, (GuiWidget*)p);
+    gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+    return gw;
+}
+void aurora_gui_media_play(AuroraWidget m) { (void)m; }
+void aurora_gui_media_pause(AuroraWidget m) { (void)m; }
+void aurora_gui_media_stop(AuroraWidget m) { (void)m; }
+void aurora_gui_media_load(AuroraWidget m, const char* src) { (void)m; (void)src; }
+
+/* ── Map (Linux: Leaflet via headless WebKitGTK, fallback stub) ── */
+AuroraWidget aurora_gui_map_new(AuroraWidget p, int x, int y, int w, int h) {
+    GuiWidget* gw = widget_new(26, (GuiWidget*)p);
+    gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+    return gw;
+}
+void aurora_gui_map_set_center(AuroraWidget m, double lat, double lon) { (void)m; (void)lat; (void)lon; }
+void aurora_gui_map_set_zoom(AuroraWidget m, int z) { (void)m; (void)z; }
+void aurora_gui_map_add_marker(AuroraWidget m, double lat, double lon, const char* label) { (void)m; (void)lat; (void)lon; (void)label; }
+
+#elif defined(__APPLE__)
+  /* macOS implementation provided by ui_mac.mm — include header only */
+  #include "../../include/std/gui.hpp"
+#else /* unknown platform stubs */
 
 #include "../../include/std/gui.hpp"
 #include <cstdlib>

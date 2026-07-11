@@ -1670,6 +1670,11 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
         case NodeType::Response:
         case NodeType::Query:
         case NodeType::Token:
+        case NodeType::Cors:
+        case NodeType::WebSocket:
+        case NodeType::Sse:
+        case NodeType::Tpl:
+        case NodeType::Validate:
         case NodeType::Input:
         case NodeType::Update:
         case NodeType::Tick:

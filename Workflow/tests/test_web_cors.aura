@@ -1,0 +1,17 @@
+# Phase 35.1 — CORS Test
+# Verify CORS keyword and per-route cors compile
+
+server test_cors
+    cors
+
+    route "GET" "/public"
+        response.json("{\"public\": true}")
+
+    route "GET" "/private"
+        response.json("{\"private\": true}")
+
+    route "OPTIONS" "/preflight"
+        response.status(204)
+
+output("Web CORS Test: CORS syntax compiled OK")
+output("Web CORS Test: PASS")

@@ -1,0 +1,21 @@
+# Phase 35.2 — macOS Desktop Integration Tests
+# Run with: aurorac --run test_mac_desktop.aura
+
+extern function aurora_gui_clipboard_set_text(s: str): int
+extern function aurora_gui_clipboard_get_text(): str
+
+function main()
+    output("macOS Desktop Test: Starting...")
+
+    ret = aurora_gui_clipboard_set_text("hello")
+    if ret == 0
+        output("macOS Desktop Test: clipboard_set_text OK")
+    else
+        output("macOS Desktop Test: clipboard_set_text failed")
+    end
+
+    t = aurora_gui_clipboard_get_text()
+    output("macOS Desktop Test: clipboard_get_text = \"" + t + "\"")
+
+    output("macOS Desktop Test: PASS")
+end

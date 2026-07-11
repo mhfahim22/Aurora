@@ -1,0 +1,21 @@
+# Phase 35.1 — WebSocket & SSE Test
+# Verify websocket and sse blocks compile
+
+server test_ws
+    websocket "/chat"
+        output("WebSocket client connected")
+        on_open
+            output("WebSocket: open")
+        on_message
+            output("WebSocket: message received")
+        on_close
+            output("WebSocket: closed")
+
+    sse "/notifications"
+        output("SSE client connected")
+
+    route "GET" "/health"
+        response.json("{\"status\": \"ok\"}")
+
+output("WebSocket Test: WebSocket and SSE syntax compiled OK")
+output("WebSocket Test: PASS")

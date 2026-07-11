@@ -1568,6 +1568,122 @@ void Codegen::gen_server(const ASTNode* node) {
 
                 builder_->CreateCall(route_register_, { method_str, path_str, hdl_ptr });
             }
+        } else if (child->type == NodeType::Cors) {
+            /* CORS: call aurora_cors_apply_default on the response */
+            auto* cors_fn = module_->getFunction("aurora_cors_apply_default");
+            if (cors_fn && child->left) {
+                /* Specific origin */
+                llvm::Value* origin = gen_expr(child->left.get());
+                auto* cors_with_origin = module_->getFunction("aurora_cors_apply_with_origin");
+                auto* fn_from_cstr = module_->getFunction("aurora_str_as_cstr");
+                if (cors_with_origin && origin && fn_from_cstr) {
+                    if (origin->getType() != i8ptr_ty())
+                        origin = builder_->CreateIntToPtr(origin, i8ptr_ty(), "origin_ptr");
+                    origin = builder_->CreateCall(fn_from_cstr, { origin }, "origin_cstr");
+                    builder_->CreateCall(cors_with_origin, { llvm::ConstantPointerNull::get(i8ptr_ty()), origin });
+                }
+            } else if (cors_fn) {
+                /* Default CORS (*) — store flag on server to apply on each response */
+                builder_->CreateCall(cors_fn, { llvm::ConstantPointerNull::get(i8ptr_ty()) });
+            }
+        } else if (child->type == NodeType::WebSocket) {
+            /* WebSocket: generate a handler that upgrades to WS */
+            static uint64_t ws_counter = 0;
+            std::string ws_name = "_ws_hdl_" + std::to_string(ws_counter++);
+            auto* ws_fn_type = llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i8ptr_ty() }, false);
+            auto* ws_fn = llvm::Function::Create(
+                ws_fn_type, llvm::Function::InternalLinkage, ws_name, module_.get());
+            auto* ws_entry = llvm::BasicBlock::Create(ctx_, "entry", ws_fn);
+            auto* saved_fn = cur_fn_;
+            auto saved_ip = builder_->saveIP();
+            literal_aurora_cache_.clear();
+            builder_->SetInsertPoint(ws_entry);
+            cur_fn_ = ws_fn;
+            auto arg_it = ws_fn->arg_begin();
+            llvm::Value* ws_req = arg_it++;
+            llvm::Value* ws_res = arg_it++;
+            ws_req->setName("req");
+            ws_res->setName("res");
+            push_scope();
+            declare_var("__http_req", create_entry_alloca("__http_req", i8ptr_ty()), OwnershipState::Borrowed);
+            declare_var("__http_res", create_entry_alloca("__http_res", i8ptr_ty()), OwnershipState::Borrowed);
+            builder_->CreateStore(ws_req, lookup_var("__http_req")->alloca_ptr);
+            builder_->CreateStore(ws_res, lookup_var("__http_res")->alloca_ptr);
+            if (child->body) gen_block(child->body.get());
+            pop_scope_and_drop();
+            builder_->CreateRetVoid();
+            cur_fn_ = saved_fn;
+            builder_->restoreIP(saved_ip);
+            /* Register route */
+            if (route_register_) {
+                llvm::Value* method_str = builder_->CreateGlobalStringPtr("GET", "wsmethod");
+                llvm::Value* path_str = builder_->CreateGlobalStringPtr(
+                    child->value.empty() ? "/ws" : child->value.c_str(), "wspath");
+                llvm::Value* hdl_ptr = builder_->CreateBitCast(ws_fn, i8ptr_ty(), "wshdl");
+                builder_->CreateCall(route_register_, { method_str, path_str, hdl_ptr });
+            }
+        } else if (child->type == NodeType::Sse) {
+            /* SSE: generate a handler that starts SSE stream */
+            static uint64_t sse_counter = 0;
+            std::string sse_name = "_sse_hdl_" + std::to_string(sse_counter++);
+            auto* sse_fn_type = llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i8ptr_ty() }, false);
+            auto* sse_fn = llvm::Function::Create(
+                sse_fn_type, llvm::Function::InternalLinkage, sse_name, module_.get());
+            auto* sse_entry = llvm::BasicBlock::Create(ctx_, "entry", sse_fn);
+            auto* saved_fn = cur_fn_;
+            auto saved_ip = builder_->saveIP();
+            literal_aurora_cache_.clear();
+            builder_->SetInsertPoint(sse_entry);
+            cur_fn_ = sse_fn;
+            auto arg_it = sse_fn->arg_begin();
+            llvm::Value* sse_req = arg_it++;
+            llvm::Value* sse_res = arg_it++;
+            sse_req->setName("req");
+            sse_res->setName("res");
+            push_scope();
+            declare_var("__http_req", create_entry_alloca("__http_req", i8ptr_ty()), OwnershipState::Borrowed);
+            declare_var("__http_res", create_entry_alloca("__http_res", i8ptr_ty()), OwnershipState::Borrowed);
+            builder_->CreateStore(sse_req, lookup_var("__http_req")->alloca_ptr);
+            builder_->CreateStore(sse_res, lookup_var("__http_res")->alloca_ptr);
+            if (child->body) gen_block(child->body.get());
+            pop_scope_and_drop();
+            builder_->CreateRetVoid();
+            cur_fn_ = saved_fn;
+            builder_->restoreIP(saved_ip);
+            if (route_register_) {
+                llvm::Value* method_str = builder_->CreateGlobalStringPtr("GET", "ssemethod");
+                llvm::Value* path_str = builder_->CreateGlobalStringPtr(
+                    child->value.empty() ? "/events" : child->value.c_str(), "ssepath");
+                llvm::Value* hdl_ptr = builder_->CreateBitCast(sse_fn, i8ptr_ty(), "ssehdl");
+                builder_->CreateCall(route_register_, { method_str, path_str, hdl_ptr });
+            }
+        } else if (child->type == NodeType::Tpl) {
+            /* Template: compile and register template */
+            auto* tpl_fn = module_->getFunction("aurora_template_compile");
+            if (tpl_fn) {
+                llvm::Value* name_str = builder_->CreateGlobalStringPtr(
+                    child->value.c_str(), "tpl_name");
+                llvm::Value* source_str = llvm::ConstantPointerNull::get(i8ptr_ty());
+                if (child->left) {
+                    source_str = gen_expr(child->left.get());
+                    if (source_str && source_str->getType() != i8ptr_ty())
+                        source_str = builder_->CreateIntToPtr(source_str, i8ptr_ty(), "tpl_src");
+                    auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+                    if (as_cstr && source_str)
+                        source_str = builder_->CreateCall(as_cstr, { source_str }, "tpl_src_cstr");
+                }
+                builder_->CreateCall(tpl_fn, { name_str, source_str }, "tpl");
+            }
+        } else if (child->type == NodeType::Validate) {
+            /* Validate: generate validation checks (simplified — emit builtin) */
+            auto* validate_fn = module_->getFunction("builtin_validate");
+            if (validate_fn && child->body) {
+                /* For now, just emit validate() call and generate body */
+                builder_->CreateCall(validate_fn, {}, "validate_ret");
+                gen_block(child->body.get());
+            } else {
+                gen_block(child->body.get());
+            }
         } else {
             gen_stmt(child);
         }

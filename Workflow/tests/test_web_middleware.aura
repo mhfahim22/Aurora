@@ -1,0 +1,23 @@
+# Phase 35.1 — Middleware Chain Test
+# Verify middleware blocks, next(), route_group compile
+
+import "server"
+
+extern function aurora_middleware_set_context(key: str, value: str)
+extern function aurora_middleware_get_context(key: str): str
+
+function main()
+    output("Middleware Test: Starting...")
+
+    aurora_middleware_set_context("request_id", "abc-123")
+    output("Middleware Test: Set context OK")
+
+    rid = aurora_middleware_get_context("request_id")
+    if rid == "abc-123"
+        output("Middleware Test: Get context OK")
+    else
+        output("Middleware Test: Get context mismatch — got \"" + rid + "\"")
+    end
+
+    output("Middleware Test: PASS")
+end

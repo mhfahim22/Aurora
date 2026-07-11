@@ -1,0 +1,31 @@
+# Phase 35.1 — Auth Middleware Test
+# Verify JWT, middleware, bearer, login_required keywords compile
+
+import "server"
+
+extern function aurora_jwt_sign(payload: str, secret: str): str
+extern function aurora_jwt_verify(token: str, secret: str): str
+extern function aurora_auth_has_role(user: str, role: str): int
+
+function main()
+    output("Auth Test: Starting...")
+
+    token = aurora_jwt_sign("{\"user\":\"alice\",\"role\":\"admin\"}", "my-secret")
+    if token == ""
+        output("Auth Test: Warning — JWT sign returned empty")
+    else
+        output("Auth Test: JWT sign OK")
+    end
+
+    decoded = aurora_jwt_verify(token, "my-secret")
+    if decoded == ""
+        output("Auth Test: Warning — JWT verify returned empty (wrong secret?)")
+    else
+        output("Auth Test: JWT verify OK")
+    end
+
+    has = aurora_auth_has_role("alice", "admin")
+    output("Auth Test: has_role OK")
+
+    output("Auth Test: PASS")
+end

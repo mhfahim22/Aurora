@@ -86,6 +86,54 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
                     result = builder_->CreateCall(fn_from_cstr, { result }, "param_aurora");
                 return result ? result : i64(0);
             }
+            /* request.query.xxx — HTTP query parameter access */
+            if (node->left && node->left->type == NodeType::Attribute &&
+                node->left->value == "query" && node->left->left &&
+                node->left->left->type == NodeType::Var && node->left->left->value == "request") {
+                VarRecord* http_req_rec = lookup_var("__http_req");
+                if (!http_req_rec || !http_req_rec->alloca_ptr) return i64(0);
+                llvm::Value* req_val = builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "req");
+                llvm::Value* param_str = builder_->CreateGlobalStringPtr(node->value, "rqparam");
+                auto* fn = module_->getFunction("aurora_http_get_query_param");
+                if (!fn) return i64(0);
+                llvm::Value* result = builder_->CreateCall(fn, { req_val, param_str }, "qparam_val");
+                auto* fn_from_cstr = module_->getFunction("aurora_str_from_cstr");
+                if (fn_from_cstr && result)
+                    result = builder_->CreateCall(fn_from_cstr, { result }, "qparam_aurora");
+                return result ? result : i64(0);
+            }
+            /* request.form.xxx — HTTP form field access */
+            if (node->left && node->left->type == NodeType::Attribute &&
+                node->left->value == "form" && node->left->left &&
+                node->left->left->type == NodeType::Var && node->left->left->value == "request") {
+                VarRecord* http_req_rec = lookup_var("__http_req");
+                if (!http_req_rec || !http_req_rec->alloca_ptr) return i64(0);
+                llvm::Value* req_val = builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "req");
+                llvm::Value* param_str = builder_->CreateGlobalStringPtr(node->value, "rfparam");
+                auto* fn = module_->getFunction("aurora_http_get_form_param");
+                if (!fn) return i64(0);
+                llvm::Value* result = builder_->CreateCall(fn, { req_val, param_str }, "fparam_val");
+                auto* fn_from_cstr = module_->getFunction("aurora_str_from_cstr");
+                if (fn_from_cstr && result)
+                    result = builder_->CreateCall(fn_from_cstr, { result }, "fparam_aurora");
+                return result ? result : i64(0);
+            }
+            /* request.cookie.xxx — HTTP cookie access */
+            if (node->left && node->left->type == NodeType::Attribute &&
+                node->left->value == "cookie" && node->left->left &&
+                node->left->left->type == NodeType::Var && node->left->left->value == "request") {
+                VarRecord* http_req_rec = lookup_var("__http_req");
+                if (!http_req_rec || !http_req_rec->alloca_ptr) return i64(0);
+                llvm::Value* req_val = builder_->CreateLoad(i8ptr_ty(), http_req_rec->alloca_ptr, "req");
+                llvm::Value* param_str = builder_->CreateGlobalStringPtr(node->value, "rcparam");
+                auto* fn = module_->getFunction("aurora_http_get_cookie");
+                if (!fn) return i64(0);
+                llvm::Value* result = builder_->CreateCall(fn, { req_val, param_str }, "cparam_val");
+                auto* fn_from_cstr = module_->getFunction("aurora_str_from_cstr");
+                if (fn_from_cstr && result)
+                    result = builder_->CreateCall(fn_from_cstr, { result }, "cparam_aurora");
+                return result ? result : i64(0);
+            }
             /* obj.field read */
             const std::string& obj_name   = node->left ? node->left->value : "";
             const std::string& field_name = node->value;
@@ -646,6 +694,26 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
             if (fn_set_ct)
                 builder_->CreateCall(fn_set_ct, { res_val, builder_->CreateGlobalStringPtr("text/html") });
         }
+        return i64(0);
+    }
+
+    /* ── redirect(url, code) — set HTTP redirect response ── */
+    if (node->value == "redirect") {
+        VarRecord* http_res_rec = lookup_var("__http_res");
+        if (!http_res_rec || !http_res_rec->alloca_ptr) return i64(0);
+        llvm::Value* res_val = builder_->CreateLoad(i8ptr_ty(), http_res_rec->alloca_ptr, "res");
+        llvm::Value* url = node->args ? gen_expr(node->args.get()) : i64(0);
+        llvm::Value* code = (node->args && node->args->next) ? gen_expr(node->args->next.get()) : i64(302);
+        if (url) {
+            if (url->getType() != i8ptr_ty())
+                url = builder_->CreateIntToPtr(url, i8ptr_ty(), "url_ptr");
+            auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+            if (as_cstr)
+                url = builder_->CreateCall(as_cstr, { url }, "url_cstr");
+        }
+        auto* fn_redirect = module_->getFunction("aurora_http_response_redirect");
+        if (fn_redirect)
+            builder_->CreateCall(fn_redirect, { res_val, url ? url : llvm::ConstantPointerNull::get(i8ptr_ty()), code });
         return i64(0);
     }
 

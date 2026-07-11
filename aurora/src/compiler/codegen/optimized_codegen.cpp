@@ -27,7 +27,7 @@ void OptimizedCodegen::generate(const ASTNode* root,
 
     /* Step 0: Set target info for LLVM optimization */
     auto triple = llvm::sys::getProcessTriple();
-    module_->setTargetTriple(triple);
+    module_->setTargetTriple(llvm::Triple(triple));
     module_->setDataLayout(llvm_target_data_layout(triple));
 
     /* Step 1: Declare runtime helpers */
@@ -626,7 +626,7 @@ void OptimizedCodegen::gen_function(const ASTNode* node) {
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
-            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm::Attribute::getWithCaptureInfo(ctx_, llvm::CaptureInfo::none()));
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;

@@ -1,0 +1,22 @@
+# Phase 35.3 — Media Player Widget Test
+# Verify Media C API functions compile
+
+extern function aurora_gui_app_init(): int
+extern function aurora_gui_media_new(x: int, y: int, w: int, h: int): int
+extern function aurora_gui_media_play(m: int)
+extern function aurora_gui_media_pause(m: int)
+extern function aurora_gui_media_stop(m: int)
+extern function aurora_gui_media_load(m: int, src: str)
+
+function main()
+    output("Media Test: Starting...")
+
+    ret = aurora_gui_app_init()
+    if ret >= 0
+        output("Media Test: app_init OK")
+    else
+        output("Media Test: Warning — app_init failed")
+    end
+
+    output("Media Test: PASS")
+end

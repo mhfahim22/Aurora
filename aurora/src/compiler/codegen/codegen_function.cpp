@@ -35,7 +35,7 @@ void Codegen::gen_function(const ASTNode* node) {
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
-            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm::Attribute::getWithCaptureInfo(ctx_, llvm::CaptureInfo::none()));
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;
@@ -167,7 +167,7 @@ void Codegen::gen_generic_instance(const std::string& mangled_name,
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
-            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm::Attribute::getWithCaptureInfo(ctx_, llvm::CaptureInfo::none()));
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;

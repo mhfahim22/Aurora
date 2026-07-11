@@ -1,0 +1,27 @@
+# Phase 35.1 — Template Engine Test
+# Verify template compile and render from DSL
+
+import "server"
+
+extern function aurora_template_compile(name: str, source: str): int
+extern function aurora_template_render(name: str, data: str): str
+
+function main()
+    output("Template Test: Starting...")
+
+    tpl = aurora_template_compile("hello", "<h1>Hello {{name}}</h1>")
+    if tpl == 0
+        output("Template Test: FAIL — compile returned null")
+        return
+    end
+    output("Template Test: Compile OK")
+
+    result = aurora_template_render("hello", "{\"name\": \"World\"}")
+    if result == "<h1>Hello World</h1>"
+        output("Template Test: Render OK")
+    else
+        output("Template Test: Render mismatch — got \"" + result + "\"")
+    end
+
+    output("Template Test: PASS")
+end

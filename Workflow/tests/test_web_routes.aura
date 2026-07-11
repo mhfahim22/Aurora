@@ -1,0 +1,42 @@
+# Phase 35.1 — Route Registration Test
+# Verify multiple HTTP methods, path params, query params
+
+server test_routes
+    route "GET" "/users"
+        response.json("{\"users\": []}")
+
+    route "GET" "/users/:id"
+        response.json("{\"user\": \"" + request.params.id + "\"}")
+
+    route "POST" "/users"
+        response.status(201)
+        response.json("{\"created\": true}")
+
+    route "PUT" "/users/:id"
+        response.json("{\"updated\": \"" + request.params.id + "\"}")
+
+    route "DELETE" "/users/:id"
+        response.json("{\"deleted\": \"" + request.params.id + "\"}")
+
+    route "GET" "/search"
+        q = request.query.q
+        response.json("{\"query\": \"" + q + "\"}")
+
+    route "POST" "/login"
+        u = request.form.username
+        p = request.form.password
+        response.json("{\"user\": \"" + u + "\"}")
+
+    route "GET" "/cookie-test"
+        t = request.cookie.token
+        if t == ""
+            response.json("{\"cookie\": \"none\"}")
+        else
+            response.json("{\"cookie\": \"" + t + "\"}")
+        end
+
+    route "GET" "/redirect-test"
+        redirect("/users", 301)
+
+output("Web Routes Test: All route patterns compiled OK")
+output("Web Routes Test: PASS")

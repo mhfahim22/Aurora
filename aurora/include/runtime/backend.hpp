@@ -151,6 +151,8 @@ int                 aurora_http_response_send_chunked(AuroraHttpResponse* res, i
 void                aurora_http_response_free(AuroraHttpResponse* res);
 void                aurora_http_response_set_content_type(AuroraHttpResponse* res, const char* content_type);
 void                aurora_http_response_set_status_code(AuroraHttpResponse* res, int code);
+void                aurora_http_response_redirect(AuroraHttpResponse* res, const char* url, int64_t code);
+const char*         aurora_http_get_form_param(AuroraHttpRequest* req, const char* name);
 
 /* ── Router ── */
 AuroraRouter*       aurora_router_new(void);
@@ -161,6 +163,7 @@ void                aurora_router_set_prefix_match(AuroraRouter* router, int ena
 /* ── Middleware ── */
 typedef int (*AuroraMiddlewareFn)(AuroraHttpRequest*, AuroraHttpResponse*, void*);
 int                 aurora_middleware_run_chain(void** handlers, int count, AuroraHttpRequest* req, AuroraHttpResponse* res);
+void                aurora_middleware_set_context(void** handlers, int count, int current_idx, AuroraHttpRequest* req, AuroraHttpResponse* res);
 
 /* ── CORS ── */
 void aurora_cors_apply(AuroraHttpResponse* res, const char* origin, const char* methods, const char* headers);
@@ -220,6 +223,14 @@ int         aurora_auth_login(const char* user, const char* pass);
 const char* aurora_auth_generate_token(const char* payload, const char* secret);
 int         aurora_auth_verify_token(const char* token, const char* secret, char** out_payload);
 const char* aurora_auth_hash_password(const char* password);
+
+/* ── JWT Auth ── */
+char* aurora_auth_jwt_sign(const char* payload_json, const char* secret);
+int   aurora_auth_jwt_verify(const char* jwt, const char* secret, char** out_payload);
+int   aurora_auth_check_role(const char* payload_json, const char* required_role);
+
+/* ── Session config ── */
+void aurora_session_set_default_ttl(int64_t ttl_ms);
 
 /* ── Static file route ── */
 struct AuroraStaticRoute {

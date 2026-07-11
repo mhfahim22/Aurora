@@ -1,6 +1,6 @@
 # aurora_restructured/CMakeLists.txt (updated)
 cmake_minimum_required(VERSION 3.20)
-project(Aurora LANGUAGES C CXX ASM_MASM)
+project(Aurora LANGUAGES C CXX)
 include(CTest)
 
 # ── Read VERSION file and generate version.h ──
@@ -47,7 +47,8 @@ if(NOT WIN32 AND NOT APPLE)
     find_package(X11 QUIET)
 endif()
 
-# ── Find LLVM ────────────────────────────────────────────────
+# ── Find LLVM (MinGW LLVM needs ZLIB) ──────────────────────
+find_package(ZLIB QUIET)
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 
@@ -282,14 +283,23 @@ add_library(aurora_runtime STATIC
 )
 
 if(WIN32)
-    target_sources(aurora_runtime PRIVATE aurora/src/runtime/core/ffi_call_win64.asm)
+    if(MSVC)
+        enable_language(ASM_MASM)
+        target_sources(aurora_runtime PRIVATE aurora/src/runtime/core/ffi_call_win64.asm)
+    else()
+        target_sources(aurora_runtime PRIVATE aurora/src/runtime/core/ffi_call_win64_gcc.cpp)
+    endif()
 endif()
 
 set_source_files_properties(aurora/src/runtime/backend/miniz.c PROPERTIES COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
 set_source_files_properties(aurora/src/runtime/backend/miniz_tdef.c PROPERTIES COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
 if(APPLE)
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
-    target_link_libraries(aurora_runtime PRIVATE "-framework Cocoa")
+    target_link_libraries(aurora_runtime PRIVATE
+        "-framework Cocoa"
+        "-framework WebKit"
+        "-framework AVKit"
+        "-framework AVFoundation")
     set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
         COMPILE_FLAGS "-x objective-c++")
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -333,6 +343,11 @@ else()
         message(STATUS "OpenGL not found — 3D graphics support disabled")
         target_compile_definitions(aurora_runtime PRIVATE AURORA_GL=0)
     endif()
+endif()
+
+# ── Windows-specific libraries (MinGW/GCC cannot use #pragma comment(lib)) ──
+if(WIN32 AND NOT MSVC)
+    target_link_libraries(aurora_runtime PRIVATE dbghelp)
 endif()
 
 # ── AddressSanitizer for runtime library ──
@@ -515,7 +530,11 @@ add_executable(voss
 )
 target_include_directories(voss PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 if(WIN32)
-    target_link_libraries(voss PRIVATE winhttp.lib)
+    if(MSVC)
+        target_link_libraries(voss PRIVATE winhttp.lib ws2_32.lib)
+    else()
+        target_link_libraries(voss PRIVATE winhttp ws2_32)
+    endif()
 endif()
 if(UNIX)
     find_package(CURL REQUIRED)
@@ -704,7 +723,11 @@ add_executable(test_server
 target_link_libraries(test_server PRIVATE aurora_runtime)
 target_include_directories(test_server PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 if(WIN32)
-    target_link_libraries(test_server PRIVATE ws2_32.lib crypt32.lib)
+    if(MSVC)
+        target_link_libraries(test_server PRIVATE ws2_32.lib crypt32.lib)
+    else()
+        target_link_libraries(test_server PRIVATE ws2_32 crypt32)
+    endif()
 endif()
 if(ENABLE_ASAN)
     target_compile_options(test_server PRIVATE ${ASAN_FLAGS})
@@ -721,7 +744,11 @@ add_executable(test_crossplatform
 target_link_libraries(test_crossplatform PRIVATE aurora_runtime)
 target_include_directories(test_crossplatform PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 if(WIN32)
-    target_link_libraries(test_crossplatform PRIVATE ws2_32.lib)
+    if(MSVC)
+        target_link_libraries(test_crossplatform PRIVATE ws2_32.lib)
+    else()
+        target_link_libraries(test_crossplatform PRIVATE ws2_32)
+    endif()
 endif()
 if(ENABLE_ASAN)
     target_compile_options(test_crossplatform PRIVATE ${ASAN_FLAGS})

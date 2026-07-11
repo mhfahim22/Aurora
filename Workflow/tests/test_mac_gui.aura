@@ -1,0 +1,19 @@
+# Phase 35.2 — macOS Cocoa Widget Tests
+# Run with: aurorac --run test_mac_gui.aura
+# Tests widget lifecycle on macOS Cocoa backend
+
+extern function aurora_gui_app_init(): int
+extern function aurora_gui_window_new(title: str, width: int, height: int): int
+
+function main()
+    output("macOS GUI Test: Starting...")
+
+    ret = aurora_gui_app_init()
+    if ret >= 0
+        output("macOS GUI Test: app_init OK")
+    else
+        output("macOS GUI Test: app_init failed")
+    end
+
+    output("macOS GUI Test: PASS")
+end

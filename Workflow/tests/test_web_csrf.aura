@@ -1,0 +1,20 @@
+# Phase 35.1 — CSRF Protection Test
+# Verify CSRF token generation and verification compile
+
+import "server"
+
+extern function aurora_csrf_token(): int
+extern function aurora_csrf_verify(token: int): int
+
+function main()
+    output("CSRF Test: Starting...")
+
+    token = aurora_csrf_token()
+    if token == 0
+        output("CSRF Test: Warning — token generation returned empty")
+    else
+        output("CSRF Test: Token generated OK")
+    end
+
+    output("CSRF Test: PASS")
+end

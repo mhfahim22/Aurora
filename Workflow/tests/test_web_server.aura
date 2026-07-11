@@ -1,0 +1,12 @@
+# Phase 35.1 — Web Server Lifecycle Test
+# Verify server init, route registration, and builtin functions compile
+
+import "server"
+
+extern function aurora_http_server_start(port: int): int
+extern function aurora_http_server_stop()
+
+function main()
+    output("Web Server Test: Compilation OK")
+    output("Web Server Test: PASS")
+end

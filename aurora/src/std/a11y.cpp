@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 #include <algorithm>
+#include <sstream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -149,6 +150,48 @@ struct ShortcutEntry {
 };
 static std::vector<ShortcutEntry> g_shortcuts;
 
+static int parse_shortcut_mods(const std::string& s) {
+    int mods = 0;
+#ifdef _WIN32
+    if (s.find("Ctrl+") != std::string::npos || s.find("ctrl+") != std::string::npos) mods |= MOD_CONTROL;
+    if (s.find("Alt+") != std::string::npos || s.find("alt+") != std::string::npos) mods |= MOD_ALT;
+    if (s.find("Shift+") != std::string::npos || s.find("shift+") != std::string::npos) mods |= MOD_SHIFT;
+    if (s.find("Win+") != std::string::npos || s.find("win+") != std::string::npos) mods |= MOD_WIN;
+#endif
+    return mods;
+}
+
+static int parse_shortcut_key(const std::string& s) {
+    std::string k;
+    size_t plus = s.rfind('+');
+    if (plus != std::string::npos) k = s.substr(plus + 1);
+    else k = s;
+#ifdef _WIN32
+    if (k.size() == 1 && k[0] >= 'A' && k[0] <= 'Z') return (int)k[0];
+    if (k.size() == 1 && k[0] >= '0' && k[0] <= '9') return (int)k[0];
+    if (k == "F1") return VK_F1; if (k == "F2") return VK_F2;
+    if (k == "F3") return VK_F3; if (k == "F4") return VK_F4;
+    if (k == "F5") return VK_F5; if (k == "F6") return VK_F6;
+    if (k == "F7") return VK_F7; if (k == "F8") return VK_F8;
+    if (k == "F9") return VK_F9; if (k == "F10") return VK_F10;
+    if (k == "F11") return VK_F11; if (k == "F12") return VK_F12;
+    if (k == "Space") return VK_SPACE;
+    if (k == "Enter" || k == "Return") return VK_RETURN;
+    if (k == "Tab") return VK_TAB;
+    if (k == "Escape" || k == "Esc") return VK_ESCAPE;
+    if (k == "Delete" || k == "Del") return VK_DELETE;
+    if (k == "Home") return VK_HOME;
+    if (k == "End") return VK_END;
+    if (k == "PageUp") return VK_PRIOR;
+    if (k == "PageDown") return VK_NEXT;
+    if (k == "Left") return VK_LEFT;
+    if (k == "Right") return VK_RIGHT;
+    if (k == "Up") return VK_UP;
+    if (k == "Down") return VK_DOWN;
+#endif
+    return 0;
+}
+
 int aurora_a11y_register_shortcut(const char* shortcut, void (*fn)(void)) {
     if (!shortcut || !fn) return 0;
     std::lock_guard<std::mutex> lock(g_a11y_mtx);
@@ -159,12 +202,26 @@ int aurora_a11y_register_shortcut(const char* shortcut, void (*fn)(void)) {
         }
     }
     g_shortcuts.push_back({shortcut, fn});
+#ifdef _WIN32
+    int mods = parse_shortcut_mods(shortcut);
+    int key = parse_shortcut_key(shortcut);
+    if (key) RegisterHotKey(nullptr, (int)g_shortcuts.size(), mods, key);
+#endif
     return 1;
 }
 
 int aurora_a11y_unregister_shortcut(const char* shortcut) {
     if (!shortcut) return 0;
     std::lock_guard<std::mutex> lock(g_a11y_mtx);
+#ifdef _WIN32
+    auto it = std::find_if(g_shortcuts.begin(), g_shortcuts.end(),
+        [&](const ShortcutEntry& e) { return e.shortcut == shortcut; });
+    if (it != g_shortcuts.end()) {
+        int mods = parse_shortcut_mods(shortcut);
+        int key = parse_shortcut_key(shortcut);
+        if (key) UnregisterHotKey(nullptr, (int)(it - g_shortcuts.begin()) + 1);
+    }
+#endif
     g_shortcuts.erase(std::remove_if(g_shortcuts.begin(), g_shortcuts.end(),
         [&](const ShortcutEntry& e) { return e.shortcut == shortcut; }), g_shortcuts.end());
     return 1;

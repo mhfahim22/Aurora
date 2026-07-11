@@ -131,6 +131,41 @@ int aurora_i18n_load(const char* domain, const char* filepath) {
     return aurora_i18n_load_json(domain, data.c_str());
 }
 
+static size_t json_skip_string(const std::string& js, size_t pos) {
+    if (pos >= js.size() || js[pos] != '"') return pos;
+    pos++;
+    while (pos < js.size()) {
+        if (js[pos] == '\\' && pos + 1 < js.size()) { pos += 2; continue; }
+        if (js[pos] == '"') return pos + 1;
+        pos++;
+    }
+    return std::string::npos;
+}
+
+static size_t json_skip_value(const std::string& js, size_t pos) {
+    if (pos >= js.size()) return pos;
+    while (pos < js.size() && (js[pos] == ' ' || js[pos] == '\t' || js[pos] == '\n' || js[pos] == '\r')) pos++;
+    if (pos >= js.size()) return pos;
+    if (js[pos] == '"') return json_skip_string(js, pos);
+    if (js[pos] == '{' || js[pos] == '[') {
+        char open = js[pos];
+        char close = (open == '{') ? '}' : ']';
+        pos++;
+        int depth = 1;
+        while (pos < js.size() && depth > 0) {
+            if (js[pos] == '"') pos = json_skip_string(js, pos);
+            else if (js[pos] == open) depth++;
+            else if (js[pos] == close) depth--;
+            else pos++;
+        }
+        return pos + 1;
+    }
+    while (pos < js.size() && js[pos] != ',' && js[pos] != '}' && js[pos] != ']' &&
+           js[pos] != ' ' && js[pos] != '\t' && js[pos] != '\n' && js[pos] != '\r')
+        pos++;
+    return pos;
+}
+
 int aurora_i18n_load_json(const char* domain, const char* json_data) {
     if (!domain || !json_data) return 0;
     std::lock_guard<std::mutex> lock(g_i18n_mtx);
@@ -144,27 +179,43 @@ int aurora_i18n_load_json(const char* domain, const char* json_data) {
     size_t pos = 0;
     while ((pos = js.find('"', pos)) != std::string::npos) {
         size_t kstart = pos + 1;
+        if (kstart >= js.size()) break;
         size_t kend = js.find('"', kstart);
         if (kend == std::string::npos) break;
+        if (kend > 0 && js[kend - 1] == '\\') {
+            pos = kend + 1;
+            continue;
+        }
         std::string key = js.substr(kstart, kend - kstart);
+        if (key.empty() || key[0] == '@' || key[0] == '$') {
+            pos = kend + 1;
+            continue;
+        }
         pos = kend + 1;
-        size_t colon = js.find(':', pos);
-        if (colon == std::string::npos) break;
-        pos = colon + 1;
-        while (pos < js.size() && (js[pos] == ' ' || js[pos] == '\t' || js[pos] == '\n')) pos++;
+        while (pos < js.size() && (js[pos] == ' ' || js[pos] == '\t' || js[pos] == '\n' || js[pos] == '\r')) pos++;
+        if (pos >= js.size() || js[pos] != ':') continue;
+        pos++;
+        while (pos < js.size() && (js[pos] == ' ' || js[pos] == '\t' || js[pos] == '\n' || js[pos] == '\r')) pos++;
         if (pos >= js.size()) break;
+        if (js[pos] == '{') {
+            size_t lang_end = json_skip_value(js, pos);
+            if (lang_end != std::string::npos) pos = lang_end;
+            continue;
+        }
         if (js[pos] == '"') {
             size_t vstart = pos + 1;
-            size_t vend = js.find('"', vstart);
-            if (vend == std::string::npos) break;
+            size_t vend = pos;
+            while (vend < js.size()) {
+                if (js[vend] == '\\' && vend + 1 < js.size()) { vend += 2; continue; }
+                if (js[vend] == '"') break;
+                vend++;
+            }
+            if (vend >= js.size()) break;
             std::string value = js.substr(vstart, vend - vstart);
             d->entries.push_back({g_current_locale, key, value});
             pos = vend + 1;
         }
     }
-    bool found = false;
-    for (auto& l : d->available_langs) if (l == g_current_locale) { found = true; break; }
-    if (!found) d->available_langs.push_back(g_current_locale);
     auto& langs = d->available_langs;
     if (std::find(langs.begin(), langs.end(), g_current_locale) == langs.end())
         langs.push_back(g_current_locale);

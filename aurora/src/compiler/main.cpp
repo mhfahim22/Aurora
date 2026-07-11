@@ -759,7 +759,7 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
     std::string target_triple = cross_target.empty()
         ? llvm::sys::getProcessTriple()
         : cross_target;
-    module->setTargetTriple(target_triple);
+    module->setTargetTriple(llvm::Triple(target_triple));
 
     std::string error;
     const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple, error);
@@ -1877,10 +1877,10 @@ auto get_output_path = [&]() -> std::string {
             }
 #endif
             if (verbose) std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
-            module->setTargetTriple(target_triple.empty()
+            module->setTargetTriple(llvm::Triple(target_triple.empty()
                 ? llvm::sys::getProcessTriple()
-                : target_triple);
-            if (verbose) std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;
+                : target_triple));
+            if (verbose) std::cerr << "STAGE6: triple=" << module->getTargetTriple().str() << "\n" << std::flush;
 
             if (verbose) std::cerr << "STAGE6: creating managers\n" << std::flush;
             llvm::LoopAnalysisManager LAM;

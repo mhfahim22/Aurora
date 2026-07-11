@@ -1,0 +1,47 @@
+import "server"
+import "net"
+
+server test
+    cors
+    template "greeting" "<h1>Hello {{name}}</h1>"
+
+    route "GET" "/hello/:name"
+        response.html("<h1>Hello " + request.params.name + "</h1>")
+
+    route "GET" "/search"
+        q = request.query.q
+        response.json("{\"query\": \"" + q + "\"}")
+
+    route "POST" "/login"
+        username = request.form.username
+        password = request.form.password
+        if username == "admin"
+            if password == "secret"
+                response.json("{\"status\": \"ok\"}")
+            else
+                response.status(401)
+                response.json("{\"error\": \"invalid password\"}")
+        else
+            response.status(401)
+            response.json("{\"error\": \"invalid username\"}")
+
+    route "GET" "/redirect-test"
+        redirect("/hello/world", 301)
+
+    route "GET" "/check-cookie"
+        token = request.cookie.token
+        if token == ""
+            response.json("{\"cookie\": \"none\"}")
+        else
+            response.json("{\"cookie\": \"" + token + "\"}")
+
+    websocket "/ws"
+        output("WebSocket client connected")
+
+    sse "/events"
+        output("SSE client connected")
+
+    validate
+        output("validation block")
+
+output("Phase 31 test compiled OK")

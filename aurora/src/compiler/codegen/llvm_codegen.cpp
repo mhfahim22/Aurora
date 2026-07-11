@@ -70,7 +70,7 @@ LLVMCodegen::LLVMCodegen()
 {
     ensure_llvm_init();
     auto triple = llvm::sys::getProcessTriple();
-    module_->setTargetTriple(triple);
+    module_->setTargetTriple(llvm::Triple(triple));
     module_->setDataLayout(llvm_target_data_layout(triple));
 }
 
@@ -337,6 +337,13 @@ static void log_error(llvm::Error err) {
 #pragma comment(linker, "/include:aurora_gui_listbox_get_selected")
 #pragma comment(linker, "/include:aurora_gui_listbox_get_item")
 #pragma comment(linker, "/include:aurora_gui_listbox_count")
+#pragma comment(linker, "/include:aurora_gui_webview_new")
+#pragma comment(linker, "/include:aurora_gui_webview_navigate")
+#pragma comment(linker, "/include:aurora_gui_webview_go_back")
+#pragma comment(linker, "/include:aurora_gui_webview_go_forward")
+#pragma comment(linker, "/include:aurora_gui_webview_reload")
+#pragma comment(linker, "/include:aurora_gui_webview_set_on_title")
+#pragma comment(linker, "/include:aurora_gui_webview_set_on_navigate")
 #endif
 
 int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
@@ -385,7 +392,7 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
     if (gen)
         static_cast<void>(jit->getMainJITDylib().addGenerator(std::move(*gen)));
 
-    module->setTargetTriple(jit->getTargetTriple().getTriple());
+    module->setTargetTriple(jit->getTargetTriple());
     module->setDataLayout(jit->getDataLayout());
 
     auto TSM = ThreadSafeModule(std::move(module), std::move(ctx));

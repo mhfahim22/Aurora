@@ -222,15 +222,35 @@ int64_t builtin_cookie_delete(const char* name) {
     return 1;
 }
 
+/* Thread-local middleware chain state for next() */
+static thread_local int g_mw_current_index = 0;
+static thread_local int g_mw_total_count = 0;
+static thread_local void** g_mw_handlers = nullptr;
+static thread_local AuroraHttpRequest* g_mw_request = nullptr;
+static thread_local AuroraHttpResponse* g_mw_response = nullptr;
+
+void aurora_middleware_set_context(void** handlers, int count, int current_idx,
+                                    AuroraHttpRequest* req, AuroraHttpResponse* res) {
+    g_mw_handlers = handlers;
+    g_mw_total_count = count;
+    g_mw_current_index = current_idx;
+    g_mw_request = req;
+    g_mw_response = res;
+}
+
 int64_t builtin_middleware(void* fn) {
-    /* Middleware registration at the AURORA level; at runtime this is called
-       from compiled code referencing the current server context. For now,
-       registration is handled at compile-time via codegen. */
     return 1;
 }
 
 int64_t builtin_next() {
-    return 1;
+    if (!g_mw_handlers || g_mw_current_index + 1 >= g_mw_total_count)
+        return 0;
+    int next_idx = g_mw_current_index + 1;
+    typedef int (*MwFn)(AuroraHttpRequest*, AuroraHttpResponse*, void*);
+    MwFn next_fn = (MwFn)g_mw_handlers[next_idx];
+    if (!next_fn) return 0;
+    g_mw_current_index = next_idx;
+    return next_fn(g_mw_request, g_mw_response, nullptr);
 }
 
 int64_t builtin_rate_limit(int64_t max, int64_t window_ms) {

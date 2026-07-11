@@ -736,6 +736,38 @@ void Codegen::declare_domain_runtime_helpers() {
     http_set_json_ = llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_http_response_set_json", mod);
+    /* http_get_query_param(i8*, i8*) → i8* - get query param from HTTP request */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_get_query_param", mod);
+    /* http_get_form_param(i8*, i8*) → i8* - get form field from HTTP request */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_get_form_param", mod);
+    /* http_get_cookie(i8*, i8*) → i8* - get cookie from HTTP request */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_get_cookie", mod);
+    /* http_response_redirect(i8*, i8*, i64) - set HTTP redirect */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_redirect", mod);
+    /* http_response_set_status_code(i8*, i32) - set HTTP status code */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_set_status_code", mod);
+    /* http_response_set_header(i8*, i8*, i8*) - set HTTP response header */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_set_header", mod);
+    /* cors_apply_default(i8*) - set default CORS headers */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_cors_apply_default", mod);
+    /* cors_apply_with_origin(i8*, i8*) - set CORS with specific origin */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "aurora_cors_apply_with_origin", mod);
     /* http_str_as_cstr(i8*) → i8* - AuroraStr* to const char* */
     /* (already declared earlier, but store a member pointer) */
 

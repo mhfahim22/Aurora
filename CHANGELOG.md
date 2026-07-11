@@ -1,5 +1,44 @@
 # Changelog
 
+## v2.0.0 (2026-07-11) — Web Framework & Production Hardening
+
+Aurora v2.0.0 adds a full web framework DSL, production-hardened session/auth/template engine, Linux X11 GUI completion, macOS Cocoa GUI backend, complex widgets (TreeView, WebView, Media, Map), developer tools (Formatter, Linter, Debugger, Profiler), and comprehensive end-to-end testing.
+
+### Phase 35: End-to-End Testing, CI/CD & Documentation
+- **Web Framework Test Suite**: 12 test files covering server lifecycle, routes, params, CORS, CSRF, sessions, auth, WebSocket, templates, validation, rate limiting, and middleware.
+- **Desktop GUI Tests**: 4 platform-specific test files for Linux X11 and macOS Cocoa (`test_{linux,mac}_{gui,desktop}.aura`).
+- **Complex Widget Tests**: WebView, Media, Map widget C API compilation tests.
+- **Developer Tools Tests**: Formatter, Linter, Debugger, Profiler C API compilation tests.
+- **CI/CD**: Updated regression script with Web Test Stage (Stage 7).
+- **Documentation**: `docs/web_framework.md` (web framework guide), `docs/developer_tools.md` (dev tools guide).
+- **Version bump**: v2.0.0 across VERSION, aurora_version.hpp.
+
+### Phase 34: Full-Stack Web & Production Hardening
+- **Session Management**: Session manager with auto-cleanup, 30-min default TTL, 6 API functions. Integrated into backend.
+- **Auth Middleware**: JWT sign/verify with HMAC-SHA256, role checking, middleware chain with `middleware_set_context()`/`next()`.
+- **Web DSL keywords**: `session`, `jwt`, `bearer`, `claim`, `middleware`, `use`, `route_group`, `login_required`, `role_required`.
+- **Template Engine Runtime**: Auto-reload with mtime checking, Tpl codegen fix.
+- **Linux X11 GUI**: 25+ stub-to-real implementations — TextBox keyboard input, Checkbox/Radio state, Slider/Progress value, ComboBox/ListBox selection, TabView pages, Canvas repaint, Clipboard, Cursor, Keyboard/Mouse tracking, MessageBox, Window EWMH maximize/minimize/restore, XSizeHints, set_resizable.
+
+### Phase 33: Complex Widgets & Developer Tools
+- **TreeView data model**: Full NSOutlineViewDataSource with AuroraTreeDataSource Obj-C class.
+- **WebView for macOS**: WKNavigationDelegate with KVO title tracking.
+- **i18n improvements**: `i18n_locale()` wrapper, JSON parser escaped-quote handling.
+- **a11y improvements**: Windows RegisterHotKey/UnregisterHotKey integration.
+- **Hot-reload improvements**: Actual before/after diff computation, apply/restore state.
+- **LLVM codegen**: `#pragma comment` directives for WebView symbols.
+
+### Phase 32: Desktop GUI Completion
+- **Linux X11**: Complete webview/media/map creator stubs with valid returns. Toolbar type collision fix.
+- **macOS Cocoa**: Full rewrite from ~470 lines of stubs to ~1400 lines with ID-based NSView* store.
+- **CMake**: WebKit.framework, AVKit.framework, AVFoundation.framework linked for macOS.
+
+### Phase 31: Web Framework DSL
+- **Route DSL**: `request.params.X`, `request.query.X`, `request.form.X`, `request.cookie.X` accessors.
+- **Response DSL**: `response.json()`, `response.html()`, `response.status()`, `response.redirect()`, `response.cookie()`.
+- **Server blocks**: `cors`, `websocket`, `sse`, `template`, `validate`, `redirect()` shortcut.
+- **Parser + Codegen**: Restricted keyword handling, NodeType::Response dispatch.
+
 ## v1.0.0 (2026-07-03) — Stable Release
 
 Aurora v1.0.0 is the first stable release. All 30 phases complete, 23 build targets, zero errors.

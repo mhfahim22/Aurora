@@ -98,6 +98,11 @@ enum class NodeType {
     Session,      /* session management     */
     Token,        /* auth token             */
     Auth,         /* authentication         */
+    Cors,         /* cors configuration     */
+    WebSocket,    /* websocket endpoint     */
+    Sse,          /* server-sent events     */
+    Tpl,          /* template declaration   */
+    Validate,     /* request validation     */
 
     /* ── Phase 6: UI Framework ── */
     Component,    /* component declaration   */

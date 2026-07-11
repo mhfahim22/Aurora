@@ -70,6 +70,8 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
         "server", "request", "response", "api",
         "middleware", "database", "query", "model",
         "cache", "session", "token", "auth",
+        "cors", "websocket", "sse", "template", "validate",
+        "redirect",
 
         /* game */
         "scene", "entity", "object", "sprite", "camera",

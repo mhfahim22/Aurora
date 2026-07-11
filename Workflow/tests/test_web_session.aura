@@ -1,0 +1,40 @@
+# Phase 35.1 — Session Management Test
+# Verify session keywords and C API compile
+
+import "server"
+
+extern function aurora_session_begin(): int
+extern function aurora_session_set(session: int, key: str, value: str)
+extern function aurora_session_get(session: int, key: str): str
+extern function aurora_session_end(session: int)
+extern function aurora_session_touch(session: int)
+
+function main()
+    output("Session Test: Starting...")
+
+    s = aurora_session_begin()
+    if s == 0
+        output("Session Test: FAIL — could not create session")
+        return
+    end
+    output("Session Test: Session created OK")
+
+    aurora_session_set(s, "user", "alice")
+    output("Session Test: Set user = alice OK")
+
+    v = aurora_session_get(s, "user")
+    if v == "alice"
+        output("Session Test: Get user OK")
+    else
+        output("Session Test: FAIL — got \"" + v + "\" expected \"alice\"")
+        return
+    end
+
+    aurora_session_touch(s)
+    output("Session Test: Touch OK")
+
+    aurora_session_end(s)
+    output("Session Test: End OK")
+
+    output("Session Test: PASS")
+end

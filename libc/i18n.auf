@@ -22,6 +22,10 @@ function i18n_detect_locale()
     return aurora_i18n_get_system_locale()
 end
 
+function i18n_locale(out)
+    return aurora_i18n_locale(out)
+end
+
 function i18n_set_locale(lang)
     aurora_i18n_set_locale(lang)
 end

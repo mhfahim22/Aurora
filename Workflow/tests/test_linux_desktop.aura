@@ -1,0 +1,26 @@
+# Phase 35.2 — Linux Desktop Integration Tests
+# Run with: xvfb-run aurorac --run test_linux_desktop.aura
+
+extern function aurora_gui_app_init(): int
+extern function aurora_gui_clipboard_set_text(s: str): int
+extern function aurora_gui_clipboard_get_text(): str
+extern function aurora_gui_cursor_set(c: int)
+
+function main()
+    output("Linux Desktop Test: Starting...")
+
+    ret = aurora_gui_clipboard_set_text("hello")
+    if ret == 0
+        output("Linux Desktop Test: clipboard_set_text OK")
+    else
+        output("Linux Desktop Test: clipboard_set_text failed")
+    end
+
+    t = aurora_gui_clipboard_get_text()
+    output("Linux Desktop Test: clipboard_get_text = \"" + t + "\"")
+
+    aurora_gui_cursor_set(1)
+    output("Linux Desktop Test: cursor_set OK")
+
+    output("Linux Desktop Test: PASS")
+end

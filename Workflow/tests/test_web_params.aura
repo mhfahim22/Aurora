@@ -1,0 +1,25 @@
+# Phase 35.1 — Path Params, Query Params, Form Data Test
+# Verify request.params.X, request.query.X, request.form.X all compile
+
+server test_params
+    route "GET" "/"
+        response("{\"status\": \"ok\"}")
+
+    route "GET" "/hello/:name/:age"
+        n = request.params.name
+        a = request.params.age
+        response.json("{\"name\": \"" + n + "\", \"age\": \"" + a + "\"}")
+
+    route "GET" "/filter"
+        sort = request.query.sort
+        page = request.query.page
+        limit = request.query.limit
+        response.json("{\"sort\": \"" + sort + "\", \"page\": \"" + page + "\"}")
+
+    route "POST" "/submit"
+        name = request.form.name
+        email = request.form.email
+        response.json("{\"name\": \"" + name + "\", \"email\": \"" + email + "\"}")
+
+output("Web Params Test: All param accessor patterns compiled OK")
+output("Web Params Test: PASS")
