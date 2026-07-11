@@ -79,7 +79,7 @@ void Codegen::generate(const ASTNode* root) {
 
     /* Step 0 — set target info for LLVM optimization */
     auto triple_str = llvm::sys::getProcessTriple();
-#if LLVM_VERSION_MAJOR >= 21
+#if LLVM_VERSION_MAJOR >= 20
     module_->setTargetTriple(llvm::Triple(triple_str));
 #else
     module_->setTargetTriple(triple_str);

@@ -70,7 +70,7 @@ LLVMCodegen::LLVMCodegen()
 {
     ensure_llvm_init();
     auto triple = llvm::sys::getProcessTriple();
-#if LLVM_VERSION_MAJOR >= 21
+#if LLVM_VERSION_MAJOR >= 20
     module_->setTargetTriple(llvm::Triple(triple));
 #else
     module_->setTargetTriple(triple);
@@ -396,7 +396,7 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
     if (gen)
         static_cast<void>(jit->getMainJITDylib().addGenerator(std::move(*gen)));
 
-#if LLVM_VERSION_MAJOR >= 21
+#if LLVM_VERSION_MAJOR >= 20
     module->setTargetTriple(jit->getTargetTriple());
 #else
     module->setTargetTriple(jit->getTargetTriple().getTriple());
