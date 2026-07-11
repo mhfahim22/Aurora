@@ -70,7 +70,11 @@ LLVMCodegen::LLVMCodegen()
 {
     ensure_llvm_init();
     auto triple = llvm::sys::getProcessTriple();
+#if LLVM_VERSION_MAJOR >= 21
     module_->setTargetTriple(llvm::Triple(triple));
+#else
+    module_->setTargetTriple(triple);
+#endif
     module_->setDataLayout(llvm_target_data_layout(triple));
 }
 
@@ -392,7 +396,11 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
     if (gen)
         static_cast<void>(jit->getMainJITDylib().addGenerator(std::move(*gen)));
 
+#if LLVM_VERSION_MAJOR >= 21
     module->setTargetTriple(jit->getTargetTriple());
+#else
+    module->setTargetTriple(jit->getTargetTriple().getTriple());
+#endif
     module->setDataLayout(jit->getDataLayout());
 
     auto TSM = ThreadSafeModule(std::move(module), std::move(ctx));

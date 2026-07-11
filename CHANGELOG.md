@@ -1,8 +1,8 @@
 # Changelog
 
-## v2.0.0 (2026-07-11) — Web Framework & Production Hardening
+## v1.0.0 (2026-07-11) — Cross-Platform Stable Release
 
-Aurora v2.0.0 adds a full web framework DSL, production-hardened session/auth/template engine, Linux X11 GUI completion, macOS Cocoa GUI backend, complex widgets (TreeView, WebView, Media, Map), developer tools (Formatter, Linter, Debugger, Profiler), and comprehensive end-to-end testing.
+Aurora v1.0.0 is the first stable release — cross-platform build validation, production hardening, web framework DSL, desktop GUI completion, complex widgets, developer tools, and comprehensive end-to-end testing.
 
 ### Phase 35: End-to-End Testing, CI/CD & Documentation
 - **Web Framework Test Suite**: 12 test files covering server lifecycle, routes, params, CORS, CSRF, sessions, auth, WebSocket, templates, validation, rate limiting, and middleware.

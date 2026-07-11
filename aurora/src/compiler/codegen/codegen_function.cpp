@@ -35,7 +35,11 @@ void Codegen::gen_function(const ASTNode* node) {
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
+#if LLVM_VERSION_MAJOR >= 21
             arg.addAttr(llvm::Attribute::getWithCaptureInfo(ctx_, llvm::CaptureInfo::none()));
+#else
+            arg.addAttr(llvm::Attribute::NoCapture);
+#endif
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;
@@ -167,7 +171,11 @@ void Codegen::gen_generic_instance(const std::string& mangled_name,
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
+#if LLVM_VERSION_MAJOR >= 21
             arg.addAttr(llvm::Attribute::getWithCaptureInfo(ctx_, llvm::CaptureInfo::none()));
+#else
+            arg.addAttr(llvm::Attribute::NoCapture);
+#endif
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;

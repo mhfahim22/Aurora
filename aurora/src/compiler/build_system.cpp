@@ -51,7 +51,11 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
     std::string triple = cfg.target_triple.empty()
         ? llvm::sys::getProcessTriple()
         : cfg.target_triple;
+#if LLVM_VERSION_MAJOR >= 21
     module->setTargetTriple(llvm::Triple(triple));
+#else
+    module->setTargetTriple(triple);
+#endif
 
     std::string error;
     const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple, error);
@@ -74,7 +78,12 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
 
     std::string features_str;
     if (cfg.target_triple.empty()) {
+#if LLVM_VERSION_MAJOR >= 21
         auto host_features = llvm::sys::getHostCPUFeatures();
+#else
+        llvm::StringMap<bool, llvm::MallocAllocator> host_features;
+        llvm::sys::getHostCPUFeatures(host_features);
+#endif
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
             features_str += f.second ? "+" : "-";
