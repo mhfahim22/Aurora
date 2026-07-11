@@ -19,6 +19,7 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
+#include <X11/cursorfont.h>
 
 struct GuiWidget {
     int id, type, x, y, w, h;
@@ -317,7 +318,6 @@ void aurora_gui_label_set_color(AuroraWidget w, unsigned int c) {
 void aurora_gui_label_set_align(AuroraWidget w, int a) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->max_val = a;
 }
-void aurora_gui_label_set_align(AuroraWidget w, int a) { (void)w;(void)a; }
 
 /* ── Text ── */
 AuroraWidget aurora_gui_text_new(AuroraWidget p, const char* t, int x, int y, int w, int h) {
@@ -620,7 +620,7 @@ void aurora_gui_canvas_set_paint_callback(AuroraWidget w, AuroraPaintCallback cb
     GuiWidget* gw = (GuiWidget*)w; if (gw) { gw->paint_cb = cb; gw->paint_user = u; }
 }
 void aurora_gui_canvas_repaint(AuroraWidget w) {
-    GuiWidget* gw = (GuiWidget*)w; if (gw && gw->paint_cb) gw->paint_cb(gw->id, gw->paint_user);
+    GuiWidget* gw = (GuiWidget*)w;     if (gw && gw->paint_cb) gw->paint_cb(gw->paint_user, gw->x, gw->y, gw->w, gw->h);
 }
 
 /* ── Menu ── */
@@ -699,7 +699,8 @@ int aurora_gui_clipboard_set_text(const char* s) {
     if (!s) return -1;
     g_clipboard_text = s;
     if (g_display) {
-        XSetSelectionOwner(g_display, XA_CLIPBOARD(g_display), g_root, CurrentTime);
+        Atom clip = XInternAtom(g_display, "CLIPBOARD", False);
+        XSetSelectionOwner(g_display, clip, g_root, CurrentTime);
     }
     return 0;
 }

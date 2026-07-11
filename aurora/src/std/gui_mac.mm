@@ -127,7 +127,7 @@ static void add_to_parent(NSView* child, AuroraWidget parent) {
     if (!pv) return;
     int ptype = g_widget_types[pid];
     if (ptype == WIDGET_WINDOW)
-        [(NSWindow*)pv contentView] addSubview:child];
+        [[(NSWindow*)pv contentView] addSubview:child];
     else
         [pv addSubview:child];
 }

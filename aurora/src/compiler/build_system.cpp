@@ -74,6 +74,7 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
 
     std::string features_str;
     if (cfg.target_triple.empty()) {
+#ifndef _MSC_VER
         llvm::StringMap<bool, llvm::MallocAllocator> host_features;
         llvm::sys::getHostCPUFeatures(host_features);
         for (const auto& f : host_features) {
@@ -81,6 +82,7 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
             features_str += f.second ? "+" : "-";
             features_str += f.first();
         }
+#endif
     }
 
     return target->createTargetMachine(
