@@ -3,6 +3,7 @@ tools/zig/
 
 # ── Build Output ──
 build/
+build2/
 _build/
 build_asan/
 output/
