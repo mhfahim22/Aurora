@@ -7,7 +7,6 @@
 #endif
 
 // LLVM includes must come before local headers to avoid macro conflicts
-#include <llvm/Config/llvm-config.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/TargetParser/Host.h>
@@ -52,11 +51,7 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
     std::string triple = cfg.target_triple.empty()
         ? llvm::sys::getProcessTriple()
         : cfg.target_triple;
-#if LLVM_VERSION_MAJOR >= 20
-    module->setTargetTriple(llvm::Triple(triple));
-#else
     module->setTargetTriple(triple);
-#endif
 
     std::string error;
     const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple, error);
@@ -79,12 +74,8 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
 
     std::string features_str;
     if (cfg.target_triple.empty()) {
-#if LLVM_VERSION_MAJOR >= 20
-        auto host_features = llvm::sys::getHostCPUFeatures();
-#else
         llvm::StringMap<bool, llvm::MallocAllocator> host_features;
         llvm::sys::getHostCPUFeatures(host_features);
-#endif
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
             features_str += f.second ? "+" : "-";

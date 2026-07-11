@@ -159,11 +159,7 @@ void Codegen::gen_try(const ASTNode* node) {
     {
         auto* fn = llvm::Function::Create(
             fty, llvm::Function::PrivateLinkage, fname, module_.get());
-#if LLVM_VERSION_MAJOR >= 20
-        fn->addParamAttr(0, llvm::Attribute::getWithCaptureInfo(C, llvm::CaptureInfo::none()));
-#else
         fn->addParamAttr(0, llvm::Attribute::NoCapture);
-#endif
 
         llvm::Value* arg_ctx = fn->getArg(0);  arg_ctx->setName("ctx");
         llvm::Value* arg_ex  = is_catch ? fn->getArg(1) : nullptr;

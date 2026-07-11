@@ -47,8 +47,11 @@ if(NOT WIN32 AND NOT APPLE)
     find_package(X11 QUIET)
 endif()
 
-# ── Find LLVM (MinGW LLVM needs ZLIB) ──────────────────────
-find_package(ZLIB QUIET)
+# ── Find LLVM ────────────────────────────────────────────────
+# MinGW LLVM 21+ cmake configs reference ZLIB::ZLIB
+if(WIN32 AND NOT MSVC)
+    find_package(ZLIB QUIET)
+endif()
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 
