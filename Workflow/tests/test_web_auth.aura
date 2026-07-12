@@ -3,9 +3,9 @@
 
 import "server"
 
-extern function aurora_jwt_sign(payload: str, secret: str): str
-extern function aurora_jwt_verify(token: str, secret: str): str
-extern function aurora_auth_has_role(user: str, role: str): int
+extern function aurora_jwt_sign(payload: str, secret: str) -> str
+extern function aurora_jwt_verify(token: str, secret: str) -> str
+extern function aurora_auth_has_role(user: str, role: str) -> int
 
 function main()
     output("Auth Test: Starting...")

@@ -1701,6 +1701,12 @@ ASTNode::Ptr Parser::parse_stmt() {
         return make_node(NodeType::Pass, "", ln);
     }
 
+    /* ── on_open / on_message / on_close — websocket event markers ── */
+    if (t0.is_keyword("on_open") || t0.is_keyword("on_message") || t0.is_keyword("on_close")) {
+        advance();
+        return make_node(NodeType::Pass, "", ln);
+    }
+
     std::ostringstream msg;
     msg << "Line " << ln << ": unsupported statement starting with '" << t0.value << "'";
     throw std::runtime_error(msg.str());

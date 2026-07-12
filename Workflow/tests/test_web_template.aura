@@ -3,8 +3,8 @@
 
 import "server"
 
-extern function aurora_template_compile(name: str, source: str): int
-extern function aurora_template_render(name: str, data: str): str
+extern function aurora_template_compile(name: str, source: str) -> int
+extern function aurora_template_render(name: str, data: str) -> str
 
 function main()
     output("Template Test: Starting...")

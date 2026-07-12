@@ -3,9 +3,9 @@
 
 import "server"
 
-extern function aurora_session_begin(): int
+extern function aurora_session_begin() -> int
 extern function aurora_session_set(session: int, key: str, value: str)
-extern function aurora_session_get(session: int, key: str): str
+extern function aurora_session_get(session: int, key: str) -> str
 extern function aurora_session_end(session: int)
 extern function aurora_session_touch(session: int)
 

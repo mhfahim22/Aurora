@@ -1,8 +1,8 @@
 # Phase 35.3 — WebView Widget Test
 # Verify WebView C API functions compile and return valid handles
 
-extern function aurora_gui_app_init(): int
-extern function aurora_gui_webview_new(x: int, y: int, w: int, h: int): int
+extern function aurora_gui_app_init() -> int
+extern function aurora_gui_webview_new(x: int, y: int, w: int, h: int) -> int
 extern function aurora_gui_webview_navigate(wv: int, url: str)
 extern function aurora_gui_webview_go_back(wv: int)
 extern function aurora_gui_webview_go_forward(wv: int)

@@ -3,8 +3,8 @@
 
 import "server"
 
-extern function aurora_csrf_token(): int
-extern function aurora_csrf_verify(token: int): int
+extern function aurora_csrf_token() -> int
+extern function aurora_csrf_verify(token: int) -> int
 
 function main()
     output("CSRF Test: Starting...")

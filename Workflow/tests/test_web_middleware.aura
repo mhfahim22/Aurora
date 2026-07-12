@@ -4,7 +4,7 @@
 import "server"
 
 extern function aurora_middleware_set_context(key: str, value: str)
-extern function aurora_middleware_get_context(key: str): str
+extern function aurora_middleware_get_context(key: str) -> str
 
 function main()
     output("Middleware Test: Starting...")

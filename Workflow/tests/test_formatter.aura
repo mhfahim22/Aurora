@@ -1,7 +1,7 @@
 # Phase 35.4 — Code Formatter Test
 # Verify formatter C API compiles and runs
 
-extern function aurora_format_code(source: str, options: str): str
+extern function aurora_format_code(source: str, options: str) -> str
 
 function main()
     output("Formatter Test: Starting...")

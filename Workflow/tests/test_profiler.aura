@@ -3,7 +3,7 @@
 
 extern function aurora_profiler_start()
 extern function aurora_profiler_stop()
-extern function aurora_profiler_get_report(): str
+extern function aurora_profiler_get_report() -> str
 
 function main()
     output("Profiler Test: Starting...")

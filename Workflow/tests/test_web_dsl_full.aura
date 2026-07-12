@@ -41,7 +41,7 @@ server full_test
     route "POST" "/data"
         name = request.form.name
         email = request.form.email
-        if name == "" || email == ""
+        if name == "" or email == ""
             response.status(400)
             response.json("{\"error\": \"name and email required\"}")
         else

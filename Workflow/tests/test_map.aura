@@ -1,8 +1,8 @@
 # Phase 35.3 — Map Widget Test
 # Verify Map C API functions compile
 
-extern function aurora_gui_app_init(): int
-extern function aurora_gui_map_new(x: int, y: int, w: int, h: int): int
+extern function aurora_gui_app_init() -> int
+extern function aurora_gui_map_new(x: int, y: int, w: int, h: int) -> int
 extern function aurora_gui_map_set_center(m: int, lat: float64, lon: float64)
 extern function aurora_gui_map_set_zoom(m: int, z: int)
 extern function aurora_gui_map_add_marker(m: int, lat: float64, lon: float64, label: str)
