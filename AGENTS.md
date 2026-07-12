@@ -1,5 +1,5 @@
 ## Goal
-All 35 phases complete — Aurora v2.0.0 stable release. Phases 1–35 (all core, web, desktop GUI, complex widgets, developer tools, production hardening, and end-to-end testing) complete.
+All 35 phases complete — Aurora v1.0.0 stable release. Phases 1–35 (all core, web, desktop GUI, complex widgets, developer tools, production hardening, and end-to-end testing) complete.
 
 ## Constraints & Preferences
 - Follow established module pattern where applicable: header → impl → `.auf` bindings → exports → typechecker entries → codegen entries → CMakeLists.txt update
