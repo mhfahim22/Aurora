@@ -93,7 +93,7 @@ foreach ($test in $featureTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     $compOut = & $Compiler $src 2>&1
-    if ($LASTEXITCODE -ne 0) { Test-Result "$($test.Desc) - compile" $false; continue }
+    if ($LASTEXITCODE -ne 0) { Write-Host "  $compOut"; Test-Result "$($test.Desc) - compile" $false; continue }
 
     $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
     if (-not $llFile) { Test-Result "$($test.Desc) - no .ll output" $false; continue }
@@ -122,7 +122,7 @@ foreach ($test in $stdlibTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     $compOut = & $Compiler $src 2>&1
-    if ($LASTEXITCODE -ne 0) { Test-Result "$($test.Desc) - compile" $false; continue }
+    if ($LASTEXITCODE -ne 0) { Write-Host "  $compOut"; Test-Result "$($test.Desc) - compile" $false; continue }
 
     $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
     if (-not $llFile) { Test-Result "$($test.Desc) - no .ll output" $false; continue }
@@ -201,7 +201,7 @@ foreach ($test in $webTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     $compOut = & $Compiler $src 2>&1
-    if ($LASTEXITCODE -ne 0) { Test-Result "$($test.Desc) - compile" $false; continue }
+    if ($LASTEXITCODE -ne 0) { Write-Host "  $compOut"; Test-Result "$($test.Desc) - compile" $false; continue }
 
     $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
     if (-not $llFile) { Test-Result "$($test.Desc) - no .ll output" $false; continue }
