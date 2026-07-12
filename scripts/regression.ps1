@@ -207,7 +207,8 @@ foreach ($test in $webTests) {
     if (-not $llFile) { Test-Result "$($test.Desc) - no .ll output" $false; continue }
 
     $verifyOut = & $OptPath -passes=verify -o nul $llFile.FullName 2>&1
-    Test-Result $test.Desc ($LASTEXITCODE -eq 0)
+    if ($LASTEXITCODE -ne 0) { if ($verifyOut) { $verifyOut | ForEach-Object { Write-Host "  opt: $_" } }; Test-Result $test.Desc $false; continue }
+    Test-Result $test.Desc $true
 }
 Pop-Location
 

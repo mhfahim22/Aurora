@@ -317,9 +317,22 @@ llvm::Value* Codegen::gen_var(const ASTNode* node) {
     /* Load with the actual allocated type */
     auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
     auto* global_var = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr);
-    llvm::Type* alloc_ty = alloca_inst ? alloca_inst->getAllocatedType()
-                         : global_var ? global_var->getValueType()
-                         : i64_ty();
+    llvm::Type* alloc_ty;
+    if (alloca_inst) {
+        alloc_ty = alloca_inst->getAllocatedType();
+    } else if (global_var) {
+        alloc_ty = global_var->getValueType();
+    } else if (rec->type_kind == AstTypeKind::String ||
+               rec->type_kind == AstTypeKind::Array ||
+               rec->type_kind == AstTypeKind::Struct ||
+               rec->type_kind == AstTypeKind::Pointer ||
+               rec->type_kind == AstTypeKind::Class) {
+        alloc_ty = i8ptr_ty();
+    } else if (rec->type_kind == AstTypeKind::Float) {
+        alloc_ty = llvm::Type::getDoubleTy(ctx_);
+    } else {
+        alloc_ty = i64_ty();
+    }
     return builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->value);
 }
 

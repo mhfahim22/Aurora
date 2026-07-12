@@ -74,12 +74,25 @@ llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConf
 
     std::string features_str;
     if (cfg.target_triple.empty()) {
+#if LLVM_VERSION_MAJOR >= 19
         auto host_features = llvm::sys::getHostCPUFeatures();
-        for (const auto& f : host_features) {
-            if (!features_str.empty()) features_str += ",";
-            features_str += f.second ? "+" : "-";
-            features_str += f.first();
+        if (!host_features.empty()) {
+            for (const auto& f : host_features) {
+                if (!features_str.empty()) features_str += ",";
+                features_str += f.second ? "+" : "-";
+                features_str += f.first();
+            }
         }
+#else
+        llvm::StringMap<bool, llvm::MallocAllocator> host_features;
+        if (llvm::sys::getHostCPUFeatures(host_features)) {
+            for (const auto& f : host_features) {
+                if (!features_str.empty()) features_str += ",";
+                features_str += f.second ? "+" : "-";
+                features_str += f.first();
+            }
+        }
+#endif
     }
 
     return target->createTargetMachine(
