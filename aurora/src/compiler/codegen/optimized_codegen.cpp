@@ -709,11 +709,11 @@ llvm::Value* OptimizedCodegen::gen_binop(const ASTNode* node) {
     if (!lhs || !rhs) return llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
 
     const std::string& op = node->value;
-    /* Type unification: if one side is ptr and the other i64, cast ptr to i64 */
+    /* Type unification: if operands differ, cast both to i64 uniformly */
     if (lhs->getType() != rhs->getType()) {
-        if (lhs->getType()->isPointerTy() && rhs->getType()->isIntegerTy())
+        if (lhs->getType()->isPointerTy())
             lhs = builder_->CreatePtrToInt(lhs, llvm::Type::getInt64Ty(ctx_), "l_ptoi");
-        else if (rhs->getType()->isPointerTy() && lhs->getType()->isIntegerTy())
+        if (rhs->getType()->isPointerTy())
             rhs = builder_->CreatePtrToInt(rhs, llvm::Type::getInt64Ty(ctx_), "r_ptoi");
     }
 

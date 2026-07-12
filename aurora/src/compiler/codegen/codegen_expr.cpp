@@ -318,22 +318,26 @@ llvm::Value* Codegen::gen_var(const ASTNode* node) {
     auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(rec->alloca_ptr);
     auto* global_var = llvm::dyn_cast<llvm::GlobalVariable>(rec->alloca_ptr);
     llvm::Type* alloc_ty;
+    bool is_arena_slot = false;
     if (alloca_inst) {
         alloc_ty = alloca_inst->getAllocatedType();
     } else if (global_var) {
         alloc_ty = global_var->getValueType();
-    } else if (rec->type_kind == AstTypeKind::String ||
-               rec->type_kind == AstTypeKind::Array ||
-               rec->type_kind == AstTypeKind::Struct ||
-               rec->type_kind == AstTypeKind::Pointer ||
-               rec->type_kind == AstTypeKind::Class) {
-        alloc_ty = i8ptr_ty();
-    } else if (rec->type_kind == AstTypeKind::Float) {
-        alloc_ty = llvm::Type::getDoubleTy(ctx_);
+        /* GlobalVariable may store i64 even for pointer-typed values; rebox if needed */
     } else {
+        /* Arena/GC heap slot — always i64 (see gen_allocation_for_var) */
         alloc_ty = i64_ty();
+        is_arena_slot = true;
     }
-    return builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->value);
+    llvm::Value* loaded = builder_->CreateLoad(alloc_ty, rec->alloca_ptr, node->value);
+    /* Rebox i64 → ptr for pointer-typed variables stored in i64 slots */
+    if (is_arena_slot && (rec->type_kind == AstTypeKind::String ||
+                          rec->type_kind == AstTypeKind::Array ||
+                          rec->type_kind == AstTypeKind::Struct ||
+                          rec->type_kind == AstTypeKind::Pointer ||
+                          rec->type_kind == AstTypeKind::Class))
+        return builder_->CreateIntToPtr(loaded, i8ptr_ty(), node->value + "_ptr");
+    return loaded;
 }
 
 bool Codegen::expr_is_string_type(const ASTNode* node) {
@@ -474,11 +478,11 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
         return i64(0);
     }
 
-    /* Type unification: if one side is ptr and the other i64, cast ptr to i64 */
+    /* Type unification: if operands differ, cast both to i64 uniformly */
     if (L->getType() != R->getType()) {
-        if (L->getType()->isPointerTy() && R->getType()->isIntegerTy())
+        if (L->getType()->isPointerTy())
             L = builder_->CreatePtrToInt(L, i64_ty(), "l_ptoi");
-        else if (R->getType()->isPointerTy() && L->getType()->isIntegerTy())
+        if (R->getType()->isPointerTy())
             R = builder_->CreatePtrToInt(R, i64_ty(), "r_ptoi");
     }
 
