@@ -307,21 +307,17 @@ llvm::Value* Codegen::gen_allocation_for_var(const std::string& name,
     switch (strategy) {
         case AllocStrategy::Arena: {
             /* Arena allocation: call aurora_arena_alloc */
-            llvm::Value* size = llvm::ConstantExpr::getSizeOf(ty);
-            size = builder_->CreateZExtOrTrunc(size, i64_ty());
-            llvm::Value* raw = builder_->CreateCall(fn_arena_alloc_, { size },
+            llvm::Value* raw = builder_->CreateCall(fn_arena_alloc_, { i64(8) },
                                                      name + "_arena");
-            /* Bitcast arena pointer to actual type so gen_assign can store directly */
-            return builder_->CreateBitCast(raw, ty->getPointerTo(), name);
+            /* Use i64 slot type to match gen_var's fallback load type */
+            return builder_->CreateBitCast(raw, i64_ty()->getPointerTo(), name);
         }
         case AllocStrategy::GC: {
             /* GC allocation: call aurora_gc_alloc */
-            llvm::Value* size = llvm::ConstantExpr::getSizeOf(ty);
-            size = builder_->CreateZExtOrTrunc(size, i64_ty());
-            llvm::Value* raw = builder_->CreateCall(fn_gc_alloc_, { size },
+            llvm::Value* raw = builder_->CreateCall(fn_gc_alloc_, { i64(8) },
                                                      name + "_gc");
-            /* Bitcast GC pointer to actual type so gen_assign can store directly */
-            return builder_->CreateBitCast(raw, ty->getPointerTo(), name);
+            /* Use i64 slot type to match gen_var's fallback load type */
+            return builder_->CreateBitCast(raw, i64_ty()->getPointerTo(), name);
         }
         default:
             break;

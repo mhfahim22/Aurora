@@ -125,6 +125,8 @@ void Codegen::gen_assign(const ASTNode* node) {
                 else if (store_val->getType()->isIntegerTy() && gv_ty->isPointerTy())
                     store_val = builder_->CreateIntToPtr(store_val, gv_ty, name + "_gv_ptr");
             }
+        } else if (!llvm::isa<llvm::AllocaInst>(slot) && store_val->getType()->isPointerTy()) {
+            store_val = builder_->CreatePtrToInt(store_val, i64_ty(), name + "_slot_int");
         }
         builder_->CreateStore(store_val, slot);
         declare_var(name, slot, init_state, assign_kind);
