@@ -1,13 +1,13 @@
 # Phase 35.4 — Code Linter Test
 # Verify linter C API compiles and runs
 
-extern function aurora_lint_code(source: str) -> str
+extern function aurora_dev_lint(code: str) -> str
 
 function main()
     output("Linter Test: Starting...")
 
     source = "function main()\n    x = 1\nend"
-    diagnostics = aurora_lint_code(source)
+    diagnostics = aurora_dev_lint(source)
 
     output("Linter Test: Diagnostics returned")
 

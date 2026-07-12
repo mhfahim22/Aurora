@@ -3,9 +3,9 @@
 
 extern function aurora_gui_app_init() -> int
 extern function aurora_gui_map_new(x: int, y: int, w: int, h: int) -> int
-extern function aurora_gui_map_set_center(m: int, lat: float64, lon: float64)
+extern function aurora_gui_map_set_center(m: int, lat: f64, lon: f64)
 extern function aurora_gui_map_set_zoom(m: int, z: int)
-extern function aurora_gui_map_add_marker(m: int, lat: float64, lon: float64, label: str)
+extern function aurora_gui_map_add_marker(m: int, lat: f64, lon: f64, label: str)
 
 function main()
     output("Map Test: Starting...")
