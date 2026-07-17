@@ -1,0 +1,46 @@
+extern function f64array_new(n)
+extern function f64array_free(a)
+extern function f64array_get(a, i) -> f64
+extern function f64array_set(a, i, v)
+extern function f64array_len(a) -> i64
+extern function f64array_fill(a, v)
+extern function f64array_matmul(a, b, c, n)
+extern function f64array_sum(a) -> f64
+extern function aurora_time_ns() -> i64
+
+function main():
+    output("AOT vs JIT Benchmark")
+    output("=====================")
+    N = 400
+    n2 = N * N
+    a = f64array_new(n2)
+    b = f64array_new(n2)
+    c = f64array_new(n2)
+    f64array_fill(a, 2.0)
+    f64array_fill(b, 3.0)
+    f64array_fill(c, 0.0)
+
+    for i in range(N):
+        for j in range(N):
+            idx = i * N + j
+            f64array_set(a, idx, (i * 2.0 + j * 3.0) / N)
+            f64array_set(b, idx, (j * 5.0 - i * 7.0) / N)
+        end
+    end
+
+    t0 = aurora_time_ns()
+    f64array_matmul(a, b, c, N)
+    t1 = aurora_time_ns()
+    ms = (t1 - t0) / 1000000
+    flops = 2 * N * N * N * 1000 / (t1 - t0)
+    output("400x400 matmul: " + str(ms) + " ms (" + str(flops) + " MFLOPS)")
+
+    s = f64array_sum(c)
+    if s != 0.0
+        output("sum != 0 (expected)")
+    end
+
+    f64array_free(a)
+    f64array_free(b)
+    f64array_free(c)
+    output("OK")

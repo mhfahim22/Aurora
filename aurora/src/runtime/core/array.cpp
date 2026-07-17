@@ -331,18 +331,10 @@ void aurora_array_free(int64_t arr_ptr) {
 
 AuroraStr* aurora_str_concat(AuroraStr* a, AuroraStr* b) {
     if (!a) return b ? aurora_str_from_cstr(b->ptr) : aurora_str_new(0);
-    if (!b) return aurora_str_from_cstr(a->ptr);
-    size_t new_len = a->len + b->len;
-    size_t cap = new_len + 1;
-    if (cap < 16) cap = 16;
-    AuroraStr* result = aurora_str_new(cap);
-    if (a->len > 0) memcpy(result->ptr, a->ptr, a->len);
-    if (b->len > 0) memcpy(result->ptr + a->len, b->ptr, b->len);
-    result->ptr[new_len] = '\0';
-    result->len = new_len;
-    aurora_str_free(a);
+    if (!b) return a;
+    aurora_str_append(a, b);
     aurora_str_free(b);
-    return result;
+    return a;
 }
 
 /* ── Contains / Copy (unchanged logic) ── */

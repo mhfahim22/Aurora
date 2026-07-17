@@ -1,0 +1,14 @@
+# ── String Concatenation Benchmark (with O(1) strcat fix) ──
+extern function aurora_time_ns() -> i64
+
+function main():
+    count = 1000000
+    result = ""
+    start = aurora_time_ns()
+    for i in range(count):
+        result = strcat(result, "x")
+    end
+    elapsed = aurora_time_ns() - start
+    sz = len(result)
+    output("AURORA STRING: " + str(sz) + " chars, " + str(elapsed / 1000000) + " ms, " + str(elapsed / count) + " ns/op")
+end

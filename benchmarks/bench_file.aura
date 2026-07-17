@@ -1,0 +1,26 @@
+# ── File I/O Benchmark ──
+extern function aurora_time_ns() -> i64
+extern function aurora_fs_write_file(path: str, content: str) -> i32
+extern function aurora_fs_read_file(path: str) -> str
+extern function aurora_fs_remove(path: str) -> i32
+
+function main():
+    line = "Hello World! This is a benchmark line for Aurora file I/O testing.\n"
+    data = ""
+    for i in range(200000):
+        data = strcat(data, line)
+    end
+    data_len = len(data)
+    start = aurora_time_ns()
+    ret = aurora_fs_write_file("bench_file.tmp", data)
+    if ret == 0:
+        output("FAIL: write_file returned 0")
+        return
+    end
+    content = aurora_fs_read_file("bench_file.tmp")
+    elapsed = aurora_time_ns() - start
+    read_len = len(content)
+    aurora_fs_remove("bench_file.tmp")
+    ms = elapsed / 1000000
+    output("AURORA FILE: " + str(ms) + " ms (wrote " + str(data_len) + " bytes, read " + str(read_len) + " bytes, " + str(data_len * 2 * 1000 / elapsed) + " MB/s)")
+end

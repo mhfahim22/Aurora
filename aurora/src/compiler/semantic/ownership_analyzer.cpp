@@ -791,57 +791,53 @@ int OwnershipAnalyzer::count_aliases() const {
 
 void OwnershipAnalyzer::print_ownership_report() const {
     std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║        Aurora Ownership Analysis Report                  ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "--- Aurora Ownership Analysis Report ---\n";
 
     if (ownership_info_.empty()) {
-        std::cerr << "║  No variables analyzed.                                 ║\n";
+        std::cerr << "  No variables analyzed.\n";
     } else {
-        std::cerr << "║  Variable          │ Ownership Type   │ Owner Count     ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        fprintf(stderr, "  %-18s  %-17s  %s\n",
+               "Variable", "Ownership Type", "Owner Count");
+        std::cerr << "  " << std::string(54, '-') << "\n";
 
         for (const auto& [name, info] : ownership_info_) {
             std::string type_name = ownership_type_name(info.type);
-            /* Strip function prefix for display (use last :: for safety) */
             auto pos = name.rfind("::");
             std::string display = (pos != std::string::npos) ? name.substr(pos + 2) : name;
-            fprintf(stderr, "║  %-18s│ %-17s│ %d               ║\n",
+            fprintf(stderr, "  %-18s  %-17s  %d\n",
                    display.c_str(), type_name.c_str(), info.owner_count);
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    Single:       " << count_single() << "                                ║\n";
-        std::cerr << "║    Shared:       " << count_shared() << "                                ║\n";
-        std::cerr << "║    Weak:         " << count_weak() << "                                ║\n";
-        std::cerr << "║    Borrowed:     " << count_borrowed() << "                                ║\n";
-        std::cerr << "║    With Aliases: " << count_aliases() << "                                ║\n";
+        std::cerr << "  Statistics:\n";
+        fprintf(stderr, "    Single:       %d\n", count_single());
+        fprintf(stderr, "    Shared:       %d\n", count_shared());
+        fprintf(stderr, "    Weak:         %d\n", count_weak());
+        fprintf(stderr, "    Borrowed:     %d\n", count_borrowed());
+        fprintf(stderr, "    With Aliases: %d\n", count_aliases());
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "------------------------------------------\n";
     std::cerr << "\n";
 }
 
 void OwnershipAnalyzer::print_alias_graph() const {
     std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║           Aurora Alias Graph                             ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "--- Aurora Alias Graph ---\n";
 
     if (alias_edges_.empty()) {
-        std::cerr << "║  No alias relationships.                                ║\n";
+        std::cerr << "  No alias relationships.\n";
     } else {
-        std::cerr << "║  From              → To                │ Type            ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        fprintf(stderr, "  %-18s  %-18s  %s\n",
+               "From", "To", "Type");
+        std::cerr << "  " << std::string(48, '-') << "\n";
 
         for (const auto& edge : alias_edges_) {
             std::string type_str = edge.is_strong ? "Strong" : "Weak";
-            fprintf(stderr, "║  %-18s→ %-18s│ %-16s║\n",
+            fprintf(stderr, "  %-18s  %-18s  %s\n",
                    edge.from.c_str(), edge.to.c_str(), type_str.c_str());
         }
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "------------------------------------------\n";
     std::cerr << "\n";
 }

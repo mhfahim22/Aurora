@@ -15,9 +15,62 @@
    Aurora Runtime — I/O
    ════════════════════════════════════════════════════════════
    Platform-level print functions used by codegen-emitted code.
-   These write directly to STDOUT via platform APIs to avoid
-   the CRT startup overhead and to stay dependency-free.
+   Uses buffered output for minimal syscall overhead.
    ════════════════════════════════════════════════════════════ */
+
+/* ── Buffered stdout (4KB buffer, flush on \n or full) ── */
+#define IO_BUF_SIZE 4096
+static char  io_data[IO_BUF_SIZE];
+static int   io_pos;
+
+static void io_flush(void) {
+    if (io_pos == 0) return;
+#ifdef _WIN32
+    static HANDLE hOut;
+    if (!hOut) hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD written;
+    WriteFile(hOut, io_data, (DWORD)io_pos, &written, nullptr);
+#else
+    write(STDOUT_FILENO, io_data, io_pos);
+#endif
+    io_pos = 0;
+}
+
+static void io_write(const char* data, int len) {
+    for (int i = 0; i < len; ) {
+        int avail = IO_BUF_SIZE - io_pos;
+        if (avail == 0) { io_flush(); avail = IO_BUF_SIZE; }
+        int chunk = len - i;
+        if (chunk > avail) chunk = avail;
+        memcpy(io_data + io_pos, data + i, chunk);
+        io_pos += chunk;
+        i += chunk;
+    }
+}
+
+static void io_write_char(char c) {
+    if (io_pos >= IO_BUF_SIZE) io_flush();
+    io_data[io_pos++] = c;
+    if (c == '\n') io_flush();
+}
+
+/* Fast integer-to-string: write directly to buffer, right-to-left */
+static void io_write_int(int64_t val) {
+    if (val == INT64_MIN) {
+        io_write("-9223372036854775808", 20);
+        return;
+    }
+    char buf[24];
+    int pos = 24;
+    bool neg = false;
+    if (val < 0) { neg = true; val = -val; }
+    do {
+        buf[--pos] = '0' + (int)(val % 10);
+        val /= 10;
+    } while (val > 0);
+    if (neg) buf[--pos] = '-';
+    io_write(buf + pos, 24 - pos);
+}
 
 /* Forward-declare arena allocator from memory.cpp */
 extern "C" void* aurora_alloc(size_t size);
@@ -25,95 +78,36 @@ extern "C" void* aurora_alloc(size_t size);
 extern "C" {
 
 void aurora_print_int(int64_t val) {
-    char buf[32];
-    int len = 0;
-    if (val < 0) {
-        buf[len++] = '-';
-        if (val == INT64_MIN) {
-            buf[len++] = '9';
-            int64_t rem = 223372036854775808LL;
-            char tmp[20]; int tlen = 0;
-            while (rem > 0) { tmp[tlen++] = '0' + (int)(rem % 10); rem /= 10; }
-            for (int i = tlen - 1; i >= 0; i--) buf[len++] = tmp[i];
-        } else {
-            val = -val;
-            if (val == 0) { buf[len++] = '0'; }
-            else {
-                char tmp[20]; int tlen = 0;
-                while (val > 0) { tmp[tlen++] = '0' + (int)(val % 10); val /= 10; }
-                for (int i = tlen - 1; i >= 0; i--) buf[len++] = tmp[i];
-            }
-        }
-    } else if (val == 0) {
-        buf[len++] = '0';
-    } else {
-        char tmp[20]; int tlen = 0;
-        while (val > 0) { tmp[tlen++] = '0' + (int)(val % 10); val /= 10; }
-        for (int i = tlen - 1; i >= 0; i--) buf[len++] = tmp[i];
-    }
-    buf[len++] = '\n';
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD written;
-    WriteFile(hOut, buf, (DWORD)len, &written, nullptr);
-#else
-    write(STDOUT_FILENO, buf, len);
-#endif
+    io_write_int(val);
+    io_write_char('\n');
 }
 
 void aurora_print_float(double val) {
-    char buf[64];
-    int len = 0;
-    if (val < 0) { buf[len++] = '-'; val = -val; }
+    if (val < 0) { io_write_char('-'); val = -val; }
     int64_t int_part = (int64_t)val;
     double  frac     = val - (double)int_part;
-    if (int_part == 0) {
-        buf[len++] = '0';
-    } else {
-        char tmp[20]; int tlen = 0;
-        int64_t ip = int_part;
-        while (ip > 0) { tmp[tlen++] = '0' + (int)(ip % 10); ip /= 10; }
-        for (int i = tlen - 1; i >= 0; i--) buf[len++] = tmp[i];
-    }
-    buf[len++] = '.';
+    io_write_int(int_part);
+    io_write_char('.');
     for (int i = 0; i < 6; i++) {
         frac *= 10;
         int digit = (int)frac;
-        buf[len++] = '0' + digit;
+        io_write_char('0' + digit);
         frac -= digit;
     }
-    buf[len++] = '\n';
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD written;
-    WriteFile(hOut, buf, (DWORD)len, &written, nullptr);
-#else
-    write(STDOUT_FILENO, buf, len);
-#endif
+    io_write_char('\n');
 }
 
 void aurora_print_str(const char* str) {
     auto* s = reinterpret_cast<const AuroraStr*>(str);
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD written;
-    if (!s || !s->ptr) {
-        WriteFile(hOut, "null\n", 5, &written, nullptr);
-        return;
-    }
-    WriteFile(hOut, s->ptr, (DWORD)s->len, &written, nullptr);
-    WriteFile(hOut, "\n", 1, &written, nullptr);
-#else
-    if (!s || !s->ptr) {
-        write(STDOUT_FILENO, "null\n", 5);
-        return;
-    }
-    write(STDOUT_FILENO, s->ptr, s->len);
-    write(STDOUT_FILENO, "\n", 1);
-#endif
+    if (!s || !s->ptr) { io_write("null\n", 5); return; }
+    io_write(s->ptr, (int)s->len);
+    io_write_char('\n');
 }
 
-
+void aurora_print_bool(int64_t val) {
+    if (val) io_write("true\n", 5);
+    else     io_write("false\n", 6);
+}
 
 void aurora_panic(const char* msg) {
 #ifdef _WIN32
@@ -136,24 +130,6 @@ void aurora_panic(const char* msg) {
     }
     write(STDERR_FILENO, "\n", 1);
     _exit(1);
-#endif
-}
-
-void aurora_print_bool(int64_t val) {
-#ifdef _WIN32
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD written;
-    if (val) {
-        WriteFile(hOut, "true\n", 5, &written, nullptr);
-    } else {
-        WriteFile(hOut, "false\n", 6, &written, nullptr);
-    }
-#else
-    if (val) {
-        write(STDOUT_FILENO, "true\n", 5);
-    } else {
-        write(STDOUT_FILENO, "false\n", 6);
-    }
 #endif
 }
 

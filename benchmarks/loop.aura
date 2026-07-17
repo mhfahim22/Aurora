@@ -1,0 +1,14 @@
+function main():
+    output("1 Billion Loop Benchmark in Aurora")
+    output("----------------------------------")
+
+    count = 0
+    total = 0
+    for i in range(1000000000):
+        count += 1
+        total += i
+    end
+
+    output("Loop ran " + str(count) + " times")
+    output("Sum total = " + str(total))
+    output("Expected  = 499999999500000000")

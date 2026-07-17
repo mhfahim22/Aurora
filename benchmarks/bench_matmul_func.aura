@@ -1,0 +1,37 @@
+# ── Matrix Multiplication Benchmark (function-call list_get + list_push) ──
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 128
+    a = list()
+    b = list()
+    c = list()
+    for i in range(N * N):
+        list_push(a, 0)
+        list_push(b, 0)
+    end
+    for i in range(N):
+        for j in range(N):
+            idx = i * N + j
+            list_set(a, idx, (i * 1.0 + j) / N)
+            list_set(b, idx, (j * 2.0 - i) / N)
+        end
+    end
+    start = aurora_time_ns()
+    for i in range(N):
+        for j in range(N):
+            sum = 0.0
+            for k in range(N):
+                aik = list_get(a, i * N + k)
+                bk = list_get(b, k * N + j)
+                sum = sum + aik * bk
+            end
+            list_push(c, sum)
+        end
+    end
+    elapsed = aurora_time_ns() - start
+    ms = elapsed / 1000000
+    flops = 2 * N * N * N
+    mflops = flops * 1000 / elapsed
+    output("AURORA MATMUL (func call): " + str(ms) + " ms (N=" + str(N) + ", " + str(mflops) + " MFLOPS)")
+end

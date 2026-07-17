@@ -673,41 +673,38 @@ int LifetimeAnalyzer::count_regions() const {
 
 void LifetimeAnalyzer::print_lifetime_report() const {
     std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║          Aurora Lifetime Analysis Report                 ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "--- Aurora Lifetime Analysis Report ---\n";
 
     if (lifetime_info_.empty()) {
-        std::cerr << "║  No variables analyzed.                                 ║\n";
+        std::cerr << "  No variables analyzed.\n";
     } else {
-        std::cerr << "║  Variable          │ Lifetime Scope   │ Region ID       ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        fprintf(stderr, "  %-18s  %-17s  %s\n",
+               "Variable", "Lifetime Scope", "Region ID");
+        std::cerr << "  " << std::string(48, '-') << "\n";
 
         for (const auto& [name, info] : lifetime_info_) {
             std::string scope_name = lifetime_scope_name(info.scope);
-            fprintf(stderr, "║  %-18s│ %-17s│ %d               ║\n",
+            fprintf(stderr, "  %-18s  %-17s  %d\n",
                    name.c_str(), scope_name.c_str(), info.region_id);
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    Function:      " << count_function_lifetime() << "                                ║\n";
-        std::cerr << "║    Block:         " << count_block_lifetime() << "                                ║\n";
-        std::cerr << "║    Loop:          " << count_loop_lifetime() << "                                ║\n";
-        std::cerr << "║    Temporary:     " << count_temporary() << "                                ║\n";
-        std::cerr << "║    Global:        " << count_global_lifetime() << "                                ║\n";
-        std::cerr << "║    Regions:       " << count_regions() << "                                ║\n";
+        std::cerr << "  Statistics:\n";
+        fprintf(stderr, "    Function:      %d\n", count_function_lifetime());
+        fprintf(stderr, "    Block:         %d\n", count_block_lifetime());
+        fprintf(stderr, "    Loop:          %d\n", count_loop_lifetime());
+        fprintf(stderr, "    Temporary:     %d\n", count_temporary());
+        fprintf(stderr, "    Global:        %d\n", count_global_lifetime());
+        fprintf(stderr, "    Regions:       %d\n", count_regions());
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Region Details:                                         ║\n";
+        std::cerr << "  Region Details:\n";
         for (const auto& r : regions_) {
-            fprintf(stderr, "║    R%d (%s): %zu vars, est %d bytes, lines %d-%d   ║\n",
+            fprintf(stderr, "    R%d (%s): %zu vars, est %d bytes, lines %d-%d\n",
                    r.region_id, lifetime_scope_name(r.scope_type),
                    r.var_names.size(), r.total_size_est,
                    r.start_line, r.end_line);
         }
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "------------------------------------------\n";
     std::cerr << "\n";
 }

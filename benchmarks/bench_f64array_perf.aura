@@ -1,0 +1,33 @@
+# ── Float64Array vs List: per-element speed comparison ──
+extern function f64array_new(n: i64) -> ptr
+extern function f64array_free(arr: ptr)
+extern function f64array_get(arr: ptr, i: i64) -> f64
+extern function f64array_set(arr: ptr, i: i64, v: f64)
+extern function f64array_sum(arr: ptr) -> f64
+extern function f64array_scale(arr: ptr, f: f64)
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 50000
+    fa = f64array_new(N)
+    la = list()
+    for i in range(N):
+        f64array_set(fa, i, i * 1.0)
+        list_push(la, 0)
+        list_set_double(la, i, i * 1.0)
+    end
+
+    t0 = aurora_time_ns()
+    s1 = f64array_sum(fa)
+    t1 = aurora_time_ns()
+    ms1 = (t1 - t0) / 1000000
+    output("f64array_sum: " + str(ms1) + " ms (result=" + str(s1) + ")")
+
+    t0 = aurora_time_ns()
+    f64array_scale(fa, 2.0)
+    t1 = aurora_time_ns()
+    ms3 = (t1 - t0) / 1000000
+    output("f64array_scale: " + str(ms3) + " ms")
+
+    output("FLOAT64ARRAY: OK")
+end

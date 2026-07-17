@@ -1,0 +1,78 @@
+# ════════════════════════════════════════════════════════════
+# Aurora Standard Library — Float64Array
+# Usage:  import "float64array"  or  import libc:float64array
+#
+# Native double array — no i64 boxing, C-speed per-element access.
+# Bulk ops (matmul, sum, scale, add) use AVX2 SIMD + OpenMP.
+#
+# Functions:
+#   f64array_new(n)      — allocate array of n doubles
+#   f64array_free(a)     — free array
+#   f64array_get(a, i)   — get element (inline GEP+load)
+#   f64array_set(a, i, v) — set element (inline GEP+store)
+#   f64array_len(a)      — get length
+#   f64array_fill(a, v)  — fill all elements with v (SIMD)
+#   f64array_copy(d,s)   — copy s into d (min len)
+#   f64array_matmul(a,b,c,n) — c = a*b (NxN matrices, tiled+OMP+AVX2)
+#   f64array_sum(a)      — sum all elements (SIMD reduce)
+#   f64array_scale(a, f) — multiply all elements by f (SIMD)
+#   f64array_add(a, b)   — a[i] += b[i] for overlapping length (SIMD)
+# ════════════════════════════════════════════════════════════
+
+extern function f64array_new(n)
+extern function f64array_free(a)
+extern function f64array_get(a, i) -> f64
+extern function f64array_set(a, i, v)
+extern function f64array_len(a) -> i64
+
+extern function f64array_fill(a, v)
+extern function f64array_copy(d, s)
+extern function f64array_matmul(a, b, c, n)
+extern function f64array_sum(a) -> f64
+extern function f64array_scale(a, f)
+extern function f64array_add(a, b)
+
+function f64array_is_empty(a) -> bool
+    return f64array_len(a) == 0
+end
+
+function f64array_first(a) -> f64
+    return f64array_get(a, 0)
+end
+
+function f64array_last(a) -> f64
+    return f64array_get(a, f64array_len(a) - 1)
+end
+
+function f64array_print(a)
+    n = f64array_len(a)
+    output("[")
+    if n > 0
+        for i in range(n - 1)
+            output(f64array_get(a, i))
+            output(", ")
+        end
+        output(f64array_get(a, n - 1))
+    end
+    output("]")
+end
+
+function f64array_zeros(n)
+    a = f64array_new(n)
+    f64array_fill(a, 0.0)
+    return a
+end
+
+function f64array_ones(n)
+    a = f64array_new(n)
+    f64array_fill(a, 1.0)
+    return a
+end
+
+function f64array_from_list(lst, n)
+    a = f64array_new(n)
+    for i in range(n)
+        f64array_set(a, i, list_get_double(lst, i))
+    end
+    return a
+end

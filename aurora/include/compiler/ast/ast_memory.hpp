@@ -147,6 +147,7 @@ struct MemoryMetadata {
 /* ── Memory Analysis Result ── */
 struct MemoryAnalysisResult {
     bool is_performance_mode { false };
+    AllocStrategy func_forced_strategy { AllocStrategy::Unknown };
     bool gc_disabled         { false };
 
     std::unordered_map<std::string, MemoryMetadata> variables;

@@ -229,6 +229,7 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["outputf"]      = FunctionTypeInfo{{AuroraType::Unknown}};
     functions_["input"]         = FunctionTypeInfo{{}};
     functions_["len"]           = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["str_repeat"]    = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Int}, AuroraType::String};
     functions_["sum"]           = FunctionTypeInfo{{AuroraType::Unknown}};
     functions_["min"]           = FunctionTypeInfo{{AuroraType::Unknown}};
     functions_["max"]           = FunctionTypeInfo{{AuroraType::Unknown}};
@@ -293,9 +294,29 @@ void TypeChecker::register_functions(const ASTNode* node) {
 
     /* ── Collection utility functions (runtime-backed) ── */
     functions_["list_get"]      = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
+    functions_["list_set"]      = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["list_get_unchecked"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
+    functions_["list_set_unchecked"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["list_get_double"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Float};
+    functions_["list_set_double"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Float}};
+    functions_["list_matmul"]    = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown, AuroraType::Int}};
     functions_["list_len"]      = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
     functions_["list_push"]     = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
     functions_["list_free"]     = FunctionTypeInfo{{AuroraType::Unknown}};
+
+    /* ── Float64Array runtime functions ── */
+    functions_["f64array_new"]   = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["f64array_free"]  = FunctionTypeInfo{{AuroraType::Unknown}};
+    functions_["f64array_get"]   = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Float};
+    functions_["f64array_set"]   = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Float}};
+    functions_["f64array_len"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Int};
+    functions_["f64array_fill"]  = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Float}};
+    functions_["f64array_copy"]  = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["f64array_matmul"]= FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}};
+    functions_["f64array_sum"]   = FunctionTypeInfo{{AuroraType::Unknown}, AuroraType::Float};
+    functions_["f64array_scale"] = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Float}};
+    functions_["f64array_add"]   = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}};
+
     functions_["map_get"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Int};
     functions_["map_has"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown}, AuroraType::Bool};
     functions_["map_set"]       = FunctionTypeInfo{{AuroraType::Unknown, AuroraType::Unknown, AuroraType::Unknown}};

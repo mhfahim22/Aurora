@@ -1,0 +1,7 @@
+function main():
+    arr = []
+    for i in range(100000000):
+        arr = push(arr, i)
+    end
+    output("len = " + str(len(arr)))
+end

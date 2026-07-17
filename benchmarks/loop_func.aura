@@ -1,0 +1,11 @@
+function accum(a, b):
+    return a + b
+end
+
+function main():
+    count = 0
+    for i in range(1000000000):
+        count = accum(count, 1)
+    end
+    output("count = " + str(count))
+end

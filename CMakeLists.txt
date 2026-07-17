@@ -118,6 +118,9 @@ add_executable(aurorac
     aurora/src/compiler/optimizer/const_fold.cpp
     aurora/src/compiler/optimizer/dead_code.cpp
     aurora/src/compiler/optimizer/strength_reduce.cpp
+    aurora/src/compiler/optimizer/loop_idiom.cpp
+
+
     aurora/src/compiler/runtime_exports_init.cpp
     aurora/src/compiler/package_manager.cpp
     aurora/src/compiler/doc_generator.cpp
@@ -359,9 +362,21 @@ if(ENABLE_ASAN)
     target_link_options(aurora_runtime PRIVATE ${ASAN_LINK_FLAGS})
 endif()
 
+# ── Disable C++ exceptions for runtime (no try/catch in runtime) ──
+# This removes VCRUNTIME140.dll dependency in AOT builds
+if(MSVC)
+    target_compile_options(aurora_runtime PRIVATE /EHs-c-)
+else()
+    target_compile_options(aurora_runtime PRIVATE -fno-exceptions)
+endif()
+
 # ── LTO (Link-Time Optimization) for runtime library ──
 # Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
-set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+# Disable with: -DAURORA_RUNTIME_LTO=OFF (needed for AOT linking with lld-link)
+option(AURORA_RUNTIME_LTO "Enable LTO for aurora_runtime static library" ON)
+if(AURORA_RUNTIME_LTO)
+  set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
 
 # ── Link runtime to compiler ────────────────
 target_link_libraries(aurorac PRIVATE aurora_runtime)
@@ -417,6 +432,15 @@ if(OpenMP_CXX_FOUND)
     target_compile_definitions(aurora_runtime PRIVATE AURORA_OPENMP=1)
 else()
     message(STATUS "OpenMP not found — building without parallel matmul")
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# AVX2/FMA compile flags for collections.cpp (tiled matmul)
+# ═══════════════════════════════════════════════════════════════
+if(MSVC)
+    set_source_files_properties(aurora/src/runtime/std/collections.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2 /fp:fast")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    set_source_files_properties(aurora/src/runtime/std/collections.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma -ffast-math")
 endif()
 
 # ═══════════════════════════════════════════════════════════════

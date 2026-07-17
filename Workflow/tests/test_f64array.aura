@@ -1,0 +1,253 @@
+# ════════════════════════════════════════════════════════════
+# Float64Array — Validation Test Suite
+# ════════════════════════════════════════════════════════════
+
+extern function f64array_new(n)
+extern function f64array_free(a)
+extern function f64array_get(a, i) -> f64
+extern function f64array_set(a, i, v)
+extern function f64array_len(a) -> i64
+extern function f64array_fill(a, v)
+extern function f64array_copy(d, s)
+extern function f64array_matmul(a, b, c, n)
+extern function f64array_sum(a) -> f64
+extern function f64array_scale(a, f)
+extern function f64array_add(a, b)
+
+function test_new_free():
+    a = f64array_new(100)
+    n = f64array_len(a)
+    if n == 100
+        output("PASS new_free")
+    else
+        output("FAIL new_free (len=" + str(n) + ")")
+    end
+    f64array_free(a)
+end
+
+function test_get_set():
+    a = f64array_new(10)
+    for i in range(10)
+        f64array_set(a, i, i * 3.0)
+    end
+    ok = 1
+    for i in range(10)
+        v = f64array_get(a, i)
+        if v != i * 3.0
+            ok = 0
+        end
+    end
+    if ok == 1
+        output("PASS get_set")
+    else
+        output("FAIL get_set")
+    end
+    f64array_free(a)
+end
+
+function test_fill():
+    a = f64array_new(1000)
+    f64array_fill(a, 42.5)
+    ok = 1
+    for i in range(1000)
+        v = f64array_get(a, i)
+        if v != 42.5
+            ok = 0
+        end
+    end
+    if ok == 1
+        output("PASS fill")
+    else
+        output("FAIL fill")
+    end
+    f64array_free(a)
+end
+
+function test_len():
+    a = f64array_new(0)
+    if f64array_len(a) == 0
+        output("PASS len_empty")
+    else
+        output("FAIL len_empty")
+    end
+    f64array_free(a)
+
+    b = f64array_new(1048576)
+    if f64array_len(b) == 1048576
+        output("PASS len_1M")
+    else
+        output("FAIL len_1M")
+    end
+    f64array_free(b)
+end
+
+function test_copy():
+    a = f64array_new(50)
+    b = f64array_new(50)
+    for i in range(50)
+        f64array_set(a, i, i * 1.0)
+    end
+    f64array_copy(b, a)
+    ok = 1
+    for i in range(50)
+        v = f64array_get(b, i)
+        if v != i * 1.0
+            ok = 0
+        end
+    end
+    if ok == 1
+        output("PASS copy")
+    else
+        output("FAIL copy")
+    end
+    f64array_free(a)
+    f64array_free(b)
+end
+
+function test_sum():
+    a = f64array_new(100)
+    for i in range(100)
+        f64array_set(a, i, 1.0)
+    end
+    s = f64array_sum(a)
+    expected = 100.0
+    if s == expected
+        output("PASS sum_ones")
+    else
+        output("FAIL sum_ones")
+    end
+    f64array_free(a)
+
+    b = f64array_new(100)
+    for i in range(100)
+        f64array_set(b, i, i * 1.0)
+    end
+    s2 = f64array_sum(b)
+    expected2 = 4950.0
+    if s2 == expected2
+        output("PASS sum_0to99")
+    else
+        output("FAIL sum_0to99")
+    end
+    f64array_free(b)
+end
+
+function test_scale():
+    a = f64array_new(50)
+    for i in range(50)
+        f64array_set(a, i, i * 1.0)
+    end
+    f64array_scale(a, 2.0)
+    ok = 1
+    for i in range(50)
+        v = f64array_get(a, i)
+        if v != i * 2.0
+            ok = 0
+        end
+    end
+    if ok == 1
+        output("PASS scale")
+    else
+        output("FAIL scale")
+    end
+    f64array_free(a)
+end
+
+function test_add():
+    a = f64array_new(50)
+    b = f64array_new(50)
+    for i in range(50)
+        f64array_set(a, i, i * 1.0)
+        f64array_set(b, i, (i + 1) * 1.0)
+    end
+    f64array_add(a, b)
+    ok = 1
+    for i in range(50)
+        v = f64array_get(a, i)
+        if v != i + (i + 1) * 1.0
+            ok = 0
+        end
+    end
+    if ok == 1
+        output("PASS add")
+    else
+        output("FAIL add")
+    end
+    f64array_free(a)
+    f64array_free(b)
+end
+
+function test_matmul():
+    N = 4
+    n2 = N * N
+    a = f64array_new(n2)
+    b = f64array_new(n2)
+    c = f64array_new(n2)
+    f64array_fill(c, 0.0)
+
+    f64array_set(a, 0, 1.0)
+    f64array_set(a, 1, 2.0)
+    f64array_set(a, 2, 3.0)
+    f64array_set(a, 3, 4.0)
+    f64array_set(b, 0, 5.0)
+    f64array_set(b, 1, 6.0)
+    f64array_set(b, 2, 7.0)
+    f64array_set(b, 3, 8.0)
+
+    f64array_matmul(a, b, c, 2)
+    ok = 1
+    if f64array_get(c, 0) != 19.0
+        ok = 0
+    end
+    if f64array_get(c, 1) != 22.0
+        ok = 0
+    end
+    if f64array_get(c, 2) != 43.0
+        ok = 0
+    end
+    if f64array_get(c, 3) != 50.0
+        ok = 0
+    end
+    if ok == 1
+        output("PASS matmul_2x2")
+    else
+        output("FAIL matmul_2x2")
+    end
+    f64array_free(a)
+    f64array_free(b)
+    f64array_free(c)
+end
+
+function test_stress():
+    N = 10000
+    a = f64array_new(N)
+    for i in range(N)
+        f64array_set(a, i, i * 0.5)
+    end
+    s = f64array_sum(a)
+    expected_sum = 0.0
+    for i in range(N)
+        expected_sum = expected_sum + i * 0.5
+    end
+    if s == expected_sum
+        output("PASS stress_10K")
+    else
+        output("FAIL stress_10K")
+    end
+    f64array_free(a)
+end
+
+function main():
+    output("Float64Array Validation Tests")
+    test_new_free()
+    test_get_set()
+    test_fill()
+    test_len()
+    test_copy()
+    test_sum()
+    test_scale()
+    test_add()
+    test_matmul()
+    test_stress()
+    output("DONE")
+end

@@ -1,0 +1,40 @@
+# Float64Array inline get/set benchmark — 50M elements
+
+extern function f64array_new(n)
+extern function f64array_free(a)
+extern function f64array_get(a, i) -> f64
+extern function f64array_set(a, i, v)
+extern function f64array_len(a) -> i64
+extern function f64array_fill(a, v)
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 50000000
+    a = f64array_new(N)
+    f64array_fill(a, 42.0)
+
+    # inline get/set loop
+    t0 = aurora_time_ns()
+    for i in range(N):
+        v = f64array_get(a, i)
+        f64array_set(a, i, v + 1.0)
+    end
+    t1 = aurora_time_ns()
+    ms = (t1 - t0) / 1000000
+    output("inline get/set: " + str(ms) + " ms for " + str(N) + " elements")
+
+    # sum test
+    t0 = aurora_time_ns()
+    s = 0.0
+    for i in range(N):
+        s = s + f64array_get(a, i)
+    end
+    t1 = aurora_time_ns()
+    ms2 = (t1 - t0) / 1000000
+    output("sum (scalar): " + str(ms2) + " ms")
+
+    output("checksum = " + str(s / N))
+    output("OK")
+
+    f64array_free(a)
+end

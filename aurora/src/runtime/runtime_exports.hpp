@@ -1562,6 +1562,9 @@
 #pragma comment(linker, "/EXPORT:list_get")
 #pragma comment(linker, "/EXPORT:list_len")
 #pragma comment(linker, "/EXPORT:list_free")
+#pragma comment(linker, "/EXPORT:list_set")
+#pragma comment(linker, "/EXPORT:list_set_unchecked")
+#pragma comment(linker, "/EXPORT:list_get_unchecked")
 #pragma comment(linker, "/EXPORT:map_new")
 #pragma comment(linker, "/EXPORT:map_set")
 #pragma comment(linker, "/EXPORT:map_get")
@@ -2128,6 +2131,24 @@
 #pragma comment(linker, "/EXPORT:aurora_theme_store_export_json")
 #pragma comment(linker, "/EXPORT:aurora_theme_store_import_json")
 #pragma comment(linker, "/EXPORT:aurora_theme_store_validate")
+/* ── Benchmark/optimization exports ── */
+#pragma comment(linker, "/EXPORT:list_get_double")
+#pragma comment(linker, "/EXPORT:list_set_double")
+#pragma comment(linker, "/EXPORT:aurora_str_repeat")
+#pragma comment(linker, "/EXPORT:aurora_list_matmul")
+
+/* ── Float64Array exports ── */
+#pragma comment(linker, "/EXPORT:f64array_new")
+#pragma comment(linker, "/EXPORT:f64array_free")
+#pragma comment(linker, "/EXPORT:f64array_get")
+#pragma comment(linker, "/EXPORT:f64array_set")
+#pragma comment(linker, "/EXPORT:f64array_len")
+#pragma comment(linker, "/EXPORT:f64array_fill")
+#pragma comment(linker, "/EXPORT:f64array_copy")
+#pragma comment(linker, "/EXPORT:f64array_matmul")
+#pragma comment(linker, "/EXPORT:f64array_sum")
+#pragma comment(linker, "/EXPORT:f64array_scale")
+#pragma comment(linker, "/EXPORT:f64array_add")
 #elif defined(__GNUC__) || defined(__clang__)
 // For GCC/Clang on Linux/macOS, use visibility attributes.
 // The actual visibility is handled by the build system via -fvisibility=hidden

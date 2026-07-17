@@ -1,0 +1,63 @@
+# ════════════════════════════════════════════════════════════
+# Float64Array vs List — Performance Comparison
+# ════════════════════════════════════════════════════════════
+
+extern function f64array_new(n)
+extern function f64array_free(a)
+extern function f64array_get(a, i) -> f64
+extern function f64array_set(a, i, v)
+extern function f64array_len(a) -> i64
+extern function f64array_fill(a, v)
+extern function f64array_matmul(a, b, c, n)
+extern function f64array_sum(a) -> f64
+extern function f64array_scale(a, f)
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 1024
+    n2 = N * N
+
+    fa = f64array_new(n2)
+    fb = f64array_new(n2)
+    fc = f64array_new(n2)
+    la = list()
+    lb = list()
+    lc = list()
+
+    for i in range(n2):
+        list_push(la, 0)
+        list_push(lb, 0)
+        list_push(lc, 0)
+    end
+
+    for i in range(N):
+        for j in range(N):
+            idx = i * N + j
+            val_a = (i * 1.0 + j) / N
+            val_b = (j * 2.0 - i) / N
+            f64array_set(fa, idx, val_a)
+            f64array_set(fb, idx, val_b)
+            list_set_double(la, idx, val_a)
+            list_set_double(lb, idx, val_b)
+        end
+    end
+
+    t0 = aurora_time_ns()
+    f64array_matmul(fa, fb, fc, N)
+    t1 = aurora_time_ns()
+    fa_ms = (t1 - t0) / 1000000
+    fa_flops = 2 * N * N * N * 1000 / (t1 - t0)
+    output("F64ARRAY matmul: " + str(fa_ms) + " ms (" + str(fa_flops) + " MFLOPS)")
+
+    t0 = aurora_time_ns()
+    list_matmul(la, lb, lc, N)
+    t1 = aurora_time_ns()
+    la_ms = (t1 - t0) / 1000000
+    la_flops = 2 * N * N * N * 1000 / (t1 - t0)
+    output("LIST matmul: " + str(la_ms) + " ms (" + str(la_flops) + " MFLOPS)")
+
+    f64array_free(fa)
+    f64array_free(fb)
+    f64array_free(fc)
+    output("BENCHMARK: OK")
+end

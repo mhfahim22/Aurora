@@ -47,6 +47,24 @@ extern "C" AuroraStr* aurora_str_append(AuroraStr* a, AuroraStr* b) {
     return a;
 }
 
+/* ── Repeat source string n times, single allocation ── */
+extern "C" AuroraStr* aurora_str_repeat(AuroraStr* src, int64_t n) {
+    if (!src || n <= 0) return aurora_str_new(0);
+    size_t src_len = src->len;
+    size_t total = src_len * (size_t)n;
+    size_t cap = total + 1;
+    if (cap < 16) cap = 16;
+    AuroraStr* r = aurora_str_new(cap);
+    r->len = total;
+    char* p = r->ptr;
+    for (int64_t i = 0; i < n; i++) {
+        memcpy(p, src->ptr, src_len);
+        p += src_len;
+    }
+    *p = '\0';
+    return r;
+}
+
 /* ── Create AuroraStr from a C string (copies data) ── */
 AuroraStr* aurora_str_from_cstr(const char* cstr) {
     if (!cstr) cstr = "";

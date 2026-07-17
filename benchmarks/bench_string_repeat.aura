@@ -1,0 +1,11 @@
+# ── String Concat Benchmark (via str_repeat, single allocation) ──
+extern function aurora_time_ns() -> i64
+
+function main():
+    count = 1000000
+    start = aurora_time_ns()
+    result = str_repeat("x", count)
+    elapsed = aurora_time_ns() - start
+    sz = len(result)
+    output("AURORA STRING REPEAT: " + str(sz) + " chars, " + str(elapsed / 1000000) + " ms, " + str(elapsed / count) + " ns/op")
+end

@@ -1,0 +1,28 @@
+# ── Float64Array basic test ──
+extern function f64array_new(n: i64) -> ptr
+extern function f64array_free(arr: ptr)
+extern function f64array_get(arr: ptr, i: i64) -> f64
+extern function f64array_set(arr: ptr, i: i64, v: f64)
+extern function f64array_len(arr: ptr) -> i64
+extern function f64array_fill(arr: ptr, v: f64)
+extern function f64array_copy(dst: ptr, src: ptr)
+extern function f64array_sum(arr: ptr) -> f64
+extern function f64array_scale(arr: ptr, f: f64)
+extern function f64array_add(dst: ptr, src: ptr)
+
+function main():
+    a = f64array_new(100)
+    output("len=" + str(f64array_len(a)))
+    f64array_fill(a, 3.14)
+    output("get(0)=" + str(f64array_get(a, 0)))
+    output("get(99)=" + str(f64array_get(a, 99)))
+    s = f64array_sum(a)
+    output("sum=" + str(s))
+    f64array_scale(a, 2.0)
+    output("after scale: get(0)=" + str(f64array_get(a, 0)))
+    if f64array_len(a) == 100:
+        output("len OK")
+    end
+    f64array_free(a)
+    output("Float64Array: OK")
+end

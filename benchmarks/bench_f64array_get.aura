@@ -1,0 +1,41 @@
+# ── f64array_get vs list_get_double per-element speed ──
+extern function f64array_new(n: i64) -> ptr
+extern function f64array_free(arr: ptr)
+extern function f64array_get(arr: ptr, i: i64) -> f64
+extern function list_get_double(arr, i) -> f64
+extern function f64array_set(arr: ptr, i: i64, v: f64)
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 100000
+    fa = f64array_new(N)
+    la = list()
+    for i in range(N):
+        f64array_set(fa, i, i * 1.0)
+        list_push(la, 0)
+        list_set_double(la, i, i * 1.0)
+    end
+
+    t0 = aurora_time_ns()
+    s1 = 0.0
+    for i in range(N):
+        s1 = s1 + f64array_get(fa, i)
+    end
+    ts1 = str(s1)
+    t1 = aurora_time_ns()
+    ms1 = (t1 - t0) / 1000000
+    output("f64array_get loop: " + str(ms1) + " ms (sum=" + ts1 + ")")
+
+    t0 = aurora_time_ns()
+    s2 = 0.0
+    for i in range(N):
+        s2 = s2 + list_get_double(la, i)
+    end
+    ts2 = str(s2)
+    t1 = aurora_time_ns()
+    ms2 = (t1 - t0) / 1000000
+    output("list_get_double loop: " + str(ms2) + " ms (sum=" + ts2 + ")")
+
+    f64array_free(fa)
+    output("F64ARRAY GET: OK")
+end

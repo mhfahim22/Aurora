@@ -1,0 +1,34 @@
+# ── Tensor MatMul Benchmark (via C helper) ──
+extern function aurora_time_ns() -> i64
+extern function bench_tensor_new_f32_2d(n: i32) -> ptr
+extern function bench_tensor_fill_seq(t: ptr, n: i32)
+extern function bench_tensor_fill_seq_b(t: ptr, n: i32)
+extern function bench_tensor_matmul(a: ptr, b: ptr) -> ptr
+extern function bench_tensor_free(t: ptr)
+
+function main():
+    N = 1024
+
+    start = aurora_time_ns()
+
+    a = bench_tensor_new_f32_2d(N)
+    b = bench_tensor_new_f32_2d(N)
+    bench_tensor_fill_seq(a, N)
+    bench_tensor_fill_seq_b(b, N)
+
+    init_end = aurora_time_ns()
+
+    c = bench_tensor_matmul(a, b)
+
+    compute_elapsed = aurora_time_ns() - init_end
+
+    bench_tensor_free(a)
+    bench_tensor_free(b)
+    bench_tensor_free(c)
+
+    ms = compute_elapsed / 1000000
+    flops = 2 * N * N * N
+    gflops = flops * 1000000000 / compute_elapsed / 1000000000
+    mflops = flops * 1000 / compute_elapsed
+    output("AURORA TENSOR: " + str(ms) + " ms (N=" + str(N) + ", " + str(mflops) + " MFLOPS)")
+end

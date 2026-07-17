@@ -26,5 +26,8 @@ bool eliminate_unreachable_blocks(llvm::Function& fn);
 /* ── strength_reduce.cpp ── */
 bool strength_reduce(llvm::Function& fn);
 
+/* ── loop_idiom.cpp ── */
+bool recognize_loop_idioms(llvm::Function& fn);
+
 /* ── Main entry point (aurora_optimizer.cpp) ── */
 void run_aurora_optimizer(llvm::Module* module);

@@ -313,6 +313,17 @@ llvm::Value* codegen_builtin_section1(
         return llvm::ConstantInt::get(i64, 0);
     }
 
+    /* ── str_repeat(src, n) — repeat string n times (single allocation) ── */
+    if (name == "str_repeat" && node->args && node->args->next && !node->args->next->next) {
+        llvm::Value* src = to_ptr(builder, ctx, gen_expr(node->args.get()));
+        llvm::Value* n   = gen_expr(node->args->next.get());
+        if (!src) src = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ctx));
+        if (!n)   n   = llvm::ConstantInt::get(i64, 0);
+        llvm::Function* repeat_fn = module->getFunction("aurora_str_repeat");
+        if (repeat_fn) return builder.CreateCall(repeat_fn, { src, n }, "str_repeat_ret");
+        return llvm::ConstantInt::get(i64, 0);
+    }
+
     /* ── substr(str, start, len) — substring ── */
     if (name == "substr" && node->args && node->args->next && node->args->next->next && !node->args->next->next->next) {
         llvm::Value* s     = to_ptr(builder, ctx, gen_expr(node->args.get()));

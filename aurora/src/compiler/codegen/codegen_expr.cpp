@@ -445,8 +445,18 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
                          Lv->getType()->isDoubleTy() || Rv->getType()->isDoubleTy();
         if (is_float) {
             auto* dbl = llvm::Type::getDoubleTy(ctx_);
-            if (!Lv->getType()->isDoubleTy()) Lv = builder_->CreateSIToFP(Lv, dbl, "itof");
-            if (!Rv->getType()->isDoubleTy()) Rv = builder_->CreateSIToFP(Rv, dbl, "itof");
+            if (!Lv->getType()->isDoubleTy()) {
+                if (get_annotation_kind(node->left.get()) == AstTypeKind::Float)
+                    Lv = builder_->CreateBitCast(Lv, dbl, "fp_unbox");
+                else
+                    Lv = builder_->CreateSIToFP(Lv, dbl, "itof");
+            }
+            if (!Rv->getType()->isDoubleTy()) {
+                if (get_annotation_kind(node->right.get()) == AstTypeKind::Float)
+                    Rv = builder_->CreateBitCast(Rv, dbl, "fp_unbox");
+                else
+                    Rv = builder_->CreateSIToFP(Rv, dbl, "itof");
+            }
             return builder_->CreateFAdd(Lv, Rv, "fadd");
         }
         return builder_->CreateAdd(Lv, Rv, "add", false, true);
@@ -460,10 +470,18 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
                      L->getType()->isDoubleTy() || R->getType()->isDoubleTy();
     if (is_float) {
         auto* dbl = llvm::Type::getDoubleTy(ctx_);
-        if (!L->getType()->isDoubleTy())
-            L = builder_->CreateSIToFP(L, dbl, "itof");
-        if (!R->getType()->isDoubleTy())
-            R = builder_->CreateSIToFP(R, dbl, "itof");
+        if (!L->getType()->isDoubleTy()) {
+            if (get_annotation_kind(node->left.get()) == AstTypeKind::Float)
+                L = builder_->CreateBitCast(L, dbl, "fp_unbox");
+            else
+                L = builder_->CreateSIToFP(L, dbl, "itof");
+        }
+        if (!R->getType()->isDoubleTy()) {
+            if (get_annotation_kind(node->right.get()) == AstTypeKind::Float)
+                R = builder_->CreateBitCast(R, dbl, "fp_unbox");
+            else
+                R = builder_->CreateSIToFP(R, dbl, "itof");
+        }
 
         if (op == "+")  return builder_->CreateFAdd(L, R, "fadd");
         if (op == "-")  return builder_->CreateFSub(L, R, "fsub");

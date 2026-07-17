@@ -1,4 +1,4 @@
-## Large file benchmark — stresses lexing, parsing, IR generation
+## Large file benchmark ï¿½ stresses lexing, parsing, IR generation
 outputln("Benchmark: large")
 x = 0
 a0 = sin(0 * 3.14159 / 100.0)
@@ -3001,5 +3001,5 @@ if a499 > b499:
     x = x + 1
 else:
     x = x + 0
-outputln(x)
+output(x)
 outputln("Done large")

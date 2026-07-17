@@ -1,0 +1,12 @@
+function dummy(x):
+    return x
+end
+
+function main():
+    count = 0
+    for i in range(1000000000):
+        count = count + 1
+        count = dummy(count)
+    end
+    output("count = " + str(count))
+end

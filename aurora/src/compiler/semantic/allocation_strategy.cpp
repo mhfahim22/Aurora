@@ -28,7 +28,10 @@ void AllocationStrategyEngine::analyse(const ASTNode* root) {
                 if (!n) return;
                 if (n->type == NodeType::Var) {
                     std::string var_name = n->value;
-                    if (!var_name.empty()) {
+                    if (var_name.empty()) { wv(n->left.get(), wv); wv(n->right.get(), wv); wv(n->body.get(), wv); wv(n->next.get(), wv); wv(n->args.get(), wv); return; }
+                    std::string key = current_func_name_ + "::" + var_name;
+                    /* Don't overwrite a previously forced decision */
+                    if (!(decisions_.count(key) && is_forced_strategy(decisions_[key].strategy))) {
                         MemoryMetadata meta = n->memory_meta;
                         if (meta.size_estimate <= 0) meta.size_estimate = 64;
                         if (meta.ownership_type == OwnershipType::Unknown)
@@ -42,7 +45,7 @@ void AllocationStrategyEngine::analyse(const ASTNode* root) {
                             d.strategy = meta.forced_strategy;
                             d.confidence = 100;
                             d.reason = "forced by attribute";
-                            decisions_[current_func_name_ + "::" + var_name] = d;
+                            decisions_[key] = d;
                         } else {
                             AllocationDecision decision;
                             if (meta.size_estimate > 0 && meta.size_estimate <= 64 && !meta.has_borrows)
@@ -63,7 +66,7 @@ void AllocationStrategyEngine::analyse(const ASTNode* root) {
                                 decision.reason = "default fallback";
                             }
 
-                            decisions_[current_func_name_ + "::" + var_name] = decision;
+                            decisions_[key] = decision;
                         }
                     }
                 }
@@ -549,33 +552,31 @@ int AllocationStrategyEngine::count_unknown() const {
 
 void AllocationStrategyEngine::print_allocation_report() const {
     std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║      Aurora Allocation Strategy Report                   ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "\n";
+    std::cerr << "--- Aurora Allocation Strategy Report ---\n";
 
     if (decisions_.empty()) {
-        std::cerr << "║  No allocation decisions made.                          ║\n";
+        std::cerr << "  No allocation decisions made.\n";
     } else {
-        std::cerr << "║  Variable          │ Strategy     │ Confidence │ Reason ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        fprintf(stderr, "  %-18s  %-13s  %-10s  %s\n",
+               "Variable", "Strategy", "Confidence", "Reason");
+        std::cerr << "  " << std::string(62, '-') << "\n";
 
         for (const auto& [name, decision] : decisions_) {
             std::string strategy_name = alloc_strategy_name(decision.strategy);
-            fprintf(stderr, "║  %-18s│ %-13s│ %3d%%      │ %-24s║\n",
+            fprintf(stderr, "  %-18s  %-13s  %3d%%        %s\n",
                    name.c_str(), strategy_name.c_str(),
-                   decision.confidence, decision.reason.substr(0, 24).c_str());
+                   decision.confidence, decision.reason.substr(0, 30).c_str());
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    Stack:  " << count_stack() << "  Arena: " << count_arena()
-                  << "  RAII: " << count_raii() << "                      ║\n";
-        std::cerr << "║    ARC:    " << count_arc() << "  GC:    " << count_gc()
-                  << "  Unknown: " << count_unknown() << "                  ║\n";
-        std::cerr << "║                                                          ║\n";
-        std::cerr << "║  Mode: " << (rules_.gc_enabled ? "Normal" : "@performance") << "                                        ║\n";
+        std::cerr << "  Statistics:\n";
+        fprintf(stderr, "    Stack: %d  Arena: %d  RAII: %d\n",
+               count_stack(), count_arena(), count_raii());
+        fprintf(stderr, "    ARC:   %d  GC:    %d  Unknown: %d\n",
+               count_arc(), count_gc(), count_unknown());
+        std::cerr << "  Mode: " << (rules_.gc_enabled ? "Normal" : "@performance") << "\n";
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "------------------------------------------\n";
     std::cerr << "\n";
 }

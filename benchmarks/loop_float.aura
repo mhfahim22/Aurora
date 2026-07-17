@@ -1,0 +1,8 @@
+function main():
+    n = 1000000000
+    total = 0.0
+    for i in range(n):
+        total = total + 1.0
+    end
+    output("Total = " + str(total))
+end

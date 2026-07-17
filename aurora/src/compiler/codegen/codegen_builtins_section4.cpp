@@ -573,5 +573,150 @@ llvm::Value* codegen_builtin_section4(
         llvm::Value* n = to_ptr(builder, ctx, gen_expr(node->args.get()));
         return builder.CreateCall(builtins.step_fn, { n }, "step_ret");
     }
+
+    /* ════════════════════════════════════════════
+       Inlined list access — emit GEP+load/store instead of function call
+       List struct layout (x64): data* @ +0, cap:i32 @ +8, len:i32 @ +12
+       ════════════════════════════════════════════ */
+
+    /* i64 list_get_unchecked(i8* list, i32 idx) — inline GEP+load with aligned access */
+    if (name == "list_get_unchecked" && node->args && node->args->next) {
+        llvm::Value* list_val = gen_expr(node->args.get());
+        llvm::Value* idx_val = gen_expr(node->args->next.get());
+        if (!list_val || !idx_val) return llvm::Constant::getNullValue(i64);
+        llvm::Value* list_ptr = to_ptr(builder, ctx, list_val);
+        if (!idx_val->getType()->isIntegerTy(32))
+            idx_val = builder.CreateTrunc(idx_val, llvm::Type::getInt32Ty(ctx), "idx_trunc");
+        auto* i64_ty_local = llvm::Type::getInt64Ty(ctx);
+        auto* i8ptr_ty_local = llvm::PointerType::getUnqual(ctx);
+        auto* data_ptr_raw = builder.CreateLoad(i8ptr_ty_local, list_ptr);
+        auto* data_ptr = builder.CreateBitCast(data_ptr_raw, llvm::PointerType::get(i64_ty_local, 0), "data_bc");
+        auto* gep = builder.CreateGEP(i64_ty_local, data_ptr, { idx_val }, "list_get.gep");
+        auto* load = builder.CreateLoad(i64_ty_local, gep, "list_get.val");
+        load->setAlignment(llvm::Align(8));
+        return load;
+    }
+
+    /* void list_set_unchecked(i8* list, i32 idx, i64 val) — inline GEP+store with aligned access */
+    if (name == "list_set_unchecked" && node->args && node->args->next && node->args->next->next) {
+        llvm::Value* list_val = gen_expr(node->args.get());
+        llvm::Value* idx_val = gen_expr(node->args->next.get());
+        llvm::Value* val_val = gen_expr(node->args->next->next.get());
+        if (!list_val || !idx_val || !val_val) return nullptr;
+        llvm::Value* list_ptr = to_ptr(builder, ctx, list_val);
+        if (!idx_val->getType()->isIntegerTy(32))
+            idx_val = builder.CreateTrunc(idx_val, llvm::Type::getInt32Ty(ctx), "idx_trunc");
+        auto* i64_ty_local = llvm::Type::getInt64Ty(ctx);
+        auto* i8ptr_ty_local = llvm::PointerType::getUnqual(ctx);
+        if (val_val->getType()->isDoubleTy() || val_val->getType()->isFloatTy()) {
+            val_val = builder.CreateFPToSI(val_val, i64_ty_local, "fptosi");
+        } else if (!val_val->getType()->isIntegerTy(64)) {
+            val_val = builder.CreateSExt(val_val, i64_ty_local, "val_sext");
+        }
+        auto* data_ptr_raw = builder.CreateLoad(i8ptr_ty_local, list_ptr);
+        auto* data_ptr = builder.CreateBitCast(data_ptr_raw, llvm::PointerType::get(i64_ty_local, 0), "data_bc");
+        auto* gep = builder.CreateGEP(i64_ty_local, data_ptr, { idx_val }, "list_set.gep");
+        auto* store = builder.CreateStore(val_val, gep);
+        store->setAlignment(llvm::Align(8));
+        return llvm::UndefValue::get(void_ty(ctx));
+    }
+
+
+
+    /* double list_get_double(i8* list, i32 idx) — inline GEP+load<double> (no i64 boxing) */
+    if (name == "list_get_double" && node->args && node->args->next) {
+        llvm::Value* list_val = gen_expr(node->args.get());
+        llvm::Value* idx_val = gen_expr(node->args->next.get());
+        if (!list_val || !idx_val) return llvm::Constant::getNullValue(i64);
+        llvm::Value* list_ptr = to_ptr(builder, ctx, list_val);
+        if (!idx_val->getType()->isIntegerTy(32))
+            idx_val = builder.CreateTrunc(idx_val, llvm::Type::getInt32Ty(ctx), "idx_trunc");
+        auto* f64_ty = llvm::Type::getDoubleTy(ctx);
+        auto* i8ptr_ty_local = llvm::PointerType::getUnqual(ctx);
+        auto* data_ptr_raw = builder.CreateLoad(i8ptr_ty_local, list_ptr);
+        auto* data_ptr = builder.CreateBitCast(data_ptr_raw, llvm::PointerType::get(f64_ty, 0), "data_bc");
+        auto* gep = builder.CreateGEP(f64_ty, data_ptr, { idx_val }, "list_get_f64.gep");
+        auto* load = builder.CreateLoad(f64_ty, gep, "list_get_f64.val");
+        load->setAlignment(llvm::Align(8));
+        return load;
+    }
+
+    /* void list_set_double(i8* list, i32 idx, double val) — inline GEP+store<double> (no i64 boxing) */
+    if (name == "list_set_double" && node->args && node->args->next && node->args->next->next) {
+        llvm::Value* list_val = gen_expr(node->args.get());
+        llvm::Value* idx_val = gen_expr(node->args->next.get());
+        llvm::Value* val_val = gen_expr(node->args->next->next.get());
+        if (!list_val || !idx_val || !val_val) return nullptr;
+        llvm::Value* list_ptr = to_ptr(builder, ctx, list_val);
+        if (!idx_val->getType()->isIntegerTy(32))
+            idx_val = builder.CreateTrunc(idx_val, llvm::Type::getInt32Ty(ctx), "idx_trunc");
+        auto* f64_ty = llvm::Type::getDoubleTy(ctx);
+        auto* i8ptr_ty_local = llvm::PointerType::getUnqual(ctx);
+        if (val_val->getType()->isIntegerTy()) {
+            val_val = builder.CreateSIToFP(val_val, f64_ty, "itof");
+        } else if (val_val->getType()->isFloatTy()) {
+            val_val = builder.CreateFPExt(val_val, f64_ty, "ftof");
+        }
+        auto* data_ptr_raw = builder.CreateLoad(i8ptr_ty_local, list_ptr);
+        auto* data_ptr = builder.CreateBitCast(data_ptr_raw, llvm::PointerType::get(f64_ty, 0), "data_bc");
+        auto* gep = builder.CreateGEP(f64_ty, data_ptr, { idx_val }, "list_set_f64.gep");
+        auto* store = builder.CreateStore(val_val, gep);
+        store->setAlignment(llvm::Align(8));
+        return llvm::UndefValue::get(void_ty(ctx));
+    }
+
+    /* ── Float64Array builtins ── */
+
+    /* double f64array_get(ptr arr, i64 i) — inline GEP+load<double> flat array (no boxing) */
+    if (name == "f64array_get" && node->args && node->args->next) {
+        llvm::Value* arr_val = gen_expr(node->args.get());
+        llvm::Value* idx_val = gen_expr(node->args->next.get());
+        if (!arr_val || !idx_val) return llvm::Constant::getNullValue(dbl);
+        auto* arr_ptr = to_ptr(builder, ctx, arr_val);
+        auto* data_ptr = builder.CreateLoad(ptr, arr_ptr, "f64a.data");
+        auto* gep = builder.CreateGEP(dbl, data_ptr, { idx_val }, "f64a.get.gep");
+        auto* load = builder.CreateLoad(dbl, gep, "f64a.get.val");
+        load->setAlignment(llvm::Align(8));
+        return load;
+    }
+
+    /* void f64array_set(ptr arr, i64 i, double v) — inline GEP+store<double> (no boxing) */
+    if (name == "f64array_set" && node->args && node->args->next && node->args->next->next) {
+        llvm::Value* arr_val = gen_expr(node->args.get());
+        llvm::Value* idx_val = gen_expr(node->args->next.get());
+        llvm::Value* val_val = gen_expr(node->args->next->next.get());
+        if (!arr_val || !idx_val || !val_val) return nullptr;
+        auto* arr_ptr = to_ptr(builder, ctx, arr_val);
+        if (val_val->getType()->isIntegerTy()) {
+            val_val = builder.CreateSIToFP(val_val, dbl, "itof");
+        } else if (val_val->getType()->isFloatTy()) {
+            val_val = builder.CreateFPExt(val_val, dbl, "ftof");
+        }
+        auto* data_ptr = builder.CreateLoad(ptr, arr_ptr, "f64a.data");
+        auto* gep = builder.CreateGEP(dbl, data_ptr, { idx_val }, "f64a.set.gep");
+        auto* store = builder.CreateStore(val_val, gep);
+        store->setAlignment(llvm::Align(8));
+        return llvm::UndefValue::get(v);
+    }
+
+    /* void list_matmul(i8* a, i8* b, i8* c, i32 n) — delegate to aurora_list_matmul C helper */
+    if (name == "list_matmul" && node->args && node->args->next && node->args->next->next && node->args->next->next->next) {
+        llvm::Value* a_val = gen_expr(node->args.get());
+        llvm::Value* b_val = gen_expr(node->args->next.get());
+        llvm::Value* c_val = gen_expr(node->args->next->next.get());
+        llvm::Value* n_val = gen_expr(node->args->next->next->next.get());
+        if (!a_val || !b_val || !c_val || !n_val) return nullptr;
+        if (n_val->getType()->getIntegerBitWidth() > 32)
+            n_val = builder.CreateTrunc(n_val, llvm::Type::getInt32Ty(ctx), "n_trunc");
+        auto* fn = module->getFunction("aurora_list_matmul");
+        if (!fn) {
+            fn = llvm::Function::Create(
+                llvm::FunctionType::get(v, { ptr, ptr, ptr, llvm::Type::getInt32Ty(ctx) }, false),
+                llvm::Function::ExternalLinkage, "aurora_list_matmul", module);
+        }
+        builder.CreateCall(fn, { a_val, b_val, c_val, n_val });
+        return llvm::UndefValue::get(v);
+    }
+
     return nullptr;
 }

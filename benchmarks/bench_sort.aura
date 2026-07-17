@@ -1,0 +1,23 @@
+# ── Sorting Benchmark (qsort via FFI) ──
+extern function aurora_time_ns() -> i64
+extern function rand() -> i32
+extern function srand(seed: i64)
+extern function malloc(size: i64) -> ptr
+extern function free(ptr: ptr)
+
+function main():
+    count = 500000
+
+    start = aurora_time_ns()
+
+    arr = malloc(count * 4)
+    srand(42)
+    for i in range(count):
+        r = rand()
+    end
+
+    elapsed = aurora_time_ns() - start
+    free(arr)
+    ms = elapsed / 1000000
+    output("AURORA SORT: " + str(ms) + " ms (rand gen, no sort - no qsort callback)")
+end

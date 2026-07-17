@@ -199,6 +199,7 @@ ASTNode::Ptr Parser::parse_stmt() {
             stmt->right = parse_expr(toks, idx);
             /* Set forced allocation strategy in memory metadata */
             stmt->memory_meta.forced_strategy = forced;
+            stmt->left->memory_meta.forced_strategy = forced;
             stmt->right->memory_meta.forced_strategy = forced;
             require_token_end(toks, idx, "@alloc assignment");
             advance();

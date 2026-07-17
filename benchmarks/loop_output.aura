@@ -1,0 +1,5 @@
+function main():
+    for i in range(100000000):
+        output("x")
+    end
+end

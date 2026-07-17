@@ -710,7 +710,9 @@ void Codegen::gen_for(const ASTNode* node) {
        - for i in len(arr)    → iterate array indices 0..len-1 */
     llvm::Value* limit = nullptr;
     bool is_array_iter = false;
+    bool is_range_iter = false;
     llvm::Value* arr_ptr_val = nullptr;
+    llvm::Value* range_start_val = nullptr;
 
     /* H3 Phase B: annotation-first array detection for for-in */
     auto for_lk = get_annotation_kind(node->left.get());
@@ -725,6 +727,24 @@ void Codegen::gen_for(const ASTNode* node) {
             limit = builder_->CreateCall(fn_array_len_, { arr_ptr_val }, "arr_len");
             is_array_iter = true;
         }
+    }
+
+    /* Optimise range() in for loops: avoid creating the array entirely */
+    if (!limit && node->left && node->left->type == NodeType::Call && node->left->value == "range" && node->left->args) {
+        llvm::Value* arg1 = gen_expr(node->left->args.get());
+        llvm::Value* arg2 = nullptr;
+        if (node->left->args->next)
+            arg2 = gen_expr(node->left->args->next.get());
+        if (arg2) {
+            /* range(start, end) → limit = end - start, val = start + i */
+            range_start_val = arg1;
+            limit = builder_->CreateSub(arg2, arg1, "range_limit");
+        } else {
+            /* range(n) → limit = n, val = i */
+            range_start_val = llvm::ConstantInt::get(i64_ty(), 0);
+            limit = arg1;
+        }
+        is_range_iter = true;
     }
 
     /* Fallback: treat as integer count */
@@ -756,7 +776,11 @@ void Codegen::gen_for(const ASTNode* node) {
     builder_->SetInsertPoint(body_bb);
     push_scope();
 
-    if (is_array_iter && arr_ptr_val) {
+    if (is_range_iter) {
+        /* Range iteration: x = start + i — no array needed */
+        llvm::Value* val = builder_->CreateAdd(range_start_val, cur_idx, node->value + "_range_val");
+        builder_->CreateStore(val, loop_var_slot);
+    } else if (is_array_iter && arr_ptr_val) {
         /* Array iteration: x = arr[i] — load element by index */
         llvm::Value* elem = builder_->CreateCall(fn_array_get_int_, { arr_ptr_val, cur_idx },
                                                   node->value + "_elem");

@@ -159,4 +159,23 @@ void run_aurora_optimizer(llvm::Module* module) {
             changed |= eliminate_unreachable_blocks(fn);
         }
     }
+
+    /* Loop idiom recognition (runs once after fixed-point, not repeatedly) */
+    bool loop_opt = false;
+    for (auto& fn : *module) {
+        if (fn.isDeclaration()) continue;
+        if (count_instructions(fn) >= 100000) continue;
+        try {
+            if (recognize_loop_idioms(fn))
+                loop_opt = true;
+        } catch (...) { }
+    }
+    if (loop_opt) {
+        /* Clean up dead blocks / instructions left by loop removal */
+        for (auto& fn : *module) {
+            if (fn.isDeclaration()) continue;
+            eliminate_dead_instructions(fn);
+            eliminate_unreachable_blocks(fn);
+        }
+    }
 }

@@ -1,0 +1,17 @@
+function main():
+    a = f64array_new(100)
+    f64array_set(a, 0, 3.14)
+    f64array_set(a, 1, 2.71)
+    x = f64array_get(a, 0)
+    n = f64array_len(a)
+    s = f64array_sum(a)
+    f64array_scale(a, 2.0)
+    f64array_add(a, a)
+    b = f64array_new(n)
+    f64array_copy(b, a)
+    f64array_matmul(a, b, a, 10)
+    f64array_fill(a, 0.0)
+    f64array_free(b)
+    f64array_free(a)
+    output("typecheck OK")
+end

@@ -1,0 +1,10 @@
+function main():
+    count = 0
+    for i in range(100000000):
+        x = i * 7
+        y = x / 3
+        z = y + 5
+        count = count + z
+    end
+    output("count = " + str(count))
+end

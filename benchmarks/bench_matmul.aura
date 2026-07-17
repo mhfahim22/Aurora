@@ -1,0 +1,44 @@
+# ── Matrix Multiplication Benchmark (inlined list_get_unchecked/list_set_unchecked) ──
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 128
+    size = N * N
+
+    a = list()
+    b = list()
+    c = list()
+    for i in range(size):
+        list_push(a, 0)
+        list_push(b, 0)
+        list_push(c, 0)
+    end
+
+    for i in range(N):
+        for j in range(N):
+            idx = i * N + j
+            list_set_unchecked(a, idx, (i * 1.0 + j) / N)
+            list_set_unchecked(b, idx, (j * 2.0 - i) / N)
+        end
+    end
+
+    start = aurora_time_ns()
+
+    for i in range(N):
+        for k in range(N):
+            aik = list_get_unchecked(a, i * N + k)
+            for j in range(N):
+                idx = i * N + j
+                old = list_get_unchecked(c, idx)
+                bk = list_get_unchecked(b, k * N + j)
+                list_set_unchecked(c, idx, old + aik * bk)
+            end
+        end
+    end
+
+    elapsed = aurora_time_ns() - start
+    ms = elapsed / 1000000
+    flops = 2 * N * N * N
+    mflops = flops * 1000 / elapsed
+    output("AURORA MATMUL (inlined): " + str(ms) + " ms (N=" + str(N) + ", " + str(mflops) + " MFLOPS)")
+end

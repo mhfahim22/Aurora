@@ -46,3 +46,6 @@ extern "C" AuroraStr* aurora_float_to_str(double val);
 /* ── Append string b to string a, reusing a's buffer with exponential growth ── */
 /* Does NOT free b — caller owns b's lifetime. */
 extern "C" AuroraStr* aurora_str_append(AuroraStr* a, AuroraStr* b);
+
+/* ── Repeat source string n times with single allocation ── */
+extern "C" AuroraStr* aurora_str_repeat(AuroraStr* src, int64_t n);

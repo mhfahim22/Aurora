@@ -1,0 +1,30 @@
+# ── Matrix Multiplication Benchmark (C helper: single call, full speed) ──
+extern function aurora_time_ns() -> i64
+
+function main():
+    N = 1024
+    size = N * N
+    a = list()
+    b = list()
+    c = list()
+    for i in range(size):
+        list_push(a, 0)
+        list_push(b, 0)
+        list_push(c, 0)
+    end
+    for i in range(N):
+        for j in range(N):
+            idx = i * N + j
+            list_set_double(a, idx, (i * 1.0 + j) / N)
+            list_set_double(b, idx, (j * 2.0 - i) / N)
+        end
+    end
+    start = aurora_time_ns()
+    list_matmul(a, b, c, N)
+    elapsed = aurora_time_ns() - start
+    checksum = list_get_double(c, 0) + list_get_double(c, size - 1)
+    ms = elapsed / 1000000
+    flops = 2 * N * N * N
+    mflops = flops * 1000 / elapsed
+    output("AURORA MATMUL C-HELPER: " + str(ms) + " ms (N=" + str(N) + ", " + str(mflops) + " MFLOPS, cksum=" + str(checksum) + ")")
+end

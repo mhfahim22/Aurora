@@ -174,19 +174,6 @@ void Codegen::generate(const ASTNode* root) {
     if (!source_file_path_.empty())
         source_file_ptr_ = builder_->CreateGlobalStringPtr(source_file_path_, "cov_file");
 
-    /* Install crash handler at program start */
-    {
-        llvm::Function* init_crash = module_->getFunction("aurora_install_crash_handler");
-        if (!init_crash) {
-            auto* void_ty = llvm::Type::getVoidTy(ctx_);
-            init_crash = llvm::Function::Create(
-                llvm::FunctionType::get(void_ty, {}, false),
-                llvm::Function::ExternalLinkage,
-                "aurora_install_crash_handler", module_.get());
-        }
-        builder_->CreateCall(init_crash, {});
-    }
-
     /* Step 7 — generate IR for the AST */
     push_scope();
     gen_block(root);
@@ -255,13 +242,6 @@ void Codegen::generate(const ASTNode* root) {
                     llvm::DISubprogram::SPFlagDefinition);
                 if (main_sp)
                     cur_fn_->setSubprogram(main_sp);
-            }
-
-            /* Install crash handler */
-            {
-                llvm::Function* init_crash = module_->getFunction("aurora_install_crash_handler");
-                if (init_crash)
-                    builder_->CreateCall(init_crash, {});
             }
 
             if (entry_fn)

@@ -110,6 +110,11 @@ void Codegen::declare_runtime_helpers() {
         llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty(), i8ptr_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_str_append", module_.get());
 
+    /* i8* aurora_str_repeat(i8*, i64) — repeat src n times, single allocation */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty(), i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_str_repeat", module_.get());
+
     /* void aurora_str_reserve(AuroraStr*, i64) — ensure capacity */
     fn_str_reserve_ = llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i64_ty() }, false),
@@ -351,10 +356,81 @@ void Codegen::declare_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(i64_ty(), { ptr, i32_ty }, false),
         llvm::Function::ExternalLinkage, "list_get", module_.get());
+    /* void list_set(i8*, i32, i64) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, i32_ty, i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "list_set", module_.get());
+    /* i64 list_get_unchecked(i8*, i32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i64_ty(), { ptr, i32_ty }, false),
+        llvm::Function::ExternalLinkage, "list_get_unchecked", module_.get());
+    /* void list_set_unchecked(i8*, i32, i64) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, i32_ty, i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "list_set_unchecked", module_.get());
     /* i32 list_len(i8*) */
     llvm::Function::Create(
         llvm::FunctionType::get(i32_ty, { ptr }, false),
         llvm::Function::ExternalLinkage, "list_len", module_.get());
+    /* double list_get_double(i8*, i32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getDoubleTy(ctx_), { ptr, i32_ty }, false),
+        llvm::Function::ExternalLinkage, "list_get_double", module_.get());
+    /* void list_set_double(i8*, i32, double) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, i32_ty, llvm::Type::getDoubleTy(ctx_) }, false),
+        llvm::Function::ExternalLinkage, "list_set_double", module_.get());
+    /* void aurora_list_matmul(i8*, i8*, i8*, i32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, ptr, ptr, i32_ty }, false),
+        llvm::Function::ExternalLinkage, "aurora_list_matmul", module_.get());
+
+    /* ── Float64Array function declarations ── */
+    /* ptr f64array_new(i64) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(ptr, { i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "f64array_new", module_.get());
+    /* void f64array_free(ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr }, false),
+        llvm::Function::ExternalLinkage, "f64array_free", module_.get());
+    /* double f64array_get(ptr, i64) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getDoubleTy(ctx_), { ptr, i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "f64array_get", module_.get());
+    /* void f64array_set(ptr, i64, double) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, i64_ty(), llvm::Type::getDoubleTy(ctx_) }, false),
+        llvm::Function::ExternalLinkage, "f64array_set", module_.get());
+    /* i64 f64array_len(ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i64_ty(), { ptr }, false),
+        llvm::Function::ExternalLinkage, "f64array_len", module_.get());
+    /* void f64array_fill(ptr, double) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, llvm::Type::getDoubleTy(ctx_) }, false),
+        llvm::Function::ExternalLinkage, "f64array_fill", module_.get());
+    /* void f64array_copy(ptr, ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "f64array_copy", module_.get());
+    /* void f64array_matmul(ptr, ptr, ptr, i32) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, ptr, ptr, i32_ty }, false),
+        llvm::Function::ExternalLinkage, "f64array_matmul", module_.get());
+    /* double f64array_sum(ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getDoubleTy(ctx_), { ptr }, false),
+        llvm::Function::ExternalLinkage, "f64array_sum", module_.get());
+    /* void f64array_scale(ptr, double) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, llvm::Type::getDoubleTy(ctx_) }, false),
+        llvm::Function::ExternalLinkage, "f64array_scale", module_.get());
+    /* void f64array_add(ptr, ptr) */
+    llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "f64array_add", module_.get());
+
     /* void list_free(i8*) */
     llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { ptr }, false),

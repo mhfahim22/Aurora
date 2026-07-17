@@ -1,0 +1,12 @@
+function io_work(x):
+    return x + 1
+end
+
+function main():
+    n = 1000000000
+    total = 0
+    for i in range(n):
+        total = io_work(total)
+    end
+    output("Total = " + str(total))
+end

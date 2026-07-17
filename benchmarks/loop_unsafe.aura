@@ -1,0 +1,12 @@
+function println(s):
+    output(s)
+end
+
+function main():
+    count = 0
+    for i in range(10000):
+        count = count + 1
+        println("hello")
+    end
+    output("count = " + str(count))
+end

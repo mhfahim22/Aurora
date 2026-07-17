@@ -39,6 +39,11 @@ void MemoryAnalyzer::analyse(const ASTNode* root) {
     /* ── Phase 8: Run allocation strategy engine ── */
     apply_allocation_strategy(root);
 
+    /* Recalculate stats after strategy engine overrides */
+    for (auto& [func_name, result] : results_) {
+        result.update_stats();
+    }
+
     /* ── Phase 9: Run allocation profiler ── */
     allocation_profiler_.analyse(root, *this);
 }
@@ -57,6 +62,7 @@ void MemoryAnalyzer::walk_and_register_functions(const ASTNode* node) {
 
             MemoryAnalysisResult result;
             result.is_performance_mode = ctx.is_performance_mode;
+            result.func_forced_strategy = node->memory_meta.forced_strategy;
             result.gc_disabled = ctx.is_performance_mode;
             ctx.result = result;
 
@@ -328,6 +334,7 @@ void MemoryAnalyzer::analyse_function(const ASTNode* node) {
     /* Create analysis result */
     MemoryAnalysisResult result;
     result.is_performance_mode = current_func_.is_performance_mode;
+    result.func_forced_strategy = node->memory_meta.forced_strategy;
     result.gc_disabled = current_func_.is_performance_mode;
     current_func_.result = result;
 
@@ -613,34 +620,30 @@ void MemoryAnalyzer::apply_escape_results() {
 
 void MemoryAnalyzer::print_escape_report() const {
     std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║           Aurora Escape Analysis Report                  ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "--- Aurora Escape Analysis Report ---\n";
 
     const auto& all_info = escape_analyzer_.get_all_escape_info();
 
     if (all_info.empty()) {
-        std::cerr << "║  No variables analyzed.                                 ║\n";
+        std::cerr << "  No variables analyzed.\n";
     } else {
-        std::cerr << "║  Variable          │ Escape Status     │ Count          ║\n";
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+        fprintf(stderr, "  %-18s  %-18s\n", "Variable", "Escape Status");
+        std::cerr << "  " << std::string(40, '-') << "\n";
 
         for (const auto& [name, info] : all_info) {
             std::string status_name = escape_status_name(info.status);
-            fprintf(stderr, "║  %-18s│ %-18s│                ║\n",
-                   name.c_str(), status_name.c_str());
+            fprintf(stderr, "  %-18s  %s\n", name.c_str(), status_name.c_str());
         }
 
-        std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-        std::cerr << "║  Statistics:                                             ║\n";
-        std::cerr << "║    NoEscape:       " << escape_analyzer_.count_no_escape() << "                                ║\n";
-        std::cerr << "║    ArgEscape:      " << escape_analyzer_.count_arg_escape() << "                                ║\n";
-        std::cerr << "║    ReturnEscape:   " << escape_analyzer_.count_return_escape() << "                                ║\n";
-        std::cerr << "║    GlobalEscape:   " << escape_analyzer_.count_global_escape() << "                                ║\n";
-        std::cerr << "║    ClosureEscape:  " << escape_analyzer_.count_closure_escape() << "                                ║\n";
+        std::cerr << "  Statistics:\n";
+        fprintf(stderr, "    NoEscape:       %d\n", escape_analyzer_.count_no_escape());
+        fprintf(stderr, "    ArgEscape:      %d\n", escape_analyzer_.count_arg_escape());
+        fprintf(stderr, "    ReturnEscape:   %d\n", escape_analyzer_.count_return_escape());
+        fprintf(stderr, "    GlobalEscape:   %d\n", escape_analyzer_.count_global_escape());
+        fprintf(stderr, "    ClosureEscape:  %d\n", escape_analyzer_.count_closure_escape());
     }
 
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cerr << "------------------------------------------\n";
     std::cerr << "\n";
 }
 
@@ -796,7 +799,6 @@ void MemoryAnalyzer::print_alias_graph() const {
 void MemoryAnalyzer::apply_allocation_strategy(const ASTNode* root) {
     /* Run the AllocationStrategyEngine for sophisticated decision logic */
     allocation_engine_.analyse(root);
-    allocation_engine_.print_allocation_report();
 
     /* Check if any function is in performance mode */
     bool any_perf_mode = false;
@@ -958,9 +960,7 @@ void MemoryAnalyzer::apply_to_ast(ASTNode* root) {
 
 void MemoryAnalyzer::print_allocation_report() const {
     std::cerr << "\n";
-    std::cerr << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cerr << "║      Aurora Allocation Strategy Report                   ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cerr << "--- Aurora Allocation Strategy Report ---\n";
 
     /* Count strategies */
     int stack_count = 0, arena_count = 0, raii_count = 0;
@@ -968,7 +968,9 @@ void MemoryAnalyzer::print_allocation_report() const {
 
     for (const auto& [func_name, result] : results_) {
         for (const auto& [var_name, meta] : result.variables) {
-            switch (meta.alloc_strategy) {
+            AllocStrategy base = is_forced_strategy(meta.alloc_strategy)
+                ? forced_to_base(meta.alloc_strategy) : meta.alloc_strategy;
+            switch (base) {
                 case AllocStrategy::Stack:  stack_count++;  break;
                 case AllocStrategy::Arena:  arena_count++;  break;
                 case AllocStrategy::RAII:   raii_count++;   break;
@@ -979,26 +981,33 @@ void MemoryAnalyzer::print_allocation_report() const {
         }
     }
 
-    std::cerr << "║  Allocation Distribution:                                ║\n";
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-
     int total = stack_count + arena_count + raii_count + arc_count + gc_count;
     if (total > 0) {
-        fprintf(stderr, "║  Stack: %3d (%3d%%)  Arena: %3d (%3d%%)  RAII: %3d (%3d%%)    ║\n",
+        fprintf(stderr, "  Stack: %3d (%3d%%)  Arena: %3d (%3d%%)  RAII: %3d (%3d%%)\n",
                stack_count, (stack_count * 100 / total),
                arena_count, (arena_count * 100 / total),
                raii_count, (raii_count * 100 / total));
-        fprintf(stderr, "║  ARC:   %3d (%3d%%)  GC:    %3d (%3d%%)                      ║\n",
+        fprintf(stderr, "  ARC:   %3d (%3d%%)  GC:    %3d (%3d%%)\n",
                arc_count, (arc_count * 100 / total),
                gc_count, (gc_count * 100 / total));
     } else {
-        std::cerr << "║  No allocation decisions made.                          ║\n";
+        std::cerr << "  No allocation decisions made.\n";
     }
 
-    std::cerr << "╠══════════════════════════════════════════════════════════╣\n";
-    std::cerr << "║  Mode: " << (results_.empty() ? "Normal" :
-        (results_.begin()->second.is_performance_mode ? "@performance" : "Normal")) << "                                        ║\n";
-    std::cerr << "╚══════════════════════════════════════════════════════════╝\n";
+    {
+        std::string mode_str = "Normal";
+        if (!results_.empty()) {
+            for (const auto& [fn, r] : results_) {
+                if (r.func_forced_strategy != AllocStrategy::Unknown) {
+                    mode_str = alloc_strategy_name(r.func_forced_strategy);
+                } else if (r.is_performance_mode) {
+                    mode_str = "@performance";
+                }
+            }
+        }
+        std::cerr << "  Mode: " << mode_str << "\n";
+    }
+    std::cerr << "------------------------------------------\n";
     std::cerr << "\n";
 }
 

@@ -6,6 +6,8 @@ build/
 build2/
 _build/
 build_asan/
+build_aot/
+build_release_no_gl/
 output/
 Testing/
 crash/

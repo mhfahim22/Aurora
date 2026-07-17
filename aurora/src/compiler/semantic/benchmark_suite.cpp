@@ -351,49 +351,37 @@ void BenchmarkSuite::calculate_summary() {
 
 void BenchmarkSuite::print_summary() const {
     std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║        Aurora Benchmark Summary                          ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
-    std::cout << "║                                                          ║\n";
-    printf("║  Total Benchmarks: %4d                                 ║\n",
-           summary_.total_benchmarks);
-    printf("║  Passed:           %4d                                 ║\n",
-           summary_.passed);
-    printf("║  Failed:           %4d                                 ║\n",
-           summary_.failed);
-    printf("║  Total Time:       %8.2f ms                         ║\n",
-           summary_.total_time_ms);
-
-    std::cout << "║                                                          ║\n";
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "\n";
+    std::cout << "--- Aurora Benchmark Summary ---\n";
+    printf("  Total Benchmarks: %d\n", summary_.total_benchmarks);
+    printf("  Passed:           %d\n", summary_.passed);
+    printf("  Failed:           %d\n", summary_.failed);
+    printf("  Total Time:       %.2f ms\n", summary_.total_time_ms);
+    std::cout << "------------------------------------------\n";
     std::cout << "\n";
 }
 
 void BenchmarkSuite::print_detailed() const {
     std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║        Aurora Detailed Benchmark Results                 ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cout << "--- Aurora Detailed Benchmark Results ---\n";
 
     std::string current_category;
     for (const auto& result : results_) {
         if (result.category != current_category) {
             current_category = result.category;
-            std::cout << "║  ── " << current_category << " ──                    ║\n";
+            std::cout << "  -- " << current_category << " --\n";
         }
-        printf("║    %-35s %8.2f ms  %10.0f ops/s ║\n",
+        printf("    %-35s %8.2f ms  %10.0f ops/s\n",
                result.name.c_str(), result.time_ms, result.ops_per_sec);
     }
 
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "------------------------------------------\n";
     std::cout << "\n";
 }
 
 void BenchmarkSuite::print_optimization_report() const {
     std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      Aurora Optimization Report                          ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════╣\n";
+    std::cout << "--- Aurora Optimization Report ---\n";
 
     /* Find best/worst allocations */
     double fastest_alloc = 1e9, slowest_alloc = 0;
@@ -412,24 +400,19 @@ void BenchmarkSuite::print_optimization_report() const {
         }
     }
 
-    std::cout << "║                                                          ║\n";
-    std::cout << "║  Allocation Performance:                                  ║\n";
-    printf("║    Fastest: %-35s %8.2f ms ║\n",
-           fastest_name.c_str(), fastest_alloc);
-    printf("║    Slowest: %-35s %8.2f ms ║\n",
-           slowest_name.c_str(), slowest_alloc);
-    printf("║    Ratio:   %.1fx                                     ║\n",
-           slowest_alloc / fastest_alloc);
+    std::cout << "  Allocation Performance:\n";
+    printf("    Fastest: %-35s %8.2f ms\n", fastest_name.c_str(), fastest_alloc);
+    printf("    Slowest: %-35s %8.2f ms\n", slowest_name.c_str(), slowest_alloc);
+    printf("    Ratio:   %.1fx\n", slowest_alloc / fastest_alloc);
 
-    std::cout << "║                                                          ║\n";
-    std::cout << "║  Recommendations:                                         ║\n";
-    std::cout << "║    • Use Stack for small, local variables                 ║\n";
-    std::cout << "║    • Use Arena for bulk allocations                       ║\n";
-    std::cout << "║    • Use RAII for single-owner objects                    ║\n";
-    std::cout << "║    • Use ARC only when shared ownership needed            ║\n";
-    std::cout << "║    • Avoid GC in @performance mode                        ║\n";
+    std::cout << "  Recommendations:\n";
+    std::cout << "    - Use Stack for small, local variables\n";
+    std::cout << "    - Use Arena for bulk allocations\n";
+    std::cout << "    - Use RAII for single-owner objects\n";
+    std::cout << "    - Use ARC only when shared ownership needed\n";
+    std::cout << "    - Avoid GC in @performance mode\n";
 
-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+    std::cout << "------------------------------------------\n";
     std::cout << "\n";
 }
 

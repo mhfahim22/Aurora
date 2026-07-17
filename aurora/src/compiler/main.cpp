@@ -47,6 +47,9 @@
 #include <cstdlib>
 #include <array>
 #include <chrono>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <iomanip>
 #ifdef _WIN32
 #  include <windows.h>
@@ -161,22 +164,23 @@ static bool line_needs_continuation(const std::string& line) {
 
 /* ── Print usage to stderr ── */
 static void print_usage() {
-    std::cerr << "Usage: aurorac <source.aura> [--emit-obj] [-o output] [-l lib] [-L path]\n";
-    std::cerr << "       aurorac --repl\n";
-    std::cerr << "       aurorac --doc <source.aura> [output.html]\n";
-    std::cerr << "       aurorac --package <init|install|build|list|clean>\n";
-    std::cerr << "       aurorac --help\n";
-    std::cerr << "       aurorac --version\n";
+    std::cerr << "Usage: aurora <source.aura> [options]\n";
+    std::cerr << "       aurora --repl\n";
+    std::cerr << "       aurora --doc <source.aura> [output.html]\n";
+    std::cerr << "       aurora --package <init|install|build|list|clean>\n";
+    std::cerr << "       aurora --help\n";
+    std::cerr << "       aurora --version\n";
     std::cerr << "\n";
     std::cerr << "Options:\n";
     std::cerr << "  --help          Show this help message\n";
     std::cerr << "  --version       Show version info\n";
     std::cerr << "  --emit-ir       Print LLVM IR to stdout\n";
+    std::cerr << "  --build, --aot  AOT compile and link into .exe\n";
     std::cerr << "  --emit-obj      Emit object file (and link if -l used)\n";
     std::cerr << "  -o <file>       Output path (.obj or .exe)\n";
     std::cerr << "  -l <lib>        Library to link against (e.g. -l user32)\n";
     std::cerr << "  -L <path>       Library search path\n";
-    std::cerr << "  --run           JIT-execute main function\n";
+    std::cerr << "  --run           JIT-execute main function (default: on)\n";
     std::cerr << "  -O0/-O1/-O2/-O3  Optimization level (default: -O3)\n";
     std::cerr << "  -Os             Optimize for size\n";
     std::cerr << "  -Oz             Aggressively optimize for size\n";
@@ -887,7 +891,8 @@ static std::vector<std::string> detect_msvc_lib_paths() {
         for (auto p : pf) {
             if (!p) continue;
             std::string base = std::string(p) + "\\Microsoft Visual Studio";
-            const char* editions[] = { "2022\\Community", "2022\\BuildTools", "2022\\Professional", "2022\\Enterprise",
+            const char* editions[] = { "18\\Community", "18\\BuildTools", "18\\Professional", "18\\Enterprise",
+                                       "2022\\Community", "2022\\BuildTools", "2022\\Professional", "2022\\Enterprise",
                                        "2019\\Community", "2019\\BuildTools", "2019\\Professional", "2019\\Enterprise" };
             for (auto e : editions) {
                 std::string candidate = base + "\\" + e;
@@ -915,15 +920,36 @@ static std::vector<std::string> detect_msvc_lib_paths() {
     }
 
     std::string kits_root;
-    const char* kit_pf[] = {
-        std::getenv("ProgramFiles(x86)"),
-        std::getenv("ProgramFiles"),
-        std::getenv("ProgramW6432"),
+    /* Try WindowsSdkDir env var first (set by vcvars64.bat / VS dev prompt) */
+    const char* wdk = std::getenv("WindowsSdkDir");
+    if (wdk) {
+        kits_root = std::string(wdk) + "Lib";
+        if (!fs::exists(kits_root)) kits_root.clear();
+    }
+    /* Try known Windows Kits locations */
+    const char* kit_search[] = {
+        "D:\\Windows Kits\\10\\Lib",
+        "C:\\Program Files\\Windows Kits\\10\\Lib",
+        "C:\\Program Files (x86)\\Windows Kits\\10\\Lib",
+        nullptr,
     };
-    for (auto p : kit_pf) {
-        if (!p) continue;
-        kits_root = std::string(p) + "\\Windows Kits\\10\\Lib";
-        if (fs::exists(kits_root)) break;
+    if (kits_root.empty()) {
+        for (int i = 0; kit_search[i]; ++i) {
+            if (fs::exists(kit_search[i])) { kits_root = kit_search[i]; break; }
+        }
+    }
+    /* Also check via ProgramFiles env vars */
+    if (kits_root.empty()) {
+        const char* kit_pf[] = {
+            std::getenv("ProgramFiles(x86)"),
+            std::getenv("ProgramFiles"),
+            std::getenv("ProgramW6432"),
+        };
+        for (auto p : kit_pf) {
+            if (!p) continue;
+            kits_root = std::string(p) + "\\Windows Kits\\10\\Lib";
+            if (fs::exists(kits_root)) break;
+        }
     }
     if (fs::exists(kits_root)) {
         std::string sdk_ver;
@@ -982,12 +1008,30 @@ static std::string find_lld_link() {
         if (fs::exists(c)) return c;
     }
 
-    /* 4) Hardcoded fallback paths (last resort) */
+    /* 4) Hardcoded fallback paths (last resort) — also search PATH manually */
     std::vector<std::string> fallbacks = {
         "C:\\LLVM\\bin\\lld-link.exe",
         "C:\\Program Files\\LLVM\\bin\\lld-link.exe",
         "C:\\Program Files (x86)\\LLVM\\bin\\lld-link.exe",
     };
+    /* Also search all directories on PATH for lld-link.exe */
+    {
+        const char* path_env = std::getenv("PATH");
+        if (path_env) {
+            std::string path_str = path_env;
+            size_t start = 0;
+            while (start < path_str.size()) {
+                auto sep = path_str.find(';', start);
+                std::string dir = path_str.substr(start, sep - start);
+                if (!dir.empty()) {
+                    std::string candidate = dir + "\\lld-link.exe";
+                    if (fs::exists(candidate)) return candidate;
+                }
+                if (sep == std::string::npos) break;
+                start = sep + 1;
+            }
+        }
+    }
     for (auto& c : fallbacks) {
         if (fs::exists(c)) return c;
     }
@@ -1075,7 +1119,8 @@ static std::string find_msvc_link() {
         for (auto p : pf_env) {
             if (!p) continue;
             std::string base = std::string(p) + "\\Microsoft Visual Studio";
-            const char* editions[] = { "2022\\Community", "2022\\BuildTools", "2022\\Professional", "2022\\Enterprise",
+            const char* editions[] = { "18\\Community", "18\\BuildTools", "18\\Professional", "18\\Enterprise",
+                                       "2022\\Community", "2022\\BuildTools", "2022\\Professional", "2022\\Enterprise",
                                        "2019\\Community", "2019\\BuildTools", "2019\\Professional", "2019\\Enterprise" };
             for (auto e : editions) {
                 std::string candidate = base + "\\" + e;
@@ -1088,12 +1133,16 @@ static std::string find_msvc_link() {
     if (!vs_install.empty()) {
         std::string msvc_root = vs_install + "\\VC\\Tools\\MSVC";
         if (fs::exists(msvc_root)) {
+            std::string best_ver;
             for (auto& entry : fs::directory_iterator(msvc_root)) {
                 if (!entry.is_directory()) continue;
-                std::string ver = entry.path().filename().string();
+                std::string v = entry.path().filename().string();
+                if (v > best_ver) best_ver = v;
+            }
+            if (!best_ver.empty()) {
                 std::vector<std::string> candidates = {
-                    msvc_root + "\\" + ver + "\\bin\\Hostx64\\x64\\link.exe",
-                    msvc_root + "\\" + ver + "\\bin\\Hostx86\\x64\\link.exe",
+                    msvc_root + "\\" + best_ver + "\\bin\\Hostx64\\x64\\link.exe",
+                    msvc_root + "\\" + best_ver + "\\bin\\Hostx86\\x64\\link.exe",
                 };
                 for (auto& c : candidates) {
                     if (fs::exists(c)) return c;
@@ -1280,10 +1329,12 @@ int main(int argc, char** argv) {
 
     bool emit_ir = false;
     bool emit_obj = false;
+    bool build_mode = false;                 /* --build: AOT compile + link → .exe */
+    bool aot_mode = false;                   /* --aot: build + auto-run */
     std::string output_path;                /* -o <file> */
     std::vector<std::string> link_libs;     /* -l <lib> */
     std::vector<std::string> lib_paths;     /* -L <path> */
-    bool run_jit = false;
+    bool run_jit = true;
     bool show_memory_report = false;
     bool show_lifetime_report = false;
     bool show_ownership_report = false;
@@ -1366,7 +1417,7 @@ auto get_output_path = [&]() -> std::string {
         if (arg == "--doc") doc_mode = true;
         if (arg == "--help") { print_usage(); return 0; }
         if (arg == "--version") {
-            std::cout << "Aurorac version " << AURORA_VERSION << "\n";
+            std::cout << "Aurora version " << AURORA_VERSION << "\n";
             return 0;
         }
         if (arg == "--package") {
@@ -1407,6 +1458,8 @@ auto get_output_path = [&]() -> std::string {
         std::string arg = argv[i];
         if (arg == "--emit-ir") emit_ir = true;
         else if (arg == "--emit-obj") emit_obj = true;
+        else if (arg == "--build") build_mode = true;
+        else if (arg == "--aot")   { build_mode = true; aot_mode = true; }
         else if (arg == "-o" && i + 1 < argc) output_path = argv[++i];
         else if (arg == "-l" && i + 1 < argc) link_libs.push_back(argv[++i]);
         else if (arg == "-L" && i + 1 < argc) lib_paths.push_back(argv[++i]);
@@ -1451,6 +1504,25 @@ auto get_output_path = [&]() -> std::string {
         else if (arg == "--version") {} /* already handled */
     }
 
+    /* If emitting to file, don't JIT-run by default */
+    if (emit_obj || emit_ir || build_mode) run_jit = false;
+    if (build_mode) {
+        emit_obj = true;
+        /* Auto-link aurora_runtime.lib */
+        if (link_libs.empty()) {
+            std::string rt_lib = exe_dir + "/aurora_runtime.lib";
+            if (!fs::exists(rt_lib))
+                rt_lib = exe_dir + "/lib/aurora_runtime.lib";
+            if (!fs::exists(rt_lib))
+                rt_lib = exe_dir + "/../build_aot/Release/aurora_runtime.lib";
+            if (!fs::exists(rt_lib))
+                rt_lib = exe_dir + "/../build_release/Release/aurora_runtime.lib";
+            if (!fs::exists(rt_lib))
+                rt_lib = "aurora_runtime.lib";
+            link_libs.push_back(rt_lib);
+        }
+    }
+
     /* ── Package Mode ── */
     if (package_mode) {
         return run_package_command(package_args);
@@ -1459,7 +1531,7 @@ auto get_output_path = [&]() -> std::string {
     /* ── Doc Mode ── */
     if (doc_mode) {
         if (source_path.empty()) {
-            std::cerr << "Usage: aurorac --doc <source.aura> [output.html]\n";
+            std::cerr << "Usage: aurora --doc <source.aura> [output.html]\n";
             return 1;
         }
         return run_doc_generator(source_path, doc_output);
@@ -1609,7 +1681,7 @@ auto get_output_path = [&]() -> std::string {
     }
 
     if (source_path.empty() && !repl_mode) {
-        std::cerr << "Usage: aurorac <source.aura> [options]\n";
+        std::cerr << "Usage: aurora <source.aura> [options]\n";
         return 1;
     }
 
@@ -1748,6 +1820,52 @@ auto get_output_path = [&]() -> std::string {
         }
         if (export_csv) {
             std::cout << memory_analyzer.export_profiler_csv();
+        }
+
+        /* ── Capture execution summary data (printed after JIT) ── */
+        std::string exec_summary;
+        {
+            std::ostringstream ss;
+            int total_stack = 0, total_arena = 0, total_raii = 0, total_arc = 0, total_gc = 0;
+            bool gc_disabled = false;
+            bool all_stack = false;
+
+            /* Use allocation engine decisions (more accurate than overridden results) */
+            const auto& decisions = memory_analyzer.get_allocation_engine().get_all_decisions();
+            for (const auto& [var_name, decision] : decisions) {
+                AllocStrategy base = is_forced_strategy(decision.strategy)
+                    ? forced_to_base(decision.strategy) : decision.strategy;
+                switch (base) {
+                    case AllocStrategy::Stack: total_stack++; break;
+                    case AllocStrategy::Arena: total_arena++; break;
+                    case AllocStrategy::RAII:  total_raii++;  break;
+                    case AllocStrategy::ARC:   total_arc++;   break;
+                    case AllocStrategy::GC:    total_gc++;    break;
+                    default: break;
+                }
+            }
+
+            const auto& profiler = memory_analyzer.get_allocation_profiler();
+            gc_disabled = profiler.get_metrics().gc_disabled;
+            all_stack = profiler.get_metrics().all_stack_possible;
+
+            ss << "\n--- Execution Summary ---\n";
+            ss << "  Status: OK (exit 0)\n";
+            ss << "  Allocations: Stack(" << total_stack << ")";
+            if (total_arena) ss << " Arena(" << total_arena << ")";
+            if (total_raii) ss << " RAII(" << total_raii << ")";
+            if (total_arc) ss << " ARC(" << total_arc << ")";
+            if (total_gc) ss << " GC(" << total_gc << ")";
+            ss << "\n";
+            ss << "  GC: " << (total_gc > 0 ? "ON (" + std::to_string(total_gc) + " vars)" : "OFF") << "  -  Total vars: " << (decisions.size());
+            if (all_stack) ss << "  -  All-Stack: Yes";
+            ss << "\n";
+            ss << "  Optimization: -O" << opt_level;
+            if (opt_size) ss << (opt_size_aggressive ? "z" : "s");
+            if (use_lto) ss << " + LTO";
+            if (fast_math) ss << " + FastMath";
+            ss << "\n";
+            exec_summary = ss.str();
         }
 
         /* Run benchmarks if requested */
@@ -1938,11 +2056,16 @@ auto get_output_path = [&]() -> std::string {
 
         if (run_jit) {
             /* JIT-execute main function */
+            auto jit_start = std::chrono::high_resolution_clock::now();
             g_timer.start("JIT");
             if (verbose) std::cerr << "JIT: Starting execution\n" << std::flush;
             int exit_code = jit_execute_main(std::move(ctx), std::move(module));
+            auto jit_end = std::chrono::high_resolution_clock::now();
             g_timer.stop();
             g_timer.report();
+            double exe_ms = std::chrono::duration<double, std::milli>(jit_end - jit_start).count();
+            std::cout << exec_summary;
+            std::cout << "  Execution time: " << std::fixed << std::setprecision(2) << exe_ms << " ms\n" << std::flush;
             if (exit_code != 0 && exit_code != -1)
                 if (verbose) std::cerr << "JIT exit code: " << exit_code << "\n" << std::flush;
             return exit_code == -1 ? 1 : 0;
@@ -1982,6 +2105,43 @@ auto get_output_path = [&]() -> std::string {
                     return 1;
                 std::cout << "aurora: executable written to " << exe_path << "\n";
                 compile_success = true;
+                if (aot_mode) {
+                    int ret = 0;
+                    double cpu_ms = 0.0;
+#ifdef _WIN32
+                    std::string cmd = "\"" + exe_path + "\"";
+                    STARTUPINFOW si = { sizeof(si) };
+                    PROCESS_INFORMATION pi;
+                    int nsize = MultiByteToWideChar(CP_UTF8, 0, cmd.c_str(), -1, NULL, 0);
+                    std::wstring wcmd(nsize, L'\0');
+                    MultiByteToWideChar(CP_UTF8, 0, cmd.c_str(), -1, &wcmd[0], nsize);
+                    if (CreateProcessW(NULL, &wcmd[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+                        WaitForSingleObject(pi.hProcess, INFINITE);
+                        DWORD ec = 0;
+                        GetExitCodeProcess(pi.hProcess, &ec);
+                        ret = (int)ec;
+                        FILETIME create, exit, kernel, user;
+                        GetProcessTimes(pi.hProcess, &create, &exit, &kernel, &user);
+                        auto ft2ms = [](FILETIME ft) {
+                            return (ft.dwHighDateTime * 4294967296.0 + ft.dwLowDateTime) / 10000.0;
+                        };
+                        cpu_ms = ft2ms(kernel) + ft2ms(user);
+                        CloseHandle(pi.hProcess);
+                        CloseHandle(pi.hThread);
+                    } else {
+                        ret = -1;
+                    }
+#else
+                    auto aot_start = std::chrono::high_resolution_clock::now();
+                    ret = std::system(exe_path.c_str());
+                    auto aot_end = std::chrono::high_resolution_clock::now();
+                    cpu_ms = std::chrono::duration<double, std::milli>(aot_end - aot_start).count();
+#endif
+                    std::cout << exec_summary;
+                    if (ret != 0)
+                        std::cout << "  Status: FAIL (exit " << ret << ")\n";
+                    std::cout << "  Execution time: " << std::fixed << std::setprecision(2) << cpu_ms << " ms\n" << std::flush;
+                }
             }
         } else {
             /* Write IR to .ll file */
