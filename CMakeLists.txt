@@ -369,11 +369,13 @@ if(MSVC)
 else()
     target_compile_options(aurora_runtime PRIVATE -fno-exceptions)
 endif()
-# regex.cpp uses std::regex which requires exceptions — re-enable for this file
+# Files that use std::regex or test framework need exceptions
 if(MSVC)
     set_source_files_properties(aurora/src/std/regex.cpp PROPERTIES COMPILE_FLAGS "/EHsc")
+    set_source_files_properties(aurora/src/std/test.cpp PROPERTIES COMPILE_FLAGS "/EHsc")
 else()
     set_source_files_properties(aurora/src/std/regex.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
+    set_source_files_properties(aurora/src/std/test.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
 endif()
 
 # ── LTO (Link-Time Optimization) for runtime library ──
