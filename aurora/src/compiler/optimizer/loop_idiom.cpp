@@ -16,6 +16,7 @@
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/IR/Module.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 /* ── Struct to collect info about a simple counted loop ── */

@@ -1,4 +1,5 @@
 #include "runtime/interop/type_serializer.hpp"
+#include <cstdlib>
 #include <sstream>
 #include <cassert>
 
@@ -353,8 +354,8 @@ static InteropType json_parse_type(const std::string& json) {
 
     std::string arr_size_str = json_extract(j, "array_size");
     if (!arr_size_str.empty()) {
-        try { t.array_size = std::stoll(arr_size_str); }
-        catch (...) { t.array_size = 0; }
+        char* end_ptr = nullptr;
+        t.array_size = strtoll(arr_size_str.c_str(), &end_ptr, 10);
     }
 
     std::string elem_str = json_extract(j, "element_type");

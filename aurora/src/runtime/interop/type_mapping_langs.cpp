@@ -1,4 +1,5 @@
 #include "runtime/interop/type_mapping.hpp"
+#include <cstdlib>
 #include <cstring>
 
 /* ═══════════════════════════════════════════════════════════════
@@ -214,7 +215,8 @@ MappedType CppMapper::map_to_ir(const std::string& native_type, const InteropTyp
             while (!elem.empty() && elem.front() == ' ') elem.erase(0, 1);
             while (!size_str.empty() && size_str.front() == ' ') size_str.erase(0, 1);
             int64_t arr_size = 0;
-            try { arr_size = std::stoll(size_str); } catch (...) {}
+            char* end_ptr = nullptr;
+            arr_size = strtoll(size_str.c_str(), &end_ptr, 10);
             result.ir_type = InteropType::make_array(elem, arr_size);
         }
         return result;
