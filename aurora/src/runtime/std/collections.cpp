@@ -477,28 +477,6 @@ double f64array_sum(void* arr) {
     for (; i < n; i++) result += d[i];
     return result;
 }
-#else
-void f64array_matmul(void* a, void* b, void* c, int32_t n) {
-    double* da = ((Float64Array*)a)->data;
-    double* db = ((Float64Array*)b)->data;
-    double* dc = ((Float64Array*)c)->data;
-    if (!da || !db || !dc) return;
-    for (int32_t i = 0; i < n; i++)
-        for (int32_t k = 0; k < n; k++)
-            for (int32_t j = 0; j < n; j++)
-                dc[i * n + j] += da[i * n + k] * db[k * n + j];
-}
-
-double f64array_sum(void* arr) {
-    Float64Array* a = (Float64Array*)arr;
-    int64_t n = a->len;
-    double* d = a->data;
-    if (!d || n == 0) return 0.0;
-    double result = 0.0;
-    for (int64_t i = 0; i < n; i++) result += d[i];
-    return result;
-}
-#endif
 
 void f64array_scale(void* arr, double f) {
     Float64Array* a = (Float64Array*)arr;
@@ -527,3 +505,43 @@ void f64array_add(void* dst, void* src) {
     }
     for (int64_t i = n - (n % 4); i < n; i++) dd[i] += sd[i];
 }
+#else
+void f64array_matmul(void* a, void* b, void* c, int32_t n) {
+    double* da = ((Float64Array*)a)->data;
+    double* db = ((Float64Array*)b)->data;
+    double* dc = ((Float64Array*)c)->data;
+    if (!da || !db || !dc) return;
+    for (int32_t i = 0; i < n; i++)
+        for (int32_t k = 0; k < n; k++)
+            for (int32_t j = 0; j < n; j++)
+                dc[i * n + j] += da[i * n + k] * db[k * n + j];
+}
+
+double f64array_sum(void* arr) {
+    Float64Array* a = (Float64Array*)arr;
+    int64_t n = a->len;
+    double* d = a->data;
+    if (!d || n == 0) return 0.0;
+    double result = 0.0;
+    for (int64_t i = 0; i < n; i++) result += d[i];
+    return result;
+}
+
+void f64array_scale(void* arr, double f) {
+    Float64Array* a = (Float64Array*)arr;
+    int64_t n = a->len;
+    double* d = a->data;
+    if (!d) return;
+    for (int64_t i = 0; i < n; i++) d[i] *= f;
+}
+
+void f64array_add(void* dst, void* src) {
+    Float64Array* d = (Float64Array*)dst;
+    Float64Array* s = (Float64Array*)src;
+    int64_t n = d->len < s->len ? d->len : s->len;
+    double* dd = d->data;
+    double* sd = s->data;
+    if (!dd || !sd) return;
+    for (int64_t i = 0; i < n; i++) dd[i] += sd[i];
+}
+#endif
