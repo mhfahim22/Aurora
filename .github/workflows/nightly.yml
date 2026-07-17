@@ -22,20 +22,27 @@ jobs:
             Windows)
               curl -fsSL -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.0/clang+llvm-19.1.0-x86_64-pc-windows-msvc.tar.xz
               tar -xf llvm.tar.xz
-              echo "$(pwd)/clang+llvm-19.1.0-x86_64-pc-windows-msvc/bin" >> $GITHUB_PATH
+              LLVM_DIR=$(ls -d clang+llvm-*/lib/cmake/llvm 2>/dev/null | head -1)
+              echo "LLVM_DIR=$(pwd)/$LLVM_DIR" >> $GITHUB_ENV
+              echo "$(pwd)/clang+llvm-*/bin" >> $GITHUB_PATH
               ;;
             Linux)
               wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
               sudo add-apt-repository 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main'
-              sudo apt-get update && sudo apt-get install -y clang-19 lld-19 llvm-19-dev
+              sudo apt-get update && sudo apt-get install -y clang-19 lld-19 llvm-19-dev libcurl4-openssl-dev
+              echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
+              echo "/usr/lib/llvm-19/bin" >> $GITHUB_PATH
               ;;
             macOS)
               brew install llvm@19
+              LLVM_PREFIX=$(brew --prefix llvm@19)
+              echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
+              echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
               ;;
           esac
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
 
       - name: Build
         run: cmake --build build --config Release
