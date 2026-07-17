@@ -155,8 +155,10 @@ void aurora_server_stop(AuroraServer* srv) {
     srv->running = 0;
     if (srv->handle) {
 #ifdef _WIN32
+        shutdown((SOCKET)(intptr_t)srv->handle, SD_BOTH);
         closesocket((SOCKET)(intptr_t)srv->handle);
 #else
+        shutdown((int)(intptr_t)srv->handle, SHUT_RDWR);
         close((int)(intptr_t)srv->handle);
 #endif
         srv->handle = nullptr;

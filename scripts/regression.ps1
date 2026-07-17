@@ -51,7 +51,7 @@ Test-Result "Pre-checks" $true
 # Stage 1: CTest
 Write-Step "Stage 1: CTest (runtime tests)"
 Push-Location (Join-Path $Root "build")
-$ctestOut = & ctest --output-on-failure -C Release 2>&1
+$ctestOut = & ctest --output-on-failure -C Release --timeout 60 2>&1
 $ctestExit = $LASTEXITCODE
 Pop-Location
 $ctestOk = ($ctestOut -match "100% tests passed") -and ($ctestExit -eq 0)

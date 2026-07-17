@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(Aurora LANGUAGES C CXX)
 include(CTest)
+set(DART_TESTING_TIMEOUT 60)
 
 # ── Read VERSION file and generate version.h ──
 file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" AURORA_VERSION_STR)
