@@ -369,6 +369,12 @@ if(MSVC)
 else()
     target_compile_options(aurora_runtime PRIVATE -fno-exceptions)
 endif()
+# regex.cpp uses std::regex which requires exceptions — re-enable for this file
+if(MSVC)
+    set_source_files_properties(aurora/src/std/regex.cpp PROPERTIES COMPILE_FLAGS "/EHsc")
+else()
+    set_source_files_properties(aurora/src/std/regex.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
+endif()
 
 # ── LTO (Link-Time Optimization) for runtime library ──
 # Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
@@ -439,7 +445,7 @@ endif()
 # ═══════════════════════════════════════════════════════════════
 if(MSVC)
     set_source_files_properties(aurora/src/runtime/std/collections.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2 /fp:fast")
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU") AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
     set_source_files_properties(aurora/src/runtime/std/collections.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma -ffast-math")
 endif()
 
