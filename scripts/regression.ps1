@@ -23,29 +23,24 @@ $global:CompileTimeout = 120  # seconds
 
 function Invoke-WithTimeout {
     param([string]$FilePath, [string[]]$ArgumentList, [int]$TimeoutSec = 120)
+    $argString = $ArgumentList -join ' '
     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
     $pinfo.FileName = $FilePath
-    $pinfo.Arguments = $ArgumentList
+    $pinfo.Arguments = $argString
     $pinfo.RedirectStandardOutput = $true
     $pinfo.RedirectStandardError = $true
     $pinfo.UseShellExecute = $false
     $pinfo.CreateNoWindow = $true
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo = $pinfo
-    $null = $p.Start()
-    $output = New-Object System.Text.StringBuilder
-    $errorOut = New-Object System.Text.StringBuilder
-    $p.OutputDataReceived += { $output.AppendLine($_.Data) }
-    $p.ErrorDataReceived += { $errorOut.AppendLine($_.Data) }
-    $p.BeginOutputReadLine()
-    $p.BeginErrorReadLine()
+    $p.Start() | Out-Null
     if ($p.WaitForExit($TimeoutSec * 1000)) {
-        $p.WaitForExit()
+        $stdout = $p.StandardOutput.ReadToEnd()
+        $stderr = $p.StandardError.ReadToEnd()
         $global:LASTEXITCODE = $p.ExitCode
-        return $output.ToString().Trim() + "`n" + $errorOut.ToString().Trim()
+        return ($stdout + "`n" + $stderr).Trim()
     } else {
-        $p.Kill()
-        $p.WaitForExit()
+        try { $p.Kill() } catch {}
         $global:LASTEXITCODE = -1
         throw "Command timed out after ${TimeoutSec}s"
     }
