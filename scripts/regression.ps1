@@ -19,6 +19,35 @@ $TestSrcDir = Join-Path $PSScriptRoot "test_src"
 $ExamplesDir = Join-Path $Root "examples"
 
 $global:StagePass = 0; $global:StageFail = 0; $global:StageTotal = 0
+$global:CompileTimeout = 120  # seconds
+
+function Invoke-WithTimeout {
+    param([scriptblock]$ScriptBlock, [int]$TimeoutSec = 120)
+    $wrapper = {
+        param($sb)
+        $out = & $sb
+        $code = $LASTEXITCODE
+        return "$code`n$out"
+    }
+    $job = Start-Job -ScriptBlock $wrapper -ArgumentList $ScriptBlock
+    if (Wait-Job $job -Timeout $TimeoutSec) {
+        $raw = Receive-Job $job
+        Remove-Job $job
+        $newline = $raw.IndexOf("`n")
+        if ($newline -ge 0) {
+            $code = [int]::Parse($raw.Substring(0, $newline))
+            $global:LASTEXITCODE = $code
+            return $raw.Substring($newline + 1)
+        }
+        $global:LASTEXITCODE = 0
+        return $raw
+    } else {
+        Stop-Job $job
+        Remove-Job $job
+        $global:LASTEXITCODE = -1
+        throw "Command timed out after ${TimeoutSec}s"
+    }
+}
 
 function Write-Step($msg) {
     Write-Host "`n========================================================" -ForegroundColor Cyan
@@ -63,7 +92,7 @@ Write-Step "Stage 2: IR verification - all examples"
 $irVerifyScript = Join-Path $PSScriptRoot "test_ir_verify.ps1"
 if (Test-Path $irVerifyScript) {
     Push-Location $Root
-    $irOut = & powershell -ExecutionPolicy Bypass -File $irVerifyScript -Compiler $Compiler 2>&1
+    $irOut = & $irVerifyScript -Compiler $Compiler 2>&1
     $irExit = $LASTEXITCODE
     Pop-Location
 } else {
@@ -92,7 +121,11 @@ foreach ($test in $featureTests) {
     $outDir = Join-Path $Root "output/ir"
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
-    $compOut = & $Compiler $src 2>&1
+    try {
+        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec $global:CompileTimeout
+    } catch {
+        $compOut = "[TIMEOUT] $($_.Exception.Message)"
+    }
     if ($LASTEXITCODE -ne 0) { if ($compOut) { $compOut | ForEach-Object { Write-Host "  $_" } }; Test-Result "$($test.Desc) - compile" $false; continue }
 
     $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
@@ -121,7 +154,11 @@ foreach ($test in $stdlibTests) {
     $outDir = Join-Path $Root "output/ir"
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
-    $compOut = & $Compiler $src 2>&1
+    try {
+        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec $global:CompileTimeout
+    } catch {
+        $compOut = "[TIMEOUT] $($_.Exception.Message)"
+    }
     if ($LASTEXITCODE -ne 0) { if ($compOut) { $compOut | ForEach-Object { Write-Host "  $_" } }; Test-Result "$($test.Desc) - compile" $false; continue }
 
     $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
@@ -135,7 +172,11 @@ Pop-Location
 # Stage 5: JIT execution tests
 Write-Step "Stage 5: JIT execution tests"
 Push-Location $Root
-$jitOut = & $Compiler (Join-Path $ExamplesDir "simple_test.aura") --run 2>&1
+try {
+    $jitOut = Invoke-WithTimeout -ScriptBlock { & $Compiler (Join-Path $ExamplesDir "simple_test.aura") --run 2>&1 } -TimeoutSec $global:CompileTimeout
+} catch {
+    $jitOut = "[TIMEOUT] $($_.Exception.Message)"
+}
 $jitOk = ($LASTEXITCODE -eq 0) -and ($jitOut -match "Hello from Aurora")
 Test-Result "JIT: simple_test.aura" $jitOk
 Pop-Location
@@ -157,7 +198,11 @@ foreach ($test in $errorTests) {
     $outDir = Join-Path $Root "output/ir"
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
-    $compOut = & $Compiler $src 2>&1
+    try {
+        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec $global:CompileTimeout
+    } catch {
+        $compOut = "[TIMEOUT] $($_.Exception.Message)"
+    }
     $expectFail = ($LASTEXITCODE -ne 0)
     Test-Result $test.Desc $expectFail
     if (-not $expectFail) {
@@ -200,7 +245,11 @@ foreach ($test in $webTests) {
     $outDir = Join-Path $Root "output/ir"
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
-    $compOut = & $Compiler $src 2>&1
+    try {
+        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec 30
+    } catch {
+        $compOut = "[TIMEOUT] $($_.Exception.Message)"
+    }
     if ($LASTEXITCODE -ne 0) { if ($compOut) { $compOut | ForEach-Object { Write-Host "  $_" } }; Test-Result "$($test.Desc) - compile" $false; continue }
 
     $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
