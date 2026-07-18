@@ -22,28 +22,30 @@ $global:StagePass = 0; $global:StageFail = 0; $global:StageTotal = 0
 $global:CompileTimeout = 120  # seconds
 
 function Invoke-WithTimeout {
-    param([scriptblock]$ScriptBlock, [int]$TimeoutSec = 120)
-    $wrapper = {
-        param($sb)
-        $out = & $sb
-        $code = $LASTEXITCODE
-        return "$code`n$out"
-    }
-    $job = Start-Job -ScriptBlock $wrapper -ArgumentList $ScriptBlock
-    if (Wait-Job $job -Timeout $TimeoutSec) {
-        $raw = Receive-Job $job
-        Remove-Job $job
-        $newline = $raw.IndexOf("`n")
-        if ($newline -ge 0) {
-            $code = [int]::Parse($raw.Substring(0, $newline))
-            $global:LASTEXITCODE = $code
-            return $raw.Substring($newline + 1)
-        }
-        $global:LASTEXITCODE = 0
-        return $raw
+    param([string]$FilePath, [string[]]$ArgumentList, [int]$TimeoutSec = 120)
+    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+    $pinfo.FileName = $FilePath
+    $pinfo.Arguments = $ArgumentList
+    $pinfo.RedirectStandardOutput = $true
+    $pinfo.RedirectStandardError = $true
+    $pinfo.UseShellExecute = $false
+    $pinfo.CreateNoWindow = $true
+    $p = New-Object System.Diagnostics.Process
+    $p.StartInfo = $pinfo
+    $null = $p.Start()
+    $output = New-Object System.Text.StringBuilder
+    $errorOut = New-Object System.Text.StringBuilder
+    $p.OutputDataReceived += { $output.AppendLine($_.Data) }
+    $p.ErrorDataReceived += { $errorOut.AppendLine($_.Data) }
+    $p.BeginOutputReadLine()
+    $p.BeginErrorReadLine()
+    if ($p.WaitForExit($TimeoutSec * 1000)) {
+        $p.WaitForExit()
+        $global:LASTEXITCODE = $p.ExitCode
+        return $output.ToString().Trim() + "`n" + $errorOut.ToString().Trim()
     } else {
-        Stop-Job $job
-        Remove-Job $job
+        $p.Kill()
+        $p.WaitForExit()
         $global:LASTEXITCODE = -1
         throw "Command timed out after ${TimeoutSec}s"
     }
@@ -122,7 +124,7 @@ foreach ($test in $featureTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     try {
-        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec $global:CompileTimeout
+        $compOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @($src, "-O0") -TimeoutSec $global:CompileTimeout
     } catch {
         $compOut = "[TIMEOUT] $($_.Exception.Message)"
     }
@@ -155,7 +157,7 @@ foreach ($test in $stdlibTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     try {
-        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec $global:CompileTimeout
+        $compOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @($src, "-O0") -TimeoutSec $global:CompileTimeout
     } catch {
         $compOut = "[TIMEOUT] $($_.Exception.Message)"
     }
@@ -173,7 +175,7 @@ Pop-Location
 Write-Step "Stage 5: JIT execution tests"
 Push-Location $Root
 try {
-    $jitOut = Invoke-WithTimeout -ScriptBlock { & $Compiler (Join-Path $ExamplesDir "simple_test.aura") --run 2>&1 } -TimeoutSec $global:CompileTimeout
+    $jitOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @((Join-Path $ExamplesDir "simple_test.aura"), "--run") -TimeoutSec $global:CompileTimeout
 } catch {
     $jitOut = "[TIMEOUT] $($_.Exception.Message)"
 }
@@ -199,7 +201,7 @@ foreach ($test in $errorTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     try {
-        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec $global:CompileTimeout
+        $compOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @($src, "-O0") -TimeoutSec $global:CompileTimeout
     } catch {
         $compOut = "[TIMEOUT] $($_.Exception.Message)"
     }
@@ -246,7 +248,7 @@ foreach ($test in $webTests) {
     if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
 
     try {
-        $compOut = Invoke-WithTimeout -ScriptBlock { & $Compiler $src -O0 2>&1 } -TimeoutSec 30
+        $compOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @($src, "-O0") -TimeoutSec 30
     } catch {
         $compOut = "[TIMEOUT] $($_.Exception.Message)"
     }
