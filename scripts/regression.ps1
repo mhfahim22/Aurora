@@ -28,7 +28,7 @@ function Invoke-WithTimeout {
     $pinfo.FileName = $FilePath
     $pinfo.Arguments = $argString
     $pinfo.RedirectStandardOutput = $true
-    $pinfo.RedirectStandardError = $true
+    $pinfo.RedirectStandardError = $false
     $pinfo.UseShellExecute = $false
     $pinfo.CreateNoWindow = $true
     $p = New-Object System.Diagnostics.Process
@@ -36,9 +36,8 @@ function Invoke-WithTimeout {
     $p.Start() | Out-Null
     if ($p.WaitForExit($TimeoutSec * 1000)) {
         $stdout = $p.StandardOutput.ReadToEnd()
-        $stderr = $p.StandardError.ReadToEnd()
         $global:LASTEXITCODE = $p.ExitCode
-        return ($stdout + "`n" + $stderr).Trim()
+        return $stdout.Trim()
     } else {
         try { $p.Kill() } catch {}
         $global:LASTEXITCODE = -1

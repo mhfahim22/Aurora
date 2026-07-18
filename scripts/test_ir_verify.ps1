@@ -58,8 +58,25 @@ foreach ($file in $examples) {
     New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 
     Write-Host -NoNewline "."
-    $output = & $Compiler $file.FullName 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $compArgs = @($file.FullName, "-O0")
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $Compiler
+    $psi.Arguments = $compArgs -join ' '
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $false
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $p = New-Object System.Diagnostics.Process
+    $p.StartInfo = $psi
+    $p.Start() | Out-Null
+    if (-not $p.WaitForExit(60000)) {
+        try { $p.Kill() } catch {}
+        $failed++
+        $failures += "$rel => TIMEOUT (60s)"
+        continue
+    }
+    $output = $p.StandardOutput.ReadToEnd()
+    if ($p.ExitCode -ne 0) {
         $failed++
         $errLine = ($output | Select-String -Pattern "\[Error\]" | Select-Object -First 1)
         if (-not $errLine) { $errLine = $output | Select-Object -Last 1 }
