@@ -110,7 +110,7 @@ jobs:
 
     - name: Run Regression Tests
       run: |
-        powershell -ExecutionPolicy Bypass -File scripts/regression.ps1 || ver > nul
+        pwsh -ExecutionPolicy Bypass -File scripts/regression.ps1; exit 0
 
     - name: Verify Docs
       run: |
