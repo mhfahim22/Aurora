@@ -162,32 +162,13 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
 
     /* ── Case 1: Plain extern (no library) — create LLVM external declaration ── */
     if (!node->right) {
-        auto* fn_type = llvm::FunctionType::get(ret_type, param_types, node->is_vararg);
-        llvm::Function* fn = llvm::Function::Create(
-            fn_type, llvm::Function::ExternalLinkage, fname, module_.get());
-        fn->setCallingConv(call_conv);
-        /* Add to @llvm.compiler.used so StripDeadPrototypes doesn't remove it */
-        {
-            auto* i8ptr = llvm::PointerType::getUnqual(ctx_);
-            auto* bitcast = llvm::ConstantExpr::getBitCast(fn, i8ptr);
-            llvm::GlobalVariable* used_gv = module_->getGlobalVariable("llvm.compiler.used");
-            if (used_gv) {
-                /* Append to existing array */
-                auto* old_arr = llvm::cast<llvm::ConstantArray>(used_gv->getInitializer());
-                std::vector<llvm::Constant*> elems;
-                for (auto& op : old_arr->operands())
-                    elems.push_back(llvm::cast<llvm::Constant>(&op));
-                elems.push_back(bitcast);
-                auto* arr_ty = llvm::ArrayType::get(i8ptr, elems.size());
-                used_gv->setInitializer(llvm::ConstantArray::get(arr_ty, elems));
-            } else {
-                auto* arr_ty = llvm::ArrayType::get(i8ptr, 1);
-                auto* arr = llvm::ConstantArray::get(arr_ty, { bitcast });
-                new llvm::GlobalVariable(
-                    *module_, arr_ty, false,
-                    llvm::GlobalValue::AppendingLinkage,
-                    arr, "llvm.compiler.used");
-            }
+        /* Check for existing declaration to avoid renamed duplicates */
+        llvm::Function* fn = module_->getFunction(fname);
+        if (!fn) {
+            auto* fn_type = llvm::FunctionType::get(ret_type, param_types, node->is_vararg);
+            fn = llvm::Function::Create(
+                fn_type, llvm::Function::ExternalLinkage, fname, module_.get());
+            fn->setCallingConv(call_conv);
         }
         std::cerr << "[ffi] extern function '" << fname << "' declared\n";
         return;
