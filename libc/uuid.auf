@@ -1,0 +1,55 @@
+## Aurora Standard Library — UUID
+## Usage:  import "uuid"
+##
+## Universally Unique Identifier generation and manipulation.
+## Supports UUID v4 (random) and nil UUIDs.
+##
+## Examples:
+##   import "uuid"
+##   id = uuid_v4()
+##   output(uuid_to_string(id))
+## ════════════════════════════════════════════════════════════
+
+import "stdlib"
+
+## ── Core UUID functions ──
+extern function aurora_uuid_v4() -> pointer
+extern function aurora_uuid_parse(str: cstring) -> pointer
+extern function aurora_uuid_to_string(uuid: pointer) -> cstring
+extern function aurora_uuid_nil() -> pointer
+extern function aurora_uuid_equal(a: pointer, b: pointer) -> i32
+extern function aurora_uuid_free(uuid: pointer)
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Generate a random UUID v4 ──
+function uuid_v4():
+    return aurora_uuid_v4()
+end
+
+## ── Parse a UUID string ──
+function uuid_parse(str):
+    return aurora_uuid_parse(str)
+end
+
+## ── Convert UUID to string ──
+function uuid_to_string(uuid):
+    return aurora_uuid_to_string(uuid)
+end
+
+## ── Create a nil UUID (all zeros) ──
+function uuid_nil():
+    return aurora_uuid_nil()
+end
+
+## ── Compare two UUIDs for equality ──
+function uuid_equal(a, b):
+    return aurora_uuid_equal(a, b) == 1
+end
+
+## ── Free UUID memory ──
+function uuid_free(uuid):
+    aurora_uuid_free(uuid)
+end

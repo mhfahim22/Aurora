@@ -1,0 +1,8 @@
+name: aurora/std-json
+version: 1.0.0
+author: Aurora Core Team
+description: JSON parse/serialize library for Aurora
+entry: src/json.auf
+dependencies:
+permissions:
+

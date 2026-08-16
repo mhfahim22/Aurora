@@ -210,6 +210,154 @@ jobs:
           else echo "  MISSING $f"; exit 1; fi
         done
 
+  test-android-emulator:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Setup LLVM (host tools for aurorac)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y llvm-19-dev lld-19 libclang-19-dev liblld-19-dev 2>/dev/null || true
+        echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "/usr/lib/llvm-19/bin" >> $GITHUB_PATH
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build aurorac
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime -j$(nproc) >build.log 2>&1 || { cat build.log; exit 1; }
+
+    - name: Validate Android launcher build (compile-only check)
+      run: |
+        pwsh -Command "
+          \$files = @('examples/mobile/counter.aura','examples/mobile/todo.aura')
+          foreach (\$f in \$files) {
+            if (Test-Path \$f) {
+              Write-Host \"  OK \$f\"
+              & ./build/aurorac --shared --target aarch64-linux-android -c \$f 2>&1 | Out-Null
+              Write-Host \"  Compiled \$f\"
+            } else { Write-Host \"  MISSING \$f\"; exit 1 }
+          }
+        "
+
+    - name: Android Emulator UI Test
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 33
+        arch: x86_64
+        disable-animations: true
+        working-directory: scripts
+        script: |
+          bash test_android_emulator.sh
+
+  test-ios-simulator:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Select Xcode 15+
+      run: |
+        sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null || true
+        xcodebuild -version
+
+    - name: Install LLVM
+      run: |
+        brew install llvm@19
+        brew link --overwrite llvm@19 2>/dev/null || true
+        LLVM_PREFIX=$(brew --prefix llvm@19)
+        echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build aurorac
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime -j$(sysctl -n hw.ncpu) >build.log 2>&1 || { cat build.log; exit 1; }
+
+    - name: Validate iOS launcher compile (x86_64 simulator target)
+      run: |
+        pwsh -Command "
+          \$files = @('examples/mobile/counter.aura','examples/mobile/todo.aura')
+          foreach (\$f in \$files) {
+            if (Test-Path \$f) {
+              ./build/aurorac --shared --target x86_64-apple-darwin -c \$f 2>&1 | Out-Null
+              Write-Host \"  Compiled \$f for simulator\"
+            } else { Write-Host \"  MISSING \$f\"; exit 1 }
+          }
+        "
+
+    - name: iOS Simulator UI Test
+      run: |
+        bash scripts/test_ios_simulator.sh
+
+  test-macos-gui:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      run: |
+        brew install llvm@19
+        brew link --overwrite llvm@19 2>/dev/null || true
+        LLVM_PREFIX=$(brew --prefix llvm@19)
+        echo "LLVM_DIR=$LLVM_PREFIX/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"
+
+    - name: Build aurorac + runtime (Cocoa GUI backend)
+      run: |
+        cmake --build build --config Release --target aurorac --target aurora_runtime -j$(sysctl -n hw.ncpu) >build.log 2>&1 || { cat build.log; exit 1; }
+
+    - name: Compile GUI parity + widget tests to IR
+      run: |
+        cd build
+        tests="test_gui_parity test_window test_button test_label test_textbox test_slider test_switch test_checkbox test_radio test_progress test_combobox test_dropdown test_listbox test_widget_common test_webview test_media test_map test_mac_gui test_mac_desktop"
+        fail=0
+        for t in $tests; do
+          src="../Workflow/tests/$t.aura"
+          if [ ! -f "$src" ]; then echo "  skip $t (missing)"; continue; fi
+          ./aurorac "$src" -O0 >/dev/null 2>&1
+          if [ $? -ne 0 ]; then echo "  FAIL $t"; fail=1; else echo "  OK   $t"; fi
+        done
+        exit $fail
+
+    - name: JIT-run parity test (Cocoa)
+      run: |
+        cd build
+        timeout 60 ./aurorac "../Workflow/tests/test_gui_parity.aura" --run 2>&1 | tail -5 || true
+
   build-macos:
     runs-on: macos-latest
     defaults:

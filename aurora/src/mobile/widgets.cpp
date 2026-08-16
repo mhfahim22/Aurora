@@ -3,6 +3,13 @@
 #include <cstring>
 #include <cstdio>
 #include <cmath>
+#include <chrono>
+
+/* Current time in milliseconds (wall clock) for gesture dwell detection. */
+static double now_ms_double(void) {
+    auto now = std::chrono::steady_clock::now().time_since_epoch();
+    return std::chrono::duration<double, std::milli>(now).count();
+}
 
 /* ════════════════════════════════════════════════════════════
    Helpers
@@ -40,7 +47,22 @@ static float clampf(float v, float lo, float hi) {
    Widget core
    ════════════════════════════════════════════════════════════ */
 
-void mw_init(void) {}
+/* Root widget tracking for mobile event dispatch (37.3).
+   When a root widget is created, register it with the platform
+   JNI bridge so native touch events during production runtime
+   dispatch into `mw_handle_touch` (hit-test → callback). */
+static void* g_mw_root = nullptr;
+
+#ifdef __ANDROID__
+extern "C" void _aurora_android_set_root_widget(void* root);
+#endif
+
+void mw_init(void) {
+    g_mw_root = nullptr;
+#ifdef __ANDROID__
+    _aurora_android_set_root_widget(nullptr);
+#endif
+}
 
 void mw_shutdown(void) {}
 
@@ -56,8 +78,21 @@ void* mw_create(int type) {
     w->text_color[3] = 1.0f;
     w->main_align = MW_MAIN_START;
     w->cross_align = MW_CROSS_STRETCH;
+    /* ── 37.3 Gesture / theme defaults ── */
+    w->touch_state = MW_TOUCH_NONE;
+    w->gesture_active = 0;
+    w->long_press_ms = (int)MW_GESTURE_LONG_PRESS_MS;
+    w->swipe_threshold = MW_GESTURE_SWIPE_THRESHOLD;
+    w->dark_mode = MW_THEME_LIGHT;
     if (type == MW_TEXT) {
         w->cross_align = MW_CROSS_START;
+    }
+    /* Track root widget for native touch dispatch (37.3) */
+    if (!g_mw_root && !w->parent) {
+        g_mw_root = w;
+#ifdef __ANDROID__
+        _aurora_android_set_root_widget(w);
+#endif
     }
     return w;
 }
@@ -375,9 +410,13 @@ static MwWidget* hit_test(MwWidget* w, float x, float y) {
         MwWidget* hit = hit_test(w->children[i], x, y);
         if (hit) return hit;
     }
+    /* Containers (column/row/grid/scroll/nav/drawer) only capture the touch
+       when they are interactive (have a callback); otherwise empty space
+       inside a container is a miss. Leaf widgets are always hit targets. */
     if (w->type == MW_COLUMN || w->type == MW_ROW || w->type == MW_GRID ||
-        w->type == MW_SCROLL || w->type == MW_NAV_BAR || w->type == MW_DRAWER)
-        return w;
+        w->type == MW_SCROLL || w->type == MW_NAV_BAR || w->type == MW_DRAWER) {
+        return w->callback ? w : nullptr;
+    }
     return w;
 }
 
@@ -385,12 +424,115 @@ int mw_handle_touch(void* widget, float x, float y, int action) {
     if (!widget) return 0;
     MwWidget* target = hit_test((MwWidget*)widget, x, y);
     if (!target || !target->enabled) return 0;
-    if (action == MW_TOUCH_DOWN && target->callback) {
+
+    /* ── 37.3 gesture recognition state machine ──
+       DOWN   : record press origin + start dwell timer, mark gesture active
+       MOVE   : if dwell exceeded → LONG_PRESS; detect swipe only after
+                releasing (so scrolling isn't falsely treated as a tap)
+       UP     : if not moved beyond swipe threshold → it's a tap/toggle;
+                otherwise emit the directional SWIPE_* event
+       CANCEL : reset gesture state, no events */
+
+    if (action == MW_TOUCH_DOWN) {
+        target->press_x = x;
+        target->press_y = y;
+        target->press_time_ms = now_ms_double();
+        target->touch_state = MW_TOUCH_PRESSED;
+        target->gesture_active = 1;
+
+        /* Native tap-ish events (focus, drawer, click) on press */
         int evt = MW_EVENT_CLICK;
         if (target->type == MW_INPUT) evt = MW_EVENT_FOCUS;
         else if (target->type == MW_DRAWER) evt = MW_EVENT_DRAWER;
-        target->callback(target, evt, nullptr);
+        if (target->callback) target->callback(target, evt, nullptr);
+        return 1;
     }
+
+    if (action == MW_TOUCH_MOVE) {
+        if (!target->gesture_active) return 1;
+        /* Long press fires once the finger has been held beyond the
+           configured dwell time (default 500 ms). */
+        if (target->long_press_ms >= 0 &&
+            (now_ms_double() - target->press_time_ms) >= (double)target->long_press_ms) {
+            target->touch_state = MW_TOUCH_HELD;
+            if (target->callback) target->callback(target, MW_EVENT_LONG_PRESS, nullptr);
+        }
+        return 1;
+    }
+
+    if (action == MW_TOUCH_CANCEL) {
+        target->touch_state = MW_TOUCH_NONE;
+        target->gesture_active = 0;
+        return 1;
+    }
+
+    /* ── MW_TOUCH_UP ── */
+    if (!target->gesture_active) return 1;
+    target->gesture_active = 0;
+
+    double held_ms = now_ms_double() - target->press_time_ms;
+    float dx = x - target->press_x;
+    float dy = y - target->press_y;
+    float dist_sq = dx * dx + dy * dy;
+    float thresh = target->swipe_threshold < 1.0f ? MW_GESTURE_SWIPE_THRESHOLD : target->swipe_threshold;
+    float thresh_sq = thresh * thresh;
+
+    /* Long press fired earlier via a MOVE event → resolve to long-press,
+       not a tap, so interactive widgets don't toggle. */
+    if (target->touch_state == MW_TOUCH_HELD && target->long_press_ms >= 0) {
+        target->touch_state = MW_TOUCH_NONE;
+        return 1;
+    }
+    /* Long press completed entirely within UP (no intervening MOVE) */
+    if (target->long_press_ms >= 0 && held_ms >= (double)target->long_press_ms) {
+        target->touch_state = MW_TOUCH_HELD;
+        if (target->callback) target->callback(target, MW_EVENT_LONG_PRESS, nullptr);
+        target->touch_state = MW_TOUCH_NONE;
+        return 1;
+    }
+
+    /* Swipe detection: movement beyond the configured threshold (60 px) */
+    if (dist_sq >= thresh_sq) {
+        int evt;
+        if (fabs(dx) > fabs(dy)) evt = (dx > 0) ? MW_EVENT_SWIPE_RIGHT : MW_EVENT_SWIPE_LEFT;
+        else                      evt = (dy > 0) ? MW_EVENT_SWIPE_DOWN  : MW_EVENT_SWIPE_UP;
+        target->touch_state = MW_TOUCH_NONE;
+        if (target->callback) target->callback(target, evt, nullptr);
+        return 1;
+    }
+    target->touch_state = MW_TOUCH_NONE;
+        /* Toggle state changes */
+        if (target->type == MW_CHECKBOX) {
+            target->selected_index = target->selected_index ? 0 : 1;
+            if (target->callback) target->callback(target, MW_EVENT_CHANGE, nullptr);
+        } else if (target->type == MW_SWITCH) {
+            target->selected_index = target->selected_index ? 0 : 1;
+            target->value = (float)target->selected_index;
+            if (target->callback) target->callback(target, MW_EVENT_CHANGE, nullptr);
+        } else if (target->type == MW_RADIO) {
+            MwWidget* root = (MwWidget*)widget;
+            /* Uncheck siblings in the same group */
+            if (root->parent) root = root->parent;
+            for (int i = 0; i < root->child_count; i++) {
+                MwWidget* s = root->children[i];
+                if (s && s->type == MW_RADIO && s != target)
+                    s->selected_index = 0;
+            }
+            target->selected_index = 1;
+            target->value = (float)target->selected_index;
+            if (target->callback) target->callback(target, MW_EVENT_CHANGE, nullptr);
+        } else if (target->type == MW_BUTTON || target->type == MW_FAB) {
+            if (target->callback) target->callback(target, MW_EVENT_CLICK, nullptr);
+        } else if (target->type == MW_SLIDER) {
+            /* Click-to-seek on slider: map tap position to value 0..1 */
+            if (target->w > 0) {
+                float rel = (x - target->x) / target->w;
+                if (rel < 0) rel = 0;
+                if (rel > 1) rel = 1;
+                target->value = rel;
+            }
+            if (target->callback) target->callback(target, MW_EVENT_CHANGE, nullptr);
+        }
     return 1;
 }
 
@@ -433,3 +575,68 @@ void mw_render(void* widget) {
     mw_desktop_render(widget);
 }
 #endif
+
+/* ════════════════════════════════════════════════════════════
+   37.3 — Gesture tuning (long-press dwell, swipe threshold)
+   ════════════════════════════════════════════════════════════ */
+
+void mw_set_long_press_ms(void* widget, int ms) {
+    if (!widget) return;
+    ((MwWidget*)widget)->long_press_ms = ms;
+}
+
+void mw_set_swipe_threshold(void* widget, float px) {
+    if (!widget) return;
+    ((MwWidget*)widget)->swipe_threshold = px < 1.0f ? MW_GESTURE_SWIPE_THRESHOLD : px;
+}
+
+int mw_get_touch_state(void* widget) {
+    if (!widget) return MW_TOUCH_NONE;
+    return ((MwWidget*)widget)->touch_state;
+}
+
+/* ════════════════════════════════════════════════════════════
+   37.3 — Safe area insets (notch / home indicator)
+   ════════════════════════════════════════════════════════════ */
+
+void mw_set_safe_area(void* widget, float top, float bottom, float left, float right) {
+    if (!widget) return;
+    MwWidget* w = (MwWidget*)widget;
+    w->safe_area[0] = top;
+    w->safe_area[1] = bottom;
+    w->safe_area[2] = left;
+    w->safe_area[3] = right;
+}
+
+void mw_get_safe_area(void* widget, float* top, float* bottom, float* left, float* right) {
+    if (!widget) return;
+    MwWidget* w = (MwWidget*)widget;
+    if (top)    *top    = w->safe_area[0];
+    if (bottom) *bottom = w->safe_area[1];
+    if (left)   *left   = w->safe_area[2];
+    if (right)  *right  = w->safe_area[3];
+}
+
+/* ════════════════════════════════════════════════════════════
+   37.3 — Dark mode theming
+   ════════════════════════════════════════════════════════════ */
+
+void mw_set_theme(void* widget, int theme) {
+    if (!widget) return;
+    ((MwWidget*)widget)->dark_mode = theme ? MW_THEME_DARK : MW_THEME_LIGHT;
+}
+
+int mw_get_theme(void* widget) {
+    if (!widget) return MW_THEME_LIGHT;
+    return ((MwWidget*)widget)->dark_mode;
+}
+
+int mw_is_dark_mode(void* widget) {
+    if (!widget) return 0;
+    return ((MwWidget*)widget)->dark_mode == MW_THEME_DARK;
+}
+
+void mw_set_dark_mode(void* widget, int dark) {
+    if (!widget) return;
+    ((MwWidget*)widget)->dark_mode = dark ? MW_THEME_DARK : MW_THEME_LIGHT;
+}

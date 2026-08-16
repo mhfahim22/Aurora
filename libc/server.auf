@@ -9,6 +9,8 @@
 ##   server_run(srv)
 ## ════════════════════════════════════════════════════════════
 
+import "stdlib"
+
 # ── Server lifecycle ──
 extern function aurora_server_init(port: i64) -> pointer
 extern function aurora_server_start(srv: pointer)
@@ -39,6 +41,7 @@ extern function aurora_ws_upgrade(key: cstring, sock: i64, tls_handle: i64) -> i
 extern function aurora_ws_read_frame(sock: i64, tls_handle: i64, out_payload: pointer, out_opcode: pointer) -> i32
 extern function aurora_ws_write_frame(sock: i64, tls_handle: i64, opcode: i32, data: pointer, len: i32) -> i32
 extern function aurora_ws_close(sock: i64, tls_handle: i64)
+extern function aurora_str_from_cstr(str: cstring) -> str
 
 # ── Raw TLS contexts (advanced) ──
 extern function aurora_tls_server_ctx_new(cert_path: cstring, key_path: cstring) -> pointer
@@ -53,7 +56,7 @@ extern function aurora_tls_close(tls_handle: i64)
 extern function aurora_ws_registry_init()
 extern function aurora_ws_registry_add(sock: i64, tls_handle: i64)
 extern function aurora_ws_registry_remove(sock: i64)
-extern function aurora_ws_broadcast(opcode: i32, data: pointer, len: i32) -> i32
+extern function aurora_ws_broadcast(opcode: i32, data: cstring, len: i32) -> i32
 
 # ── HTTP/2 ──
 extern function aurora_h2_is_upgrade(raw: cstring) -> i32
@@ -112,6 +115,7 @@ extern function aurora_rest_set_hook(router: pointer, schema: pointer, hook_type
 
 # ── Cookie ──
 extern function aurora_http_get_cookie(req: pointer, name: cstring) -> cstring
+extern function aurora_http_get_field(req: pointer, field: cstring) -> cstring
 
 # ── Form body parsing ──
 extern function aurora_parse_form_body(body: cstring, len: i64) -> pointer
@@ -239,10 +243,12 @@ function ws_upgrade(key, sock, tls_handle):
 end
 
 function ws_read_frame(sock, tls_handle):
-    payload_ptr = alloc(8)
-    opcode_ptr = alloc(4)
+    payload_ptr = malloc(8)
+    opcode_ptr = malloc(4)
     len = aurora_ws_read_frame(sock, tls_handle, payload_ptr, opcode_ptr)
-    return len, load(opcode_ptr, i32), load(payload_ptr, pointer)
+    free(payload_ptr)
+    free(opcode_ptr)
+    return len
 end
 
 function ws_write_frame(sock, tls_handle, opcode, data, len):
@@ -286,7 +292,7 @@ function ws_registry_init():
 end
 
 function ws_broadcast_text(msg: cstring):
-    return aurora_ws_broadcast(1, pointer_from_cstring(msg), len_cstring(msg))
+    return aurora_ws_broadcast(1, msg, len(msg))
 end
 
 function h2_is_upgrade(raw):
@@ -319,7 +325,7 @@ end
 
 function h2_send_response(h2, stream_id, status_code, body="", content_type="text/plain"):
     headers = [content_type]
-    return aurora_h2_send_response(h2, stream_id, status_code, headers, 1, body, len_cstring(body)) == 0
+    return aurora_h2_send_response(h2, stream_id, status_code, headers, 1, body, len(body)) == 0
 end
 
 function h2_send_goaway(h2, error_code=0):
@@ -349,7 +355,7 @@ function stream_start(res):
 end
 
 function stream_chunk(res, data):
-    return aurora_response_stream_chunk(res, data, len_cstring(data)) == 0
+    return aurora_response_stream_chunk(res, data, len(data)) == 0
 end
 
 function stream_end(res):
@@ -553,9 +559,11 @@ function gql_introspect(schema):
 end
 
 function gql_handle_request(schema, body_json):
-    buf = cstring_repeat(65536)
+    buf = malloc(65536)
     aurora_gql_handle_request(schema, body_json, buf, 65536)
-    return buf
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
 end
 
 # ── API Gateway wrappers ──
@@ -597,28 +605,46 @@ function gateway_remove_route(gw, method, path):
 end
 
 function gateway_forward(gw, method, path, body="", headers=""):
-    buf = cstring_repeat(65536)
+    buf = malloc(65536)
     n = aurora_gateway_forward(gw, method, path, body, headers, buf, 65536)
-    if n < 0 return "" end
-    return buf
+    if n < 0
+        free(buf)
+        return ""
+    end
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
 end
 
 function gateway_batch(gw, requests_json):
-    buf = cstring_repeat(131072)
+    buf = malloc(131072)
     n = aurora_gateway_batch(gw, requests_json, buf, 131072)
-    if n < 0 return "" end
-    return buf
+    if n < 0
+        free(buf)
+        return ""
+    end
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
 end
 
 function gateway_health(gw):
-    buf = cstring_repeat(4096)
+    buf = malloc(4096)
     aurora_gateway_health(gw, buf, 4096)
-    return buf
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
 end
 
 function gateway_handle(gw, method, path, body="", headers="", client_ip=""):
-    buf = cstring_repeat(65536)
+    buf = malloc(65536)
     n = aurora_gateway_handle(gw, method, path, body, headers, client_ip, buf, 65536)
-    if n < 0 return "" end
-    return buf
+    if n < 0
+        free(buf)
+        return ""
+    end
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
 end
+

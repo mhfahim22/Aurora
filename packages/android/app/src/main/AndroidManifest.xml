@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Aurora Android App — AndroidManifest.xml -->
+<!-- Aurora Android App — AndroidManifest.xml (Phase 37) -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="aurora.app">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
 
@@ -17,11 +21,14 @@
         android:allowBackup="true"
         android:label="Aurora App"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/AuroraTheme">
 
+        <!-- Main Aurora Activity (NativeActivity-based) -->
         <activity
-            android:name="aurora.AuroraActivity"
+            android:name="aurora.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true"
             android:screenOrientation="sensor"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -29,6 +36,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Existing legacy activity name kept for backward compatibility -->
+        <activity
+            android:name="aurora.AuroraActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:screenOrientation="sensor"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>

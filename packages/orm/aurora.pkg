@@ -1,0 +1,8 @@
+name: aurora/orm
+version: 1.0.0
+author: Community
+description: Object-relational mapping convenience layer
+entry: src/orm.auf
+dependencies:
+permissions:
+

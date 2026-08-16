@@ -26,7 +26,7 @@ llvm::Value* Codegen::get_literal_aurora(const std::string& str) {
     llvm::IRBuilder<> entry_builder(
         &entry, term ? term->getIterator() : entry.end());
     auto* raw = entry_builder.CreateGlobalStringPtr(str, "strlit_");
-    auto* aurora = entry_builder.CreateCall(fn_str_from_cstr_, { raw }, "aurora_lit");
+    auto* aurora = entry_builder.CreateCall(fn_str_literal_, { raw }, "aurora_lit");
 
     /* Also cache the pointer to the AuroraStr so the codegen can GEP into
        it directly without re-loading the AuroraStr* every time. */
@@ -167,16 +167,18 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
             return i64(0);
         }
         case NodeType::Lambda: {
-            /* Inline lambda expression — create LLVM function, return i8* fn ptr */
-            if (!node->captures.empty()) {
-                global_diag().warn(node->src_line, "inline lambda with captures not yet supported, returning 0");
-                return i64(0);
-            }
+            /* Inline lambda expression — create LLVM function, return closure or fn ptr */
+            bool has_captures = !node->captures.empty();
 
-            /* Build param types — prefer annotation, fall back to i8* */
+            std::vector<std::string> param_names;
             std::vector<llvm::Type*> param_types;
+            if (has_captures) {
+                param_types.push_back(i8ptr_ty());
+                param_names.push_back("__closure_env");
+            }
             const ASTNode* p = node->args.get();
             while (p) {
+                param_names.push_back(p->value);
                 param_types.push_back(ast_kind_to_abi_type(ctx_, p->type_annotation.kind, i8ptr_ty()));
                 p = p->next.get();
             }
@@ -188,17 +190,9 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
                 fn_type, llvm::Function::InternalLinkage,
                 node->value.empty() ? "_lambda_expr" : node->value, module_.get());
 
-            /* Name params */
             int ai = 0;
-            for (auto& arg : fn->args()) {
-                std::string pname = "_p" + std::to_string(ai++);
-                const ASTNode* pp = node->args.get();
-                for (int i = 0; i < ai - 1 && pp; i++) pp = pp->next.get();
-                if (pp) pname = pp->value;
-                arg.setName(pname);
-            }
+            for (auto& arg : fn->args()) arg.setName(param_names[ai++]);
 
-            /* Emit debug info for the lambda function */
             llvm::DISubprogram* lambda_sp = nullptr;
             if (dibuilder_) {
                 llvm::SmallVector<llvm::Metadata*, 4> param_dbg_types;
@@ -229,25 +223,43 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
             cur_fn_ = fn;
             debug_cur_fn_ = lambda_sp;
             builder_->SetInsertPoint(entry_bb);
+            function_stack_.push_back(node->value.empty() ? "_lambda_expr" : node->value);
             push_scope();
 
-            /* Set DILocation for lambda body if debug enabled */
             if (dibuilder_ && lambda_sp) {
                 auto* loc = llvm::DILocation::get(ctx_, node->src_line, node->src_col, lambda_sp);
                 builder_->SetCurrentDebugLocation(loc);
             }
 
-            /* Allocate and store params */
-            ai = 0;
-            p = node->args.get();
-            while (p) {
-                auto* slot = create_entry_alloca(p->value, i64_ty());
-                llvm::Value* val = fn->getArg(ai++);
-                if (val->getType() != i64_ty())
-                    val = builder_->CreatePtrToInt(val, i64_ty(), p->value + "_unbox");
+            /* Load captured values from env array into local variables */
+            if (has_captures) {
+                llvm::Value* env = fn->getArg(0);
+                llvm::Value* env_i64 = builder_->CreateBitCast(env, llvm::PointerType::get(i64_ty(), 0), "env_arr");
+                for (size_t ci = 0; ci < node->captures.size(); ci++) {
+                    auto* gep = builder_->CreateGEP(i64_ty(), env_i64, i64(static_cast<int64_t>(ci)), node->captures[ci] + "_gep");
+                    llvm::Value* val = builder_->CreateLoad(i64_ty(), gep, node->captures[ci] + "_cap");
+                    auto* slot = create_entry_alloca(node->captures[ci], i64_ty());
+                    builder_->CreateStore(val, slot);
+                    declare_var(node->captures[ci], slot, OwnershipState::Owned);
+                }
+            }
+
+            /* Allocate and store params (skip env if capturing) */
+            int param_start = has_captures ? 1 : 0;
+            for (int i = param_start; i < static_cast<int>(param_names.size()); i++) {
+                llvm::Type* pty = (i < static_cast<int>(param_types.size())) ? param_types[i] : i64_ty();
+                auto* slot = create_entry_alloca(param_names[i], pty);
+                llvm::Value* val = fn->getArg(i);
+                if (val->getType() != pty) {
+                    if (val->getType()->isIntegerTy() && pty->isPointerTy())
+                        val = builder_->CreateIntToPtr(val, pty, param_names[i] + "_inttoptr");
+                    else if (val->getType()->isPointerTy() && pty->isIntegerTy())
+                        val = builder_->CreatePtrToInt(val, pty, param_names[i] + "_unbox");
+                    else
+                        val = builder_->CreateBitCast(val, pty, param_names[i] + "_cast");
+                }
                 builder_->CreateStore(val, slot);
-                declare_var(p->value, slot, OwnershipState::Owned, p->type_annotation.kind);
-                p = p->next.get();
+                declare_var(param_names[i], slot, OwnershipState::Owned);
             }
 
             gen_block(node->body.get());
@@ -267,10 +279,42 @@ llvm::Value* Codegen::gen_expr(const ASTNode* node) {
             cur_fn_ = saved_fn;
             debug_cur_fn_ = saved_debug_fn;
             scopes_ = std::move(saved_scopes);
+            function_stack_.pop_back();
             if (saved_bb) builder_->SetInsertPoint(saved_bb);
 
-            return builder_->CreateBitCast(fn, i8ptr_ty(), "lambda_ptr");
+            /* Return closure struct or plain function pointer */
+            if (has_captures) {
+                auto* closure_ty = llvm::StructType::get(ctx_, { i8ptr_ty(), i8ptr_ty() }, false);
+                auto* closure_alloca = builder_->CreateAlloca(closure_ty, nullptr, "lambda_closure");
+                llvm::Value* fn_ptr = builder_->CreateBitCast(fn, i8ptr_ty(), "lambda_fn_ptr");
+                auto* fn_gep = builder_->CreateStructGEP(closure_ty, closure_alloca, 0, "cfn");
+                builder_->CreateStore(fn_ptr, fn_gep);
+                size_t ncaptures = node->captures.size();
+                size_t env_bytes = ncaptures * 8;
+                auto* env_heap = builder_->CreateCall(
+                    fn_arena_alloc_, { i64(static_cast<int64_t>(env_bytes)) }, "lambda_env_heap");
+                auto* env_as_i64 = builder_->CreateBitCast(env_heap, llvm::PointerType::get(i64_ty(), 0), "env_i64");
+                for (size_t ci = 0; ci < ncaptures; ci++) {
+                    VarRecord* cap_rec = lookup_var(node->captures[ci]);
+                    if (cap_rec && cap_rec->alloca_ptr) {
+                        llvm::Value* cap_val = builder_->CreateLoad(i64_ty(), cap_rec->alloca_ptr, node->captures[ci]);
+                        auto* cap_gep = builder_->CreateGEP(i64_ty(), env_as_i64, i64(static_cast<int64_t>(ci)), node->captures[ci] + "_slot");
+                        builder_->CreateStore(cap_val, cap_gep);
+                    }
+                }
+                llvm::Value* env_ptr = builder_->CreateBitCast(env_heap, i8ptr_ty(), "env_ptr");
+                auto* env_gep = builder_->CreateStructGEP(closure_ty, closure_alloca, 1, "cenv");
+                builder_->CreateStore(env_ptr, env_gep);
+                llvm::Value* closure_ptr = builder_->CreateBitCast(closure_alloca, i8ptr_ty(), "closure_ptr");
+                last_expr_was_closure_ = true;
+                return closure_ptr;
+            } else {
+                return builder_->CreateBitCast(fn, i8ptr_ty(), "lambda_ptr");
+            }
         }
+        case NodeType::Conditional: return gen_conditional(node);
+        case NodeType::Match:     return gen_match_expr(node);
+        case NodeType::Comprehension: return gen_comprehension(node);
         default: {
             global_diag().warn(node->src_line, "unhandled expression node type " + std::to_string(static_cast<int>(node->type)) + ", returning 0");
             return i64(0);
@@ -337,6 +381,16 @@ llvm::Value* Codegen::gen_var(const ASTNode* node) {
                           rec->type_kind == AstTypeKind::Pointer ||
                           rec->type_kind == AstTypeKind::Class))
         return builder_->CreateIntToPtr(loaded, i8ptr_ty(), node->value + "_ptr");
+    /* Rebox i64 → double for Float variables stored in i64 arena/GC/global
+       slots: the slot holds the double bit pattern, so reinterpret, don't
+       sitofp. Without this, passing a float var as a double arg emits
+       CreateSIToFP on the bit pattern and the callee receives garbage.
+       Falls back to the usage node's annotation for vars whose declared
+       type_kind is Unknown (e.g. `x = float_fn()` call results). */
+    auto is_float_var = (rec->type_kind == AstTypeKind::Float) ||
+                        (get_annotation_kind(node) == AstTypeKind::Float);
+    if (is_float_var && loaded->getType()->isIntegerTy())
+        return builder_->CreateBitCast(loaded, llvm::Type::getDoubleTy(ctx_), node->value + "_fbits");
     return loaded;
 }
 
@@ -418,19 +472,34 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
         /* If annotation says string, or either side is a pointer → string concat */
         if (get_annotation_kind(node) == AstTypeKind::String ||
             L->getType()->isPointerTy() || R->getType()->isPointerTy()) {
-            /* Non-pointer operands: if the expression is a string type → re-box pointer;
-               if it's an integer type → convert to string representation */
+            /* Helper: check if expression is string-like */
+            auto is_string_expr = [&](const ASTNode* n) -> bool {
+                if (!n) return false;
+                if (n->type == NodeType::Str) return true;
+                return get_annotation_kind(n) == AstTypeKind::String;
+            };
+            /* Non-pointer operands: re-box pointer-stuffed strings; convert true ints */
+            auto num_to_str = [&](llvm::Value* nv, const ASTNode* na) -> llvm::Value* {
+                if (!nv) return i64(0);
+                if (get_annotation_kind(na) == AstTypeKind::Float ||
+                    nv->getType()->isDoubleTy() || nv->getType()->isFloatTy()) {
+                    if (nv->getType()->isIntegerTy())
+                        nv = builder_->CreateBitCast(nv, llvm::Type::getDoubleTy(ctx_), "fp_unbox");
+                    return builder_->CreateCall(fn_float_to_str_, { nv }, "l_float_str");
+                }
+                return builder_->CreateCall(fn_int_to_str_, { nv }, "l_int_str");
+            };
             if (!L->getType()->isPointerTy()) {
-                if (node->left && expr_is_string_type(node->left.get()))
+                if (is_string_expr(node->left.get()))
                     L = builder_->CreateIntToPtr(L, i8ptr_ty(), "rebox_l");
                 else
-                    L = builder_->CreateCall(fn_int_to_str_, { L }, "l_int_str");
+                    L = num_to_str(L, node->left.get());
             }
             if (!R->getType()->isPointerTy()) {
-                if (node->right && expr_is_string_type(node->right.get()))
+                if (is_string_expr(node->right.get()))
                     R = builder_->CreateIntToPtr(R, i8ptr_ty(), "rebox_r");
                 else
-                    R = builder_->CreateCall(fn_int_to_str_, { R }, "r_int_str");
+                    R = num_to_str(R, node->right.get());
             }
 
             /* ── String concat — append R to L with exponential buffer growth ── */
@@ -496,6 +565,40 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
         return i64(0);
     }
 
+    /* ── String comparison (== / !=) — must run before type unification
+       since string params are stored as i64 (pointer-stuffed).          ── */
+    if (op == "==" || op == "!=") {
+        bool l_is_str = (L && L->getType()->isPointerTy()) ||
+                        (node->left && node->left->type == NodeType::Str);
+        bool r_is_str = (R && R->getType()->isPointerTy()) ||
+                        (node->right && node->right->type == NodeType::Str);
+        /* Also check type annotations */
+        if (!l_is_str && node->left) {
+            auto lk = get_annotation_kind(node->left.get());
+            l_is_str = (lk == AstTypeKind::String);
+        }
+        if (!r_is_str && node->right) {
+            auto rk = get_annotation_kind(node->right.get());
+            r_is_str = (rk == AstTypeKind::String);
+        }
+        /* Re-box pointer-stuffed i64 values back to i8* for string ops */
+        if (l_is_str || r_is_str) {
+            if (L && !L->getType()->isPointerTy())
+                L = builder_->CreateIntToPtr(L, i8ptr_ty(), "rebox_l");
+            if (R && !R->getType()->isPointerTy())
+                R = builder_->CreateIntToPtr(R, i8ptr_ty(), "rebox_r");
+            auto* fn_str_equal = module_->getFunction("aurora_str_equal");
+            if (fn_str_equal && L && R) {
+                llvm::Value* eq = builder_->CreateCall(fn_str_equal, { L, R }, "streq");
+                if (op == "!=") {
+                    auto* is_zero = builder_->CreateICmpEQ(eq, i64(0), "is_zero");
+                    return builder_->CreateZExt(is_zero, i64_ty(), "strne");
+                }
+                return eq;
+            }
+        }
+    }
+
     /* Type unification: if operands differ, cast both to i64 uniformly */
     if (L->getType() != R->getType()) {
         if (L->getType()->isPointerTy())
@@ -542,11 +645,198 @@ llvm::Value* Codegen::gen_binop(const ASTNode* node) {
     if (op == "^" || op == "xor") return builder_->CreateXor(L, R, "xor");
     if (op == "&") return builder_->CreateAnd(L, R, "band");
     if (op == "|") return builder_->CreateOr (L, R, "bor");
+    if (op == "<<") return builder_->CreateShl(L, R, "shl");
+    if (op == ">>") return builder_->CreateAShr(L, R, "ashr");
     if (op == "in") {
         /* Check if L is a member of collection R (array for now) */
         return builder_->CreateCall(fn_array_contains_int_, { R, L }, "contains");
     }
     return i64(0);
+}
+
+llvm::Value* Codegen::gen_conditional(const ASTNode* node) {
+    llvm::Value* cond = gen_expr(node->left.get());
+    llvm::Value* cond_bool = gen_truthy(cond, "cond");
+
+    auto* then_bb = llvm::BasicBlock::Create(ctx_, "cond_then", cur_fn_);
+    auto* else_bb = llvm::BasicBlock::Create(ctx_, "cond_else", cur_fn_);
+    auto* merge_bb = llvm::BasicBlock::Create(ctx_, "cond_merge", cur_fn_);
+
+    builder_->CreateCondBr(cond_bool, then_bb, else_bb);
+
+    builder_->SetInsertPoint(then_bb);
+    llvm::Value* then_val = gen_expr(node->body.get());
+    safe_br(merge_bb);
+
+    builder_->SetInsertPoint(else_bb);
+    llvm::Value* else_val = gen_expr(node->orelse.get());
+    safe_br(merge_bb);
+
+    builder_->SetInsertPoint(merge_bb);
+    auto* phi = builder_->CreatePHI(i64_ty(), 2, "cond_result");
+    phi->addIncoming(then_val, then_bb);
+    phi->addIncoming(else_val, else_bb);
+    return phi;
+}
+
+llvm::Value* Codegen::gen_match_expr(const ASTNode* node) {
+    llvm::Value* match_val = gen_expr(node->left.get());
+    std::string match_enum_type;
+    {
+        auto mk = get_annotation_kind(node->left.get());
+        if (mk == AstTypeKind::Enum)
+            match_enum_type = node->left->type_annotation.type_name;
+        if (match_enum_type.empty() && node->left->type == NodeType::Var) {
+            VarRecord* rec = lookup_var(node->left->value);
+            if (rec) match_enum_type = rec->struct_type;
+        }
+    }
+
+    auto* merge_bb = llvm::BasicBlock::Create(ctx_, "match_merge", cur_fn_);
+    int incoming_count = 0;
+    std::vector<std::pair<llvm::Value*, llvm::BasicBlock*>> phi_incomings;
+
+    auto add_incoming = [&](llvm::Value* v) {
+        auto* bb = builder_->GetInsertBlock();
+        if (bb && !bb->getTerminator())
+            safe_br(merge_bb);
+        phi_incomings.push_back({v ? v : i64(0), bb ? bb : merge_bb});
+        incoming_count++;
+    };
+
+    const ASTNode* case_node = node->args.get();
+    while (case_node) {
+        if (case_node->value == "default") {
+            llvm::Value* val = gen_expr(case_node->body.get());
+            add_incoming(val);
+            break;
+        }
+
+        if (case_node->args) {
+            const ASTNode* pattern = case_node->args.get();
+            llvm::Value* cond = gen_pattern_cond(pattern, match_val, match_enum_type);
+            const ASTNode* or_pat = pattern->next.get();
+            while (or_pat) {
+                llvm::Value* or_cond = gen_pattern_cond(or_pat, match_val, match_enum_type);
+                cond = builder_->CreateOr(cond, or_cond, "or_pat");
+                or_pat = or_pat->next.get();
+            }
+            if (case_node->left) {
+                llvm::Value* guard = gen_expr(case_node->left.get());
+                llvm::Value* guard_bool = gen_truthy(guard, "guard");
+                cond = builder_->CreateAnd(cond, guard_bool, "pat_guard");
+            }
+            auto* case_bb = llvm::BasicBlock::Create(ctx_, "match_case", cur_fn_);
+            auto* next_bb = llvm::BasicBlock::Create(ctx_, "match_next", cur_fn_);
+            builder_->CreateCondBr(cond, case_bb, next_bb);
+            builder_->SetInsertPoint(case_bb);
+            gen_pattern_bind(pattern, match_val, match_enum_type);
+            llvm::Value* val = gen_expr(case_node->body.get());
+            add_incoming(val);
+            builder_->SetInsertPoint(next_bb);
+        } else {
+            llvm::Value* case_val = i64(std::stoll(case_node->value));
+            llvm::Value* cmp = builder_->CreateICmpEQ(match_val, case_val, "match_cmp");
+            auto* case_bb = llvm::BasicBlock::Create(ctx_, "match_case", cur_fn_);
+            auto* next_bb = llvm::BasicBlock::Create(ctx_, "match_next", cur_fn_);
+            builder_->CreateCondBr(cmp, case_bb, next_bb);
+            builder_->SetInsertPoint(case_bb);
+            llvm::Value* val = gen_expr(case_node->body.get());
+            add_incoming(val);
+            builder_->SetInsertPoint(next_bb);
+        }
+        case_node = case_node->next.get();
+    }
+
+    if (!builder_->GetInsertBlock()->getTerminator())
+        safe_br(merge_bb);
+
+    if (merge_bb->getSinglePredecessor())
+        builder_->SetInsertPoint(merge_bb);
+    else if (merge_bb->hasNPredecessorsOrMore(1))
+        builder_->SetInsertPoint(merge_bb);
+
+    auto* phi = builder_->CreatePHI(i64_ty(), incoming_count > 0 ? incoming_count : 1, "match_result");
+    for (auto& inc : phi_incomings)
+        phi->addIncoming(inc.first, inc.second);
+    return phi;
+}
+
+llvm::Value* Codegen::gen_comprehension(const ASTNode* node) {
+    /* [expr for var in iterable if cond]
+       AST: body=mapping-expr, args=loop-var (Var), left=iterable, orelse=filter-cond
+    */
+    if (!node->args || !node->left) return i64(0);
+
+    std::string loop_var = node->args->value;
+
+    /* Evaluate iterable */
+    llvm::Value* iterable = gen_expr(node->left.get());
+
+    /* Create result array */
+    llvm::Value* result = builder_->CreateCall(fn_array_new_, { i64(8) }, "comp_arr");
+
+    /* Get length */
+    llvm::Value* len = builder_->CreateCall(fn_array_len_, { iterable }, "comp_len");
+
+    /* Alloca loop index and loop variable */
+    auto* idx_ptr = create_entry_alloca("__comp_idx", i64_ty());
+    auto* var_ptr = create_entry_alloca(loop_var, i64_ty());
+    declare_var(loop_var, var_ptr, OwnershipState::Owned);
+    builder_->CreateStore(i64(0), idx_ptr);
+
+    /* ── Loop ── */
+    auto* cond_bb = llvm::BasicBlock::Create(ctx_, "comp_cond", cur_fn_);
+    auto* body_bb = llvm::BasicBlock::Create(ctx_, "comp_body", cur_fn_);
+    auto* exit_bb = llvm::BasicBlock::Create(ctx_, "comp_exit", cur_fn_);
+    loop_stack_.push_back({ cond_bb, exit_bb });
+
+    safe_br(cond_bb);
+
+    /* Condition: idx < len */
+    builder_->SetInsertPoint(cond_bb);
+    llvm::Value* idx = builder_->CreateLoad(i64_ty(), idx_ptr, "comp_idx");
+    llvm::Value* done = builder_->CreateICmpSLT(idx, len, "comp_done");
+    builder_->CreateCondBr(done, body_bb, exit_bb);
+
+    /* Body */
+    builder_->SetInsertPoint(body_bb);
+
+    /* Get element: array[idx] as i64 */
+    llvm::Value* elem = builder_->CreateCall(fn_array_get_int_, { iterable, idx }, "comp_elem");
+
+    /* Bind loop variable */
+    builder_->CreateStore(elem, var_ptr);
+
+    /* Filter: if cond, skip if false */
+    if (node->orelse) {
+        llvm::Value* filter = gen_expr(node->orelse.get());
+        llvm::Value* filter_bool = gen_truthy(filter, "comp_filter");
+        auto* push_bb = llvm::BasicBlock::Create(ctx_, "comp_push", cur_fn_);
+        auto* skip_bb = llvm::BasicBlock::Create(ctx_, "comp_skip", cur_fn_);
+        builder_->CreateCondBr(filter_bool, push_bb, skip_bb);
+
+        builder_->SetInsertPoint(push_bb);
+        llvm::Value* map_val = gen_expr(node->body.get());
+        if (map_val) builder_->CreateCall(fn_array_push_int_, { result, map_val });
+        safe_br(skip_bb);
+
+        builder_->SetInsertPoint(skip_bb);
+    } else {
+        /* No filter: always push */
+        llvm::Value* map_val = gen_expr(node->body.get());
+        if (map_val) builder_->CreateCall(fn_array_push_int_, { result, map_val });
+    }
+
+    /* Increment index */
+    llvm::Value* next_idx = builder_->CreateAdd(idx, i64(1), "comp_next");
+    builder_->CreateStore(next_idx, idx_ptr);
+    safe_br(cond_bb);
+
+    /* Exit */
+    builder_->SetInsertPoint(exit_bb);
+    loop_stack_.pop_back();
+    return result;
 }
 
 llvm::Value* Codegen::gen_unary(const ASTNode* node) {
@@ -1003,6 +1293,81 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         if (dot != std::string::npos) {
             std::string obj_name    = node->value.substr(0, dot);
             std::string method_name = node->value.substr(dot + 1);
+            if (obj_name == "super") {
+                /* super.method(args) — call parent's implementation directly (bypass vtable) */
+                std::string cls_name = oop_class_of("__self__");
+                if (cls_name.empty()) {
+                    throw std::runtime_error("Line " + std::to_string(node->src_line) +
+                        ": 'super' used outside of a class method");
+                }
+                const ClassInfo* cls = global_class_registry().get(cls_name);
+                if (!cls || cls->parent_name.empty()) {
+                    throw std::runtime_error("Line " + std::to_string(node->src_line) +
+                        ": class '" + cls_name + "' has no parent to call super on");
+                }
+                const ClassMethodInfo* method =
+                    global_class_registry().find_method(cls->parent_name, method_name);
+                if (!method) {
+                    throw std::runtime_error("Line " + std::to_string(node->src_line) +
+                        ": parent class '" + cls->parent_name +
+                        "' has no method '" + method_name + "'");
+                }
+                llvm::Value* self_ptr = oop_get_ptr("__self__");
+                if (!self_ptr) {
+                    throw std::runtime_error("Line " + std::to_string(node->src_line) +
+                        ": 'super' not available outside a method body");
+                }
+                auto gen_expr_fn = [this](const ASTNode* n) -> llvm::Value* {
+                    return gen_expr(n);
+                };
+                /* Build call args */
+                std::vector<llvm::Value*> call_args;
+                call_args.push_back(self_ptr);
+                const ASTNode* arg = node->args.get();
+                while (arg) {
+                    llvm::Value* v = gen_expr_fn(arg);
+                    if (!v) v = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx_), 0);
+                    call_args.push_back(v);
+                    arg = arg->next.get();
+                }
+                /* Always call directly — bypass vtable */
+                llvm::Function* fn = module_->getFunction(method->llvm_name);
+                if (!fn) {
+                    std::vector<llvm::Type*> param_types;
+                    param_types.push_back(llvm::PointerType::getUnqual(ctx_));
+                    for (size_t i = 0; i < method->params.size(); i++)
+                        param_types.push_back(llvm::PointerType::getUnqual(ctx_));
+                    auto* ret_ty = ast_kind_to_abi_type(ctx_, method->return_kind,
+                        llvm::PointerType::getUnqual(ctx_));
+                    auto* fn_ty = llvm::FunctionType::get(ret_ty, param_types, false);
+                    fn = llvm::Function::Create(
+                        fn_ty, llvm::Function::ExternalLinkage, method->llvm_name, *module_);
+                }
+                /* Convert args to match fn's param types */
+                {
+                    auto* fty = fn->getFunctionType();
+                    for (size_t i = 1; i < call_args.size() && i < fty->getNumParams(); i++) {
+                        llvm::Value*& v = call_args[i];
+                        llvm::Type* target = fty->getParamType(i);
+                        if (v->getType() != target) {
+                            if (v->getType()->isIntegerTy() && target->isPointerTy())
+                                v = builder_->CreateIntToPtr(v, target);
+                            else if (v->getType()->isPointerTy() && target->isIntegerTy())
+                                v = builder_->CreatePtrToInt(v, target);
+                            else if (v->getType()->isIntegerTy() && target->isDoubleTy())
+                                v = builder_->CreateSIToFP(v, target);
+                            else if (v->getType()->isDoubleTy() && target->isIntegerTy())
+                                v = builder_->CreateFPToSI(v, target);
+                        }
+                    }
+                }
+                llvm::Value* ret = builder_->CreateCall(fn, call_args, method_name + "_super_ret");
+                if (ret->getType()->isPointerTy() && method->return_kind != AstTypeKind::String)
+                    ret = builder_->CreatePtrToInt(ret, llvm::Type::getInt64Ty(ctx_), "ret_unbox");
+                else if (ret->getType()->isDoubleTy())
+                    ret = builder_->CreateBitCast(ret, llvm::Type::getInt64Ty(ctx_), "ret_fp_unbox");
+                return ret;
+            }
             if (oop_is_object(obj_name)) {
                 auto gen_expr_fn = [this](const ASTNode* n) -> llvm::Value* {
                     return gen_expr(n);
@@ -1016,7 +1381,15 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
             {
                 VarRecord* rec = lookup_var(obj_name);
                 if (rec) {
-                    std::string cls_name = global_class_registry().find_class_by_method(method_name);
+                    std::string cls_name;
+                    /* Try resolving via interface name first */
+                    if (!rec->interface_name.empty()) {
+                        cls_name = global_class_registry().find_class_by_interface_method(
+                            rec->interface_name, method_name);
+                    }
+                    /* Fallback: search by method name globally */
+                    if (cls_name.empty())
+                        cls_name = global_class_registry().find_class_by_method(method_name);
                     if (!cls_name.empty()) {
                         auto gen_expr_fn = [this](const ASTNode* n) -> llvm::Value* {
                             return gen_expr(n);
@@ -1039,6 +1412,63 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         while (ta) {
             callee_name += "__" + ta->value;
             ta = ta->next.get();
+        }
+    }
+
+    /* ── Enum variant construction: Option.Some(val) ── */
+    {
+        /* Check if call name follows EnumName.VariantName pattern */
+        auto dot_pos = callee_name.find('.');
+        if (dot_pos != std::string::npos && dot_pos > 0 && dot_pos + 1 < callee_name.size()) {
+            std::string enum_name = callee_name.substr(0, dot_pos);
+            std::string var_name  = callee_name.substr(dot_pos + 1);
+            const EnumInfo* einfo = global_type_registry().get_enum(enum_name);
+            if (einfo && einfo->has_data) {
+                /* Find matching variant */
+                for (auto& v : einfo->variants) {
+                    if (v.name == var_name) {
+                        llvm::StructType* enum_ty = codegen_get_enum_type(ctx_, enum_name);
+                        if (!enum_ty) return i64(0);
+                        /* Heap-allocate the tagged union via arena alloc */
+                        uint64_t alloc_size = module_->getDataLayout().getTypeAllocSize(enum_ty);
+                        llvm::Value* alloc_bytes = llvm::ConstantInt::get(i64_ty(), alloc_size);
+                        llvm::Value* heap_ptr = builder_->CreateCall(fn_arena_alloc_, { alloc_bytes }, enum_name + ".heap");
+                        llvm::Value* ptr = builder_->CreateBitCast(heap_ptr, llvm::PointerType::get(enum_ty, 0), enum_name + ".ptr");
+                        /* Store discriminant */
+                        llvm::Value* disc_ptr = builder_->CreateStructGEP(enum_ty, ptr, 0);
+                        builder_->CreateStore(i64(v.value), disc_ptr);
+                        /* Store data fields into the data array (index 1) */
+                        const ASTNode* f = node->args.get();
+                        unsigned fi = 0;
+                        while (f && fi < v.fields.size()) {
+                            llvm::Value* fval = gen_expr(f);
+                            if (fval) {
+                                llvm::Value* data_ptr = builder_->CreateStructGEP(enum_ty, ptr, 1);
+                                llvm::Value* elem_ptr = builder_->CreateGEP(
+                                    llvm::ArrayType::get(llvm::Type::getInt64Ty(ctx_), v.fields.size()),
+                                    data_ptr,
+                                    { i64(0), i64(fi) }, "enum_field");
+                                llvm::Value* store_val = fval;
+                                if (store_val->getType()->isPointerTy())
+                                    store_val = builder_->CreatePtrToInt(store_val, i64_ty(), "enum_field_ptr");
+                                else if (store_val->getType()->isDoubleTy())
+                                    store_val = builder_->CreateBitCast(store_val, i64_ty(), "enum_field_fp");
+                                else if (store_val->getType()->isFloatTy())
+                                    store_val = builder_->CreateBitCast(
+                                        builder_->CreateFPExt(store_val, llvm::Type::getDoubleTy(ctx_), "enum_field_fpext"),
+                                        i64_ty(), "enum_field_fp");
+                                else if (store_val->getType()->getIntegerBitWidth() < 64)
+                                    store_val = builder_->CreateZExt(store_val, i64_ty(), "enum_field_zext");
+                                builder_->CreateStore(store_val, elem_ptr);
+                            }
+                            fi++;
+                            f = f->next.get();
+                        }
+                        /* Return as boxed i64 pointer */
+                        return builder_->CreatePtrToInt(ptr, i64_ty(), enum_name + ".boxed");
+                    }
+                }
+            }
         }
     }
 
@@ -1100,6 +1530,14 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
     const ExternStringInfo* str_info = (str_it != extern_string_info_.end()) ? &str_it->second : nullptr;
     size_t str_next = 0;
 
+    /* Out-param (by-reference) store-backs: {var slot, temp f32 slot} */
+    std::vector<std::pair<llvm::Value*, llvm::Value*>> out_storebacks;
+    const std::vector<int>* out_params = nullptr;
+    {
+        auto op_it = extern_out_params_.find(node->value);
+        if (op_it != extern_out_params_.end()) out_params = &op_it->second;
+    }
+
     llvm::FunctionType* ft = callee->getFunctionType();
     unsigned num_fixed_params = ft->getNumParams();
     while (arg) {
@@ -1129,18 +1567,42 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
 
         /* Generate arg value: string literal for cstring bypasses heap alloc */
         llvm::Value* v = nullptr;
-        if (is_cstring && arg->type == NodeType::Str) {
-            v = builder_->CreateGlobalStringPtr(arg->value, "strlit_");
-        } else {
-            v = gen_expr(arg);
+        bool is_out_param = false;
+        llvm::Value* out_temp_slot = nullptr;
+        if (out_params && param_ty && param_ty->isPointerTy() &&
+            arg->type == NodeType::Var &&
+            std::find(out_params->begin(), out_params->end(), pidx) != out_params->end()) {
+            /* Out-param: pass address of a temp f32 slot, write result back
+               after the call (float → double → i64 bit-pattern). */
+            VarRecord* vrec = lookup_var(arg->value);
+            if (vrec && vrec->alloca_ptr) {
+                auto* f32_ty = llvm::Type::getFloatTy(ctx_);
+                out_temp_slot = create_entry_alloca(arg->value + "_out", f32_ty);
+                builder_->CreateStore(llvm::ConstantFP::get(f32_ty, 0.0), out_temp_slot);
+                out_storebacks.emplace_back(vrec->alloca_ptr, out_temp_slot);
+                v = out_temp_slot;
+                is_out_param = true;
+            }
+        }
+        if (!v) {
+            if (is_cstring && arg->type == NodeType::Str) {
+                v = builder_->CreateGlobalStringPtr(arg->value, "strlit_");
+            } else {
+                v = gen_expr(arg);
+            }
         }
         if (!v) v = i64(0);
 
         if (is_callback) {
-            /* Generate trampoline: a real C-callable wrapper that calls the Aurora function ref */
+            /* Generate trampoline: a real C-callable wrapper that calls the Aurora function ref.
+               Each call site gets a uniquely named trampoline + callback global so that
+               passing different handlers to the same extern (at the same param index)
+               doesn't collide — a shared trampoline would call whichever handler was
+               stored last for every registered event. */
             llvm::FunctionType* cb_fn_type = (*cb_sigs)[cb_next].fn_type;
-            std::string tramp_name = node->value + "_tramp_" + std::to_string(cb_next);
-            std::string global_name = node->value + "_cb_" + std::to_string(cb_next);
+            unsigned cb_site_id = next_cb_id_++;
+            std::string tramp_name = node->value + "_tramp_" + std::to_string(cb_site_id);
+            std::string global_name = node->value + "_cb_" + std::to_string(cb_site_id);
 
             /* Create global to hold the Aurora callback ref */
             llvm::GlobalVariable* cb_global = module_->getGlobalVariable(global_name);
@@ -1184,17 +1646,28 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
         }
         /* C string: auto-convert to char* */
         /* For string literals: create GlobalStringPtr directly (already done above) */
-        /* For non-literal Aurora strings: use aurora_str_as_cstr (zero-copy, no allocation) */
+        /* For non-literal Aurora strings: use aurora_str_as_cstr (zero-copy, no allocation).
+           Only values that are genuinely raw C pointers (declared `pointer`, e.g. malloc'd
+           buffers) must pass through untouched — calling aurora_str_as_cstr on them would
+           read the buffer as an AuroraStr header and crash. Everything else (String- or
+           Unknown-annotated Aurora strings, incl. untyped wrapper params) is a boxed
+           AuroraStr* and needs aurora_str_as_cstr. */
         else if (is_cstring && !(arg->type == NodeType::Str) && (v->getType()->isPointerTy() || v->getType()->isIntegerTy())) {
-            auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
-            if (!as_cstr)
-                as_cstr = llvm::Function::Create(
-                    llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
-                    llvm::Function::ExternalLinkage, "aurora_str_as_cstr", module_.get());
-            llvm::Value* ptr_v = v;
-            if (ptr_v->getType()->isIntegerTy())
-                ptr_v = builder_->CreateIntToPtr(v, i8ptr_ty(), "aurora_str_as_i8ptr");
-            v = builder_->CreateCall(as_cstr, { ptr_v }, "cstr_view");
+            bool is_raw_pointer = (get_annotation_kind(arg) == AstTypeKind::Pointer);
+            if (is_raw_pointer) {
+                if (v->getType()->isIntegerTy())
+                    v = builder_->CreateIntToPtr(v, i8ptr_ty(), "cstr_raw");
+            } else {
+                auto* as_cstr = module_->getFunction("aurora_str_as_cstr");
+                if (!as_cstr)
+                    as_cstr = llvm::Function::Create(
+                        llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
+                        llvm::Function::ExternalLinkage, "aurora_str_as_cstr", module_.get());
+                llvm::Value* ptr_v = v;
+                if (ptr_v->getType()->isIntegerTy())
+                    ptr_v = builder_->CreateIntToPtr(v, i8ptr_ty(), "aurora_str_as_i8ptr");
+                v = builder_->CreateCall(as_cstr, { ptr_v }, "cstr_view");
+            }
             str_next++;
         } else if (is_cstring) {
             str_next++;
@@ -1220,6 +1693,16 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
             v = builder_->CreateSIToFP(v, param_ty, "arg_itof");
         else if (!is_vararg_param && param_ty->isIntegerTy() && v->getType()->isFloatingPointTy())
             v = builder_->CreateFPToSI(v, param_ty, "arg_ftoi");
+        /* Float width conversion (f64 ↔ f32 params). Aurora floats are doubles
+           internally; extern params may be declared f32. Without an explicit
+           fpext/fptrunc the wrong ABI slot is read and values arrive as 0. */
+        else if (!is_vararg_param && param_ty->isFloatingPointTy() &&
+                 v->getType()->isFloatingPointTy()) {
+            if (param_ty->isFloatTy() && v->getType()->isDoubleTy())
+                v = builder_->CreateFPTrunc(v, param_ty, "arg_f2f");
+            else if (param_ty->isDoubleTy() && v->getType()->isFloatTy())
+                v = builder_->CreateFPExt(v, param_ty, "arg_f2f");
+        }
 
         args.push_back(v);
         pidx++;
@@ -1235,6 +1718,25 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
     llvm::CallInst* ret_inst = builder_->CreateCall(callee, args, call_nm);
     ret_inst->setCallingConv(callee->getCallingConv());
     llvm::Value* ret = ret_inst;
+
+    /* Out-param store-backs: read temp float out-slots the callee filled,
+       widen to double, encode as i64 bit-pattern and write into the var slot. */
+    if (!out_storebacks.empty()) {
+        auto* f32_ty = llvm::Type::getFloatTy(ctx_);
+        auto* f64_ty = llvm::Type::getDoubleTy(ctx_);
+        for (auto& [var_slot, temp] : out_storebacks) {
+            llvm::Value* f = builder_->CreateLoad(f32_ty, temp, "out_load");
+            llvm::Value* d = builder_->CreateFPExt(f, f64_ty, "out_fpext");
+            if (auto* ai = llvm::dyn_cast<llvm::AllocaInst>(var_slot)) {
+                if (ai->getAllocatedType()->isDoubleTy()) {
+                    builder_->CreateStore(d, var_slot, "out_store");
+                    continue;
+                }
+            }
+            llvm::Value* bits = builder_->CreateBitCast(d, i64_ty(), "out_bits");
+            builder_->CreateStore(bits, var_slot, "out_store");
+        }
+    }
 
     if (ret_ty->isStructTy()) {
         /* struct return — keep as LLVM struct value, no conversion */
@@ -1257,9 +1759,15 @@ llvm::Value* Codegen::gen_call(const ASTNode* node) {
             ret = builder_->CreatePtrToInt(ret, i64_ty(), "ret_unbox");
     }
 
-    /* Floating-point return: bitcast to i64 for Aurora's internal representation */
-    else if (ret->getType()->isFloatingPointTy())
+    /* Floating-point return: encode to i64 for Aurora's internal representation.
+       The decode side (gen_binop) recreates doubles via `bitcast i64 → double`,
+       so f32 must be fpext→double first (32-bit values cannot bitcast to i64). */
+    else if (ret->getType()->isDoubleTy())
         ret = builder_->CreateBitCast(ret, i64_ty(), "ret_fp_unbox");
+    else if (ret->getType()->isFloatTy())
+        ret = builder_->CreateBitCast(
+            builder_->CreateFPExt(ret, llvm::Type::getDoubleTy(ctx_), "ret_fpext"),
+            i64_ty(), "ret_fp_unbox");
 
     /* Extend smaller integer types to i64 for Aurora's internal representation */
     else if (ret->getType()->isIntegerTy() && ret->getType()->getIntegerBitWidth() < 64)

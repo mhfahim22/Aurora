@@ -58,9 +58,6 @@ end
 function ln(x):
     return aurora_math_log(x)
 end
-function log(x):
-    return ln(x)
-end
 function log10(x):
     return aurora_math_log10(x)
 end
@@ -78,9 +75,6 @@ function ceil(x):
 end
 function round(x):
     return aurora_math_round(x)
-end
-function random():
-    return aurora_math_random()
 end
 function random_int(min, max):
     return aurora_math_random_int(min, max)

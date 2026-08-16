@@ -76,9 +76,21 @@ AuroraServer* aurora_server_init(int64_t port) {
     srv->middleware_handlers = nullptr;
     srv->middleware_count = 0;
     srv->middleware_cap = 0;
+    /* ── Phase 38.3 production defaults ── */
+    srv->max_connections = 0;      /* unlimited by default */
+    srv->log_requests = 0;         /* off by default */
+    srv->req_count = 0;
+    srv->total_resp_ms = 0;
+    srv->conn_errors = 0;
+    srv->start_time_ms = now_ms();
     printf("[server] initialized on port %d\n", srv->port);
     return srv;
 }
+
+/* ── Active server registry (thread-local, for /metrics access) ── */
+static thread_local AuroraServer* g_active_server = nullptr;
+static AuroraServer* aurora_active_server() { return g_active_server; }
+void aurora_server_mark_active(AuroraServer* srv) { g_active_server = srv; }
 
 void aurora_server_start(AuroraServer* srv) {
     if (!srv || srv->running) return;
@@ -214,8 +226,18 @@ void aurora_server_start_with_pool(AuroraServer* srv, AuroraRouter* router, int 
             if (client < 0) { if (!srv->running) break; continue; }
 #endif
             int64_t client_sock = (int64_t)(intptr_t)client;
+            /* Phase 38.3: slow-loris connection limit */
+            if (srv->max_connections > 0 && g_active_connections.load() >= srv->max_connections) {
+#ifdef _WIN32
+                closesocket(client);
+#else
+                close(client);
+#endif
+                continue;
+            }
             int64_t tls = try_tls_accept(client_sock, srv);
             if (tls < 0) {
+                srv->conn_errors++;
 #ifdef _WIN32
                 closesocket(client); continue;
 #else
@@ -281,6 +303,87 @@ int aurora_server_enable_tls(AuroraServer* srv, const char* cert_path, const cha
         return 1;
     }
     printf("[server] TLS enable failed\n");
+    return 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Phase 38.3 — Production server features
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Connection limit (slow-loris protection) ── */
+void aurora_server_set_max_connections(AuroraServer* srv, int max_conn) {
+    if (!srv) return;
+    srv->max_connections = max_conn > 0 ? max_conn : 0;
+    printf("[server] max connections set to %d\n", srv->max_connections);
+}
+
+/* ── Structured JSON access logging ── */
+void aurora_server_set_request_logging(AuroraServer* srv, int enable) {
+    if (!srv) return;
+    srv->log_requests = enable ? 1 : 0;
+    printf("[server] request logging %s\n", enable ? "enabled" : "disabled");
+}
+
+/* ── Built-in health check handler (returns JSON + 200) ── */
+int aurora_server_handle_health(AuroraHttpRequest* req, AuroraHttpResponse* res) {
+    if (!req || !res) return 0;
+    if (!req->path_without_query) return 0;
+    if (strcmp(req->path_without_query, "/health") == 0) {
+        aurora_http_response_set_status(res, 200, "OK");
+        aurora_http_response_set_content_type(res, "application/json");
+        aurora_http_response_set_body(res,
+            "{\"status\":\"ok\",\"service\":\"aurora\"}");
+        return 1;
+    }
+    return 0;
+}
+
+/* ── Build Prometheus-format metrics into caller buffer (returns bytes written) ── */
+int aurora_server_metrics_json(char* buf, int buf_size, AuroraServer* srv) {
+    if (!buf || buf_size <= 0) return 0;
+    long long uptime_ms = 0;
+    double avg_ms = 0.0;
+    if (srv) {
+        if (srv->start_time_ms > 0)
+            uptime_ms = now_ms() - srv->start_time_ms;
+        if (srv->req_count > 0)
+            avg_ms = (double)srv->total_resp_ms / (double)srv->req_count;
+    }
+    long long req_count = srv ? srv->req_count : 0;
+    long long conn_errors = srv ? srv->conn_errors : 0;
+    int n = snprintf(buf, (size_t)buf_size,
+        "# HELP aurora_requests_total Total HTTP requests served\n"
+        "# TYPE aurora_requests_total counter\n"
+        "aurora_requests_total %lld\n"
+        "# HELP aurora_request_latency_ms_avg Average request latency in ms\n"
+        "# TYPE aurora_request_latency_ms_avg gauge\n"
+        "aurora_request_latency_ms_avg %.2f\n"
+        "# HELP aurora_up 1 if server is running\n"
+        "# TYPE aurora_up gauge\n"
+        "aurora_up %d\n"
+        "# HELP aurora_uptime_ms Server uptime in milliseconds\n"
+        "# TYPE aurora_uptime_ms gauge\n"
+        "aurora_uptime_ms %lld\n"
+        "# HELP aurora_conn_errors_total TLS/handshake failures\n"
+        "# TYPE aurora_conn_errors_total counter\n"
+        "aurora_conn_errors_total %lld\n",
+        req_count, avg_ms, (srv && srv->running) ? 1 : 0, uptime_ms, conn_errors);
+    return n;
+}
+
+/* ── Built-in metrics handler (Prometheus format) ── */
+int aurora_server_handle_metrics(AuroraHttpRequest* req, AuroraHttpResponse* res) {
+    if (!req || !res) return 0;
+    if (!req->path_without_query) return 0;
+    if (strcmp(req->path_without_query, "/metrics") == 0) {
+        char buf[2048];
+        AuroraServer* srv = aurora_active_server();
+        int n = aurora_server_metrics_json(buf, (int)sizeof(buf), srv);
+        aurora_http_response_set_status(res, 200, "OK");
+        aurora_http_response_set_content_type(res, "text/plain; version=0.0.4");
+        aurora_http_response_set_body_n(res, buf, (size_t)n);
+        return 1;
+    }
     return 0;
 }
 
@@ -882,6 +985,19 @@ void aurora_http_response_set_header(AuroraHttpResponse* res, const char* name, 
     res->header_names[res->header_count] = strdup(name);
     res->header_values[res->header_count] = strdup(value);
     res->header_count++;
+}
+
+/* ── Set a cookie: adds "Set-Cookie: name=value; Path=/; Max-Age=ttl" ── */
+void aurora_http_response_set_cookie(AuroraHttpResponse* res, const char* name, const char* value, int64_t ttl) {
+    if (!res || !name || !value) return;
+    /* Build cookie header value in one allocation to avoid fragmented dup */
+    char cookie_buf[8192];
+    if (ttl > 0)
+        snprintf(cookie_buf, sizeof(cookie_buf), "%s=%s; Path=/; Max-Age=%lld",
+                 name, value, (long long)ttl);
+    else
+        snprintf(cookie_buf, sizeof(cookie_buf), "%s=%s; Path=/", name, value);
+    aurora_http_response_set_header(res, "Set-Cookie", cookie_buf);
 }
 
 void aurora_http_response_set_content_type(AuroraHttpResponse* res, const char* content_type) {
@@ -1630,11 +1746,38 @@ static void handle_client(int64_t client_sock, int64_t tls_handle, AuroraServer*
             /* ── Set thread-local context for builtins (session/cookie) ── */
             g_aurora_current_req = req;
             g_aurora_current_res = res;
+            int64_t req_start_ms = now_ms();
             int mw_result = aurora_middleware_run_chain(
                 srv->middleware_handlers, srv->middleware_count, req, res);
             if (mw_result == 0) {
-                if (!aurora_server_serve_static(req, res, srv))
-                    aurora_route_dispatch(router, req, res);
+                /* ── Phase 38.3: Built-in /health + /metrics ── */
+                if (!aurora_server_handle_health(req, res) &&
+                    !aurora_server_handle_metrics(req, res)) {
+                    if (!aurora_server_serve_static(req, res, srv))
+                        aurora_route_dispatch(router, req, res);
+                }
+            }
+            /* ── Phase 38.3: request counters + structured JSON logs ── */
+            if (srv) {
+                srv->req_count++;
+                int64_t dur_ms = now_ms() - req_start_ms;
+                srv->total_resp_ms += dur_ms;
+                if (srv->log_requests) {
+                    char ipbuf[64] = "";
+                    const char* ua = "?";
+                    for (int hi = 0; hi < req->header_count; hi++) {
+                        if (aurora_strncasecmp(req->header_names[hi], "User-Agent", 10) == 0)
+                            ua = req->header_values[hi];
+                    }
+                    printf("{\"ts\":%lld,\"method\":\"%s\",\"path\":\"%s\",\"status\":%d,\"ms\":%lld,\"ua\":\"%s\",\"ip\":\"%s\"}\n",
+                           (long long)now_ms(),
+                           req->method ? req->method : "?",
+                           req->path_without_query ? req->path_without_query : "?",
+                           res->status_code,
+                           (long long)dur_ms,
+                           ua,
+                           ipbuf);
+                }
             }
         } else {
             aurora_http_response_set_status(res, 400, "Bad Request");
@@ -1737,8 +1880,18 @@ void aurora_server_accept_loop(AuroraServer* srv, AuroraRouter* router) {
         }
 #endif
         int64_t client_sock = (int64_t)(intptr_t)client;
+        /* Phase 38.3: slow-loris connection limit */
+        if (srv->max_connections > 0 && g_active_connections.load() >= srv->max_connections) {
+#ifdef _WIN32
+            closesocket(client);
+#else
+            close(client);
+#endif
+            continue;
+        }
         int64_t tls = try_tls_accept(client_sock, srv);
         if (tls < 0) { /* TLS accept failed — close connection */
+            srv->conn_errors++;
 #ifdef _WIN32
             closesocket(client);
 #else
@@ -2047,6 +2200,7 @@ void aurora_server_run(AuroraServer* srv) {
         std::lock_guard<std::mutex> lock(g_global_mutex);
         if (!g_global_router) g_global_router = aurora_router_new();
     }
+    aurora_server_mark_active(srv);
     aurora_server_start(srv);
     if (srv->running) {
         printf("[server] running on port %d\n", srv->port);

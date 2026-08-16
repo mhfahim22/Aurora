@@ -1,0 +1,19 @@
+## aurora/cache - Key/value cache helpers
+
+function cache_new(capacity: int):
+    return aurora_alloc(capacity)
+end
+
+extern function aurora_alloc(size: int) -> pointer
+
+function cache_put(c: pointer, key: cstring, value: cstring):
+    return 0
+end
+
+function cache_get(c: pointer, key: cstring):
+    return ""
+end
+
+function main():
+    output("aurora/cache seed ready")
+end

@@ -1,0 +1,26 @@
+## aurora/auth - Authentication helpers
+
+extern function aurora_session_begin(token: cstring) -> pointer
+extern function aurora_session_set(session: pointer, key: cstring, value: cstring) -> int
+extern function aurora_session_get(session: pointer, key: cstring) -> cstring
+extern function aurora_session_end(session: pointer) -> int
+
+function auth_login(session: pointer, user: cstring):
+    return aurora_session_set(session, "user", user)
+end
+
+function auth_user(session: pointer):
+    return aurora_session_get(session, "user")
+end
+
+function auth_logout(session: pointer):
+    return aurora_session_end(session)
+end
+
+function auth_begin(token: cstring):
+    return aurora_session_begin(token)
+end
+
+function main():
+    output("aurora/auth seed ready")
+end

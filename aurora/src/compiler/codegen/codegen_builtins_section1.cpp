@@ -91,16 +91,22 @@ llvm::Value* codegen_builtin_section1(
         return builder.CreateSelect(cmp, a, b, "max_sel");
     }
 
-    /* ── range(start, end) or range(end) ── */
+    /* ── range(start, end) or range(end) or range(start, end, step) ── */
     if (name == "range" && node->args) {
         llvm::Value* arg1 = gen_expr(node->args.get());
         llvm::Value* arg2 = nullptr;
-        if (node->args->next)
+        llvm::Value* arg3 = nullptr;
+        if (node->args->next) {
             arg2 = gen_expr(node->args->next.get());
+            if (node->args->next->next)
+                arg3 = gen_expr(node->args->next->next.get());
+        }
         if (!arg2) {
             arg2 = arg1;
             arg1 = llvm::ConstantInt::get(i64, 0);
         }
+        if (arg3)
+            return builder.CreateCall(builtins.range3, { arg1, arg2, arg3 }, "range_ret");
         return builder.CreateCall(builtins.range, { arg1, arg2 }, "range_ret");
     }
 
@@ -350,7 +356,12 @@ llvm::Value* codegen_builtin_section1(
         llvm::Value* val = gen_expr(node->args.get());
         if (!val) return llvm::ConstantInt::get(i64, 0);
         if (val->getType()->isPointerTy()) return val;
-        if (val->getType()->isDoubleTy()) {
+        /* H2: float variables are stored as i64 bit-patterns of doubles, so
+           check the AST annotation to route them to the float printer. */
+        if (val->getType()->isDoubleTy() ||
+            get_annotation_kind(node->args.get()) == AstTypeKind::Float) {
+            if (val->getType()->isIntegerTy())
+                val = builder.CreateBitCast(val, dbl, "fp_val");
             llvm::Function* f2s = module->getFunction("aurora_float_to_str");
             if (f2s) return builder.CreateCall(f2s, { val }, "str_ret");
         }

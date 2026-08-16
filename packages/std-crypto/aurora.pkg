@@ -1,0 +1,8 @@
+name: aurora/std-crypto
+version: 1.0.0
+author: Aurora Core Team
+description: Cryptographic primitives (SHA-256, AES, HMAC)
+entry: src/crypto.auf
+dependencies:
+permissions:
+

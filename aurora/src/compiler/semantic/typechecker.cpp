@@ -10,16 +10,23 @@
 
 /* ── FFI helper: parse type name string → AuroraType ── */
 static AuroraType parse_extern_type(const std::string& name) {
-    if (name == "int" || name == "i64" || name == "Int" || name == "u64")   return AuroraType::Int;
-    if (name == "i32" || name == "u32")    return AuroraType::Int;     /* treat as int */
-    if (name == "i16")    return AuroraType::Int;     /* treat as int */
-    if (name == "i8" || name == "char") return AuroraType::Int;  /* treat as int */
-    if (name == "float" || name == "f64" || name == "Float" || name == "double") return AuroraType::Float;
-    if (name == "f32")    return AuroraType::Float;   /* treat as float */
+    if (name == "int" || name == "Int")   return AuroraType::Int;
+    if (name == "i8")    return AuroraType::I8;
+    if (name == "i16" || name == "short") return AuroraType::I16;
+    if (name == "i32" || name == "int32") return AuroraType::I32;
+    if (name == "i64" || name == "long" || name == "Int64") return AuroraType::I64;
+    if (name == "u8" || name == "byte") return AuroraType::U8;
+    if (name == "u16" || name == "ushort") return AuroraType::U16;
+    if (name == "u32" || name == "uint")  return AuroraType::U32;
+    if (name == "u64" || name == "ulong") return AuroraType::U64;
+    if (name == "float" || name == "f32") return AuroraType::F32;
+    if (name == "f64" || name == "Float" || name == "double") return AuroraType::Float;
+    if (name == "char")  return AuroraType::Char;
     if (name == "string" || name == "String" || name == "str" || name == "cstring" || name == "char*") return AuroraType::String;
     if (name == "void" || name == "Void")    return AuroraType::Void;
     if (name == "bool" || name == "Bool")    return AuroraType::Bool;
     if (name == "pointer" || name == "Pointer" || name == "ptr" || name == "void*") return AuroraType::Pointer;
+    if (!name.empty() && name[0] == '[' && name.back() == ']')                    return AuroraType::Array;
     return AuroraType::Unknown;
 }
 
@@ -47,6 +54,18 @@ static AuroraType ast_kind_to_type(AstTypeKind k) {
         case AstTypeKind::Stack:     return AuroraType::Stack;
         case AstTypeKind::Queue:     return AuroraType::Queue;
         case AstTypeKind::Json:      return AuroraType::Json;
+        case AstTypeKind::I8:        return AuroraType::I8;
+        case AstTypeKind::I16:       return AuroraType::I16;
+        case AstTypeKind::I32:       return AuroraType::I32;
+        case AstTypeKind::I64:       return AuroraType::I64;
+        case AstTypeKind::U8:        return AuroraType::U8;
+        case AstTypeKind::U16:       return AuroraType::U16;
+        case AstTypeKind::U32:       return AuroraType::U32;
+        case AstTypeKind::U64:       return AuroraType::U64;
+        case AstTypeKind::F32:       return AuroraType::F32;
+        case AstTypeKind::Byte:      return AuroraType::Byte;
+        case AstTypeKind::Char:      return AuroraType::Char;
+        case AstTypeKind::FixedArray: return AuroraType::Array;
     }
     return AuroraType::Unknown;
 }
@@ -107,10 +126,68 @@ void TypeChecker::analyse(const ASTNode* root) {
     oop_set_current_tc(this);
     oop_clear_object_types();
 
+    /* Register built-in types: Option[T] and Result[T, E] */
+    register_builtin_types();
+
     register_functions(root);
     push_scope();
     walk_block(root);
     pop_scope();
+}
+
+void TypeChecker::register_builtin_types() {
+    /* ── Option[T] — Some(T) | None ── */
+    {
+        if (!global_type_registry().has_enum("Option")) {
+            EnumInfo opt_info;
+            opt_info.name = "Option";
+            opt_info.has_data = true;
+
+            EnumVariantInfo some;
+            some.name = "Some";
+            some.value = 0;
+            some.fields.push_back({"int", AstTypeKind::Int});
+            opt_info.variants.push_back(some);
+
+            EnumVariantInfo none;
+            none.name = "None";
+            none.value = 1;
+            opt_info.variants.push_back(none);
+
+            global_type_registry().register_enum(std::move(opt_info));
+
+            UserTypeEntry opt_entry;
+            opt_entry.kind = AuroraType::Enum;
+            user_types_["Option"] = std::move(opt_entry);
+        }
+    }
+
+    /* ── Result[T, E] — Ok(T) | Err(E) ── */
+    {
+        if (!global_type_registry().has_enum("Result")) {
+            EnumInfo res_info;
+            res_info.name = "Result";
+            res_info.has_data = true;
+
+            EnumVariantInfo ok;
+            ok.name = "Ok";
+            ok.value = 0;
+            ok.fields.push_back({"int", AstTypeKind::Int});
+            res_info.variants.push_back(ok);
+
+            EnumVariantInfo err;
+            err.name = "Err";
+            err.value = 1;
+            err.fields.push_back({"int", AstTypeKind::Int});
+            res_info.variants.push_back(err);
+
+            global_type_registry().register_enum(std::move(res_info));
+
+            UserTypeEntry res_entry;
+            res_entry.kind = AuroraType::Enum;
+            user_types_["Result"] = std::move(res_entry);
+        }
+    }
 }
 
 void TypeChecker::push_scope() {
@@ -222,7 +299,10 @@ std::string TypeChecker::type_describe(const std::string& var_name) const {
     return aurora_type_name(t);
 }
 
-void TypeChecker::register_functions(const ASTNode* node) {
+static void rescan_register_extern_fns(TypeChecker& tc, const ASTNode* node);
+
+void TypeChecker::register_functions(const ASTNode* root) {
+    const ASTNode* node = root;
     functions_["output"]        = FunctionTypeInfo{{AuroraType::Unknown}};
     functions_["outputln"]     = FunctionTypeInfo{{AuroraType::Unknown}};
     functions_["outputN"]      = FunctionTypeInfo{{}};
@@ -1372,7 +1452,7 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["mw_set_text_color"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
     functions_["mw_set_font_size"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
     functions_["mw_set_text"]          = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
-    functions_["mw_get_text"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Pointer};
+    functions_["mw_get_text"]          = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::String};
     functions_["mw_set_enabled"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
     functions_["mw_set_visible"]       = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
     functions_["mw_set_image"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
@@ -1387,6 +1467,17 @@ void TypeChecker::register_functions(const ASTNode* node) {
     functions_["mw_set_scroll_pos"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
     functions_["mw_get_scroll_pos"]    = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
     functions_["mw_render"]            = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Void};
+
+    /* ── 37.3 Mobile Widget Parity (gesture / safe-area / dark-mode) ── */
+    functions_["mw_set_long_press_ms"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_set_swipe_threshold"] = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_get_touch_state"]   = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["mw_set_safe_area"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Float, AuroraType::Float, AuroraType::Float, AuroraType::Float}, AuroraType::Void};
+    functions_["mw_get_safe_area"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer, AuroraType::Pointer}, AuroraType::Void};
+    functions_["mw_set_theme"]         = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
+    functions_["mw_get_theme"]         = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["mw_is_dark_mode"]      = FunctionTypeInfo{{AuroraType::Pointer}, AuroraType::Int};
+    functions_["mw_set_dark_mode"]     = FunctionTypeInfo{{AuroraType::Pointer, AuroraType::Int}, AuroraType::Void};
 
     /* ── Phase 16: Mobile Runtime ── */
 
@@ -1513,12 +1604,43 @@ void TypeChecker::register_functions(const ASTNode* node) {
             info.is_vararg = node->is_vararg;
             functions_[node->value] = info;
             /* H2 Phase D: annotate ExternFn node with resolved types */
-            annotate_node(node, info.result);
+            if (node->left && !node->left->value.empty() && node->left->value[0] == '[') {
+                auto& ann = const_cast<ASTNode*>(node)->type_annotation;
+                ann.kind = AstTypeKind::FixedArray;
+                ann.type_name = node->left->value;
+                std::string raw = node->left->value;
+                auto semi_pos = raw.find(';');
+                if (semi_pos != std::string::npos && raw.back() == ']') {
+                    std::string elem_name = raw.substr(1, semi_pos - 1);
+                    std::string size_str = raw.substr(semi_pos + 1, raw.size() - semi_pos - 2);
+                    ann.fixed_array_element_kind = to_ast_type_kind(resolve_type_name(elem_name));
+                    ann.fixed_array_size = std::atoi(size_str.c_str());
+                }
+            } else {
+                annotate_node(node, info.result);
+            }
             {
                 const ASTNode* ap = node->args.get();
                 size_t ai = 0;
                 while (ap && ai < info.params.size()) {
-                    annotate_node(ap, info.params[ai]);
+                    /* Preserve fixed array type info in annotation */
+                    if (ap->right && !ap->right->value.empty() &&
+                        ap->right->value[0] == '[') {
+                        auto& ann = const_cast<ASTNode*>(ap)->type_annotation;
+                        ann.kind = AstTypeKind::FixedArray;
+                        ann.type_name = ap->right->value;
+                        /* Parse [elem;size] inline */
+                        std::string raw = ap->right->value;
+                        auto semi_pos = raw.find(';');
+                        if (semi_pos != std::string::npos && raw.back() == ']') {
+                            std::string elem_name = raw.substr(1, semi_pos - 1);
+                            std::string size_str = raw.substr(semi_pos + 1, raw.size() - semi_pos - 2);
+                            ann.fixed_array_element_kind = to_ast_type_kind(resolve_type_name(elem_name));
+                            ann.fixed_array_size = std::atoi(size_str.c_str());
+                        }
+                    } else {
+                        annotate_node(ap, info.params[ai]);
+                    }
                     ap = ap->next.get();
                     ai++;
                 }
@@ -1578,6 +1700,53 @@ void TypeChecker::register_functions(const ASTNode* node) {
     for (auto& [name, info] : functions_) {
         if (info.result == AuroraType::String)
             global_string_fns().insert(name);
+    }
+
+    /* Safety rescan: ensure import-resolved ExternFn nodes are registered */
+    rescan_register_extern_fns(*this, root);
+}
+
+/* ── Public helper: register a single ExternFn node ── */
+void TypeChecker::register_extern_fn(const ASTNode* node) {
+    if (!node || node->type != NodeType::ExternFn) return;
+    if (functions_.find(node->value) != functions_.end()) return;
+
+    FunctionTypeInfo info;
+    const ASTNode* param = node->args.get();
+    while (param) {
+        AuroraType ptype = AuroraType::Int;
+        if (param->right) {
+            if (param->right->type == NodeType::FunctionType)
+                ptype = AuroraType::Pointer;
+            else {
+                std::string ptype_name = param->right->value;
+                if (is_valid_abi_type(ptype_name))
+                    ptype = parse_extern_type(ptype_name);
+            }
+        }
+        info.params.push_back(ptype);
+        param = param->next.get();
+    }
+    if (node->left) {
+        std::string ret_name = node->left->value;
+        if (is_valid_abi_type(ret_name))
+            info.result = parse_extern_type(ret_name);
+    } else {
+        info.result = AuroraType::Void;
+    }
+    info.is_vararg = node->is_vararg;
+    functions_[node->value] = info;
+}
+
+/* ── Recursive rescan: ensure all ExternFn nodes are registered ── */
+static void rescan_register_extern_fns(TypeChecker& tc, const ASTNode* node) {
+    while (node) {
+        if (node->type == NodeType::ExternFn)
+            tc.register_extern_fn(node);
+        if (node->body) rescan_register_extern_fns(tc, node->body.get());
+        if (node->left) rescan_register_extern_fns(tc, node->left.get());
+        if (node->right) rescan_register_extern_fns(tc, node->right.get());
+        node = node->next.get();
     }
 }
 
@@ -1819,7 +1988,11 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
 
         case NodeType::Output:
         case NodeType::Return:
-        case NodeType::Throw: {
+        case NodeType::Throw:
+        case NodeType::Panic:
+        case NodeType::Debug:
+        case NodeType::Log:
+        case NodeType::Assert: {
             AuroraType value_type = node->left ? infer_expr(node->left.get()) : AuroraType::Void;
             if (node->type == NodeType::Return && inside_function_) {
                 if (current_return_type_ == AuroraType::Unknown) {
@@ -1830,6 +2003,9 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
                     expect_assignable(current_return_type_, value_type, node->src_line);
                 }
             }
+            /* Assert: also typecheck the optional message */
+            if (node->type == NodeType::Assert && node->right)
+                infer_expr(node->right.get());
             /* H2 Phase E-1: propagate element kind from value expression */
             annotate_node(node, value_type, "",
                 node->left ? node->left->type_annotation.element_kind : AstTypeKind::Unknown);
@@ -2002,8 +2178,15 @@ void TypeChecker::walk_stmt(const ASTNode* node) {
 
             const ASTNode* param = node->args.get();
             while (param) {
-                define_var(param->value, AuroraType::Unknown);
-                annotate_node(param, AuroraType::Unknown);  /* H2 Phase D */
+                AuroraType ptype = AuroraType::Unknown;
+                if (param->right && !param->right->value.empty()) {
+                    ptype = resolve_type_name(param->right->value);
+                    annotate_node(param, ptype, param->right->value);
+                } else {
+                    annotate_node(param, AuroraType::Unknown);
+                }
+                define_var_elem(param->value, ptype,
+                    ptype == AuroraType::Interface ? AstTypeKind::Interface : AstTypeKind::Unknown);
                 param = param->next.get();
             }
 
@@ -2690,6 +2873,49 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
         if (dot != std::string::npos) {
             std::string obj_name    = node->value.substr(0, dot);
             std::string method_name = node->value.substr(dot + 1);
+
+            /* super.method(args) — validate parent has the method */
+            if (obj_name == "super") {
+                if (current_class_name_.empty())
+                    throw TypeError("'super' used outside of a class method", node->src_line);
+                const ClassInfo* cls = global_class_registry().get(current_class_name_);
+                if (!cls || cls->parent_name.empty())
+                    throw TypeError("class '" + current_class_name_ + "' has no parent to call super on", node->src_line);
+                const ClassMethodInfo* method =
+                    global_class_registry().find_method(cls->parent_name, method_name);
+                if (!method)
+                    throw TypeError("parent class '" + cls->parent_name + "' has no method '" + method_name + "'", node->src_line);
+                const ASTNode* arg = node->args.get();
+                while (arg) { infer_expr(arg); arg = arg->next.get(); }
+                if (method->return_kind != AstTypeKind::Unknown)
+                    return annotate_ret(node, ast_kind_to_type(method->return_kind));
+                return annotate_ret(node, AuroraType::Unknown);
+            }
+
+            /* Check if this is enum data construction: EnumName.Variant(args) */
+            if (global_type_registry().has_enum(obj_name)) {
+                const EnumInfo* einfo = global_type_registry().get_enum(obj_name);
+                if (einfo && einfo->has_data) {
+                    /* Check variant exists and validate field arg count */
+                    for (auto& v : einfo->variants) {
+                        if (v.name == method_name) {
+                            int arg_count = 0;
+                            const ASTNode* arg = node->args.get();
+                            while (arg) { infer_expr(arg); arg_count++; arg = arg->next.get(); }
+                            if (static_cast<size_t>(arg_count) != v.fields.size()) {
+                                std::ostringstream msg;
+                                msg << "enum variant '" << obj_name << "." << method_name
+                                    << "' expects " << v.fields.size() << " field(s), got " << arg_count;
+                                throw TypeError(msg.str(), node->src_line);
+                            }
+                            return annotate_ret(node, AuroraType::Enum, obj_name);
+                        }
+                    }
+                    std::ostringstream msg;
+                    msg << "unknown variant '" << method_name << "' for enum '" << obj_name << "'";
+                    throw TypeError(msg.str(), node->src_line);
+                }
+            }
             oop_check_method_call(obj_name, method_name, node->src_line);
             const ASTNode* arg = node->args.get();
             while (arg) { infer_expr(arg); arg = arg->next.get(); }
@@ -2731,7 +2957,7 @@ AuroraType TypeChecker::infer_call(const ASTNode* node) {
         arg = arg->next.get();
     }
 
-    if (node->value == "range" && (count == 1 || count == 2)) {
+    if (node->value == "range" && count >= 1 && count <= 3) {
         return annotate_ret(node, it->second.result);
     }
     if (node->value == "outputf" && count >= 1) {
@@ -2794,15 +3020,51 @@ bool TypeChecker::is_numeric(AuroraType type) const {
     return type == AuroraType::Int ||
            type == AuroraType::Float ||
            type == AuroraType::Bool ||
+           type == AuroraType::I8 ||
+           type == AuroraType::I16 ||
+           type == AuroraType::I32 ||
+           type == AuroraType::I64 ||
+           type == AuroraType::U8 ||
+           type == AuroraType::U16 ||
+           type == AuroraType::U32 ||
+           type == AuroraType::U64 ||
+           type == AuroraType::F32 ||
+           type == AuroraType::Byte ||
+           type == AuroraType::Char ||
            type == AuroraType::Unknown ||
            type == AuroraType::Generic;
 }
 
 bool TypeChecker::is_boolish(AuroraType type) const {
-    return type == AuroraType::Int ||
-           type == AuroraType::Bool ||
-           type == AuroraType::Unknown ||
-           type == AuroraType::Generic;
+    /* Any numeric type (int/uint/float/char/byte) or bool can serve as a
+       condition — non-zero/non-null is true. This matches the error
+       messages ("must be numeric or bool") and lets e.g. i32-returning
+       extern calls (glfwGetKey -> i32) be used directly in `if`. */
+    return is_numeric(type);
+}
+
+/* ── Integer promotion rank ── */
+static int numeric_rank(AuroraType t) {
+    switch (t) {
+        case AuroraType::I8:
+        case AuroraType::Char:    return 0;
+        case AuroraType::U8:
+        case AuroraType::Byte:    return 1;
+        case AuroraType::I16:     return 2;
+        case AuroraType::U16:     return 3;
+        case AuroraType::I32:     return 4;
+        case AuroraType::U32:     return 5;
+        case AuroraType::Int:
+        case AuroraType::I64:     return 6;
+        case AuroraType::U64:     return 7;
+        case AuroraType::F32:     return 8;
+        case AuroraType::Float:   return 9;
+        default:                  return -1;
+    }
+}
+
+static bool is_floating(AuroraType t) {
+    return t == AuroraType::F32 || t == AuroraType::Float;
 }
 
 AuroraType TypeChecker::common_numeric(AuroraType left, AuroraType right, int line) const {
@@ -2812,19 +3074,81 @@ AuroraType TypeChecker::common_numeric(AuroraType left, AuroraType right, int li
             << aurora_type_name(left) << " and " << aurora_type_name(right);
         throw TypeError(msg.str(), line);
     }
-    if (left == AuroraType::Float || right == AuroraType::Float) return AuroraType::Float;
-    if (left == AuroraType::Unknown || right == AuroraType::Unknown) return AuroraType::Unknown;
-    if (left == AuroraType::Generic || right == AuroraType::Generic) return AuroraType::Generic;
-    return AuroraType::Int;
+    /* If either is dynamic, result is dynamic */
+    if (left == AuroraType::Unknown || right == AuroraType::Unknown)
+        return AuroraType::Unknown;
+    if (left == AuroraType::Generic || right == AuroraType::Generic)
+        return AuroraType::Generic;
+
+    /* If either is float, widen to the wider float type */
+    if (is_floating(left) || is_floating(right)) {
+        if (left == AuroraType::Float || right == AuroraType::Float)
+            return AuroraType::Float;
+        return AuroraType::F32;
+    }
+
+    /* Integer promotion: choose the wider type by rank */
+    int lr = numeric_rank(left);
+    int rr = numeric_rank(right);
+    if (lr < 0) lr = 6;  /* Unknowns/others map to i64 */
+    if (rr < 0) rr = 6;
+    /* Prefer signed when ranks are equal (one is unsigned) */
+    if (lr == rr) {
+        /* Prefer the signed variant */
+        if (left == AuroraType::U8 || left == AuroraType::U16 ||
+            left == AuroraType::U32 || left == AuroraType::U64)
+            return right;
+        return left;
+    }
+    return (lr > rr) ? left : right;
 }
 
-void TypeChecker::expect_assignable(AuroraType target, AuroraType value, int line) const {
+/* ── Check if `value` can be implicitly widened to `target` ── */
+static bool is_widening(AuroraType target, AuroraType value) {
+    if (target == value) return true;
+    /* Same signedness: allow widening */
+    int tr = numeric_rank(target);
+    int vr = numeric_rank(value);
+    if (tr >= 0 && vr >= 0 && tr >= vr) {
+        /* Same float family */
+        if (is_floating(target) && is_floating(value)) return true;
+        /* Integer → float */
+        if (is_floating(target) && !is_floating(value)) return true;
+        /* Prefer signedness match */
+        bool t_signed = (target != AuroraType::U8 && target != AuroraType::U16 &&
+                         target != AuroraType::U32 && target != AuroraType::U64);
+        bool v_signed = (value != AuroraType::U8 && value != AuroraType::U16 &&
+                         value != AuroraType::U32 && value != AuroraType::U64);
+        if (t_signed == v_signed) return true;
+        /* Unsigned to wider signed is OK */
+        if (!v_signed && t_signed && tr > vr) return true;
+    }
+    /* Allow 'int' to/from i64, u64, etc. */
+    if (target == AuroraType::Int || target == AuroraType::I64 ||
+        target == AuroraType::U64) {
+        if (value == AuroraType::Int || value == AuroraType::I64 ||
+            value == AuroraType::U64) return true;
+    }
+    return false;
+}
+
+void TypeChecker::expect_assignable(AuroraType target, AuroraType value, int line, bool target_nullable) const {
     if (target == AuroraType::Unknown || value == AuroraType::Unknown ||
         target == AuroraType::Generic || value == AuroraType::Generic) {
         return;
     }
     if (target == value) return;
-    if (target == AuroraType::Float && value == AuroraType::Int) return;
+    /* Allow implicit widening numeric conversion */
+    if (is_numeric(target) && is_numeric(value) && is_widening(target, value)) return;
+    /* Allow null (value Int 0) to be assigned to nullable types */
+    if (target_nullable && (value == AuroraType::Int || value == AuroraType::I8 ||
+                            value == AuroraType::I16 || value == AuroraType::I32 ||
+                            value == AuroraType::I64 || value == AuroraType::U8 ||
+                            value == AuroraType::U16 || value == AuroraType::U32 ||
+                            value == AuroraType::U64 || value == AuroraType::Char)) {
+        /* Integer zero is allowed as null for nullable types */
+        return;
+    }
 
     std::ostringstream msg;
     msg << "expected " << aurora_type_name(target)

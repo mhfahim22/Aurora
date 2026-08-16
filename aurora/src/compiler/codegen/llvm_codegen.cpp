@@ -69,8 +69,10 @@ LLVMCodegen::LLVMCodegen()
     , builder_(std::make_unique<llvm::IRBuilder<>>(*ctx_))
 {
     ensure_llvm_init();
-    auto triple = llvm::sys::getProcessTriple();
-    module_->setTargetTriple(triple);
+    /* getProcessTriple() returns std::string or llvm::Triple depending on
+       the LLVM version — normalize to std::string for setTargetTriple. */
+    auto triple = llvm::Triple(llvm::sys::getProcessTriple()).str();
+    llvm_set_module_triple(module_.get(), triple);
     module_->setDataLayout(llvm_target_data_layout(triple));
 }
 
@@ -99,8 +101,11 @@ bool LLVMCodegen::emit_object_file(const std::string& obj_path) {
     ensure_llvm_init();
 
     std::string error;
+    /* getTargetTriple() returns std::string, llvm::Triple, or StringRef
+       depending on the LLVM version — normalize to std::string. */
+    auto target_triple = llvm::Triple(module_->getTargetTriple()).str();
     const llvm::Target* target = llvm::TargetRegistry::lookupTarget(
-        module_->getTargetTriple(), error);
+        target_triple, error);
     if (!target) {
         std::cerr << "LLVMCodegen: " << error << "\n";
         return false;
@@ -250,100 +255,11 @@ static void log_error(llvm::Error err) {
 }
 
 #ifdef _MSC_VER
-/* Force linker to keep aurora_gui_* symbols for JIT lookup */
-#pragma comment(linker, "/include:aurora_gui_app_init")
-#pragma comment(linker, "/include:aurora_gui_app_run")
-#pragma comment(linker, "/include:aurora_gui_app_quit")
-#pragma comment(linker, "/include:aurora_gui_window_new")
-#pragma comment(linker, "/include:aurora_gui_window_set_title")
-#pragma comment(linker, "/include:aurora_gui_window_resize")
-#pragma comment(linker, "/include:aurora_gui_window_show")
-#pragma comment(linker, "/include:aurora_gui_window_hide")
-#pragma comment(linker, "/include:aurora_gui_window_destroy")
-#pragma comment(linker, "/include:aurora_gui_window_get_width")
-#pragma comment(linker, "/include:aurora_gui_window_get_height")
-#pragma comment(linker, "/include:aurora_gui_window_set_min_size")
-#pragma comment(linker, "/include:aurora_gui_window_set_max_size")
-#pragma comment(linker, "/include:aurora_gui_window_set_resizable")
-#pragma comment(linker, "/include:aurora_gui_set_enabled")
-#pragma comment(linker, "/include:aurora_gui_get_enabled")
-#pragma comment(linker, "/include:aurora_gui_set_visible")
-#pragma comment(linker, "/include:aurora_gui_get_visible")
-#pragma comment(linker, "/include:aurora_gui_set_focus")
-#pragma comment(linker, "/include:aurora_gui_move")
-#pragma comment(linker, "/include:aurora_gui_widget_get_text")
-#pragma comment(linker, "/include:aurora_gui_widget_get_type")
-#pragma comment(linker, "/include:aurora_gui_widget_get_id")
-#pragma comment(linker, "/include:aurora_gui_widget_count")
-#pragma comment(linker, "/include:aurora_gui_widget_get_by_index")
-#pragma comment(linker, "/include:aurora_gui_label_new")
-#pragma comment(linker, "/include:aurora_gui_label_set_text")
-#pragma comment(linker, "/include:aurora_gui_label_get_text")
-#pragma comment(linker, "/include:aurora_gui_label_set_font_size")
-#pragma comment(linker, "/include:aurora_gui_label_set_color")
-#pragma comment(linker, "/include:aurora_gui_label_set_align")
-#pragma comment(linker, "/include:aurora_gui_button_new")
-#pragma comment(linker, "/include:aurora_gui_button_set_text")
-#pragma comment(linker, "/include:aurora_gui_button_get_text")
-#pragma comment(linker, "/include:aurora_gui_checkbox_new")
-#pragma comment(linker, "/include:aurora_gui_checkbox_set_text")
-#pragma comment(linker, "/include:aurora_gui_checkbox_get_text")
-#pragma comment(linker, "/include:aurora_gui_checkbox_is_checked")
-#pragma comment(linker, "/include:aurora_gui_checkbox_set_checked")
-#pragma comment(linker, "/include:aurora_gui_radiobutton_new")
-#pragma comment(linker, "/include:aurora_gui_radiobutton_set_text")
-#pragma comment(linker, "/include:aurora_gui_radiobutton_get_text")
-#pragma comment(linker, "/include:aurora_gui_radiobutton_is_checked")
-#pragma comment(linker, "/include:aurora_gui_radiobutton_set_checked")
-#pragma comment(linker, "/include:aurora_gui_switch_new")
-#pragma comment(linker, "/include:aurora_gui_switch_is_on")
-#pragma comment(linker, "/include:aurora_gui_switch_set_on")
-#pragma comment(linker, "/include:aurora_gui_textbox_new")
-#pragma comment(linker, "/include:aurora_gui_textbox_set_text")
-#pragma comment(linker, "/include:aurora_gui_textbox_get_text")
-#pragma comment(linker, "/include:aurora_gui_textbox_set_readonly")
-#pragma comment(linker, "/include:aurora_gui_textbox_set_placeholder")
-#pragma comment(linker, "/include:aurora_gui_textbox_set_multiline")
-#pragma comment(linker, "/include:aurora_gui_textbox_get_line_count")
-#pragma comment(linker, "/include:aurora_gui_passwordbox_new")
-#pragma comment(linker, "/include:aurora_gui_passwordbox_set_text")
-#pragma comment(linker, "/include:aurora_gui_passwordbox_get_text")
-#pragma comment(linker, "/include:aurora_gui_slider_new")
-#pragma comment(linker, "/include:aurora_gui_slider_get_value")
-#pragma comment(linker, "/include:aurora_gui_slider_set_value")
-#pragma comment(linker, "/include:aurora_gui_slider_set_range")
-#pragma comment(linker, "/include:aurora_gui_progressbar_new")
-#pragma comment(linker, "/include:aurora_gui_progressbar_set_value")
-#pragma comment(linker, "/include:aurora_gui_progressbar_get_value")
-#pragma comment(linker, "/include:aurora_gui_progressbar_set_range")
-#pragma comment(linker, "/include:aurora_gui_progressbar_set_marquee")
-#pragma comment(linker, "/include:aurora_gui_combobox_new")
-#pragma comment(linker, "/include:aurora_gui_combobox_add_item")
-#pragma comment(linker, "/include:aurora_gui_combobox_clear")
-#pragma comment(linker, "/include:aurora_gui_combobox_get_selected")
-#pragma comment(linker, "/include:aurora_gui_combobox_set_selected")
-#pragma comment(linker, "/include:aurora_gui_combobox_count")
-#pragma comment(linker, "/include:aurora_gui_combobox_get_item")
-#pragma comment(linker, "/include:aurora_gui_dropdown_new")
-#pragma comment(linker, "/include:aurora_gui_dropdown_add_item")
-#pragma comment(linker, "/include:aurora_gui_dropdown_clear")
-#pragma comment(linker, "/include:aurora_gui_dropdown_get_selected")
-#pragma comment(linker, "/include:aurora_gui_dropdown_set_selected")
-#pragma comment(linker, "/include:aurora_gui_dropdown_count")
-#pragma comment(linker, "/include:aurora_gui_dropdown_get_item")
-#pragma comment(linker, "/include:aurora_gui_listbox_new")
-#pragma comment(linker, "/include:aurora_gui_listbox_add_item")
-#pragma comment(linker, "/include:aurora_gui_listbox_clear")
-#pragma comment(linker, "/include:aurora_gui_listbox_get_selected")
-#pragma comment(linker, "/include:aurora_gui_listbox_get_item")
-#pragma comment(linker, "/include:aurora_gui_listbox_count")
-#pragma comment(linker, "/include:aurora_gui_webview_new")
-#pragma comment(linker, "/include:aurora_gui_webview_navigate")
-#pragma comment(linker, "/include:aurora_gui_webview_go_back")
-#pragma comment(linker, "/include:aurora_gui_webview_go_forward")
-#pragma comment(linker, "/include:aurora_gui_webview_reload")
-#pragma comment(linker, "/include:aurora_gui_webview_set_on_title")
-#pragma comment(linker, "/include:aurora_gui_webview_set_on_navigate")
+/* Force linker to keep aurora_runtime.lib symbols for JIT lookup.
+   Per-symbol /include: directives are auto-generated by CMake
+   from runtime_exports.hpp into linker_include_symbols.cpp.
+   Maintain that file instead of adding hardcoded pragmas here. */
+#pragma comment(linker, "/DEFAULTLIB:aurora_runtime.lib")
 #endif
 
 int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
@@ -392,7 +308,7 @@ int jit_execute_main(std::unique_ptr<llvm::LLVMContext> ctx,
     if (gen)
         static_cast<void>(jit->getMainJITDylib().addGenerator(std::move(*gen)));
 
-    module->setTargetTriple(jit->getTargetTriple().getTriple());
+    llvm_set_module_triple(module.get(), jit->getTargetTriple().str());
     module->setDataLayout(jit->getDataLayout());
 
     auto TSM = ThreadSafeModule(std::move(module), std::move(ctx));

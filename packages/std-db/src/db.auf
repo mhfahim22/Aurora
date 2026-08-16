@@ -1,0 +1,213 @@
+## Aurora SQLite Database Bindings
+## Usage: import "db"  or  import libc:db
+##
+## Low-level SQLite3 FFI via the native C module.
+##
+## Example:
+##   import "db"
+##   import "collections"
+##
+##   db = sqlite_open("test.db")
+##   if db == null
+##       output("Failed to open database")
+##       return
+##   end
+##   sqlite_exec(db, "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)")
+##   sqlite_exec(db, "INSERT INTO users VALUES (1, 'Alice', 30)")
+##   rows = sqlite_query(db, "SELECT * FROM users")
+##   for row in rows
+##       output("id=" + str(row.id) + " name=" + row.name)
+##   end
+##   sqlite_close(db)
+##
+## ════════════════════════════════════════════════════════════
+
+import "string"
+import "collections"
+
+## ── Connection management ──
+
+extern function aurora_db_sqlite_open(path: cstring) -> pointer
+extern function aurora_db_sqlite_close(db: pointer)
+
+## ── Query execution ──
+
+extern function aurora_db_sqlite_exec(db: pointer, sql: cstring) -> cstring
+extern function aurora_db_sqlite_query_json(db: pointer, sql: cstring) -> pointer
+extern function aurora_db_sqlite_execute(db: pointer, sql: cstring) -> i32
+
+## ── Prepared Statements ──
+
+extern function aurora_db_sqlite_prepare(db: pointer, sql: cstring) -> pointer
+
+extern function aurora_db_sqlite_bind_int(stmt: pointer, index: i32, value: i32)
+extern function aurora_db_sqlite_bind_double(stmt: pointer, index: i32, value: f64)
+extern function aurora_db_sqlite_bind_text(stmt: pointer, index: i32, value: cstring)
+extern function aurora_db_sqlite_bind_null(stmt: pointer, index: i32)
+
+extern function aurora_db_sqlite_step(stmt: pointer) -> i32
+extern function aurora_db_sqlite_column_count(stmt: pointer) -> i32
+extern function aurora_db_sqlite_column_name(stmt: pointer, col: i32) -> cstring
+extern function aurora_db_sqlite_column_type(stmt: pointer, col: i32) -> i32
+extern function aurora_db_sqlite_column_text(stmt: pointer, col: i32) -> cstring
+extern function aurora_db_sqlite_column_int(stmt: pointer, col: i32) -> i32
+extern function aurora_db_sqlite_column_double(stmt: pointer, col: i32) -> f64
+
+extern function aurora_db_sqlite_reset(stmt: pointer)
+extern function aurora_db_sqlite_finalize(stmt: pointer)
+
+## ── Transactions ──
+
+extern function aurora_db_sqlite_begin(db: pointer) -> i32
+extern function aurora_db_sqlite_commit(db: pointer) -> i32
+extern function aurora_db_sqlite_rollback(db: pointer) -> i32
+
+## ── Utility ──
+
+extern function aurora_db_sqlite_last_insert_rowid(db: pointer) -> i64
+extern function aurora_db_sqlite_changes(db: pointer) -> i32
+extern function aurora_db_sqlite_errcode(db: pointer) -> i32
+extern function aurora_db_sqlite_errmsg(db: pointer) -> cstring
+
+extern function aurora_db_sqlite_prep_query_json(stmt: pointer) -> pointer
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Connection ──
+
+function sqlite_open(path):
+    return aurora_db_sqlite_open(path)
+end
+
+function sqlite_close(db):
+    aurora_db_sqlite_close(db)
+end
+
+## ── Query ──
+
+function sqlite_exec(db, sql):
+    return aurora_db_sqlite_exec(db, sql)
+end
+
+function sqlite_query(db, sql):
+    return aurora_db_sqlite_query_json(db, sql)
+end
+
+function sqlite_execute(db, sql):
+    return aurora_db_sqlite_execute(db, sql)
+end
+
+## ── Prepared Statements ──
+
+function sqlite_prepare(db, sql):
+    return aurora_db_sqlite_prepare(db, sql)
+end
+
+function bind_int(stmt, idx, val):
+    aurora_db_sqlite_bind_int(stmt, idx + 1, val)
+end
+
+function bind_double(stmt, idx, val):
+    aurora_db_sqlite_bind_double(stmt, idx + 1, val)
+end
+
+function bind_text(stmt, idx, val):
+    aurora_db_sqlite_bind_text(stmt, idx + 1, val)
+end
+
+function bind_null(stmt, idx):
+    aurora_db_sqlite_bind_null(stmt, idx + 1)
+end
+
+function sqlite_step(stmt):
+    return aurora_db_sqlite_step(stmt)
+end
+
+function sqlite_column_count(stmt):
+    return aurora_db_sqlite_column_count(stmt)
+end
+
+function sqlite_column_name(stmt, col):
+    return aurora_db_sqlite_column_name(stmt, col)
+end
+
+function sqlite_column_type(stmt, col):
+    return aurora_db_sqlite_column_type(stmt, col)
+end
+
+function sqlite_column_text(stmt, col):
+    return aurora_db_sqlite_column_text(stmt, col)
+end
+
+function sqlite_column_int(stmt, col):
+    return aurora_db_sqlite_column_int(stmt, col)
+end
+
+function sqlite_column_double(stmt, col):
+    return aurora_db_sqlite_column_double(stmt, col)
+end
+
+function sqlite_reset(stmt):
+    aurora_db_sqlite_reset(stmt)
+end
+
+function sqlite_finalize(stmt):
+    aurora_db_sqlite_finalize(stmt)
+end
+
+## ── Fetch all rows from a prepared statement ──
+
+function sqlite_fetch_all(stmt):
+    return aurora_db_sqlite_prep_query_json(stmt)
+end
+
+## ── Transactions ──
+
+function sqlite_begin(db):
+    return aurora_db_sqlite_begin(db)
+end
+
+function sqlite_commit(db):
+    return aurora_db_sqlite_commit(db)
+end
+
+function sqlite_rollback(db):
+    return aurora_db_sqlite_rollback(db)
+end
+
+## ── Utility ──
+
+function sqlite_last_rowid(db):
+    return aurora_db_sqlite_last_insert_rowid(db)
+end
+
+function sqlite_changes(db):
+    return aurora_db_sqlite_changes(db)
+end
+
+function sqlite_errcode(db):
+    return aurora_db_sqlite_errcode(db)
+end
+
+function sqlite_errmsg(db):
+    return aurora_db_sqlite_errmsg(db)
+end
+
+## ════════════════════════════════════════════════════════════
+## High-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## Open and return a connection map (like database.auf style)
+function sqlite_connect_map(path):
+    info = map()
+    conn = sqlite_open(path)
+    if conn == null
+        map_set(info, "error", "Failed to open SQLite database: " + path)
+        return info
+    end
+    info.driver = "sqlite3"
+    info.handle = conn
+    return info
+end

@@ -136,6 +136,11 @@ static JsonValue* json_parse_array(JsonParser* ps) {
             arr->count++;
             arr->items = (JsonValue**)aurora_safe_realloc(arr->items, arr->count * sizeof(JsonValue*));
             arr->items[arr->count - 1] = elem;
+        } else {
+            /* Malformed element (e.g. stray token like `[1 x]`): json_parse_value
+               returns nullptr without advancing. Break to avoid an infinite loop
+               instead of spinning on the same character forever. */
+            break;
         }
         json_skip_ws(ps);
         if (*ps->p == ']') { ps->p++; break; }
@@ -165,7 +170,11 @@ static JsonValue* json_parse_object(JsonParser* ps) {
             obj->keys[obj->count - 1] = key;
             obj->items[obj->count - 1] = val;
         } else {
+            /* Malformed value (e.g. `{"a":x}`): json_parse_value returned
+               nullptr without advancing. Free the key and stop to avoid an
+               infinite loop. */
             aurora_free(key);
+            break;
         }
         json_skip_ws(ps);
         if (*ps->p == '}') { ps->p++; break; }

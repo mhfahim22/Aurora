@@ -15,6 +15,7 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
+#include <cstdlib>
 
 /* ── Forward declaration for extern_type_to_llvm helper ── */
 /* (defined in codegen_stmt.cpp, used here for struct field types) */
@@ -26,7 +27,22 @@ static llvm::Type* struct_field_llvm_type(llvm::LLVMContext& ctx, const StructFi
         switch (f.type_kind) {
             case AstTypeKind::String:  return llvm::PointerType::getUnqual(ctx);
             case AstTypeKind::Float:   return llvm::Type::getDoubleTy(ctx);
-            case AstTypeKind::Bool:    return llvm::Type::getInt8Ty(ctx);
+            case AstTypeKind::F32:     return llvm::Type::getFloatTy(ctx);
+            case AstTypeKind::Bool:
+            case AstTypeKind::I8:
+            case AstTypeKind::U8:
+            case AstTypeKind::Byte:
+            case AstTypeKind::Char:    return llvm::Type::getInt8Ty(ctx);
+            case AstTypeKind::I16:
+            case AstTypeKind::U16:     return llvm::Type::getInt16Ty(ctx);
+            case AstTypeKind::I32:
+            case AstTypeKind::U32:     return llvm::Type::getInt32Ty(ctx);
+            case AstTypeKind::I64:
+            case AstTypeKind::U64:     return llvm::Type::getInt64Ty(ctx);
+            case AstTypeKind::FixedArray:
+                if (!f.type_name.empty())
+                    return extern_type_to_llvm(ctx, f.type_name);
+                return llvm::Type::getInt64Ty(ctx);
             default:                   return llvm::Type::getInt64Ty(ctx);
         }
     }
@@ -102,11 +118,45 @@ void Codegen::gen_struct_decl(const ASTNode* node) {
     get_or_create_struct_type(ctx_, sname);
 }
 
+/* ── Enum type cache ── */
+static std::unordered_map<std::string, llvm::StructType*> enum_type_cache_;
+
+/* Get or create the tagged union LLVM type for an enum with data */
+static llvm::StructType* get_or_create_enum_type(
+        llvm::LLVMContext& ctx,
+        const std::string& enum_name) {
+    auto it = enum_type_cache_.find(enum_name);
+    if (it != enum_type_cache_.end())
+        return it->second;
+
+    const EnumInfo* einfo = global_type_registry().get_enum(enum_name);
+    if (!einfo || !einfo->has_data) {
+        /* Fallback: plain i64 */
+        auto* ty = llvm::StructType::create(ctx, llvm::Type::getInt64Ty(ctx), enum_name);
+        enum_type_cache_[enum_name] = ty;
+        return ty;
+    }
+
+    size_t max_fields = 0;
+    for (auto& v : einfo->variants)
+        if (v.fields.size() > max_fields)
+            max_fields = v.fields.size();
+
+    std::vector<llvm::Type*> members;
+    members.push_back(llvm::Type::getInt64Ty(ctx)); /* discriminant */
+    members.push_back(llvm::ArrayType::get(llvm::Type::getInt64Ty(ctx), max_fields));
+    auto* st = llvm::StructType::create(ctx, members, enum_name);
+    enum_type_cache_[enum_name] = st;
+    return st;
+}
+
 /* ── Codegen: enum declaration ──
-   Enums become an i64 for now (the discriminant). */
+   Enums without data become i64 (the discriminant).
+   Enums with data become a tagged union:
+     %EnumName = type { i64, [MAX_DATA_WORDS x i64] } */
 void Codegen::gen_enum_decl(const ASTNode* node) {
-    /* Enum values are just i64 constants — no runtime code needed */
-    static_cast<void>(node);
+    if (!node) return;
+    get_or_create_enum_type(ctx_, node->value);
 }
 
 /* ── Codegen: type alias ──
@@ -164,18 +214,30 @@ llvm::Value* codegen_struct_alloca(
 /* Standalone type mapper (accessible from codegen_types). */
 /* Struct names are now recognized: they resolve to the named LLVM struct type. */
 static llvm::Type* extern_type_to_llvm(llvm::LLVMContext& ctx, const std::string& type_name) {
-    if (type_name == "int" || type_name == "i64" || type_name == "Int" || type_name == "u64")
+    if (type_name == "int" || type_name == "Int")
         return llvm::Type::getInt64Ty(ctx);
-    if (type_name == "i32" || type_name == "u32")
-        return llvm::Type::getInt32Ty(ctx);
+    if (type_name == "i8")
+        return llvm::Type::getInt8Ty(ctx);
     if (type_name == "i16")
         return llvm::Type::getInt16Ty(ctx);
-    if (type_name == "i8" || type_name == "char")
+    if (type_name == "i32")
+        return llvm::Type::getInt32Ty(ctx);
+    if (type_name == "i64" || type_name == "long")
+        return llvm::Type::getInt64Ty(ctx);
+    if (type_name == "u8" || type_name == "byte")
         return llvm::Type::getInt8Ty(ctx);
-    if (type_name == "float" || type_name == "f64" || type_name == "Float" || type_name == "double")
-        return llvm::Type::getDoubleTy(ctx);
-    if (type_name == "f32")
+    if (type_name == "u16")
+        return llvm::Type::getInt16Ty(ctx);
+    if (type_name == "u32" || type_name == "uint")
+        return llvm::Type::getInt32Ty(ctx);
+    if (type_name == "u64" || type_name == "ulong")
+        return llvm::Type::getInt64Ty(ctx);
+    if (type_name == "f32" || type_name == "float" || type_name == "Float")
         return llvm::Type::getFloatTy(ctx);
+    if (type_name == "f64" || type_name == "double")
+        return llvm::Type::getDoubleTy(ctx);
+    if (type_name == "char")
+        return llvm::Type::getInt8Ty(ctx);
     if (type_name == "string" || type_name == "String" || type_name == "str" || type_name == "cstring"
         || type_name == "char*" || type_name == "void*"
         || type_name == "pointer" || type_name == "Pointer" || type_name == "ptr")
@@ -184,12 +246,29 @@ static llvm::Type* extern_type_to_llvm(llvm::LLVMContext& ctx, const std::string
         return llvm::Type::getInt8Ty(ctx); /* C99 _Bool */
     if (type_name == "void" || type_name == "Void")
         return llvm::Type::getVoidTy(ctx);
+    /* Fixed-size array: [elem_type; size] */
+    if (!type_name.empty() && type_name[0] == '[' && type_name.back() == ']') {
+        auto semi = type_name.find(';');
+        if (semi != std::string::npos) {
+            std::string elem = type_name.substr(1, semi - 1);
+            std::string ssize = type_name.substr(semi + 1, type_name.size() - semi - 2);
+            int arr_size = std::atoi(ssize.c_str());
+            if (arr_size > 0) {
+                llvm::Type* elem_ty = extern_type_to_llvm(ctx, elem);
+                return llvm::ArrayType::get(elem_ty, static_cast<unsigned>(arr_size));
+            }
+        }
+    }
     /* Check if it's a registered struct type */
     if (global_type_registry().has_struct(type_name))
         return get_or_create_struct_type(ctx, type_name);
-    /* Check if it's a registered enum type (treat as i64) */
-    if (global_type_registry().has_enum(type_name))
+    /* Check if it's a registered enum type */
+    if (global_type_registry().has_enum(type_name)) {
+        const EnumInfo* einfo = global_type_registry().get_enum(type_name);
+        if (einfo && einfo->has_data)
+            return get_or_create_enum_type(ctx, type_name);
         return llvm::Type::getInt64Ty(ctx);
+    }
     /* default: i64 */
     return llvm::Type::getInt64Ty(ctx);
 }
@@ -240,4 +319,19 @@ llvm::Value* codegen_struct_gep(
         llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), idx, true)
     };
     return builder.CreateGEP(st, struct_ptr, indices, field_name + ".ptr");
+}
+
+/* ════════════════════════════════════════════════════════════
+   Enum type helpers
+   ════════════════════════════════════════════════════════════ */
+
+/* Get or create the LLVM struct type for an enum (tagged union if has data) */
+llvm::StructType* codegen_get_enum_type(llvm::LLVMContext& ctx, const std::string& enum_name) {
+    return get_or_create_enum_type(ctx, enum_name);
+}
+
+/* Check if an enum has data-carrying variants */
+bool codegen_enum_has_data(const std::string& enum_name) {
+    const EnumInfo* einfo = global_type_registry().get_enum(enum_name);
+    return einfo && einfo->has_data;
 }

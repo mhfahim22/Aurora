@@ -15,6 +15,7 @@ struct AuroraStr {
     char*    ptr;
     size_t   len;
     size_t   cap;
+    int      shared;   /* 1 = shared/immutable (e.g. cached literal) — append must clone */
 };
 
 /* ── Allocate a new AuroraStr with given capacity ── */
@@ -25,6 +26,10 @@ extern "C" void aurora_str_free(AuroraStr* s);
 
 /* ── Create AuroraStr from a C string (copies data) ── */
 extern "C" AuroraStr* aurora_str_from_cstr(const char* cstr);
+
+/* ── Create a shared, immutable AuroraStr (cached literal) ── */
+/* Marked shared=1: aurora_str_append clones it instead of mutating in place. */
+extern "C" AuroraStr* aurora_str_literal(const char* cstr);
 
 /* ── Create AuroraStr from raw parts (takes ownership) ── */
 extern "C" AuroraStr* aurora_str_from_parts(char* ptr, size_t len, size_t cap);
@@ -46,6 +51,9 @@ extern "C" AuroraStr* aurora_float_to_str(double val);
 /* ── Append string b to string a, reusing a's buffer with exponential growth ── */
 /* Does NOT free b — caller owns b's lifetime. */
 extern "C" AuroraStr* aurora_str_append(AuroraStr* a, AuroraStr* b);
+
+/* ── Compare two AuroraStr for content equality (returns 1 if equal, 0 if not) ── */
+extern "C" int64_t aurora_str_equal(AuroraStr* a, AuroraStr* b);
 
 /* ── Repeat source string n times with single allocation ── */
 extern "C" AuroraStr* aurora_str_repeat(AuroraStr* src, int64_t n);

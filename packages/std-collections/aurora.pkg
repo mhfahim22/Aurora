@@ -1,0 +1,8 @@
+name: aurora/std-collections
+version: 1.0.0
+author: Aurora Core Team
+description: Data structures (list, map, set, queue) for Aurora
+entry: src/collections.auf
+dependencies:
+permissions:
+

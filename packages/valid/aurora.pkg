@@ -1,0 +1,8 @@
+name: aurora/valid
+version: 1.0.0
+author: Community
+description: Input validation and sanitization helpers
+entry: src/valid.auf
+dependencies:
+permissions:
+

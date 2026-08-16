@@ -162,6 +162,8 @@ AURORA_EXPORT int          aurora_gui_window_get_height(AuroraWidget win);
 AURORA_EXPORT void         aurora_gui_window_set_min_size(AuroraWidget win, int w, int h);
 AURORA_EXPORT void         aurora_gui_window_set_max_size(AuroraWidget win, int w, int h);
 AURORA_EXPORT void         aurora_gui_window_set_resizable(AuroraWidget win, int resizable);
+AURORA_EXPORT int          aurora_gui_window_set_dark_mode(AuroraWidget win, int enable);
+AURORA_EXPORT int          aurora_gui_window_set_effect(AuroraWidget win, int effect);
 
 /* ════════════════════════════════════════════════════════════
    Application

@@ -32,6 +32,16 @@ enum class AstTypeKind {
     Stack,
     Queue,
     Json,
+
+    /* Integer/float subtypes (Phase 7 type-system fix) */
+    I8, I16, I32, I64,
+    U8, U16, U32, U64,
+    F32,
+    Byte,
+    Char,
+
+    /* Fixed-size arrays (Phase 11 type-system fix) */
+    FixedArray,
 };
 
 inline const char* ast_type_kind_name(AstTypeKind k) {
@@ -57,6 +67,18 @@ inline const char* ast_type_kind_name(AstTypeKind k) {
         case AstTypeKind::Stack:     return "stack";
         case AstTypeKind::Queue:     return "queue";
         case AstTypeKind::Json:      return "json";
+        case AstTypeKind::I8:        return "i8";
+        case AstTypeKind::I16:       return "i16";
+        case AstTypeKind::I32:       return "i32";
+        case AstTypeKind::I64:       return "i64";
+        case AstTypeKind::U8:        return "u8";
+        case AstTypeKind::U16:       return "u16";
+        case AstTypeKind::U32:       return "u32";
+        case AstTypeKind::U64:       return "u64";
+        case AstTypeKind::F32:       return "f32";
+        case AstTypeKind::Byte:      return "byte";
+        case AstTypeKind::Char:      return "char";
+        case AstTypeKind::FixedArray: return "fixed_array";
     }
     return "unknown";
 }
@@ -72,6 +94,10 @@ struct AstTypeAnnotation {
 
     /* For arrays: element type */
     AstTypeKind element_kind { AstTypeKind::Unknown };
+
+    /* For fixed-size arrays: element type and size */
+    int         fixed_array_size { 0 };
+    AstTypeKind fixed_array_element_kind { AstTypeKind::Unknown };
 
     /* For user-defined types (struct, enum, class, interface): the type name */
     std::string type_name {};

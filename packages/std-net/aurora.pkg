@@ -1,0 +1,8 @@
+name: aurora/std-net
+version: 1.0.0
+author: Aurora Core Team
+description: TCP/UDP networking for Aurora
+entry: src/net.auf
+dependencies:
+permissions:
+

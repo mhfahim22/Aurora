@@ -116,6 +116,24 @@ static void draw_text_centered(HDC dc, float x, float y, float w, float h,
 static void save_clip(HDC dc) { SaveDC(dc); }
 static void restore_clip(HDC dc) { RestoreDC(dc, -1); }
 
+/* ── 37.3 Dark-mode palette resolution ──
+   Roles: 0=surface, 1=surface-alt, 2=primary text, 3=border,
+          4=track, 5=scrim. Widgets that carry explicit bg_color /
+   text_color keep them; these roles only supply the defaults so light
+   and dark themes render identically across all three backends. */
+static COLORREF theme_color(MwWidget* w, int role) {
+    int dark = w->dark_mode == MW_THEME_DARK;
+    switch (role) {
+        case 0: return dark ? RGB(28, 28, 30)  : RGB(255, 255, 255); /* surface */
+        case 1: return dark ? RGB(44, 44, 46)  : RGB(245, 245, 245); /* surface-alt */
+        case 2: return dark ? RGB(235, 235, 240) : RGB(0, 0, 0);     /* primary text */
+        case 3: return dark ? RGB(84, 84, 88)  : RGB(180, 180, 180); /* border */
+        case 4: return dark ? RGB(90, 90, 94)  : RGB(200, 200, 200); /* track */
+        case 5: return RGB(0, 0, 0);                                   /* scrim */
+        default: return dark ? RGB(28, 28, 30) : RGB(255, 255, 255);
+    }
+}
+
 static void clip_rect(HDC dc, float x, float y, float w, float h) {
     HRGN rgn = CreateRectRgn((int)x, (int)y, (int)(x + w), (int)(y + h));
     SelectClipRgn(dc, rgn);
@@ -168,10 +186,10 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
             break;
         }
         case MW_INPUT: {
-            draw_rect(dc, abs_x, abs_y, w->w, w->h, RGB(255,255,255), 1);
-            draw_rect(dc, abs_x, abs_y, w->w, w->h, RGB(180,180,180), 0);
+            draw_rect(dc, abs_x, abs_y, w->w, w->h, theme_color(w, 0), 1);
+            draw_rect(dc, abs_x, abs_y, w->w, w->h, theme_color(w, 3), 0);
             if (w->text && w->text[0])
-                draw_text(dc, abs_x+4, abs_y + w->h/2 - w->font_size/3, w->text, RGB(0,0,0), w->font_size);
+                draw_text(dc, abs_x+4, abs_y + w->h/2 - w->font_size/3, w->text, theme_color(w, 2), w->font_size);
             break;
         }
         case MW_IMAGE: {
@@ -184,9 +202,9 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
             float rh = 40;
             for (int i = 0; i < w->item_count; i++) {
                 float ry = abs_y + i*rh;
-                if (i%2==1) draw_rect(dc, abs_x, ry, w->w, rh, RGB(245,245,245), 1);
-                if (w->items[i]) draw_text(dc, abs_x+8, ry+rh/2-7, w->items[i], RGB(0,0,0), 14);
-                draw_line(dc, abs_x, ry+rh, abs_x+w->w, ry+rh, RGB(200,200,200));
+                if (i%2==1) draw_rect(dc, abs_x, ry, w->w, rh, theme_color(w, 1), 1);
+                if (w->items[i]) draw_text(dc, abs_x+8, ry+rh/2-7, w->items[i], theme_color(w, 2), 14);
+                draw_line(dc, abs_x, ry+rh, abs_x+w->w, ry+rh, theme_color(w, 3));
             }
             break;
         }
@@ -197,7 +215,7 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
             int rows = (w->child_count + cols - 1) / cols;
             if (rows < 1) rows = 1;
             float rh2 = w->h / rows;
-            int gc = RGB(200,200,200);
+            int gc = theme_color(w, 3);
             for (int c = 1; c < cols; c++)
                 draw_line(dc, abs_x + c*cw, abs_y, abs_x + c*cw, abs_y + w->h, gc);
             for (int r = 1; r < rows; r++)
@@ -219,7 +237,7 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
         }
         case MW_SLIDER: {
             float ty = abs_y + w->h/2 - 2;
-            draw_round_rect(dc, abs_x, ty, w->w, 4, 2, RGB(180,180,180), 1);
+            draw_round_rect(dc, abs_x, ty, w->w, 4, 2, theme_color(w, 4), 1);
             float fill = (w->value > 0 && w->value <= 100) ? w->value/100.0f : 0.5f;
             if (fill > 0) draw_round_rect(dc, abs_x, ty, w->w*fill, 4, 2, RGB(76,153,255), 1);
             draw_circle(dc, abs_x+w->w*fill, abs_y+w->h/2, 8, RGB(255,255,255), 1);
@@ -237,7 +255,7 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
         case MW_CHECKBOX: {
             float box = w->h < 24 ? w->h : 24;
             float bx = abs_x, by = abs_y + (w->h-box)/2;
-            draw_round_rect(dc, bx, by, box, box, 3, RGB(128,128,128), 0);
+            draw_round_rect(dc, bx, by, box, box, 3, theme_color(w, 3), 0);
             if (w->value > 0) {
                 draw_round_rect(dc, bx+2, by+2, box-4, box-4, 2, RGB(76,153,255), 1);
                 draw_line(dc, bx+4, by+box/2, bx+box/2-2, by+box-5, RGB(255,255,255));
@@ -252,7 +270,7 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
         case MW_RADIO: {
             float rs = w->h < 24 ? w->h : 24;
             float cx = abs_x + rs/2, cy = abs_y + w->h/2;
-            draw_circle(dc, cx, cy, rs/2, RGB(128,128,128), 0);
+            draw_circle(dc, cx, cy, rs/2, theme_color(w, 3), 0);
             draw_circle(dc, cx, cy, rs/2-2, RGB(255,255,255), 1);
             if (w->value > 0) draw_circle(dc, cx, cy, rs/2-4, RGB(76,153,255), 1);
             if (w->text && w->text[0]) {
@@ -263,18 +281,18 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
         }
         case MW_PROGRESS: {
             float py = abs_y + w->h/2 - 4;
-            draw_round_rect(dc, abs_x, py, w->w, 8, 4, RGB(200,200,200), 1);
+            draw_round_rect(dc, abs_x, py, w->w, 8, 4, theme_color(w, 4), 1);
             float pct = w->value > 0 ? w->value/100.0f : 0.0f;
             if (pct > 0) draw_round_rect(dc, abs_x+1, py+1, (w->w-2)*pct, 6, 3, RGB(76,153,255), 1);
             break;
         }
         case MW_DIALOG: {
-            draw_rect(dc, (int)offset_x, (int)offset_y, 10000, 10000, RGB(0,0,0), 1);
+            draw_rect(dc, (int)offset_x, (int)offset_y, 10000, 10000, theme_color(w, 5), 1);
             float dw = w->w > 0 ? w->w : 300;
             float dh = w->h > 0 ? w->h : 200;
-            draw_round_rect(dc, abs_x, abs_y, dw, dh, 12, RGB(255,255,255), 1);
+            draw_round_rect(dc, abs_x, abs_y, dw, dh, 12, theme_color(w, 0), 1);
             if (w->text && w->text[0])
-                draw_text(dc, abs_x+16, abs_y+16, w->text, RGB(0,0,0), w->font_size+4);
+                draw_text(dc, abs_x+16, abs_y+16, w->text, theme_color(w, 2), w->font_size+4);
             break;
         }
         case MW_SNACKBAR: {
@@ -284,8 +302,8 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
             break;
         }
         case MW_BOTTOM_SHEET: {
-            draw_rect(dc, (int)offset_x, (int)offset_y, 10000, 10000, RGB(0,0,0), 1);
-            draw_round_rect(dc, abs_x, abs_y, w->w, w->h, 16, RGB(255,255,255), 1);
+            draw_rect(dc, (int)offset_x, (int)offset_y, 10000, 10000, theme_color(w, 5), 1);
+            draw_round_rect(dc, abs_x, abs_y, w->w, w->h, 16, theme_color(w, 0), 1);
             break;
         }
         case MW_NAV_BAR: {
@@ -297,19 +315,19 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
         case MW_TAB_BAR: {
             int tc2 = w->item_count > 0 ? w->item_count : 1;
             float tw = w->w / tc2;
-            draw_rect(dc, abs_x, abs_y, w->w, w->h, RGB(240,240,240), 1);
-            draw_line(dc, abs_x, abs_y, abs_x+w->w, abs_y, RGB(200,200,200));
+            draw_rect(dc, abs_x, abs_y, w->w, w->h, theme_color(w, 1), 1);
+            draw_line(dc, abs_x, abs_y, abs_x+w->w, abs_y, theme_color(w, 3));
             for (int i = 0; i < tc2; i++) {
                 const char* lb = (i < w->item_count && w->items[i]) ? w->items[i] : "Tab";
-                draw_text_centered(dc, abs_x+i*tw, abs_y, tw, w->h, lb, RGB(0,0,0), 12);
+                draw_text_centered(dc, abs_x+i*tw, abs_y, tw, w->h, lb, theme_color(w, 2), 12);
                 if (i == w->selected_index)
                     draw_rect(dc, abs_x+i*tw+8, abs_y+w->h-3, tw-16, 3, RGB(76,153,255), 1);
             }
             break;
         }
         case MW_DRAWER: {
-            draw_rect(dc, (int)offset_x, (int)offset_y, 10000, 10000, RGB(0,0,0), 1);
-            draw_rect(dc, abs_x, abs_y, w->w, w->h, RGB(255,255,255), 1);
+            draw_rect(dc, (int)offset_x, (int)offset_y, 10000, 10000, theme_color(w, 5), 1);
+            draw_rect(dc, abs_x, abs_y, w->w, w->h, theme_color(w, 0), 1);
             break;
         }
         case MW_COLUMN: case MW_ROW: default: break;
@@ -323,7 +341,10 @@ static void render_widget_desktop(MwWidget* w, float offset_x, float offset_y) {
 
 void mw_desktop_render(void* widget) {
     if (!widget || !g_render_dc) return;
-    render_widget_desktop((MwWidget*)widget, 0, 0);
+    MwWidget* root = (MwWidget*)widget;
+    /* 37.3 — reserve the root's safe-area insets (left, top) so content
+       clears the notch / status bar exactly like on device. */
+    render_widget_desktop(root, root->safe_area[2], root->safe_area[0]);
 }
 
 #else /* !_WIN32 */

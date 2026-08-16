@@ -99,3 +99,33 @@ All 21 build targets, 3 CTest suites, and 49 IR verification tests continue to p
 2. Implement CRL/OCSP stapling for TLS connections
 3. Add compile-time bounds checking via `_FORTIFY_SOURCE`
 4. Consider sandboxing QuickJS with `JS_SetModuleLoaderFunc` restriction
+
+---
+
+## 4. OWASP Top 10 Checklist (Phase 38.4)
+
+Verification of the web framework against OWASP Top 10 (2021) — each item is
+checked against the built-in security APIs (`app_security`, `security`,
+server middleware, rate limiter) plus the phase-38 hardening work.
+
+| # | OWASP Top 10 (2021) | Aurora Mitigation | Status |
+|---|--------------------|--------------------|--------|
+| A01 | Broken Access Control | `aurora_sec_permission_check/request/revoke` + `role_required` middleware + session auth | ✅ Pass |
+| A02 | Cryptographic Failures | AES-256-CBC + PBKDF2 (10000 iter) + SHA-256/HMAC + `aurora_sec_encrypt/decrypt` | ✅ Pass |
+| A03 | Injection (SQL/XSS/path) | ORM prepared statements; `aurora_app_security_sanitize`; `aurora_sec_sandbox_check_path` | ✅ Pass |
+| A04 | Insecure Design | Rate limiter (token bucket, per-IP) + gateway batch guard + request size limits | ✅ Pass |
+| A05 | Security Misconfiguration | Secure storage default; sandbox off-by-default; explicit permissions | ✅ Pass |
+| A06 | Vulnerable Components | SQLite3 amalgamation pinned; QuickJS/Rust/Python bridges version-noted | ⚠️ Pass w/ note |
+| A07 | Identification & Auth Failures | JWT HS256 (`aurora_jwt_encode/decode`) + password hashing (PBKDF2-SHA256) | ✅ Pass |
+| A08 | Software & Data Integrity | Package checksums (voss); JWT signature verification enforced | ✅ Pass |
+| A09 | Logging & Monitoring | `aurora_server_*` structured request logging; metrics endpoint (/metrics) | ✅ Pass |
+| A10 | SSRF | Restricted redirects; URL validation in `aurora_net_http_get/post` | ⚠️ Pass w/ note |
+
+**Test coverage (Phase 38.4):** SQL injection, XSS, and path-traversal
+sanitization tests compile and pass via `Workflow/tests/test_sec_input.aura`.
+Rate limiter distributed (Redis-compatible) mode available via
+`aurora_ratelimit_redis_*` RESTP client — see `security.auf`.
+X.509 certificate APIs now perform real DER parsing (subject/issuer/serial,
+validity window, SHA-256 fingerprint) — `aurora_sec_cert_load/info/verify/free`.
+
+**Overall:** 8/10 Pass, 2/10 Pass-with-note. No Critical/High findings open.

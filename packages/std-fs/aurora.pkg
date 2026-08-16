@@ -1,0 +1,8 @@
+name: aurora/std-fs
+version: 1.0.0
+author: Aurora Core Team
+description: Filesystem operations for Aurora
+entry: src/fs.auf
+dependencies:
+permissions:
+

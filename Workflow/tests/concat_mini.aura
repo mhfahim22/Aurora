@@ -1,0 +1,6 @@
+function main()
+    output("concat start")
+    v = 42
+    output("v=" + v)
+    output("concat PASS")
+end

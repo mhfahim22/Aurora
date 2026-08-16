@@ -1,0 +1,75 @@
+## Aurora Standard Library — Decimal (arbitrary-precision fixed-point)
+## Usage:  import "decimal"
+##
+## Precise decimal arithmetic for financial and monetary calculations.
+## Uses 64-bit scaled integer representation with up to 18 decimal places.
+##
+## Examples:
+##   import "decimal"
+##   a = decimal_from_str("10.50")
+##   b = decimal_from_str("3.25")
+##   c = decimal_add(a, b)
+##   output(decimal_to_str(c))  # "13.75"
+## ════════════════════════════════════════════════════════════
+
+import "stdlib"
+
+## ── Core decimal functions ──
+extern function aurora_decimal_from_str(s: cstring) -> pointer
+extern function aurora_decimal_from_int(i: i64) -> pointer
+extern function aurora_decimal_from_float(f: f64) -> pointer
+extern function aurora_decimal_to_str(d: pointer) -> cstring
+extern function aurora_decimal_free(d: pointer)
+
+extern function aurora_decimal_add(a: pointer, b: pointer) -> pointer
+extern function aurora_decimal_sub(a: pointer, b: pointer) -> pointer
+extern function aurora_decimal_mul(a: pointer, b: pointer) -> pointer
+extern function aurora_decimal_div(a: pointer, b: pointer) -> pointer
+extern function aurora_decimal_compare(a: pointer, b: pointer) -> i32
+
+extern function aurora_decimal_abs(d: pointer) -> pointer
+extern function aurora_decimal_negate(d: pointer) -> pointer
+extern function aurora_decimal_round(d: pointer, places: i32) -> pointer
+
+extern function aurora_decimal_is_zero(d: pointer) -> i32
+extern function aurora_decimal_is_negative(d: pointer) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Constructors ──
+function decimal(str):            return aurora_decimal_from_str(str) end
+function decimal_from_int(i):     return aurora_decimal_from_int(i) end
+function decimal_from_float(f):   return aurora_decimal_from_float(f) end
+function decimal_to_str(d):       return aurora_decimal_to_str(d) end
+function decimal_free(d):
+    aurora_decimal_free(d)
+end
+
+## ── Arithmetic ──
+function decimal_add(a, b):       return aurora_decimal_add(a, b) end
+function decimal_sub(a, b):       return aurora_decimal_sub(a, b) end
+function decimal_mul(a, b):       return aurora_decimal_mul(a, b) end
+function decimal_div(a, b):       return aurora_decimal_div(a, b) end
+
+## ── Comparison (returns -1, 0, or 1) ──
+function decimal_compare(a, b):   return aurora_decimal_compare(a, b) end
+function decimal_equal(a, b):     return aurora_decimal_compare(a, b) == 0 end
+function decimal_less(a, b):      return aurora_decimal_compare(a, b) < 0 end
+function decimal_greater(a, b):   return aurora_decimal_compare(a, b) > 0 end
+
+## ── Utilities ──
+function decimal_abs(d):          return aurora_decimal_abs(d) end
+function decimal_negate(d):       return aurora_decimal_negate(d) end
+function decimal_round(d, p):     return aurora_decimal_round(d, p) end
+function decimal_is_zero(d):      return aurora_decimal_is_zero(d) == 1 end
+function decimal_is_negative(d):  return aurora_decimal_is_negative(d) == 1 end
+
+## ── Convenience ──
+function decimal_is_positive(d):
+    if decimal_is_zero(d)
+        return false
+    end
+    return not decimal_is_negative(d)
+end

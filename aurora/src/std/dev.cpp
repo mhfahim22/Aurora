@@ -13,6 +13,9 @@
 #include <windows.h>
 #else
 #include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <signal.h>
 #endif
 
 /* ════════════════════════════════════════════════════════════
@@ -169,27 +172,99 @@ int aurora_dev_lint_set_rule(const char* rule, int enabled) {
     return 1;
 }
 
-/* ── LSP ── */
+/* ── LSP ──
+   Real implementation: spawns the standalone `aurora_lsp` binary
+   (built from aurora/tools/lsp/) as a child process. */
 
 static struct LspState {
     int port = 0;
     int running = 0;
+    int pid = 0;
     std::string root;
 } g_lsp;
+
+#ifdef _WIN32
+static HANDLE g_lsp_proc = nullptr;
+#endif
 
 int aurora_dev_lsp_start(int port) {
     std::lock_guard<std::mutex> lock(g_mtx);
     if (g_lsp.running) return 0;
     g_lsp.port = port;
-    g_lsp.running = 1;
-    printf("[dev] LSP server started on port %d\n", port);
-    return 1;
+
+    /* Locate the real LSP binary: AURORA_LSP_PATH env, sibling of aurorac,
+       current dir, or PATH. */
+    std::string lsp_bin;
+    if (const char* env = getenv("AURORA_LSP_PATH")) {
+        lsp_bin = env;
+    } else {
+        const char* candidates[] = {
+            "aurora_lsp",
+            "aurora_lsp.exe",
+            "./aurora_lsp.exe",
+            "./aurora_lsp",
+            nullptr
+        };
+        for (int i = 0; candidates[i]; i++) {
+            FILE* probe = fopen(candidates[i], "rb");
+            if (probe) { fclose(probe); lsp_bin = candidates[i]; break; }
+        }
+    }
+    if (lsp_bin.empty()) {
+        printf("[dev] LSP start failed: aurora_lsp binary not found (set AURORA_LSP_PATH)\n");
+        return 0;
+    }
+
+#ifdef _WIN32
+    std::string cmdline = "\"" + lsp_bin + "\"";
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+    /* stdio stays attached so the LSP client (editor) can speak over stdin/stdout */
+    if (CreateProcessA(nullptr, &cmdline[0], nullptr, nullptr, TRUE,
+                       CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        g_lsp_proc = pi.hProcess;
+        g_lsp.pid = (int)pi.dwProcessId;
+        g_lsp.running = 1;
+        printf("[dev] LSP server started (pid %d)\n", g_lsp.pid);
+        return 1;
+    }
+    printf("[dev] LSP start failed: CreateProcess error %lu\n", (unsigned long)GetLastError());
+    return 0;
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        execlp(lsp_bin.c_str(), lsp_bin.c_str(), (char*)nullptr);
+        _exit(127);
+    }
+    if (pid > 0) {
+        g_lsp.pid = (int)pid;
+        g_lsp.running = 1;
+        printf("[dev] LSP server started (pid %d)\n", g_lsp.pid);
+        return 1;
+    }
+    printf("[dev] LSP start failed: fork error\n");
+    return 0;
+#endif
 }
 
 int aurora_dev_lsp_stop(void) {
     std::lock_guard<std::mutex> lock(g_mtx);
     if (!g_lsp.running) return 0;
+#ifdef _WIN32
+    if (g_lsp_proc) {
+        TerminateProcess(g_lsp_proc, 0);
+        CloseHandle(g_lsp_proc);
+        g_lsp_proc = nullptr;
+    }
+#else
+    if (g_lsp.pid > 0) kill(g_lsp.pid, SIGTERM);
+#endif
     g_lsp.running = 0;
+    g_lsp.pid = 0;
     printf("[dev] LSP server stopped\n");
     return 1;
 }

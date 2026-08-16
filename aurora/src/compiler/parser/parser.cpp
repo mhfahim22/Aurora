@@ -49,6 +49,9 @@ ASTNode::Ptr Parser::parse_block(int parent_indent) {
     if (!at_end() && !cur_line().is_blank()) {
         const auto& toks = cur_line().tokens;
         if (!toks.empty() && toks[0].is_operator('{')) {
+            if (strict_indent_) {
+                throw std::runtime_error("strict-indent mode: brace blocks ({}) are not allowed; use indentation-based blocks");
+            }
             advance();
             return parse_brace_block(1);
         }

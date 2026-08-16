@@ -23,10 +23,7 @@ typedef char          GLchar;
 #endif
 #endif
 
-#ifndef AURORA_STB_IMAGE_LOADED
-#define AURORA_STB_IMAGE_LOADED
-#define STB_IMAGE_IMPLEMENTATION
-#endif
+// STB_IMAGE_IMPLEMENTATION is defined in aurora/src/std/image.cpp
 #include "../../deps/stb_image.h"
 
 extern "C" {
@@ -72,17 +69,9 @@ static void gl_img_ensure_loaded() {
     glTexParameteri_fn = (FP_TexParameteri)gl_load("glTexParameteri");
 }
 
-/* ── Public API ── */
+/* ── GL texture creation helper (called by aurora_image_create_gl_texture in image.cpp) ── */
 
-void* aurora_image_load(const char* path, int* width, int* height, int* channels) {
-    return stbi_load(path, width, height, channels, 0);
-}
-
-void aurora_image_free(void* data) {
-    stbi_image_free(data);
-}
-
-unsigned int aurora_image_create_gl_texture(const char* path) {
+static int image_helper_gl_tex(const char* path, unsigned int* out_tex) {
     gl_img_ensure_loaded();
     if (!glGenTextures_fn || !glBindTexture_fn || !glTexImage2D_fn || !glTexParameteri_fn)
         return 0;
@@ -103,7 +92,8 @@ unsigned int aurora_image_create_gl_texture(const char* path) {
     glTexParameteri_fn(0x0DE1, 0x2803, 0x2901);
 
     stbi_image_free(pixels);
-    return (unsigned int)tex;
+    *out_tex = (unsigned int)tex;
+    return 1;
 }
 
 } /* extern "C" */

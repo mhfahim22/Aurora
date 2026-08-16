@@ -232,6 +232,30 @@ void oop_register_class(const ASTNode* node) {
                 needs_virtual = true;
             }
 
+            /* 1a. Method is virtual -> virtual */
+            if (stmt->is_virtual) {
+                method.is_abstract = false;
+                needs_virtual = true;
+            }
+
+            /* 1b. Check override validity */
+            if (stmt->is_override) {
+                if (info.parent_name.empty()) {
+                    throw std::runtime_error(
+                        "Line " + std::to_string(stmt->src_line) +
+                        ": method '" + method.name + "' marked override but class '" +
+                        info.name + "' does not extend any class");
+                }
+                const ClassMethodInfo* parent_method =
+                    global_class_registry().find_method(info.parent_name, method.name);
+                if (!parent_method) {
+                    throw std::runtime_error(
+                        "Line " + std::to_string(stmt->src_line) +
+                        ": method '" + method.name + "' marked override but parent class '" +
+                        info.parent_name + "' has no method '" + method.name + "'");
+                }
+            }
+
             /* 2. Method overrides a parent virtual method */
             if (!info.parent_name.empty()) {
                 const ClassMethodInfo* parent_method =

@@ -24,6 +24,7 @@ struct BuiltinFunctions {
     llvm::Function* min     { nullptr };
     llvm::Function* max     { nullptr };
     llvm::Function* range   { nullptr };
+    llvm::Function* range3  { nullptr };
 
     /* I/O builtins */
     llvm::Function* outputln_int    { nullptr };

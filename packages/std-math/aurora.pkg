@@ -1,0 +1,8 @@
+name: aurora/std-math
+version: 1.0.0
+author: Aurora Core Team
+description: Mathematics functions for Aurora
+entry: src/math.auf
+dependencies:
+permissions:
+

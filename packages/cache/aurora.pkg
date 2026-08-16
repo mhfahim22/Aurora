@@ -1,0 +1,8 @@
+name: aurora/cache
+version: 1.0.0
+author: Community
+description: Key/value caching helpers
+entry: src/cache.auf
+dependencies:
+permissions:
+

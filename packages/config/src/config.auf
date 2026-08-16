@@ -1,0 +1,19 @@
+## aurora/config - Configuration helpers
+
+extern function aurora_json_parse(text: cstring) -> pointer
+extern function aurora_json_get_string(obj: pointer, key: cstring) -> cstring
+
+function config_load(path: cstring):
+    text = read_file(path)
+    return aurora_json_parse(text)
+end
+
+extern function read_file(path: cstring) -> cstring
+
+function config_get(cfg: pointer, key: cstring):
+    return aurora_json_get_string(cfg, key)
+end
+
+function main():
+    output("aurora/config seed ready")
+end

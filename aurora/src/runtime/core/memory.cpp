@@ -69,11 +69,13 @@ extern "C" void* aurora_safe_calloc(size_t nmemb, size_t size) {
 }
 
 // ── Memory Arena Allocator ────────────────────────────────────
-#define ARENA_BLOCK_SIZE (1024 * 1024 * 4) // 4 MB per block
+#define ARENA_BLOCK_BASE_SIZE (64 * 1024)     // 64 KB initial block
+#define ARENA_BLOCK_MAX_SIZE  (1024 * 1024 * 4) // 4 MB max per block
 struct ArenaBlock {
     ArenaBlock* next;
     size_t      used;
-    char        data[ARENA_BLOCK_SIZE];
+    size_t      capacity;
+    char*       data;       // dynamically allocated, size = capacity
 };
 
 static thread_local ArenaBlock* current_arena = nullptr;
@@ -121,7 +123,7 @@ static void update_stats_free(void) {
 // ═══════════════════════════════════════════════════════════════
 
 /* Maximum arena blocks — prevents runaway memory consumption */
-#define AURORA_MAX_ARENA_BLOCKS 256  /* 256 × 4 MB = 1 GB max */
+#define AURORA_MAX_ARENA_BLOCKS 4096  /* 4096 × 4 MB = 16 GB max (actual less with exponential growth) */
 
 static int arena_block_count(void) {
     int n = 0;
@@ -179,7 +181,7 @@ static pthread_mutex_t arena_blocks_lock = PTHREAD_MUTEX_INITIALIZER;
 #define UNLOCK_ARENA_BLOCKS() pthread_mutex_unlock(&arena_blocks_lock)
 #endif
 
-enum { MAX_ARENA_BLOCKS = 256 };
+enum { MAX_ARENA_BLOCKS = 4096 };
 static FixedVec<ArenaBlockRange, MAX_ARENA_BLOCKS> arena_blocks;
 
 static void track_arena_block(void* start, size_t size) {
@@ -213,27 +215,45 @@ static bool is_arena_ptr(void* ptr) {
     return false;
 }
 
+/* Compute next block size with exponential growth: start at 64KB, double each block, max 4MB */
+static size_t next_block_size(void) {
+    int n = arena_block_count();
+    size_t sz = ARENA_BLOCK_BASE_SIZE;
+    for (int i = 0; i < n; i++) {
+        sz *= 2;
+        if (sz >= ARENA_BLOCK_MAX_SIZE) return ARENA_BLOCK_MAX_SIZE;
+    }
+    return sz;
+}
+
+/* Allocate a new arena block with current exponential-growth size */
+static ArenaBlock* alloc_new_arena_block(void) {
+    if (arena_block_count() >= AURORA_MAX_ARENA_BLOCKS) {
+        aurora_panic("arena memory limit reached (16 GB)");
+    }
+    size_t block_cap = next_block_size();
+    ArenaBlock* block = (ArenaBlock*)malloc(sizeof(ArenaBlock));
+    if (!block) aurora_panic("out of memory");
+    block->data = (char*)malloc(block_cap);
+    if (!block->data) { free(block); aurora_panic("out of memory"); }
+    block->next = current_arena;
+    block->used = 0;
+    block->capacity = block_cap;
+    current_arena = block;
+    track_arena_block(block->data, block_cap);
+    if (diagnostics_enabled) {
+        LOCK_STATS();
+        memory_stats.arena_blocks++;
+        UNLOCK_STATS();
+    }
+    return block;
+}
+
 extern "C" {
 
 void* aurora_arena_alloc(size_t size) {
-    if (!current_arena || current_arena->used + size > ARENA_BLOCK_SIZE) {
-        if (arena_block_count() >= AURORA_MAX_ARENA_BLOCKS) {
-            aurora_panic("arena memory limit reached (1 GB)");
-        }
-        ArenaBlock* next_block = (ArenaBlock*)malloc(sizeof(ArenaBlock));
-        if (!next_block) {
-            aurora_panic("out of memory");
-        }
-        next_block->next = current_arena;
-        next_block->used = 0;
-        current_arena = next_block;
-        track_arena_block(current_arena->data, ARENA_BLOCK_SIZE);
-
-        if (diagnostics_enabled) {
-            LOCK_STATS();
-            memory_stats.arena_blocks++;
-            UNLOCK_STATS();
-        }
+    if (!current_arena || current_arena->used + size > current_arena->capacity) {
+        alloc_new_arena_block();
     }
     void* ptr = current_arena->data + current_arena->used;
     size_t aligned_size = (size + 7) & ~7; /* 8-byte alignment */
@@ -244,24 +264,8 @@ void* aurora_arena_alloc(size_t size) {
 }
 
 void* aurora_arena_alloc_aligned(size_t size, size_t alignment) {
-    if (!current_arena || current_arena->used + size > ARENA_BLOCK_SIZE) {
-        if (arena_block_count() >= AURORA_MAX_ARENA_BLOCKS) {
-            aurora_panic("arena memory limit reached (1 GB)");
-        }
-        ArenaBlock* next_block = (ArenaBlock*)malloc(sizeof(ArenaBlock));
-        if (!next_block) {
-            aurora_panic("out of memory");
-        }
-        next_block->next = current_arena;
-        next_block->used = 0;
-        current_arena = next_block;
-        track_arena_block(current_arena->data, ARENA_BLOCK_SIZE);
-
-        if (diagnostics_enabled) {
-            LOCK_STATS();
-            memory_stats.arena_blocks++;
-            UNLOCK_STATS();
-        }
+    if (!current_arena || current_arena->used + size > current_arena->capacity) {
+        alloc_new_arena_block();
     }
 
     /* Align the pointer */
@@ -292,7 +296,7 @@ void aurora_arena_free(void) {
         LOCK_ARENA_BLOCKS();
         {
             void* data_start = block->data;
-            void* data_end = static_cast<char*>(block->data) + ARENA_BLOCK_SIZE;
+            void* data_end = static_cast<char*>(block->data) + block->capacity;
             for (auto& range : arena_blocks) {
                 if (range.start == data_start && range.end == data_end) {
                     if (range.refcount > 0) {
@@ -306,7 +310,8 @@ void aurora_arena_free(void) {
 
         if (can_free) {
             total_freed += block->used;
-            untrack_arena_block(block->data, ARENA_BLOCK_SIZE);
+            untrack_arena_block(block->data, block->capacity);
+            free(block->data);
             free(block);
             if (prev) prev->next = next;
             else current_arena = next;

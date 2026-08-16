@@ -23,6 +23,13 @@ typedef struct AuroraServer {
     int       static_count;
     int       static_cap;
     struct AuroraTLSContext* tls_ctx;  /* NULL = plain HTTP */
+    /* ── Production hardening (Phase 38.3) ── */
+    int       max_connections;   /* 0 = unlimited; enforces slow-loris protection */
+    int       log_requests;      /* 1 = structured JSON access logs */
+    long long req_count;         /* total requests served */
+    long long total_resp_ms;     /* sum of request latencies (ms) */
+    long long start_time_ms;     /* server start timestamp */
+    long long conn_errors;       /* TLS/parse failures */
 } AuroraServer;
 
 AuroraServer* aurora_server_init(int64_t port);
@@ -31,6 +38,13 @@ void          aurora_server_stop(AuroraServer* srv);
 void          aurora_server_start_with_pool(AuroraServer* srv, struct AuroraRouter* router, int pool_size);
 void          aurora_server_add_middleware(AuroraServer* srv, void* handler);
 void          aurora_server_clear_middleware(AuroraServer* srv);
+
+/* ── Production server features (Phase 38.3) ── */
+void aurora_server_set_max_connections(AuroraServer* srv, int max_conn);
+void aurora_server_set_request_logging(AuroraServer* srv, int enable);
+int  aurora_server_metrics_json(char* buf, int buf_size, AuroraServer* srv);
+void aurora_server_mark_active(AuroraServer* srv);
+int  aurora_h2_is_upgrade(const char* raw_request);
 
 /* ── HTTP Request ── */
 typedef struct AuroraHttpRequest {
@@ -153,6 +167,10 @@ void                aurora_http_response_set_content_type(AuroraHttpResponse* re
 void                aurora_http_response_set_status_code(AuroraHttpResponse* res, int code);
 void                aurora_http_response_redirect(AuroraHttpResponse* res, const char* url, int64_t code);
 const char*         aurora_http_get_form_param(AuroraHttpRequest* req, const char* name);
+
+/* ── Built-in /health + /metrics handlers (Phase 38.3) ── */
+int  aurora_server_handle_health(AuroraHttpRequest* req, AuroraHttpResponse* res);
+int  aurora_server_handle_metrics(AuroraHttpRequest* req, AuroraHttpResponse* res);
 
 /* ── Router ── */
 AuroraRouter*       aurora_router_new(void);

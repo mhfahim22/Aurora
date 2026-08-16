@@ -1,0 +1,8 @@
+name: aurora/queue
+version: 1.0.0
+author: Community
+description: In-memory job queue helpers
+entry: src/queue.auf
+dependencies:
+permissions:
+

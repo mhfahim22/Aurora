@@ -1,0 +1,11 @@
+function main()
+    w = mw_create(15)
+    mw_set_size(w, 300.0, 200.0)
+    output("w=" + str(mw_get_width(w)) + " h=" + str(mw_get_height(w)))
+    scr = mw_create(10)
+    mw_set_scroll_pos(scr, 0.0, 50.0)
+    sx = 0.0
+    sy = 0.0
+    mw_get_scroll_pos(scr, sx, sy)
+    output("sy=" + str(sy))
+end

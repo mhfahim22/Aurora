@@ -1,0 +1,10 @@
+function main()
+    x = "Hello"
+    a = x + "World"
+    output("len(x)=" + len(x))
+    output("a=" + a)
+    b = "Hello"
+    output("b=" + b)
+    c = "x" + "y" + "z"
+    output("c=" + c)
+end

@@ -15,13 +15,36 @@ static void annotate_node_decl(const ASTNode* node, AstTypeKind kind, const std:
 
 /* H2 Phase E-2: extern type name to AstTypeKind conversion (mirrors resolve_type_name) */
 static AstTypeKind extern_type_name_to_kind(const std::string& name) {
-    if (name == "int" || name == "i64" || name == "Int" || name == "u64")    return AstTypeKind::Int;
-    if (name == "float" || name == "f64" || name == "Float" || name == "double") return AstTypeKind::Float;
+    if (name == "int" || name == "Int")    return AstTypeKind::Int;
+    if (name == "i8")    return AstTypeKind::I8;
+    if (name == "i16")   return AstTypeKind::I16;
+    if (name == "i32")   return AstTypeKind::I32;
+    if (name == "i64")   return AstTypeKind::I64;
+    if (name == "u8" || name == "byte") return AstTypeKind::U8;
+    if (name == "u16")   return AstTypeKind::U16;
+    if (name == "u32")   return AstTypeKind::U32;
+    if (name == "u64")   return AstTypeKind::U64;
+    if (name == "f32" || name == "float") return AstTypeKind::F32;
+    if (name == "f64" || name == "Float" || name == "double") return AstTypeKind::Float;
+    if (name == "char")  return AstTypeKind::Char;
     if (name == "string" || name == "String" || name == "str" || name == "cstring") return AstTypeKind::String;
     if (name == "bool" || name == "Bool")                                     return AstTypeKind::Bool;
     if (name == "void" || name == "Void")                                     return AstTypeKind::Void;
-    if (name == "char")                                                       return AstTypeKind::Int;
+    if (!name.empty() && name[0] == '[')                                       return AstTypeKind::FixedArray;
     return AstTypeKind::Unknown;
+}
+
+/* Helper: parse [elem_type;size] string → kind + size */
+static bool parse_fixed_array_str(const std::string& name, AstTypeKind& elem_kind, int& size) {
+    if (name.size() < 5 || name[0] != '[' || name.back() != ']')
+        return false;
+    auto semi = name.find(';');
+    if (semi == std::string::npos) return false;
+    std::string elem_name = name.substr(1, semi - 1);
+    std::string size_str = name.substr(semi + 1, name.size() - semi - 2);
+    elem_kind = extern_type_name_to_kind(elem_name);
+    size = std::atoi(size_str.c_str());
+    return size > 0 && elem_kind != AstTypeKind::Unknown;
 }
 
 /* ── Register type alias: type T = BaseType ── */
@@ -51,7 +74,18 @@ void TypeChecker::register_type_alias(const ASTNode* node) {
                 case AuroraType::Pointer:  return AstTypeKind::Pointer;
                 case AuroraType::Void:     return AstTypeKind::Void;
                 case AuroraType::Generic:  return AstTypeKind::Unknown;
-                default:                   return AstTypeKind::Unknown;
+                case AuroraType::I8:    return AstTypeKind::I8;
+                case AuroraType::I16:   return AstTypeKind::I16;
+                case AuroraType::I32:   return AstTypeKind::I32;
+                case AuroraType::I64:   return AstTypeKind::I64;
+                case AuroraType::U8:    return AstTypeKind::U8;
+                case AuroraType::U16:   return AstTypeKind::U16;
+                case AuroraType::U32:   return AstTypeKind::U32;
+                case AuroraType::U64:   return AstTypeKind::U64;
+                case AuroraType::F32:   return AstTypeKind::F32;
+                case AuroraType::Byte:  return AstTypeKind::Byte;
+                case AuroraType::Char:  return AstTypeKind::Char;
+                default:                return AstTypeKind::Unknown;
             }
         };
         annotate_node_decl(node, aurora_to_ast(at), base);
@@ -66,7 +100,7 @@ void TypeChecker::register_struct(const ASTNode* node) {
 
     StructInfo info;
     info.name = node->value;
-    info.is_union = (node->type == NodeType::ExternUnion);
+    info.is_union = (node->type == NodeType::ExternUnion) || (node->type == NodeType::StructDecl && node->is_union);
     info.is_opaque = (node->type == NodeType::ExternStruct && !node->args);
 
     /* Detect generic structs */
@@ -158,11 +192,30 @@ void TypeChecker::register_enum(const ASTNode* node) {
     info.name = node->value;
 
     int val = 0;
-    const ASTNode* stmt = node->body.get();
+    const ASTNode* stmt = node->args.get();
     while (stmt) {
         EnumVariantInfo variant;
         variant.name  = stmt->value;
         variant.value = val++;
+
+        /* Extract variant data fields from stmt->right linked list */
+        const ASTNode* f = stmt->right.get();
+        while (f) {
+            EnumVariantField field;
+            field.type_name = f->value;
+            field.type_kind = extern_type_name_to_kind(field.type_name);
+            /* Fallback: try resolve_type_name for user types */
+            if (field.type_kind == AstTypeKind::Unknown) {
+                AuroraType rt = resolve_type_name(field.type_name);
+                if (rt != AuroraType::Unknown)
+                    field.type_kind = to_ast_type_kind(rt);
+            }
+            variant.fields.push_back(field);
+            f = f->next.get();
+        }
+
+        if (!variant.fields.empty())
+            info.has_data = true;
 
         info.variants.push_back(variant);
         stmt = stmt->next.get();
@@ -171,10 +224,15 @@ void TypeChecker::register_enum(const ASTNode* node) {
     /* Register in user_types_ */
     UserTypeEntry entry;
     entry.kind = AuroraType::Enum;
+    for (auto& v : info.variants) {
+        if (!v.fields.empty()) {
+            entry.fields.emplace_back(v.name, AuroraType::Unknown);
+        }
+    }
     user_types_[info.name] = std::move(entry);
 
     global_type_registry().register_enum(std::move(info));
-    annotate_node_decl(node, AstTypeKind::Enum, node->value);  /* H2 Phase D2 */
+    annotate_node_decl(node, AstTypeKind::Enum, node->value);
 }
 
 /* ── Register interface from AST ── */
@@ -221,8 +279,18 @@ bool TypeChecker::is_user_type(const std::string& name) const {
 }
 
 AuroraType TypeChecker::resolve_type_name(const std::string& name) {
-    if (name == "int" || name == "Int" || name == "i64" || name == "u64") return AuroraType::Int;
+    if (name == "int" || name == "Int") return AuroraType::Int;
+    if (name == "i8")    return AuroraType::I8;
+    if (name == "i16")   return AuroraType::I16;
+    if (name == "i32")   return AuroraType::I32;
+    if (name == "i64" || name == "long") return AuroraType::I64;
+    if (name == "u8" || name == "byte") return AuroraType::U8;
+    if (name == "u16")   return AuroraType::U16;
+    if (name == "u32")   return AuroraType::U32;
+    if (name == "u64")   return AuroraType::U64;
+    if (name == "f32")   return AuroraType::F32;
     if (name == "float" || name == "Float" || name == "f64" || name == "double") return AuroraType::Float;
+    if (name == "char")  return AuroraType::Char;
     if (name == "string" || name == "String" || name == "str") return AuroraType::String;
     if (name == "bool" || name == "Bool") return AuroraType::Bool;
     if (name == "void" || name == "Void") return AuroraType::Void;
@@ -241,6 +309,10 @@ AuroraType TypeChecker::resolve_type_name(const std::string& name) {
     /* Check user types */
     auto it = user_types_.find(name);
     if (it != user_types_.end()) return it->second.kind;
+
+    /* Check global type registry for enums/structs registered without AST nodes */
+    if (global_type_registry().has_enum(name)) return AuroraType::Enum;
+    if (global_type_registry().has_struct(name)) return AuroraType::Struct;
 
     return AuroraType::Unknown;
 }

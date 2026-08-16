@@ -1,0 +1,8 @@
+name: aurora/log
+version: 1.0.0
+author: Community
+description: Leveled structured logging helpers
+entry: src/log.auf
+dependencies:
+permissions:
+

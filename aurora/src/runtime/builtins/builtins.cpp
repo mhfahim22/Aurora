@@ -72,6 +72,26 @@ int64_t aurora_builtin_range(int64_t start, int64_t end) {
     return arr;
 }
 
+/* ── range(start, end, step) — 3-arg version with custom step ── */
+int64_t aurora_builtin_range3(int64_t start, int64_t end, int64_t step) {
+    extern int64_t aurora_array_new(int64_t cap);
+    extern void aurora_array_push_int(int64_t arr_ptr, int64_t val);
+
+    if (step == 0) step = 1;
+    int64_t cap = step > 0
+        ? (end > start ? (end - start + step - 1) / step : 1)
+        : (start > end ? (start - end + (-step) - 1) / (-step) : 1);
+    int64_t arr = aurora_array_new(cap > 0 ? cap : 1);
+    if (step > 0) {
+        for (int64_t i = start; i < end; i += step)
+            aurora_array_push_int(arr, i);
+    } else {
+        for (int64_t i = start; i > end; i += step)
+            aurora_array_push_int(arr, i);
+    }
+    return arr;
+}
+
 /* ── pow(base, exp) — floating-point power ── */
 double aurora_pow(double base, double exp) {
     return std::pow(base, exp);

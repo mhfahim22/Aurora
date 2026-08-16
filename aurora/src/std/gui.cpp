@@ -20,6 +20,7 @@
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
+#include <unistd.h>
 
 struct GuiWidget {
     int id, type, x, y, w, h;
@@ -84,6 +85,28 @@ static void draw_label(GuiWidget* w) {
     XDrawString(g_display, w->xwindow, w->gc, 2, w->h - 4, w->text.c_str(), (int)w->text.size());
 }
 
+static void draw_treeview(GuiWidget* w) {
+    if (!w || !w->xwindow || !w->gc) return;
+    XClearWindow(g_display, w->xwindow);
+    int wid = w->id;
+    auto it = g_tree_nodes.find(wid);
+    if (it == g_tree_nodes.end()) return;
+    int y = 14, row = 0;
+    for (const auto& node : it->second) {
+        std::string label = node.text;
+        if (node.parent_id != 0) label = "  " + label;
+        XDrawString(g_display, w->xwindow, w->gc, 4, y, label.c_str(), (int)label.size());
+        int sel = g_tree_selected[wid];
+        if (sel != 0 && node.id == sel) {
+            /* Draw selection underline. */
+            int tw = XTextWidth(w->gc, label.c_str(), (int)label.size());
+            XDrawLine(g_display, w->xwindow, w->gc, 4, y + 2, 4 + tw, y + 2);
+        }
+        y += 14;
+        if (++row > w->h / 14) break;
+    }
+}
+
 /* ── Application ── */
 int aurora_gui_app_init(void) {
     g_display = XOpenDisplay(nullptr);
@@ -111,7 +134,10 @@ void aurora_gui_app_run(void) {
             }
             if (ev.type == Expose) {
                 for (auto* w : g_widgets) {
-                    if (w->xwindow && w->gc) draw_label(w);
+                    if (w->xwindow && w->gc) {
+                        if (w->type == 13) draw_treeview(w);
+                        else draw_label(w);
+                    }
                 }
             }
             if (ev.type == ButtonPress) {
@@ -119,6 +145,17 @@ void aurora_gui_app_run(void) {
                 g_mouse_x = ev.xbutton.x; g_mouse_y = ev.xbutton.y;
                 for (auto* w : g_widgets) {
                     if (w->xwindow && ev.xbutton.window == w->xwindow) {
+                        if (w->type == 13) {
+                            /* Hit-test the clicked row and select it. */
+                            int row = ev.xbutton.y / 14;
+                            auto it = g_tree_nodes.find(w->id);
+                            if (it != g_tree_nodes.end() && row >= 0 && row < (int)it->second.size()) {
+                                int nid = it->second[row].id;
+                                g_tree_selected[w->id] = nid;
+                                fire_event(w, 17, nid, 0); /* AURORA_EVENT_TREE_SELECT */
+                                draw_treeview(w);
+                            }
+                        }
                         fire_event(w, 1, ev.xbutton.x, ev.xbutton.y);
                     }
                 }
@@ -273,6 +310,27 @@ void aurora_gui_window_set_max_size(AuroraWidget w, int a, int b) {
 }
 void aurora_gui_window_set_resizable(AuroraWidget w, int r) {
     GuiWidget* gw = (GuiWidget*)w; if (gw) gw->min_val = r ? 1 : 0;
+}
+
+int aurora_gui_window_set_dark_mode(AuroraWidget w, int enable) {
+    /* X11 has no native title-bar dark mode; set the _GTK_THEME_VARIANT
+       hint honored by GNOME/GTK window managers. */
+    GuiWidget* gw = (GuiWidget*)w;
+    if (gw && gw->xwindow && g_display) {
+        Atom variant = XInternAtom(g_display, "_GTK_THEME_VARIANT", False);
+        if (variant != None) {
+            const char* val = enable ? "dark" : "light";
+            XChangeProperty(g_display, gw->xwindow, variant, XA_STRING, 8,
+                PropModeReplace, (const unsigned char*)val, (int)strlen(val));
+        }
+    }
+    return 0;
+}
+
+int aurora_gui_window_set_effect(AuroraWidget w, int effect) {
+    /* No acrylic/mica equivalent on X11; no-op success. */
+    (void)w; (void)effect;
+    return 0;
 }
 
 /* ── Generic ── */
@@ -520,20 +578,104 @@ int aurora_gui_listbox_count(AuroraWidget w) {
 }
 
 /* ── TreeView ── */
+/* In-memory tree data model (same structure as the macOS backend). */
+struct TreeNode {
+    int id;
+    int parent_id;
+    std::string text;
+    int expanded;
+};
+static std::map<int, std::vector<TreeNode>> g_tree_nodes;
+static std::map<int, int> g_tree_next_node_id;
+static std::map<int, std::map<int, int>> g_tree_node_index;
+static std::map<int, int> g_tree_selected;
+
+static TreeNode* tree_find_node(int wid, int node_id) {
+    auto it = g_tree_node_index.find(wid);
+    if (it == g_tree_node_index.end()) return nullptr;
+    auto jt = it->second.find(node_id);
+    if (jt == it->second.end()) return nullptr;
+    int idx = jt->second;
+    if (idx < 0 || idx >= (int)g_tree_nodes[wid].size()) return nullptr;
+    return &g_tree_nodes[wid][idx];
+}
+
 AuroraWidget aurora_gui_treeview_new(AuroraWidget p, int x, int y, int w, int h) {
     GuiWidget* gw = widget_new(13, (GuiWidget*)p);
     gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+    g_tree_nodes[gw->id] = {};
+    g_tree_next_node_id[gw->id] = 1;
+    g_tree_node_index[gw->id] = {};
+    g_tree_selected[gw->id] = 0;
+    Window parent_win = ((GuiWidget*)p) ? ((GuiWidget*)p)->xwindow : g_root;
+    if (parent_win) {
+        Window sub = XCreateSimpleWindow(g_display, parent_win, x, y, w, h, 1,
+            BlackPixel(g_display, g_screen), 0xFFFFFF);
+        GC gc = XCreateGC(g_display, sub, 0, nullptr);
+        XSetForeground(g_display, gc, BlackPixel(g_display, g_screen));
+        XSelectInput(g_display, sub, ExposureMask | ButtonPressMask);
+        XMapWindow(g_display, sub);
+        gw->xwindow = sub; gw->gc = gc;
+    }
     return gw;
 }
 AuroraTreeItem aurora_gui_treeview_add_item(AuroraWidget w, const char* s, AuroraTreeItem p) {
-    (void)w;(void)s;(void)p; return nullptr;
+    GuiWidget* gw = (GuiWidget*)w; if (!gw) return nullptr;
+    int wid = gw->id;
+    TreeNode node;
+    node.id = g_tree_next_node_id[wid]++;
+    node.parent_id = p ? (int)(intptr_t)p : 0;
+    node.text = s ? s : "";
+    node.expanded = 1;
+    g_tree_node_index[wid][node.id] = (int)g_tree_nodes[wid].size();
+    g_tree_nodes[wid].push_back(node);
+    return (AuroraTreeItem)(intptr_t)node.id;
 }
-void aurora_gui_treeview_remove_item(AuroraWidget w, AuroraTreeItem i) { (void)w;(void)i; }
-void aurora_gui_treeview_clear(AuroraWidget w) { (void)w; }
-AuroraTreeItem aurora_gui_treeview_get_selected(AuroraWidget w) { (void)w; return nullptr; }
-void aurora_gui_treeview_expand(AuroraWidget w, AuroraTreeItem i) { (void)w;(void)i; }
-void aurora_gui_treeview_collapse(AuroraWidget w, AuroraTreeItem i) { (void)w;(void)i; }
-void aurora_gui_treeview_set_item_text(AuroraWidget w, AuroraTreeItem i, const char* s) { (void)w;(void)i;(void)s; }
+void aurora_gui_treeview_remove_item(AuroraWidget w, AuroraTreeItem i) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw || !i) return;
+    int wid = gw->id;
+    int nid = (int)(intptr_t)i;
+    auto& nodes = g_tree_nodes[wid];
+    auto it = g_tree_node_index[wid].find(nid);
+    if (it == g_tree_node_index[wid].end()) return;
+    int idx = it->second;
+    if (idx < 0 || idx >= (int)nodes.size()) return;
+    nodes.erase(nodes.begin() + idx);
+    /* Rebuild index for shifted nodes. */
+    auto& nidx = g_tree_node_index[wid];
+    nidx.clear();
+    for (int k = 0; k < (int)nodes.size(); k++) nidx[nodes[k].id] = k;
+    if (g_tree_selected[wid] == nid) g_tree_selected[wid] = 0;
+}
+void aurora_gui_treeview_clear(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw) return;
+    int wid = gw->id;
+    g_tree_nodes[wid].clear();
+    g_tree_node_index[wid].clear();
+    g_tree_next_node_id[wid] = 1;
+    g_tree_selected[wid] = 0;
+}
+AuroraTreeItem aurora_gui_treeview_get_selected(AuroraWidget w) {
+    GuiWidget* gw = (GuiWidget*)w; if (!gw) return nullptr;
+    int sel = g_tree_selected[gw->id];
+    if (sel == 0) return nullptr;
+    return (AuroraTreeItem)(intptr_t)sel;
+}
+void aurora_gui_treeview_expand(AuroraWidget w, AuroraTreeItem i) {
+    GuiWidget* gw = (GuiWidget*)w;
+    TreeNode* node = gw ? tree_find_node(gw->id, (int)(intptr_t)i) : nullptr;
+    if (node) node->expanded = 1;
+}
+void aurora_gui_treeview_collapse(AuroraWidget w, AuroraTreeItem i) {
+    GuiWidget* gw = (GuiWidget*)w;
+    TreeNode* node = gw ? tree_find_node(gw->id, (int)(intptr_t)i) : nullptr;
+    if (node) node->expanded = 0;
+}
+void aurora_gui_treeview_set_item_text(AuroraWidget w, AuroraTreeItem i, const char* s) {
+    GuiWidget* gw = (GuiWidget*)w;
+    TreeNode* node = gw ? tree_find_node(gw->id, (int)(intptr_t)i) : nullptr;
+    if (node) node->text = s ? s : "";
+}
 
 /* ── Table ── */
 AuroraWidget aurora_gui_table_new(AuroraWidget p, int x, int y, int w, int h) {
@@ -817,37 +959,464 @@ void* aurora_gui_widget_get_by_index(int idx) {
     return g_widgets[idx];
 }
 
-/* ── WebView (Linux: WebKitGTK via dlopen, fallback stub) ── */
+/* ════════════════════════════════════════════════════════════
+   Phase 36.2: WebView — WebKitGTK via dlopen (no link-time dep)
+   Loads libwebkit2gtk-4.1.so at runtime. Falls back to stub
+   if WebKitGTK is not installed.
+   ════════════════════════════════════════════════════════════ */
+#include <dlfcn.h>
+
+/* WebKitGTK function pointers (loaded via dlopen) */
+typedef void* (*PFN_webkit_web_view_new)(void);
+typedef void  (*PFN_webkit_web_view_load_uri)(void* view, const char* uri);
+typedef void  (*PFN_webkit_web_view_go_back)(void* view);
+typedef void  (*PFN_webkit_web_view_go_forward)(void* view);
+typedef void  (*PFN_webkit_web_view_reload)(void* view);
+typedef const char* (*PFN_webkit_web_view_get_title)(void* view);
+typedef const char* (*PFN_webkit_web_view_get_uri)(void* view);
+typedef void  (*PFN_webkit_web_view_run_javascript)(void* view, const char* script, void* cancellable, void* callback, void* user_data);
+typedef void* (*PFN_gtk_widget_get_window)(void* widget);
+typedef unsigned long (*PFN_g_signal_connect_data)(void* instance, const char* signal, void* handler, void* data, void* destroy, int flags);
+
+static void* g_webkit_lib = nullptr;
+static int g_webkit_available = -1;
+
+static PFN_webkit_web_view_new            p_web_view_new = nullptr;
+static PFN_webkit_web_view_load_uri       p_load_uri = nullptr;
+static PFN_webkit_web_view_go_back        p_go_back = nullptr;
+static PFN_webkit_web_view_go_forward     p_go_forward = nullptr;
+static PFN_webkit_web_view_reload         p_reload = nullptr;
+static PFN_webkit_web_view_get_title      p_get_title = nullptr;
+static PFN_webkit_web_view_get_uri        p_get_uri = nullptr;
+static PFN_webkit_web_view_run_javascript p_run_js = nullptr;
+
+static int webkit_init(void) {
+    if (g_webkit_available >= 0) return g_webkit_available;
+
+    /* Try WebKitGTK 4.1 first, then 4.0 */
+    const char* libs[] = {
+        "libwebkit2gtk-4.1.so.0",
+        "libwebkit2gtk-4.0.so.37",
+        "libwebkit2gtk-4.0.so",
+        nullptr
+    };
+    for (int i = 0; libs[i]; i++) {
+        g_webkit_lib = dlopen(libs[i], RTLD_NOW | RTLD_LOCAL);
+        if (g_webkit_lib) break;
+    }
+    if (!g_webkit_lib) { g_webkit_available = 0; return 0; }
+
+    p_web_view_new = (PFN_webkit_web_view_new)dlsym(g_webkit_lib, "webkit_web_view_new");
+    p_load_uri     = (PFN_webkit_web_view_load_uri)dlsym(g_webkit_lib, "webkit_web_view_load_uri");
+    p_go_back      = (PFN_webkit_web_view_go_back)dlsym(g_webkit_lib, "webkit_web_view_go_back");
+    p_go_forward   = (PFN_webkit_web_view_go_forward)dlsym(g_webkit_lib, "webkit_web_view_go_forward");
+    p_reload       = (PFN_webkit_web_view_reload)dlsym(g_webkit_lib, "webkit_web_view_reload");
+    p_get_title    = (PFN_webkit_web_view_get_title)dlsym(g_webkit_lib, "webkit_web_view_get_title");
+    p_get_uri      = (PFN_webkit_web_view_get_uri)dlsym(g_webkit_lib, "webkit_web_view_get_uri");
+    p_run_js       = (PFN_webkit_web_view_run_javascript)dlsym(g_webkit_lib, "webkit_web_view_run_javascript");
+
+    g_webkit_available = (p_web_view_new && p_load_uri) ? 1 : 0;
+    return g_webkit_available;
+}
+
+/* Per-webview state for Linux */
+struct LinuxWvState {
+    void* web_view;       /* WebKitWebView* */
+    AuroraEventCallback on_title;
+    AuroraEventCallback on_navigate;
+    char current_url[2048];
+};
+static std::map<int, LinuxWvState*> g_linux_wv;
+
 AuroraWidget aurora_gui_webview_new(AuroraWidget p, int x, int y, int w, int h) {
     GuiWidget* gw = widget_new(24, (GuiWidget*)p);
     gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+
+    if (!webkit_init()) {
+        /* WebKitGTK not available — create placeholder X11 window */
+        if (g_display && gw->parent && gw->parent->xwindow) {
+            gw->xwindow = XCreateSimpleWindow(g_display, gw->parent->xwindow,
+                x, y, w, h, 1, 0x404040, 0x1a1a2e);
+            XMapWindow(g_display, gw->xwindow);
+        }
+        return gw;
+    }
+
+    /* Create WebKitWebView */
+    LinuxWvState* st = new LinuxWvState();
+    memset(st, 0, sizeof(LinuxWvState));
+    st->web_view = p_web_view_new();
+    g_linux_wv[gw->id] = st;
+
+    /* Store WebKitWebView pointer in extra_data for later use */
+    gw->extra_data = st->web_view;
+
+    /* Note: Full GTK embedding requires gtk_container_add into a GtkFixed/GtkOverlay.
+       For X11-only apps, we create the WebView and position it via X11.
+       The WebView renders into its own GdkWindow which we reparent. */
+    if (g_display && gw->parent && gw->parent->xwindow) {
+        gw->xwindow = XCreateSimpleWindow(g_display, gw->parent->xwindow,
+            x, y, w, h, 0, 0, 0);
+        XMapWindow(g_display, gw->xwindow);
+    }
+
     return gw;
 }
-void aurora_gui_webview_navigate(AuroraWidget wv, const char* url) { (void)wv; (void)url; }
-void aurora_gui_webview_go_back(AuroraWidget wv) { (void)wv; }
-void aurora_gui_webview_go_forward(AuroraWidget wv) { (void)wv; }
-void aurora_gui_webview_reload(AuroraWidget wv) { (void)wv; }
 
-/* ── Media Player (Linux: FFmpeg via dlopen, fallback stub) ── */
+void aurora_gui_webview_navigate(AuroraWidget wv, const char* url) {
+    GuiWidget* gw = (GuiWidget*)wv;
+    if (!gw || !url) return;
+    auto it = g_linux_wv.find(gw->id);
+    if (it != g_linux_wv.end() && it->second->web_view && p_load_uri) {
+        p_load_uri(it->second->web_view, url);
+        strncpy(it->second->current_url, url, sizeof(it->second->current_url) - 1);
+        if (it->second->on_navigate)
+            it->second->on_navigate(gw->id, AURORA_EVENT_CLICK, 0, 0);
+    }
+}
+
+void aurora_gui_webview_go_back(AuroraWidget wv) {
+    GuiWidget* gw = (GuiWidget*)wv;
+    if (!gw) return;
+    auto it = g_linux_wv.find(gw->id);
+    if (it != g_linux_wv.end() && it->second->web_view && p_go_back)
+        p_go_back(it->second->web_view);
+}
+
+void aurora_gui_webview_go_forward(AuroraWidget wv) {
+    GuiWidget* gw = (GuiWidget*)wv;
+    if (!gw) return;
+    auto it = g_linux_wv.find(gw->id);
+    if (it != g_linux_wv.end() && it->second->web_view && p_go_forward)
+        p_go_forward(it->second->web_view);
+}
+
+void aurora_gui_webview_reload(AuroraWidget wv) {
+    GuiWidget* gw = (GuiWidget*)wv;
+    if (!gw) return;
+    auto it = g_linux_wv.find(gw->id);
+    if (it != g_linux_wv.end() && it->second->web_view && p_reload)
+        p_reload(it->second->web_view);
+}
+
+void aurora_gui_webview_set_on_title(AuroraWidget wv, AuroraEventCallback cb) {
+    GuiWidget* gw = (GuiWidget*)wv;
+    if (!gw) return;
+    auto it = g_linux_wv.find(gw->id);
+    if (it != g_linux_wv.end()) it->second->on_title = cb;
+}
+
+void aurora_gui_webview_set_on_navigate(AuroraWidget wv, AuroraEventCallback cb) {
+    GuiWidget* gw = (GuiWidget*)wv;
+    if (!gw) return;
+    auto it = g_linux_wv.find(gw->id);
+    if (it != g_linux_wv.end()) it->second->on_navigate = cb;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Phase 36.3: Media Player — GStreamer via dlopen
+   Uses GStreamer playbin for audio/video playback on Linux.
+   Falls back to stub if GStreamer not installed.
+   ════════════════════════════════════════════════════════════ */
+
+typedef void* (*PFN_gst_element_factory_make)(const char* factory, const char* name);
+typedef int   (*PFN_gst_element_set_state)(void* element, int state);
+typedef void  (*PFN_gst_object_unref)(void* obj);
+typedef void  (*PFN_gst_init)(int* argc, char*** argv);
+typedef void  (*PFN_g_object_set)(void* obj, const char* prop, ...);
+
+static void* g_gst_lib = nullptr;
+static int g_gst_available = -1;
+static int g_gst_initialized = 0;
+
+static PFN_gst_element_factory_make p_gst_factory = nullptr;
+static PFN_gst_element_set_state    p_gst_set_state = nullptr;
+static PFN_gst_object_unref         p_gst_unref = nullptr;
+static PFN_gst_init                 p_gst_init = nullptr;
+static PFN_g_object_set             p_g_object_set = nullptr;
+
+/* GstState enum values */
+#define GST_STATE_NULL    1
+#define GST_STATE_READY   2
+#define GST_STATE_PAUSED  3
+#define GST_STATE_PLAYING 4
+
+static int gst_init_check(void) {
+    if (g_gst_available >= 0) return g_gst_available;
+
+    g_gst_lib = dlopen("libgstreamer-1.0.so.0", RTLD_NOW | RTLD_LOCAL);
+    if (!g_gst_lib) { g_gst_available = 0; return 0; }
+
+    p_gst_factory   = (PFN_gst_element_factory_make)dlsym(g_gst_lib, "gst_element_factory_make");
+    p_gst_set_state = (PFN_gst_element_set_state)dlsym(g_gst_lib, "gst_element_set_state");
+    p_gst_unref     = (PFN_gst_object_unref)dlsym(g_gst_lib, "gst_object_unref");
+    p_gst_init      = (PFN_gst_init)dlsym(g_gst_lib, "gst_init");
+
+    /* g_object_set is in libgobject */
+    void* gobj = dlopen("libgobject-2.0.so.0", RTLD_NOW | RTLD_LOCAL);
+    if (gobj) p_g_object_set = (PFN_g_object_set)dlsym(gobj, "g_object_set");
+
+    g_gst_available = (p_gst_factory && p_gst_set_state) ? 1 : 0;
+    return g_gst_available;
+}
+
+struct LinuxMediaState {
+    void* pipeline;  /* GstElement* (playbin) */
+    int is_playing;
+    int is_looping;
+    float volume;
+    char file_path[1024];
+};
+static std::map<int, LinuxMediaState*> g_linux_media;
+
 AuroraWidget aurora_gui_media_new(AuroraWidget p, int x, int y, int w, int h) {
     GuiWidget* gw = widget_new(25, (GuiWidget*)p);
     gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+
+    /* Create X11 window for video output */
+    if (g_display && gw->parent && gw->parent->xwindow) {
+        gw->xwindow = XCreateSimpleWindow(g_display, gw->parent->xwindow,
+            x, y, w, h, 0, 0, 0);
+        XMapWindow(g_display, gw->xwindow);
+    }
+
+    LinuxMediaState* ms = new LinuxMediaState();
+    memset(ms, 0, sizeof(LinuxMediaState));
+    ms->volume = 1.0f;
+    g_linux_media[gw->id] = ms;
+
     return gw;
 }
-void aurora_gui_media_play(AuroraWidget m) { (void)m; }
-void aurora_gui_media_pause(AuroraWidget m) { (void)m; }
-void aurora_gui_media_stop(AuroraWidget m) { (void)m; }
-void aurora_gui_media_load(AuroraWidget m, const char* src) { (void)m; (void)src; }
 
-/* ── Map (Linux: Leaflet via headless WebKitGTK, fallback stub) ── */
+void aurora_gui_media_open(AuroraWidget m, const char* src) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw || !src) return;
+    auto it = g_linux_media.find(gw->id);
+    if (it == g_linux_media.end()) return;
+    LinuxMediaState* ms = it->second;
+
+    if (!gst_init_check()) return;
+
+    /* Initialize GStreamer once */
+    if (!g_gst_initialized && p_gst_init) {
+        p_gst_init(nullptr, nullptr);
+        g_gst_initialized = 1;
+    }
+
+    /* Stop and free previous pipeline */
+    if (ms->pipeline) {
+        p_gst_set_state(ms->pipeline, GST_STATE_NULL);
+        if (p_gst_unref) p_gst_unref(ms->pipeline);
+        ms->pipeline = nullptr;
+        ms->is_playing = 0;
+    }
+
+    strncpy(ms->file_path, src, sizeof(ms->file_path) - 1);
+
+    /* Create playbin pipeline */
+    ms->pipeline = p_gst_factory("playbin", "aurora_media");
+    if (!ms->pipeline) return;
+
+    /* Set URI */
+    if (p_g_object_set) {
+        char uri[1200];
+        if (src[0] == '/' || strstr(src, "://"))
+            snprintf(uri, sizeof(uri), "%s", src);
+        else
+            snprintf(uri, sizeof(uri), "file://%s", src);
+        p_g_object_set(ms->pipeline, "uri", uri, nullptr);
+    }
+}
+
+void aurora_gui_media_play(AuroraWidget m) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_media.find(gw->id);
+    if (it == g_linux_media.end() || !it->second->pipeline) return;
+    p_gst_set_state(it->second->pipeline, GST_STATE_PLAYING);
+    it->second->is_playing = 1;
+}
+
+void aurora_gui_media_pause(AuroraWidget m) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_media.find(gw->id);
+    if (it == g_linux_media.end() || !it->second->pipeline) return;
+    p_gst_set_state(it->second->pipeline, GST_STATE_PAUSED);
+    it->second->is_playing = 0;
+}
+
+void aurora_gui_media_stop(AuroraWidget m) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_media.find(gw->id);
+    if (it == g_linux_media.end() || !it->second->pipeline) return;
+    p_gst_set_state(it->second->pipeline, GST_STATE_NULL);
+    it->second->is_playing = 0;
+}
+
+void aurora_gui_media_load(AuroraWidget m, const char* src) {
+    aurora_gui_media_open(m, src);
+}
+
+void aurora_gui_media_set_volume(AuroraWidget m, float vol) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_media.find(gw->id);
+    if (it == g_linux_media.end()) return;
+    it->second->volume = vol < 0.0f ? 0.0f : (vol > 1.0f ? 1.0f : vol);
+    if (it->second->pipeline && p_g_object_set) {
+        double v = (double)it->second->volume;
+        p_g_object_set(it->second->pipeline, "volume", v, nullptr);
+    }
+}
+
+void aurora_gui_media_set_looping(AuroraWidget m, int loop) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_media.find(gw->id);
+    if (it != g_linux_media.end()) it->second->is_looping = loop ? 1 : 0;
+}
+
+int aurora_gui_media_is_playing(AuroraWidget m) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return 0;
+    auto it = g_linux_media.find(gw->id);
+    return (it != g_linux_media.end()) ? it->second->is_playing : 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Phase 36.4: Map — Leaflet.js via WebKitGTK
+   Generates HTML with Leaflet and loads in WebView.
+   ════════════════════════════════════════════════════════════ */
+
+struct LinuxMapState {
+    double center_lat, center_lon;
+    int zoom;
+    int webview_widget_id;
+    char html_path[512];
+};
+static std::map<int, LinuxMapState*> g_linux_maps;
+
+static void linux_map_generate_html(LinuxMapState* ms) {
+    snprintf(ms->html_path, sizeof(ms->html_path),
+        "/tmp/aurora_map_%d.html", (int)getpid());
+    FILE* f = fopen(ms->html_path, "w");
+    if (!f) return;
+    fprintf(f,
+        "<!DOCTYPE html>\n"
+        "<html><head>\n"
+        "<meta charset='utf-8'/>\n"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'/>\n"
+        "<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>\n"
+        "<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>\n"
+        "<style>html,body,#map{height:100%%;margin:0;padding:0}</style>\n"
+        "</head><body>\n"
+        "<div id='map'></div>\n"
+        "<script>\n"
+        "var map = L.map('map').setView([%.6f, %.6f], %d);\n"
+        "L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{\n"
+        "  attribution:'&copy; OpenStreetMap contributors',maxZoom:19\n"
+        "}).addTo(map);\n"
+        "var markers=[];\n"
+        "function addMarker(lat,lon,title){\n"
+        "  var m=L.marker([lat,lon]).addTo(map);\n"
+        "  if(title)m.bindPopup(title);\n"
+        "  markers.push(m);\n"
+        "}\n"
+        "function setCenter(lat,lon,zoom){map.setView([lat,lon],zoom||map.getZoom());}\n"
+        "function clearMarkers(){markers.forEach(function(m){map.removeLayer(m)});markers=[];}\n"
+        "</script>\n"
+        "</body></html>\n",
+        ms->center_lat, ms->center_lon, ms->zoom);
+    fclose(f);
+}
+
+static void linux_map_exec_js(LinuxMapState* ms, const char* js) {
+    if (!ms || !js) return;
+    auto it = g_linux_wv.find(ms->webview_widget_id);
+    if (it != g_linux_wv.end() && it->second->web_view && p_run_js)
+        p_run_js(it->second->web_view, js, nullptr, nullptr, nullptr);
+}
+
 AuroraWidget aurora_gui_map_new(AuroraWidget p, int x, int y, int w, int h) {
     GuiWidget* gw = widget_new(26, (GuiWidget*)p);
     gw->x = x; gw->y = y; gw->w = w; gw->h = h;
+
+    LinuxMapState* ms = new LinuxMapState();
+    memset(ms, 0, sizeof(LinuxMapState));
+    ms->center_lat = 23.8103; /* Dhaka, Bangladesh */
+    ms->center_lon = 90.4125;
+    ms->zoom = 13;
+    ms->webview_widget_id = gw->id;
+    g_linux_maps[gw->id] = ms;
+
+    /* Create internal WebView for map rendering */
+    if (webkit_init()) {
+        LinuxWvState* wv_st = new LinuxWvState();
+        memset(wv_st, 0, sizeof(LinuxWvState));
+        wv_st->web_view = p_web_view_new();
+        g_linux_wv[gw->id] = wv_st;
+        gw->extra_data = wv_st->web_view;
+
+        /* Generate and load map HTML */
+        linux_map_generate_html(ms);
+        char uri[600];
+        snprintf(uri, sizeof(uri), "file://%s", ms->html_path);
+        if (p_load_uri) p_load_uri(wv_st->web_view, uri);
+    }
+
+    /* Create X11 window container */
+    if (g_display && gw->parent && gw->parent->xwindow) {
+        gw->xwindow = XCreateSimpleWindow(g_display, gw->parent->xwindow,
+            x, y, w, h, 0, 0, 0);
+        XMapWindow(g_display, gw->xwindow);
+    }
+
     return gw;
 }
-void aurora_gui_map_set_center(AuroraWidget m, double lat, double lon) { (void)m; (void)lat; (void)lon; }
-void aurora_gui_map_set_zoom(AuroraWidget m, int z) { (void)m; (void)z; }
-void aurora_gui_map_add_marker(AuroraWidget m, double lat, double lon, const char* label) { (void)m; (void)lat; (void)lon; (void)label; }
+
+void aurora_gui_map_set_center(AuroraWidget m, double lat, double lon) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_maps.find(gw->id);
+    if (it == g_linux_maps.end()) return;
+    it->second->center_lat = lat; it->second->center_lon = lon;
+    char js[256];
+    snprintf(js, sizeof(js), "setCenter(%.6f,%.6f,%d);", lat, lon, it->second->zoom);
+    linux_map_exec_js(it->second, js);
+}
+
+void aurora_gui_map_set_zoom(AuroraWidget m, int z) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_maps.find(gw->id);
+    if (it == g_linux_maps.end()) return;
+    it->second->zoom = z;
+    char js[256];
+    snprintf(js, sizeof(js), "setCenter(%.6f,%.6f,%d);",
+        it->second->center_lat, it->second->center_lon, z);
+    linux_map_exec_js(it->second, js);
+}
+
+void aurora_gui_map_add_marker(AuroraWidget m, double lat, double lon, const char* label) {
+    GuiWidget* gw = (GuiWidget*)m;
+    if (!gw) return;
+    auto it = g_linux_maps.find(gw->id);
+    if (it == g_linux_maps.end()) return;
+    char escaped[512] = {0};
+    if (label) {
+        int j = 0;
+        for (int i = 0; label[i] && j < 500; i++) {
+            if (label[i] == '\'') escaped[j++] = '\\';
+            escaped[j++] = label[i];
+        }
+        escaped[j] = '\0';
+    }
+    char js[1024];
+    snprintf(js, sizeof(js), "addMarker(%.6f,%.6f,'%s');", lat, lon, escaped);
+    linux_map_exec_js(it->second, js);
+}
 
 #elif defined(__APPLE__)
   /* macOS implementation provided by ui_mac.mm — include header only */
@@ -883,6 +1452,8 @@ int aurora_gui_window_get_height(AuroraWidget w) { (void)w; return g_win.h; }
 void aurora_gui_window_set_min_size(AuroraWidget w, int a, int b) { (void)w;(void)a;(void)b; }
 void aurora_gui_window_set_max_size(AuroraWidget w, int a, int b) { (void)w;(void)a;(void)b; }
 void aurora_gui_window_set_resizable(AuroraWidget w, int r) { (void)w;(void)r; }
+int aurora_gui_window_set_dark_mode(AuroraWidget w, int e) { (void)w;(void)e; return 0; }
+int aurora_gui_window_set_effect(AuroraWidget w, int e) { (void)w;(void)e; return 0; }
 void aurora_gui_set_callback(AuroraWidget w, AuroraEventCallback cb) { (void)w;(void)cb; }
 void* aurora_gui_get_native_handle(AuroraWidget w) { (void)w; return nullptr; }
 AuroraWidget aurora_gui_label_new(AuroraWidget p, const char* t, int x, int y, int w, int h) { (void)p;(void)t;(void)x;(void)y;(void)w;(void)h; return nullptr; }

@@ -19,6 +19,8 @@ extern function aurora_gui_window_get_height(win: pointer) -> int
 extern function aurora_gui_window_set_min_size(win: pointer, w: int, h: int)
 extern function aurora_gui_window_set_max_size(win: pointer, w: int, h: int)
 extern function aurora_gui_window_set_resizable(win: pointer, resizable: int)
+extern function aurora_gui_window_set_dark_mode(win: pointer, enable: int) -> int
+extern function aurora_gui_window_set_effect(win: pointer, effect: int) -> int
 
 extern function aurora_gui_set_enabled(widget: pointer, enabled: int)
 extern function aurora_gui_get_enabled(widget: pointer) -> int
@@ -258,6 +260,12 @@ function gui_window_set_max_size(win, w, h):
 end
 function gui_window_set_resizable(win, r):
     aurora_gui_window_set_resizable(win, r)
+end
+function gui_window_set_dark_mode(win, enable):
+    aurora_gui_window_set_dark_mode(win, enable)
+end
+function gui_window_set_effect(win, effect):
+    aurora_gui_window_set_effect(win, effect)
 end
 function gui_set_enabled(widget, enabled):
     aurora_gui_set_enabled(widget, enabled)

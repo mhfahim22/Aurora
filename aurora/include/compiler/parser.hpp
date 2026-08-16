@@ -32,8 +32,8 @@ inline std::string format_error_with_hint(int line, int col,
 
 class Parser {
 public:
-    explicit Parser(const std::vector<LexedLine>& lines)
-        : lines_(lines), cur_(0) {}
+    explicit Parser(const std::vector<LexedLine>& lines, bool strict_indent = false)
+        : lines_(lines), cur_(0), strict_indent_(strict_indent) {}
 
     ASTNode::Ptr parse();
 
@@ -44,11 +44,13 @@ private:
     std::string pending_ecosystem_ {}; /* "python", "quickjs", "rust" set by extern string */
     std::vector<std::string> errors_;
     bool had_error_ = false;
+    bool strict_indent_ = false;
 
     ASTNode::Ptr parse_stmt();
 
     ASTNode::Ptr parse_class();
     ASTNode::Ptr parse_struct();
+    ASTNode::Ptr parse_union();
     ASTNode::Ptr parse_enum();
     ASTNode::Ptr parse_interface();
     ASTNode::Ptr parse_type_alias();
@@ -86,3 +88,6 @@ public:
     /* Panic-mode error recovery: skip error line + its indented body */
     void panic_recover(int line_indent);
 };
+
+/* Pattern parsing shared between statement and expression match */
+ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln);

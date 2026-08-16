@@ -61,7 +61,18 @@ foreach ($file in $examples) {
     $compArgs = @($file.FullName, "-O0")
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $Compiler
-    $psi.Arguments = $compArgs -join ' '
+    # Build the command line safely for paths that contain spaces
+    # (e.g. "D:/Aurora Lang/..."). Use ArgumentList (pwsh / .NET Core)
+    # when available; otherwise quote each argument manually (Windows
+    # PowerShell 5.1 / .NET Framework has no ArgumentList property).
+    if ($psi.ArgumentList) {
+        foreach ($arg in $compArgs) { [void]$psi.ArgumentList.Add($arg) }
+    } else {
+        $quoted = $compArgs | ForEach-Object {
+            if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '""') + '"' } else { $_ }
+        }
+        $psi.Arguments = $quoted -join ' '
+    }
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $false
     $psi.UseShellExecute = $false

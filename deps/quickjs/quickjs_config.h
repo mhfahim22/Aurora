@@ -7,6 +7,12 @@
 /* Always available: CONFIG_VERSION */
 #define CONFIG_VERSION "2021-03-27"
 
+/* Always available: __JS_INF (Infinity constant).
+   MSVC cannot fold 1.0/0.0 at compile time (C2124), so use the
+   1e308*1e308 multiplication form for ALL compilers on Windows
+   to keep behavior consistent between MSVC and MinGW/GCC. */
+#define __JS_INF ((double)1.0e308 * (double)1.0e308)
+
 /* Always available: inttypes.h for PRId64 etc */
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
@@ -63,9 +69,6 @@ static __forceinline int gettimeofday(struct timeval *tv, void *tz) {
    C2440 "cannot convert from 'JSValue' to 'JSValue'" errors caused by
    MSVC rejecting identity casts on struct types. */
 #define JS_NAN_BOXING 1
-
-/* Infinity constant avoiding compile-time 1.0/0.0 (C2124 on MSVC) */
-#define __JS_INF ((double)1.0e308 * (double)1.0e308)
 
 /* force_inline / no_inline / maybe_unused for MSVC */
 #define force_inline __forceinline

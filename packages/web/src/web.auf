@@ -1,0 +1,27 @@
+## aurora/web - High-level web framework
+## wraps the aurora/http server for ergonomic routes.
+
+extern function aurora_http_server_create() -> pointer
+extern function aurora_http_server_listen(server: pointer, port: int) -> int
+extern function aurora_http_server_route(server: pointer, method: cstring, path: cstring, handler: pointer) -> int
+extern function aurora_http_server_stop(server: pointer) -> int
+
+function web_create():
+    return aurora_http_server_create()
+end
+
+function web_listen(server: pointer, port: int):
+    return aurora_http_server_listen(server, port)
+end
+
+function web_route(server: pointer, method: cstring, path: cstring, handler: pointer):
+    return aurora_http_server_route(server, method, path, handler)
+end
+
+function web_stop(server: pointer):
+    return aurora_http_server_stop(server)
+end
+
+function main():
+    output("aurora/web seed ready")
+end

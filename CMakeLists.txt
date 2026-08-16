@@ -1,6 +1,6 @@
 # aurora_restructured/CMakeLists.txt (updated)
 cmake_minimum_required(VERSION 3.20)
-project(Aurora LANGUAGES C CXX)
+project(Aurora VERSION 1.0.0 LANGUAGES C CXX)
 include(CTest)
 set(DART_TESTING_TIMEOUT 60)
 
@@ -51,6 +51,9 @@ endif()
 # ── Find LLVM ────────────────────────────────────────────────
 # MinGW LLVM 21+ cmake configs reference ZLIB::ZLIB
 if(WIN32 AND NOT MSVC)
+    # Force MinGW LLVM path when compiler is GCC (MinGW)
+    set(LLVM_DIR "C:/msys64/ucrt64/lib/cmake/llvm" CACHE PATH "LLVM installation directory" FORCE)
+    set(Clang_DIR "C:/msys64/ucrt64/lib/cmake/clang" CACHE PATH "Clang installation directory" FORCE)
     find_package(ZLIB QUIET)
 endif()
 find_package(LLVM REQUIRED CONFIG)
@@ -78,6 +81,7 @@ add_executable(aurorac
     aurora/src/compiler/parser/parse_expr.cpp
     aurora/src/compiler/parser/parse_class.cpp
     aurora/src/compiler/parser/parse_struct.cpp
+    aurora/src/compiler/parser/parse_union.cpp
     aurora/src/compiler/parser/parse_enum.cpp
     aurora/src/compiler/parser/parse_interface.cpp
     aurora/src/compiler/parser/parse_type_alias.cpp
@@ -126,7 +130,23 @@ add_executable(aurorac
     aurora/src/compiler/package_manager.cpp
     aurora/src/compiler/doc_generator.cpp
     aurora/src/compiler/build_system.cpp
+    aurora/src/compiler/repl.cpp
+    "${CMAKE_BINARY_DIR}/generated/linker_include_symbols.cpp"
 )
+
+# Auto-generate MSVC linker include directives from runtime_exports.hpp
+set(RUNTIME_EXPORTS_HPP "${CMAKE_SOURCE_DIR}/aurora/src/runtime/runtime_exports.hpp")
+set(GENERATED_LINKER_INCLUDES "${CMAKE_BINARY_DIR}/generated/linker_include_symbols.cpp")
+add_custom_command(
+    OUTPUT ${GENERATED_LINKER_INCLUDES}
+    COMMAND ${CMAKE_COMMAND}
+        -DRUNTIME_EXPORTS_HPP="${RUNTIME_EXPORTS_HPP}"
+        -DGENERATED_CPP="${GENERATED_LINKER_INCLUDES}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/gen_linker_includes.cmake"
+    DEPENDS "${RUNTIME_EXPORTS_HPP}" "${CMAKE_SOURCE_DIR}/cmake/gen_linker_includes.cmake"
+    COMMENT "Generating linker include directives from runtime_exports.hpp..."
+)
+source_group("Generated" FILES "${GENERATED_LINKER_INCLUDES}")
 
 # LLVM components: native + nativecodegen auto-detect the host architecture
 # (X86 on x86, AArch64 on ARM64, etc.)
@@ -135,6 +155,13 @@ set(AURORA_LLVM_COMPONENTS
     native nativecodegen
     orcjit
 )
+
+# WebAssembly backend for the WASM/browser target (Phase 40). Pulls in the
+# WebAssembly codegen + asm parser so `aurorac --target wasm32` can emit
+# WebAssembly object files.
+if(NOT AURORA_NO_WASM)
+    list(APPEND AURORA_LLVM_COMPONENTS WebAssembly WebAssemblyAsmParser)
+endif()
 
 # Conditionally add ASM parser for the host architecture
 # (native/nativecodegen auto-selects CodeGen + AsmPrinter but not AsmParser)
@@ -177,6 +204,8 @@ add_library(aurora_runtime STATIC
     aurora/src/runtime/core/reflection.cpp
     aurora/src/runtime/core/ffi.cpp
     aurora/src/runtime/core/ffi_abi.cpp
+    aurora/src/runtime/debug/dap_runtime.cpp
+    aurora/src/runtime/wasm/dom.cpp
     aurora/src/runtime/interop/type_ir.cpp
     aurora/src/runtime/interop/type_mapping.cpp
     aurora/src/runtime/interop/type_mapping_langs.cpp
@@ -256,6 +285,10 @@ add_library(aurora_runtime STATIC
     aurora/src/std/fs.cpp
     aurora/src/std/net.cpp
     aurora/src/std/regex.cpp
+    aurora/src/std/datetime.cpp
+    aurora/src/std/uuid.cpp
+    aurora/src/std/url.cpp
+    aurora/src/std/decimal.cpp
     aurora/src/std/crypto.cpp
     aurora/src/std/audio.cpp
     aurora/src/std/animation.cpp
@@ -354,7 +387,16 @@ endif()
 
 # ── Windows-specific libraries (MinGW/GCC cannot use #pragma comment(lib)) ──
 if(WIN32 AND NOT MSVC)
-    target_link_libraries(aurora_runtime PRIVATE dbghelp)
+    target_link_libraries(aurora_runtime PRIVATE
+        dbghelp
+        dxgi d3d12 d3d11 d3dcompiler
+        crypt32 secur32
+        opengl32
+        bcrypt
+        winhttp ws2_32
+        shlwapi comctl32 dwmapi
+        uiautomationcore
+        winmm)
 endif()
 
 # ── AddressSanitizer for runtime library ──
@@ -382,13 +424,38 @@ endif()
 # ── LTO (Link-Time Optimization) for runtime library ──
 # Compiles runtime .obj files with LLVM bitcode so the linker can perform LTO
 # Disable with: -DAURORA_RUNTIME_LTO=OFF (needed for AOT linking with lld-link)
-option(AURORA_RUNTIME_LTO "Enable LTO for aurora_runtime static library" ON)
+# MinGW ld cannot consume LTO bitcode (LLVM IR in .obj files).
+if(WIN32 AND NOT MSVC)
+    set(AURORA_RUNTIME_LTO_DEFAULT OFF)
+else()
+    set(AURORA_RUNTIME_LTO_DEFAULT ON)
+endif()
+option(AURORA_RUNTIME_LTO "Enable LTO for aurora_runtime static library" ${AURORA_RUNTIME_LTO_DEFAULT})
 if(AURORA_RUNTIME_LTO)
   set_property(TARGET aurora_runtime PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # ── Link runtime to compiler ────────────────
 target_link_libraries(aurorac PRIVATE aurora_runtime)
+# MinGW: export runtime symbols for ORC JIT DynamicLibrarySearchGenerator
+if(WIN32 AND NOT MSVC)
+    set(AURORA_DEF_FILE "${CMAKE_BINARY_DIR}/generated/aurora_exports.def")
+    add_custom_command(
+        OUTPUT ${AURORA_DEF_FILE}
+        COMMAND ${CMAKE_COMMAND}
+            -DRUNTIME_EXPORTS_HPP="${RUNTIME_EXPORTS_HPP}"
+            -DGENERATED_DEF="${AURORA_DEF_FILE}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/gen_export_def.cmake"
+        DEPENDS "${RUNTIME_EXPORTS_HPP}" "${CMAKE_SOURCE_DIR}/cmake/gen_export_def.cmake"
+        COMMENT "Generating MinGW .def file from runtime_exports.hpp..."
+    )
+    add_custom_target(aurora_exports_def DEPENDS ${AURORA_DEF_FILE})
+    # Pass .def file to linker so its symbols get exported.
+    # Use target_link_libraries rather than -Wl,<path> so paths
+    # containing spaces (e.g. "D:/Aurora Lang/...") are quoted correctly.
+    target_link_libraries(aurorac PRIVATE "${AURORA_DEF_FILE}")
+    add_dependencies(aurorac aurora_exports_def)
+endif()
 
 # ═══════════════════════════════════════════════════════════════
 # Optional: CUDA support
@@ -580,6 +647,26 @@ endif()
 set_target_properties(voss PROPERTIES OUTPUT_NAME "voss")
 
 # ═══════════════════════════════════════════════════════════════
+# aurora_registry — standalone Aurora package registry server (Phase 41.1)
+# ═══════════════════════════════════════════════════════════════
+add_executable(aurora_registry
+    aurora/tools/registry/registry_server.cpp
+)
+if(WIN32)
+    target_link_libraries(aurora_registry PRIVATE ws2_32)
+else()
+    find_package(Threads REQUIRED)
+    target_link_libraries(aurora_registry PRIVATE Threads::Threads)
+endif()
+
+# ═══════════════════════════════════════════════════════════════
+# auroradoc — package documentation generator (Phase 41.4)
+# ═══════════════════════════════════════════════════════════════
+add_executable(auroradoc
+    aurora/tools/auroradoc/auroradoc.cpp
+)
+
+# ═══════════════════════════════════════════════════════════════
 # Cross-platform bridge build support
 # ═══════════════════════════════════════════════════════════════
 # Generates a target that compiles a QuickJS npm bridge .c wrapper
@@ -611,6 +698,11 @@ function(add_npm_bridge name pkg c_file)
         if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
             set_property(TARGET ${name} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
             target_compile_options(${name} PRIVATE /FI"quickjs_config.h" /std:c11)
+        else()
+            # MinGW/GCC/Clang: force-include quickjs_config.h too.
+            # Without it, CONFIG_VERSION / __JS_INF / PRId64 etc. are missing
+            # and quickjs.c fails to compile (error: '__JS_INF' undeclared).
+            target_compile_options(${name} PRIVATE -include "${qjs_dir}/quickjs_config.h" -std=c11)
         endif()
         target_link_libraries(${name} PRIVATE bcrypt)
     else()
@@ -675,6 +767,7 @@ add_library(aurora_parser STATIC
     aurora/src/compiler/parser/parse_expr.cpp
     aurora/src/compiler/parser/parse_class.cpp
     aurora/src/compiler/parser/parse_struct.cpp
+    aurora/src/compiler/parser/parse_union.cpp
     aurora/src/compiler/parser/parse_enum.cpp
     aurora/src/compiler/parser/parse_interface.cpp
     aurora/src/compiler/parser/parse_type_alias.cpp
@@ -694,6 +787,32 @@ add_executable(aurora_lsp
 )
 target_link_libraries(aurora_lsp PRIVATE aurora_parser)
 target_include_directories(aurora_lsp PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# aurora_fmt — source code formatter
+# ═══════════════════════════════════════════════════════════════
+add_executable(aurora_fmt
+    aurora/tools/fmt/fmt.cpp
+)
+target_link_libraries(aurora_fmt PRIVATE aurora_parser)
+target_include_directories(aurora_fmt PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# aurora_lint — static analyzer
+# ═══════════════════════════════════════════════════════════════
+add_executable(aurora_lint
+    aurora/tools/lint/lint.cpp
+)
+target_link_libraries(aurora_lint PRIVATE aurora_parser)
+target_include_directories(aurora_lint PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
+
+# ═══════════════════════════════════════════════════════════════
+# aurora_dap — Debug Adapter Protocol server
+# ═══════════════════════════════════════════════════════════════
+add_executable(aurora_dap
+    aurora/tools/dap/dap.cpp
+)
+target_include_directories(aurora_dap PRIVATE ${CMAKE_SOURCE_DIR}/aurora/include)
 
 # ═══════════════════════════════════════════════════════════════
 # Optional: aurora-bindgen (only if libclang is available)
@@ -815,7 +934,12 @@ target_include_directories(bench_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/inclu
 install(TARGETS aurorac RUNTIME DESTINATION bin)
 install(TARGETS aurora_runtime ARCHIVE DESTINATION lib)
 install(TARGETS voss RUNTIME DESTINATION bin)
+install(TARGETS aurora_registry RUNTIME DESTINATION bin)
+install(TARGETS auroradoc RUNTIME DESTINATION bin)
 install(TARGETS aurora_lsp RUNTIME DESTINATION bin)
+install(TARGETS aurora_fmt RUNTIME DESTINATION bin)
+install(TARGETS aurora_lint RUNTIME DESTINATION bin)
+install(TARGETS aurora_dap RUNTIME DESTINATION bin)
 if(TARGET aurora_bindgen)
     install(TARGETS aurora_bindgen RUNTIME DESTINATION bin)
 endif()

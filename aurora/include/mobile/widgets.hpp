@@ -37,6 +37,17 @@ typedef struct MwWidget {
     struct MwWidget** children;
     int      child_count;
     int      child_capacity;
+    /* ── 37.3 Gesture tracking (long-press / swipe) ── */
+    float    press_x, press_y;
+    double   press_time_ms;
+    int      touch_state;         /* MW_TOUCH_NONE/PRESSED/HELD */
+    int      gesture_active;
+    int      long_press_ms;
+    float    swipe_threshold;
+    /* ── 37.3 Safe area insets (notch / home indicator) ── */
+    float    safe_area[4];        /* top, bottom, left, right */
+    /* ── 37.3 Dark mode theming ── */
+    int      dark_mode;           /* 0 = light, 1 = dark */
 } MwWidget;
 
 #define MW_BUTTON       0
@@ -77,6 +88,25 @@ typedef struct MwWidget {
 #define MW_EVENT_SCROLL     6
 #define MW_EVENT_DRAWER     7
 #define MW_EVENT_DISMISS    8
+/* ── 37.3 Gesture events ── */
+#define MW_EVENT_LONG_PRESS  9
+#define MW_EVENT_SWIPE_LEFT  10
+#define MW_EVENT_SWIPE_RIGHT 11
+#define MW_EVENT_SWIPE_UP    12
+#define MW_EVENT_SWIPE_DOWN  13
+
+/* Touch state flags */
+#define MW_TOUCH_NONE        0
+#define MW_TOUCH_PRESSED     1
+#define MW_TOUCH_HELD        2
+
+/* Gesture tuning defaults */
+#define MW_GESTURE_LONG_PRESS_MS  500.0
+#define MW_GESTURE_SWIPE_THRESHOLD 60.0f
+
+/* ── 37.3 Safe area + dark mode ── */
+#define MW_THEME_LIGHT 0
+#define MW_THEME_DARK  1
 
 #define MW_MAIN_START      0
 #define MW_MAIN_CENTER     1
@@ -127,6 +157,23 @@ int   mw_handle_touch(void* widget, float x, float y, int action);
 void  mw_set_scroll_pos(void* widget, float x, float y);
 void  mw_get_scroll_pos(void* widget, float* x, float* y);
 void  mw_render(void* widget);
+
+/* ── 37.3 Gesture recognition ── */
+extern "C" {
+void  mw_set_long_press_ms(void* widget, int ms);
+void  mw_set_swipe_threshold(void* widget, float px);
+int   mw_get_touch_state(void* widget);
+}
+
+/* ── 37.3 Safe area insets (notch / home indicator) ── */
+void  mw_set_safe_area(void* widget, float top, float bottom, float left, float right);
+void  mw_get_safe_area(void* widget, float* top, float* bottom, float* left, float* right);
+
+/* ── 37.3 Dark mode theming ── */
+void  mw_set_theme(void* widget, int theme);
+int   mw_get_theme(void* widget);
+int   mw_is_dark_mode(void* widget);
+void  mw_set_dark_mode(void* widget, int dark);
 
 #ifdef __cplusplus
 }

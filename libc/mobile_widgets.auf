@@ -108,5 +108,25 @@ extern function mw_handle_touch(widget: pointer, x: f32, y: f32, action: i32) ->
 extern function mw_set_scroll_pos(widget: pointer, x: f32, y: f32)
 extern function mw_get_scroll_pos(widget: pointer, x: pointer, y: pointer)
 
+## Gesture Tuning (Phase 37.3)
+extern function mw_set_long_press_ms(widget: pointer, ms: i32)
+extern function mw_set_swipe_threshold(widget: pointer, px: f32)
+extern function mw_get_touch_state(widget: pointer) -> i32
+@ MW_TOUCH_STATE_NONE    = 0
+@ MW_TOUCH_STATE_PRESSED = 1
+@ MW_TOUCH_STATE_HELD    = 2
+
+## Safe Area (Phase 37.3)
+extern function mw_set_safe_area(widget: pointer, top: f32, bottom: f32, left: f32, right: f32)
+extern function mw_get_safe_area(widget: pointer, top: pointer, bottom: pointer, left: pointer, right: pointer)
+
+## Theme / Dark Mode (Phase 37.3)
+@ MW_THEME_LIGHT = 0
+@ MW_THEME_DARK  = 1
+extern function mw_set_theme(widget: pointer, theme: i32)
+extern function mw_get_theme(widget: pointer) -> i32
+extern function mw_set_dark_mode(widget: pointer, dark: i32)
+extern function mw_is_dark_mode(widget: pointer) -> i32
+
 ## Rendering
 extern function mw_render(widget: pointer)

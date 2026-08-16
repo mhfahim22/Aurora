@@ -1,0 +1,8 @@
+name: aurora/std-uuid
+version: 1.0.0
+author: Aurora Core Team
+description: UUID v4 generation and parsing for Aurora
+entry: src/uuid.auf
+dependencies:
+permissions:
+

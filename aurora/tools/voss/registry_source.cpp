@@ -6,21 +6,8 @@
 
 /* ── RegistrySource trait ── */
 /* Base class for registry backends. Each backend knows how to
-   resolve packages, publish, and handle authentication. */
-struct RegistrySource {
-    virtual ~RegistrySource() = default;
-    virtual std::string name() const = 0;
-    /* Resolve a package: returns JSON metadata or empty string */
-    virtual std::string resolve(const std::string& pkg, const std::string& ver) = 0;
-    /* Publish a package archive. Returns true on success. */
-    virtual bool publish(const std::string& pkg, const std::string& version,
-                         const std::string& archive_path,
-                         const std::string& voss_json) = 0;
-    /* Check if this source is authenticated */
-    virtual bool is_authenticated() const { return false; }
-    /* Get auth token (for display) */
-    virtual std::string auth_info() const { return "no auth"; }
-};
+   resolve packages, publish, and handle authentication.
+   (Definition shared via voss.h for cross-TU use.) */
 
 /* ── GitHub API Registry Source ── */
 /* Uses the GitHub API (via http_client.hpp or http_fetch) to
@@ -247,8 +234,127 @@ struct GitHubAPISource : RegistrySource {
     }
 };
 
+/* ── HTTP Registry Source (Phase 41.1) ── */
+/* Publish/resolve against an Aurora registry server (aurora_registry). */
+struct HTTPRegistrySource : RegistrySource {
+    std::string m_base;
+    std::string m_token;
+
+    HTTPRegistrySource(const std::string& url) : m_base(url) {
+        const char* tok = std::getenv("AURORA_REGISTRY_TOKEN");
+        if (!tok) tok = std::getenv("VOSS_TOKEN");
+        if (tok) m_token = tok;
+    }
+
+    std::string name() const override { return m_base; }
+
+    bool is_authenticated() const override { return !m_token.empty(); }
+
+    std::string auth_info() const override {
+        if (!m_token.empty())
+            return "token (" + m_token.substr(0, 6) + "...) via AURORA_REGISTRY_TOKEN";
+        return "no token (set AURORA_REGISTRY_TOKEN to publish)";
+    }
+
+    /* Fetch a URL via http_fetch (shell-out) */
+    static std::string fetch(const std::string& url) {
+        return http_fetch(url);
+    }
+
+    std::string resolve(const std::string& pkg, const std::string& ver) override {
+        std::string url = m_base + "/packages/" + pkg + "/" + (ver.empty() ? "latest" : ver);
+        std::string raw = http_fetch(url);
+        if (raw.empty()) return {};
+        std::string json = extract_json_source(raw);
+        if (json.empty()) return {};
+        return json;
+    }
+
+    /* Upload a tgz archive to the registry server via POST /publish.
+       Uses curl (or PowerShell) with X-* headers. */
+    static std::string post_file(const std::string& url,
+                                 const std::string& file_path,
+                                 const std::vector<std::string>& headers) {
+        std::string cmd;
+#ifdef _WIN32
+        cmd = "powershell -NoLogo -NoProfile -Command \"";
+        cmd += "$h = @{ 'Content-Type' = 'application/gzip'";
+        for (auto& h : headers) {
+            size_t colon = h.find(':');
+            if (colon != std::string::npos) {
+                cmd += "; '" + h.substr(0, colon) + "' = '" + h.substr(colon + 1) + "'";
+            }
+        }
+        cmd += " }; try { $r = Invoke-WebRequest -Uri '" + url + "' -Method POST -Headers $h -InFile '" + file_path + "' -UseBasicParsing -TimeoutSec 120; Write-Output $r.Content } catch { Write-Output $_.Exception.Message }\" 2>nul";
+#else
+        cmd = "curl -s -X POST '" + url + "'";
+        cmd += " -H 'Content-Type: application/gzip'";
+        for (auto& h : headers) {
+            size_t colon = h.find(':');
+            if (colon != std::string::npos)
+                cmd += " -H '" + h.substr(0, colon) + ": " + h.substr(colon + 1) + "'";
+        }
+        cmd += " --data-binary '@" + file_path + "' 2>/dev/null";
+#endif
+        std::string result;
+#ifdef _WIN32
+        FILE* pipe = _popen(cmd.c_str(), "r");
+#else
+        FILE* pipe = popen(cmd.c_str(), "r");
+#endif
+        if (!pipe) return "";
+        char buf[4096];
+        while (fgets(buf, sizeof(buf), pipe) != nullptr) result += buf;
+#ifdef _WIN32
+        _pclose(pipe);
+#else
+        pclose(pipe);
+#endif
+        return result;
+    }
+
+    bool publish(const std::string& pkg, const std::string& version,
+                 const std::string& archive_path,
+                 const std::string& voss_json) override {
+        if (!fs::exists(archive_path)) {
+            std::cerr << "error: archive not found: " << archive_path << "\n";
+            return false;
+        }
+        if (m_token.empty()) {
+            std::cerr << "error: publish requires auth token.\n";
+            std::cerr << "  set AURORA_REGISTRY_TOKEN (or VOSS_TOKEN)\n";
+            return false;
+        }
+        PackageInfo info = read_manifest(".");
+        std::vector<std::string> headers;
+        headers.push_back("X-Aurora-Token: " + m_token);
+        headers.push_back("X-Package-Name: " + pkg);
+        headers.push_back("X-Package-Version: " + version);
+        headers.push_back("X-Package-Author: " + info.author);
+        headers.push_back("X-Package-Description: " + info.description);
+        headers.push_back("X-Package-Entry: " + (info.entry.empty() ? "main.aura" : info.entry));
+
+        std::string url = m_base + "/publish";
+        std::cout << "  uploading " << pkg << "@" << version << " to " << m_base << "...\n";
+        std::string result = post_file(url, archive_path, headers);
+        if (result.empty()) {
+            std::cerr << "error: upload failed (is the registry server running?)\n";
+            return false;
+        }
+        if (result.find("\"ok\": true") != std::string::npos) {
+            std::cout << "  published successfully\n";
+            if (!voss_json.empty()) {
+                std::cout << "  (voss.json metadata also bundled with package)\n";
+            }
+            return true;
+        }
+        std::cerr << "error: publish rejected: " << result << "\n";
+        return false;
+    }
+};
+
 /* ── Factory: create appropriate RegistrySource for a given spec ── */
-static RegistrySource* create_registry_source(const std::string& spec) {
+RegistrySource* create_registry_source(const std::string& spec) {
     /* github:user/repo */
     if (spec.find("github:") == 0 || spec.find("gh:") == 0) {
         std::string gh_spec = spec;
@@ -263,6 +369,10 @@ static RegistrySource* create_registry_source(const std::string& spec) {
             std::string repo = gh_spec.substr(slash + 1);
             return new GitHubAPISource(user, repo);
         }
+    }
+    /* http(s)://... — Aurora registry server (Phase 41.1) */
+    if (spec.find("http://") == 0 || spec.find("https://") == 0) {
+        return new HTTPRegistrySource(spec);
     }
     /* file:///path or just a URL (future: plain registry server) */
     return nullptr;

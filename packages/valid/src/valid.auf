@@ -1,0 +1,38 @@
+## aurora/valid - Input validation helpers
+
+function valid_email(text: cstring):
+    if len(text) < 3:
+        return 0
+    end
+    i = 0
+    found_at = 0
+    while i < len(text):
+        c = text[i]
+        if c == 64:
+            found_at = 1
+        end
+        i = i + 1
+    end
+    return found_at
+end
+
+function valid_nonempty(text: cstring):
+    if len(text) == 0:
+        return 0
+    end
+    return 1
+end
+
+function valid_len(text: cstring, min: int, max: int):
+    if len(text) < min:
+        return 0
+    end
+    if len(text) > max:
+        return 0
+    end
+    return 1
+end
+
+function main():
+    output("aurora/valid seed ready")
+end

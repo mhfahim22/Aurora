@@ -1,0 +1,56 @@
+# Auto-detect text files and normalize to LF
+* text=auto
+
+# Source files
+*.cpp text
+*.hpp text
+*.h text
+*.c text
+*.hpp text
+*.mm text
+*.m text
+*.asm text
+*.def text
+
+# Aurora files
+*.aura text
+*.auf text
+
+# Build files
+*.cmake text
+CMakeLists.txt text
+
+# Config files
+*.json text
+*.yml text
+*.yaml text
+*.ps1 text
+*.sh text
+*.bat text
+*.iss text
+
+# Documentation
+*.md text
+*.txt text
+
+# Binary files - keep as-is
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.a binary
+*.lib binary
+*.obj binary
+*.exe binary
+*.dll binary
+*.pdb binary
+*.ilk binary
+*.exp binary
+*.pyc binary

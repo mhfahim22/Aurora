@@ -301,6 +301,31 @@ int cmd_install(const std::string& pkg, const std::string& ecosystem_hint) {
         rver = version.empty() ? "1.0.0" : version; source = "stub"; integrity = sha256_hex(rver);
     }
 
+    /* Phase 41.1: if resolved from an HTTP registry, download + extract the
+       package archive so its source lands in packages/<name>/ */
+    if (source.rfind("registry:", 0) == 0) {
+        std::string reg_name = source.substr(9);
+        for (auto& reg : g_registries) {
+            if (reg.name == reg_name && (reg.url.find("http://") == 0 || reg.url.find("https://") == 0)) {
+                std::string archive_url = reg.url + "/archive/" + name + "/" + rver + ".tgz";
+                std::string tmp = cache_dir() + "/" + name + "@" + rver + ".tgz";
+                if (http_download(archive_url, tmp)) {
+                    std::string pkg_dir = "packages/" + name;
+                    if (extract_tgz(tmp, pkg_dir)) {
+                        std::cout << "  downloaded + extracted " << name << "@" << rver << "\n";
+                        source = "registry:" + reg_name + " (" + reg.url + ")";
+                    } else {
+                        std::cout << "  warning: archive downloaded but could not be extracted\n";
+                    }
+                    std::cout << "  integrity: " << integrity << "\n";
+                } else {
+                    std::cout << "  warning: could not download archive from " << archive_url << "\n";
+                }
+                break;
+            }
+        }
+    }
+
     /* Verify package signature if available */
     if (!g_offline && fs::exists("packages/" + name)) {
         if (verify_package_signature(name, rver)) {

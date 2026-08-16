@@ -1,0 +1,12 @@
+import "thread"
+
+function main()
+    output("mini2 start")
+    a = atomic_create(0)
+    output("mini2 created")
+    atomic_store(a, 42)
+    output("mini2 stored")
+    v = atomic_load(a)
+    output("mini2 loaded v=" + v)
+    output("mini2 PASS")
+end

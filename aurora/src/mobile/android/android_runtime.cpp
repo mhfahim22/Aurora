@@ -525,4 +525,111 @@ int aurora_android_px_to_dp(int px) {
     return d > 0 ? (int)(px / d + 0.5f) : px;
 }
 
+/* ════════════════════════════════════════════════════════════
+   JNI bridge — Phase 37.1 / 37.3
+   Resolves the native methods declared in MainActivity.java via
+   the standard JNI symbol convention (Java_aurora_MainActivity_*).
+
+   nativeInit          → calls aurora_android_init
+   nativeInitRenderer  → calls aurora_android_renderer_init
+   nativeOnTouch       → pushes touch event AND dispatches to the
+                         mobile widget tree (37.3 event parity)
+   nativeOnKey         → updates key state
+   nativeOnImeText     → sets IME text for text fields
+   nativeOnPermissionResult → forwards permission grant/deny
+   ════════════════════════════════════════════════════════════ */
+
+#ifdef __ANDROID__
+
+/* Root widget pointer set by the Aurora app (via mw_init root) */
+static void* g_root_widget = nullptr;
+
+/* Internal: root widget setter used by the widget subsystem */
+void _aurora_android_set_root_widget(void* root) {
+    g_root_widget = root;
+}
+
+/* Forward-declared from widgets.cpp (37.3 event dispatch) */
+#ifdef __cplusplus
+extern "C" {
+#endif
+int mw_handle_touch(void* widget, float x, float y, int action);
+void mw_set_safe_area(void* widget, float top, float bottom, float left, float right);
+#ifdef __cplusplus
+}
+#endif
+
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeInit(JNIEnv* env, jobject thiz) {
+    (void)env; (void)thiz;
+    JavaVM* jvm = nullptr;
+    env->GetJavaVM(&jvm);
+    if (jvm) {
+        aurora_android_init(jvm, thiz);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeInitRenderer(JNIEnv* env, jobject thiz) {
+    (void)thiz;
+    aurora_android_renderer_init(env);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeOnTouch(JNIEnv* env, jobject thiz,
+                                       jint action, jint id,
+                                       jfloat x, jfloat y,
+                                       jfloat pressure, jfloat size) {
+    (void)env; (void)thiz;
+    /* Store in the ring buffer for the Aurora API */
+    _aurora_android_push_touch(action, id, x, y, pressure, size);
+
+    /* 37.3 — dispatch to the mobile widget tree for callbacks */
+    if (g_root_widget) {
+        mw_handle_touch(g_root_widget, x, y, action);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeOnKey(JNIEnv* env, jobject thiz,
+                                     jint keyCode, jint pressed) {
+    (void)env; (void)thiz;
+    _aurora_android_set_key(keyCode, pressed);
+}
+
+/* 37.3 — propagate the real device safe-area insets (status bar /
+   notch, navigation bar / home indicator) into the widget tree so
+   rendering clears them. Values arrive in density-independent pixels. */
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeOnSafeArea(JNIEnv* env, jobject thiz,
+                                          jfloat top, jfloat bottom,
+                                          jfloat left, jfloat right) {
+    (void)env; (void)thiz;
+    if (g_root_widget)
+        mw_set_safe_area(g_root_widget, top, bottom, left, right);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeOnImeText(JNIEnv* env, jobject thiz, jstring text) {
+    (void)thiz;
+    if (!text) { _aurora_android_set_ime_text(""); return; }
+    const char* utf = env->GetStringUTFChars(text, nullptr);
+    _aurora_android_set_ime_text(utf ? utf : "");
+    if (utf) env->ReleaseStringUTFChars(text, utf);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_aurora_MainActivity_nativeOnPermissionResult(JNIEnv* env, jobject thiz,
+                                                  jstring permission,
+                                                  jboolean granted) {
+    (void)env; (void)thiz;
+    const char* p = permission ? env->GetStringUTFChars(permission, nullptr) : nullptr;
+    if (p) {
+        aurora_android_on_permission_result(p, granted ? 1 : 0);
+        env->ReleaseStringUTFChars(permission, p);
+    }
+}
+
+#endif /* __ANDROID__ */
+
 } /* extern "C" */

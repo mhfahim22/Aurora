@@ -1,0 +1,243 @@
+## Aurora Standard Library — Filesystem
+## Usage:  import "fs"
+##
+## File I/O, directory operations, and path utilities.
+##
+## Example:
+##   import "fs"
+##   content = read_file("hello.txt")
+##   write_file("copy.txt", content)
+##   if exists("data")
+##     entries = listdir("data")
+##     output(entries)
+##   end
+## ════════════════════════════════════════════════════════════
+
+## ── File operations ──
+extern function aurora_fs_read_file(path: cstring) -> cstring
+extern function aurora_fs_write_file(path: cstring, content: cstring) -> i32
+extern function aurora_fs_append_file(path: cstring, content: cstring) -> i32
+extern function aurora_fs_exists(path: cstring) -> i32
+extern function aurora_fs_copy(src: cstring, dst: cstring) -> i32
+extern function aurora_fs_remove(path: cstring) -> i32
+extern function aurora_fs_rename(old: cstring, newname: cstring) -> i32
+extern function aurora_fs_size(path: cstring) -> i64
+extern function aurora_fs_mkdir(path: cstring) -> i32
+extern function aurora_fs_rmdir(path: cstring) -> i32
+extern function aurora_fs_is_dir(path: cstring) -> i32
+
+## ── Directory listing ──
+extern function aurora_fs_listdir(path: cstring) -> cstring
+
+## ── Path utilities ──
+extern function aurora_fs_dirname(path: cstring) -> cstring
+extern function aurora_fs_basename(path: cstring) -> cstring
+extern function aurora_fs_extension(path: cstring) -> cstring
+extern function aurora_fs_join(dir: cstring, file: cstring) -> cstring
+extern function aurora_fs_normalize(path: cstring) -> cstring
+extern function aurora_fs_absolute(path: cstring) -> cstring
+extern function aurora_fs_relative(path: cstring, base: cstring) -> cstring
+extern function aurora_fs_walk(path: cstring) -> cstring
+extern function aurora_fs_metadata(path: cstring) -> cstring
+extern function aurora_fs_permissions(path: cstring) -> cstring
+extern function aurora_fs_chmod(path: cstring, mode: i32) -> i32
+extern function aurora_fs_temp_directory() -> cstring
+
+## ── File system watching (polling) ──
+extern function aurora_fs_watch_init(dir: cstring) -> pointer
+extern function aurora_fs_watch_poll(state: pointer) -> i32
+extern function aurora_fs_watch_free(state: pointer)
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Read file (returns empty string on failure) ──
+function read_file(path):
+    result = aurora_fs_read_file(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+
+## ── Write file ──
+function write_file(path, content):
+    return aurora_fs_write_file(path, content) == 1
+end
+
+## ── Append to file ──
+function append_file(path, content):
+    return aurora_fs_append_file(path, content) == 1
+end
+
+## ── Check if path exists ──
+function exists(path):
+    return aurora_fs_exists(path) == 1
+end
+
+## ── Copy file ──
+function copy_file(src, dst):
+    return aurora_fs_copy(src, dst) == 1
+end
+
+## ── Delete file ──
+function delete_file(path):
+    return aurora_fs_remove(path) == 1
+end
+
+## ── Move/rename file ──
+function move_file(old, newname):
+    return aurora_fs_rename(old, newname) == 1
+end
+
+## ── Get file size (returns -1 on error) ──
+function file_size(path):
+    return aurora_fs_size(path)
+end
+
+## ── Create directory ──
+function mkdir(path):
+    return aurora_fs_mkdir(path) == 1
+end
+
+## ── Remove empty directory ──
+function rmdir(path):
+    return aurora_fs_rmdir(path) == 1
+end
+
+## ── Check if path is a directory ──
+function is_dir(path):
+    return aurora_fs_is_dir(path) == 1
+end
+
+## ── List directory entries (one per line) ──
+function listdir(path):
+    result = aurora_fs_listdir(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+
+## ── Get parent directory path ──
+function dirname(path):
+    result = aurora_fs_dirname(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+
+## ── Get file name from path ──
+function basename(path):
+    result = aurora_fs_basename(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+
+## ── File system watching ──
+## Usage:
+##   watcher = fs_watch_init(".")
+##   changed = fs_watch_poll(watcher)
+##   fs_watch_free(watcher)
+function fs_watch_init(dir):
+    return aurora_fs_watch_init(dir)
+end
+function fs_watch_poll(state):
+    return aurora_fs_watch_poll(state)
+end
+function fs_watch_free(state):
+    aurora_fs_watch_free(state)
+end
+
+## ════════════════════════════════════════════════════════════
+## Phase 2 — Filesystem API wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Extended aliases (Phase 2 naming) ──
+function createDir(path):
+    return mkdir(path)
+end
+function removeDir(path):
+    return rmdir(path)
+end
+
+## ── Path utilities ──
+function parent(path):
+    return dirname(path)
+end
+function extension(path):
+    result = aurora_fs_extension(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+function path_join(dir, file):
+    result = aurora_fs_join(dir, file)
+    if result == null
+        return ""
+    end
+    return result
+end
+function normalize(path):
+    result = aurora_fs_normalize(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+function absolute(path):
+    result = aurora_fs_absolute(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+function relative(path, base):
+    result = aurora_fs_relative(path, base)
+    if result == null
+        return ""
+    end
+    return result
+end
+
+## ── Directory walking ──
+function walk(path):
+    result = aurora_fs_walk(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+
+## ── Metadata ──
+function metadata(path):
+    result = aurora_fs_metadata(path)
+    if result == null
+        return "{}"
+    end
+    return result
+end
+function permissions(path):
+    result = aurora_fs_permissions(path)
+    if result == null
+        return ""
+    end
+    return result
+end
+function chmod(path, mode):
+    return aurora_fs_chmod(path, mode) == 1
+end
+
+## ── System paths ──
+function temp_directory():
+    result = aurora_fs_temp_directory()
+    if result == null
+        return ""
+    end
+    return result
+end

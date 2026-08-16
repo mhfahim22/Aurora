@@ -26,9 +26,12 @@ void OptimizedCodegen::generate(const ASTNode* root,
     memory_analyzer_ = &memory_analyzer;
 
     /* Step 0: Set target info for LLVM optimization */
-    auto triple = llvm::sys::getProcessTriple();
-    module_->setTargetTriple(triple);
-    module_->setDataLayout(llvm_target_data_layout(triple));
+    /* getProcessTriple() returns std::string on some LLVM versions and
+       llvm::Triple on others — construct a Triple (handles both) and
+       always pass a plain string to setTargetTriple/StringRef APIs. */
+    llvm::Triple triple(llvm::sys::getProcessTriple());
+    llvm_set_module_triple(module_.get(), triple.str());
+    module_->setDataLayout(llvm_target_data_layout(triple.str()));
 
     /* Step 1: Declare runtime helpers */
     declare_runtime_helpers();
@@ -486,6 +489,7 @@ void OptimizedCodegen::walk(const ASTNode* node) {
     case NodeType::Spawn:
     case NodeType::Wait:
     case NodeType::Async:
+    case NodeType::Assert:
         break;
 
     default:
@@ -626,7 +630,7 @@ void OptimizedCodegen::gen_function(const ASTNode* node) {
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
-            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm_attr_nocapture());
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;
@@ -807,6 +811,13 @@ llvm::Value* OptimizedCodegen::gen_call(const ASTNode* node) {
                     args[i] = builder_->CreateSIToFP(args[i], param_ty, "arg_itof");
                 else if (args[i]->getType()->isDoubleTy() && param_ty->isIntegerTy())
                     args[i] = builder_->CreateFPToSI(args[i], param_ty, "arg_ftoi");
+                else if (args[i]->getType()->isFloatingPointTy() &&
+                         param_ty->isFloatingPointTy()) {
+                    if (param_ty->isFloatTy() && args[i]->getType()->isDoubleTy())
+                        args[i] = builder_->CreateFPTrunc(args[i], param_ty, "arg_f2f");
+                    else if (param_ty->isDoubleTy() && args[i]->getType()->isFloatTy())
+                        args[i] = builder_->CreateFPExt(args[i], param_ty, "arg_f2f");
+                }
             }
         }
     }

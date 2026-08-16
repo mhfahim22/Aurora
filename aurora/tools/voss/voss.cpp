@@ -412,6 +412,26 @@ int main(int argc, char* argv[]) {
         }
         return cmd_package(target, format);
     }
+    /* ── Mobile Publishing (voss publish-mobile) ── */
+    if (cmd == "publish-mobile" || cmd == "pub-mobile" || cmd == "publish") {
+        std::string platform, format;
+        for (int i = off; i < argc; i++) {
+            if (strcmp(argv[i], "--platform") == 0 || strcmp(argv[i], "-p") == 0) { if (i + 1 < argc) platform = argv[++i]; }
+            else if (strcmp(argv[i], "--format") == 0 || strcmp(argv[i], "-f") == 0) { if (i + 1 < argc) format = argv[++i]; }
+        }
+        if (platform.empty()) {
+            std::cerr << "usage: voss publish-mobile --platform <android|ios> [--format <format>]\n"
+                      << "  Builds a signed, store-ready mobile artifact (APK/AAB or IPA)\n"
+                      << "formats:\n"
+                      << "  android: apk (default), aab\n"
+                      << "  ios: ipa (default)\n"
+                      << "  Generates: Android keystore + mipmap icons + splash + permissions\n"
+                      << "             iOS AppIcon + LaunchScreen assets\n";
+            return 1;
+        }
+        if (format.empty()) format = (platform == "ios") ? "ipa" : "apk";
+        return cmd_publish_mobile(platform, format);
+    }
     if (cmd == "theme") return cmd_theme(argc - 2, argv + 2);
     if (cmd == "help" || cmd == "--help" || cmd == "-h") return cmd_help();
 

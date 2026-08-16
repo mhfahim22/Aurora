@@ -1,0 +1,8 @@
+name: aurora/mail
+version: 1.0.0
+author: Community
+description: Email composition and sending helpers
+entry: src/mail.auf
+dependencies:
+permissions:
+

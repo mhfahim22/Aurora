@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <chrono>
 #include <mutex>
+#include <ctime>
 
 /* ── External HTTP client functions from net.cpp (C linkage) ── */
 extern "C" {
@@ -42,6 +43,12 @@ struct AuroraRateLimiter {
     int window_sec;
     std::unordered_map<std::string, BucketEntry> buckets;
     std::mutex mtx;
+    /* Distributed (Redis-compatible) backend URL.
+       When set, the limiter delegates state to a shared store so that
+       multiple gateway nodes enforce a single global limit. */
+    std::string redis_url;
+    /* Partition key prefix for the shared store when distributed mode is on */
+    std::string redis_prefix;
 };
 
 AuroraRateLimiter* aurora_rate_limiter_new(int max_requests, int window_sec) {
@@ -49,6 +56,7 @@ AuroraRateLimiter* aurora_rate_limiter_new(int max_requests, int window_sec) {
     if (!rl) return nullptr;
     rl->max_tokens = max_requests > 0 ? max_requests : 100;
     rl->window_sec = window_sec > 0 ? window_sec : 60;
+    rl->redis_prefix = "aurora:rl:";
     return rl;
 }
 
@@ -56,8 +64,62 @@ void aurora_rate_limiter_free(AuroraRateLimiter* rl) {
     delete rl;
 }
 
+/* Enable distributed (Redis-compatible) mode.
+   `url` is a shared key-value HTTP endpoint, e.g.
+   "http://redis-gateway:8080/" or a real Redis RESTP bridge
+   (https://redis.io/docs/latest/develop/connect/cli/restp/).
+   The endpoint must support:
+     POST {key, incr, expire_sec}  -> {"value": N, "ttl": T}
+   which mirrors Redis INCR + EXPIRE semantics atomically. */
+void aurora_rate_limiter_set_redis(AuroraRateLimiter* rl, const char* url) {
+    if (!rl || !url) return;
+    rl->redis_url = url;
+}
+
+/* Distributed allow: perform an atomic INCR against the shared store.
+   A fixed-window counter keyed by `prefix + key + ":" + window_epoch`
+   gives the same semantics as Redis INCR + EXPIRE across nodes. */
+static int rate_limiter_allow_distributed(AuroraRateLimiter* rl, const char* key) {
+    long long window_epoch = (long long)time(nullptr) / rl->window_sec;
+    std::string full_key = rl->redis_prefix + key + ":" + std::to_string(window_epoch);
+
+    /* Build RESTP-style JSON body */
+    std::string json = "{\"key\":\"" + full_key
+                     + "\",\"incr\":1,\"expire_sec\":" + std::to_string(rl->window_sec) + "}";
+
+    char resp[4096];
+    int ret = aurora_net_http_post_ex(rl->redis_url.c_str(),
+                                       "Content-Type: application/json\r\n",
+                                       json.c_str(), "application/json",
+                                       resp, sizeof(resp));
+    if (ret <= 0) {
+        /* Backend unreachable — fail closed to protect the origin */
+        return 0;
+    }
+    char* body = strstr(resp, "\r\n\r\n");
+    if (!body) return 0;
+    body += 4;
+
+    /* Parse {"value":N} — the shared store returns the incremented count */
+    const char* v = strstr(body, "\"value\"");
+    if (!v) return 0;
+    v = strchr(v, ':');
+    if (!v) return 0;
+    v++;
+    while (*v == ' ') v++;
+    long long count = 0;
+    while (*v >= '0' && *v <= '9') {
+        count = count * 10 + (*v - '0');
+        v++;
+    }
+    return (count <= rl->max_tokens) ? 1 : 0;
+}
+
 int aurora_rate_limiter_allow(AuroraRateLimiter* rl, const char* key) {
     if (!rl || !key) return 0;
+    if (!rl->redis_url.empty()) {
+        return rate_limiter_allow_distributed(rl, key);
+    }
     std::lock_guard<std::mutex> lock(rl->mtx);
     auto now = std::chrono::steady_clock::now();
     auto& entry = rl->buckets[key];

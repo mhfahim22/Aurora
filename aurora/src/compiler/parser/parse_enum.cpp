@@ -21,7 +21,8 @@ ASTNode::Ptr Parser::parse_enum() {
     require_token_end(toks, idx, "enum definition");
     advance();
 
-    /* Parse variant names from indented body (each line is just a name) */
+    /* Parse variant names from indented body */
+    /* Supports: VariantName, VariantName(Type1, Type2), VariantName */
     ASTNode* tail = nullptr;
     while (!at_end()) {
         if (!skip_blanks()) break;
@@ -34,6 +35,24 @@ ASTNode::Ptr Parser::parse_enum() {
         std::string vname = vtoks[0].value;
         auto variant = make_node(NodeType::Var, vname, vline.line_no);
         ASTNode* raw = variant.get();
+
+        /* Check for Variant(Type1, Type2, ...) with associated data */
+        int vi = 1;
+        if (vi < (int)vtoks.size() && vtoks[vi].is_operator('(')) {
+            vi++;
+            ASTNode* ftail = nullptr;
+            while (vi < (int)vtoks.size() && !vtoks[vi].is_operator(')')) {
+                if (vtoks[vi].is_operator(',')) { vi++; continue; }
+                if (vi < (int)vtoks.size() && (vtoks[vi].is_identifier() || vtoks[vi].is(TokenKind::Keyword))) {
+                    auto ftype = make_node(NodeType::Var, vtoks[vi].value, vline.line_no);
+                    ASTNode* raw_ft = ftype.get();
+                    if (!variant->right) { variant->right = std::move(ftype); ftail = raw_ft; }
+                    else                  { ftail->next = std::move(ftype);   ftail = raw_ft; }
+                }
+                vi++;
+            }
+            /* skip ')' */
+        }
 
         if (!stmt->args) { stmt->args = std::move(variant); tail = raw; }
         else             { tail->next = std::move(variant);  tail = raw; }

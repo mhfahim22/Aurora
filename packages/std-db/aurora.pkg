@@ -1,0 +1,8 @@
+name: aurora/std-db
+version: 1.0.0
+author: Aurora Core Team
+description: SQLite database bindings for Aurora
+entry: src/db.auf
+dependencies:
+permissions:
+

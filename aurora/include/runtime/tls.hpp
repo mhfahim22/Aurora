@@ -31,6 +31,11 @@ int aurora_tls_write(int64_t tls_conn, const char* data, int len);
 /* ── Close TLS connection ── */
 void aurora_tls_close(int64_t tls_conn);
 
+/* ── Query the negotiated ALPN protocol for this TLS connection ── */
+/* Returns "h2", "http/1.1", or "" if ALPN was not negotiated. */
+/* The returned pointer is owned by the connection and valid until close. */
+const char* aurora_tls_get_alpn(int64_t tls_conn);
+
 #ifdef __cplusplus
 }
 #endif

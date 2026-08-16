@@ -16,6 +16,7 @@ AuroraStr* aurora_str_new(size_t cap) {
     s->ptr[0] = '\0';
     s->len = 0;
     s->cap = cap;
+    s->shared = 0;
     return s;
 }
 
@@ -27,10 +28,17 @@ void aurora_str_free(AuroraStr* s) {
 }
 
 /* ── Append string b onto string a, reusing a's buffer with exponential growth ── */
-/* Returns a (modified in-place). Does NOT free b — caller owns b's lifetime. */
+/* Returns a (modified in-place) when a is exclusively owned. If a is shared
+   (a cached literal), a fresh clone is allocated first so the shared string
+   is never mutated — copy-on-write. Does NOT free b — caller owns b's lifetime. */
 extern "C" AuroraStr* aurora_str_append(AuroraStr* a, AuroraStr* b) {
     if (!a) return b ? aurora_str_from_cstr(b->ptr) : aurora_str_new(0);
     if (!b) return a;
+    if (a->shared) {
+        AuroraStr* clone = aurora_str_from_cstr(a->ptr);
+        if (!clone) return a;
+        return aurora_str_append(clone, b);
+    }
     size_t new_len = a->len + b->len;
     if (a->cap < new_len + 1) {
         size_t new_cap = a->cap * 2;
@@ -45,6 +53,14 @@ extern "C" AuroraStr* aurora_str_append(AuroraStr* a, AuroraStr* b) {
     a->ptr[new_len] = '\0';
     a->len = new_len;
     return a;
+}
+
+/* ── Compare two AuroraStr for equality (content-based, not pointer-based) ── */
+extern "C" int64_t aurora_str_equal(AuroraStr* a, AuroraStr* b) {
+    if (a == b) return 1;
+    if (!a || !b) return 0;
+    if (a->len != b->len) return 0;
+    return memcmp(a->ptr, b->ptr, a->len) == 0 ? 1 : 0;
 }
 
 /* ── Repeat source string n times, single allocation ── */
@@ -78,6 +94,15 @@ AuroraStr* aurora_str_from_cstr(const char* cstr) {
     return s;
 }
 
+/* ── Create a shared, immutable AuroraStr (cached literal) ── */
+/* Shared strings are never mutated in place: aurora_str_append clones them.
+   Used for hoisted string literals so `"a" + x` can't pollute the literal. */
+extern "C" AuroraStr* aurora_str_literal(const char* cstr) {
+    AuroraStr* s = aurora_str_from_cstr(cstr);
+    if (s) s->shared = 1;
+    return s;
+}
+
 /* ── Create AuroraStr from raw parts (takes ownership of ptr) ── */
 AuroraStr* aurora_str_from_parts(char* ptr, size_t len, size_t cap) {
     AuroraStr* s = (AuroraStr*)malloc(sizeof(AuroraStr));
@@ -85,6 +110,7 @@ AuroraStr* aurora_str_from_parts(char* ptr, size_t len, size_t cap) {
     s->ptr  = ptr;
     s->len  = len;
     s->cap  = cap;
+    s->shared = 0;
     return s;
 }
 

@@ -14,6 +14,7 @@ struct BuildConfig {
     bool use_lto = false;
     bool enable_debug = false;
     bool enable_coverage = false;
+    bool enable_dap = false;
     bool incremental = false;
     bool fast_math = false;
     bool verbose = false;

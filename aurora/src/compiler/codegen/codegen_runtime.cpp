@@ -75,6 +75,27 @@ void Codegen::declare_runtime_helpers() {
         llvm::FunctionType::get(void_ty(), { i8ptr_ty(), i64_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_coverage_trace", module_.get());
 
+    /* DAP debugger hooks (Phase 42.2) */
+    /* void aurora_dap_trap(i64 line) */
+    fn_dap_trap_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { i64_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_dap_trap", module_.get());
+    /* void aurora_dap_enter(i8* fnname) */
+    fn_dap_enter_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), { i8ptr_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_dap_enter", module_.get());
+    /* void aurora_dap_exit() */
+    fn_dap_exit_ = llvm::Function::Create(
+        llvm::FunctionType::get(void_ty(), {}, false),
+        llvm::Function::ExternalLinkage, "aurora_dap_exit", module_.get());
+    /* void aurora_dap_var(i8* name, double value) */
+    {
+        auto* dbl = llvm::Type::getDoubleTy(ctx_);
+        fn_dap_var_ = llvm::Function::Create(
+            llvm::FunctionType::get(void_ty(), { i8ptr_ty(), dbl }, false),
+            llvm::Function::ExternalLinkage, "aurora_dap_var", module_.get());
+    }
+
     /* void aurora_print_str(i8* ptr) — prints AuroraStr* */
     fn_print_str_ = llvm::Function::Create(
         llvm::FunctionType::get(void_ty(), { i8ptr_ty() }, false),
@@ -84,6 +105,11 @@ void Codegen::declare_runtime_helpers() {
     fn_str_from_cstr_ = llvm::Function::Create(
         llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_str_from_cstr", module_.get());
+
+    /* i8* aurora_str_literal(i8*) — shared/immutable AuroraStr (cached literal) */
+    fn_str_literal_ = llvm::Function::Create(
+        llvm::FunctionType::get(i8ptr_ty(), { i8ptr_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_str_literal", module_.get());
 
     /* i8* aurora_str_as_cstr(i8*) — get C string pointer from AuroraStr */
     llvm::Function::Create(
@@ -134,6 +160,11 @@ void Codegen::declare_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(i64_ty(), { i8ptr_ty(), i8ptr_ty() }, false),
         llvm::Function::ExternalLinkage, "aurora_str_index", module_.get());
+
+    /* i64 aurora_str_equal(AuroraStr*, AuroraStr*) — content-based string equality */
+    llvm::Function::Create(
+        llvm::FunctionType::get(i64_ty(), { i8ptr_ty(), i8ptr_ty() }, false),
+        llvm::Function::ExternalLinkage, "aurora_str_equal", module_.get());
 
     /* AuroraStr* aurora_int_to_str(i64) — convert integer to AuroraStr */
     fn_int_to_str_ = llvm::Function::Create(
@@ -836,6 +867,10 @@ void Codegen::declare_domain_runtime_helpers() {
     llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr, ptr, ptr }, false),
         llvm::Function::ExternalLinkage, "aurora_http_response_set_header", mod);
+    /* http_response_set_cookie(i8*, i8*, i8*, i64) - set Set-Cookie header */
+    llvm::Function::Create(
+        llvm::FunctionType::get(v, { ptr, ptr, ptr, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_http_response_set_cookie", mod);
     /* cors_apply_default(i8*) - set default CORS headers */
     llvm::Function::Create(
         llvm::FunctionType::get(v, { ptr }, false),
@@ -2817,6 +2852,47 @@ void Codegen::declare_domain_runtime_helpers() {
     /* void mw_render(ptr) */
     llvm::Function::Create(llvm::FunctionType::get(v, { ptr }, false),
         llvm::Function::ExternalLinkage, "mw_render", mod);
+
+    /* mw_get_text returns char* — wrap into Aurora string */
+    extern_string_info_["mw_get_text"] = { {}, true, false };
+    /* mw_* string params are char* — convert Aurora strings before the call */
+    extern_string_info_["mw_set_text"]  = { {1}, false, false };
+    extern_string_info_["mw_set_image"] = { {1}, false, false };
+    extern_string_info_["mw_add_item"]  = { {1}, false, false };
+
+    /* mw_get_scroll_pos / mw_get_safe_area write results through float*
+       out-params — pass variable addresses and store results back. */
+    extern_out_params_["mw_get_scroll_pos"] = { 1, 2 };
+    extern_out_params_["mw_get_safe_area"]  = { 1, 2, 3, 4 };
+
+    /* ── 37.3 Mobile Widget Parity (gesture / safe-area / dark-mode) ── */
+    /* void mw_set_long_press_ms(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "mw_set_long_press_ms", mod);
+    /* void mw_set_swipe_threshold(ptr, f32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, f32 }, false),
+        llvm::Function::ExternalLinkage, "mw_set_swipe_threshold", mod);
+    /* i32 mw_get_touch_state(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "mw_get_touch_state", mod);
+    /* void mw_set_safe_area(ptr, f32, f32, f32, f32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, f32, f32, f32, f32 }, false),
+        llvm::Function::ExternalLinkage, "mw_set_safe_area", mod);
+    /* void mw_get_safe_area(ptr, ptr, ptr, ptr, ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, ptr, ptr, ptr, ptr }, false),
+        llvm::Function::ExternalLinkage, "mw_get_safe_area", mod);
+    /* void mw_set_theme(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "mw_set_theme", mod);
+    /* i32 mw_get_theme(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "mw_get_theme", mod);
+    /* i32 mw_is_dark_mode(ptr) */
+    llvm::Function::Create(llvm::FunctionType::get(i32, { ptr }, false),
+        llvm::Function::ExternalLinkage, "mw_is_dark_mode", mod);
+    /* void mw_set_dark_mode(ptr, i32) */
+    llvm::Function::Create(llvm::FunctionType::get(v, { ptr, i32 }, false),
+        llvm::Function::ExternalLinkage, "mw_set_dark_mode", mod);
 
     /* ── Phase 16: Mobile Runtime ── */
 

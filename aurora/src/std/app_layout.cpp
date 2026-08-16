@@ -161,13 +161,13 @@ static void layout_row(AppLayoutNode* n, float cw, float ch) {
         }
         x = n->pad_l;
     }
-    for (auto* c : n->children) {
+for (auto* c : n->children) {
         c->out_x = x + c->mar_l;
+        x += c->out_w + c->mar_l + c->mar_r + n->gap;
         if (n->align == 3) c->out_h = avail_h - c->mar_t - c->mar_b;
         else if (n->align == 1) c->out_y = n->pad_t + (avail_h - c->out_h) / 2;
         else if (n->align == 2) c->out_y = n->pad_t + avail_h - c->out_h - c->mar_b;
         else c->out_y = n->pad_t + c->mar_t;
-        x += c->out_w + c->mar_l + c->mar_r + n->gap;
         layout_row(c, c->out_w, c->out_h);
     }
 }

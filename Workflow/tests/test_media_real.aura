@@ -1,0 +1,34 @@
+extern function aurora_gui_init() -> int
+extern function aurora_gui_window_new(title: str, w: int, h: int) -> int
+extern function aurora_gui_media_new(parent: int, x: int, y: int, w: int, h: int) -> int
+extern function aurora_gui_media_open(media: int, path: str)
+extern function aurora_gui_media_play(media: int)
+extern function aurora_gui_media_pause(media: int)
+extern function aurora_gui_media_stop(media: int)
+extern function aurora_gui_media_set_volume(media: int, vol: int)
+extern function aurora_gui_media_set_looping(media: int, loop: int)
+extern function aurora_gui_media_is_playing(media: int) -> int
+
+function main()
+    output("Media Test: Starting...")
+    ret = aurora_gui_init()
+    if ret >= 0
+        output("init OK")
+    end
+    win = aurora_gui_window_new("Media Test", 640, 480)
+    if win >= 0
+        media = aurora_gui_media_new(win, 0, 0, 640, 480)
+        if media >= 0
+            aurora_gui_media_open(media, "test.mp3")
+            aurora_gui_media_set_volume(media, 500)
+            aurora_gui_media_set_looping(media, 1)
+            aurora_gui_media_play(media)
+            playing = aurora_gui_media_is_playing(media)
+            if playing >= 0
+                output("Media player OK")
+            end
+            aurora_gui_media_stop(media)
+        end
+    end
+    output("Media Test: PASS")
+end

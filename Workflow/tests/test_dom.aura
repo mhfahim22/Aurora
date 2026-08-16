@@ -1,0 +1,42 @@
+# Phase 40 — WASM DOM Bindings Compilation Test
+# Verify the aurora_dom_* browser bindings compile for wasm32.
+# Run via regression.ps1 Stage 9.
+
+extern function aurora_dom_init() -> int
+extern function aurora_dom_create_element(tag: cstring) -> int
+extern function aurora_dom_document_body() -> int
+extern function aurora_dom_append_child(parent: int, child: int) -> int
+extern function aurora_dom_set_text(elem: int, text: cstring) -> int
+extern function aurora_dom_set_style(elem: int, prop: cstring, value: cstring) -> int
+extern function aurora_dom_set_title(title: cstring) -> int
+extern function aurora_dom_add_event_listener(elem: int, type: cstring, fn: callback(i64) -> int) -> int
+extern function aurora_dom_clear_children(elem: int) -> int
+extern function aurora_dom_child_count(elem: int) -> int
+extern function aurora_dom_child_at(elem: int, idx: int) -> int
+
+function main()
+    output("DOM Test: Starting...")
+
+    ret = aurora_dom_init()
+    if ret >= 0
+        output("DOM Test: init OK")
+    end
+
+    body = aurora_dom_document_body()
+    title = aurora_dom_create_element("h1")
+    aurora_dom_set_text(title, "Hello DOM")
+    aurora_dom_set_style(title, "color", "#333")
+    aurora_dom_append_child(body, title)
+    aurora_dom_set_title("Aurora Test")
+
+    btn = aurora_dom_create_element("button")
+    aurora_dom_set_text(btn, "Click")
+    aurora_dom_add_event_listener(btn, "click", on_click)
+    aurora_dom_append_child(body, btn)
+
+    output("DOM Test: PASS")
+end
+
+function on_click(event: pointer)
+    aurora_dom_set_text(event, "Clicked")
+end

@@ -16,12 +16,43 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <memory>
 #include <functional>
+
+/* ════════════════════════════════════════════════════════════
+    Cross-version setTargetTriple
+    ════════════════════════════════════════════════════════════
+    LLVM 19 changed Module::setTargetTriple to take a standalone
+    llvm::Triple by value.  Older LLVM (≤ 18) takes a StringRef
+    where Triple merely derives from StringRef.  This helper
+    compiles against both API generations. */
+inline void llvm_set_module_triple(llvm::Module* mod, const std::string& triple) {
+#if LLVM_VERSION_MAJOR >= 19
+    mod->setTargetTriple(llvm::Triple(triple));
+#else
+    mod->setTargetTriple(triple);
+#endif
+}
+
+/* ════════════════════════════════════════════════════════════
+    Cross-version attribute: no-capture
+    ════════════════════════════════════════════════════════════
+    LLVM 20 renamed the AttrKind enumerator `NoCapture` to
+    `Captures` (the IR keyword itself stayed `nocapture`).
+    This helper returns the attribute kind for both API
+    generations. */
+inline llvm::Attribute::AttrKind llvm_attr_nocapture() {
+#if LLVM_VERSION_MAJOR >= 20
+    return llvm::Attribute::Captures;
+#else
+    return llvm::Attribute::NoCapture;
+#endif
+}
 
 /* ════════════════════════════════════════════════════════════
     Struct helper types
@@ -44,6 +75,10 @@ llvm::Value*      codegen_struct_alloca(llvm::LLVMContext& ctx, llvm::IRBuilder<
 llvm::Value*      codegen_struct_gep(llvm::IRBuilder<>& builder, llvm::Value* struct_ptr,
                                      const std::string& struct_name,
                                      const std::string& field_name);
+
+/* ── Enum type helpers (codegen_types.cpp) ── */
+llvm::StructType* codegen_get_enum_type(llvm::LLVMContext& ctx, const std::string& enum_name);
+bool              codegen_enum_has_data(const std::string& enum_name);
 
 /* ════════════════════════════════════════════════════════════
     OOP free functions (codegen_oop.cpp) — LLVM-dependent
@@ -140,6 +175,7 @@ struct VarRecord {
     bool           is_gc_root  { false };     /* registered with GC        */
     bool           is_closure  { false };     /* lambda closure variable   */
     std::string    struct_type {};            /* extern struct name, if any */
+    std::string    interface_name {};         /* interface type, if any     */
 };
 
 /* ── One lexical scope on the codegen stack ── */
@@ -190,6 +226,10 @@ public:
     void set_source_file(const std::string& path);
     void emit_coverage_trace(int line);
 
+    /* ── DAP debugger control (public setters) ── */
+    void set_dap_enabled(bool on) { dap_enabled_ = on; }
+    void emit_dap_trap(int line);
+
     /* ── Debug info control (public setters) ── */
     void set_debug_builder(llvm::DIBuilder* db) { dibuilder_ = db; }
     void set_debug_enabled(bool on) { debug_enabled_ = on; }
@@ -213,6 +253,22 @@ private:
     /* ── Scope stack ── */
     std::vector<CodegenScope> scopes_;
 
+    /* ── Module-global registry (capture support) ──
+       Variables promoted to GlobalVariables (scopes_.size()==1) live here
+       persistently. Nested functions lose their lexical parent's scope in
+       gen_function (scopes_ is moved out), so lookup_var falls back here
+       to resolve captured outer variables. Owner tag prevents sibling
+       functions from accidentally sharing same-named locals. */
+    std::vector<std::string> function_stack_;
+    std::unordered_map<std::string, VarRecord>   module_globals_;
+    std::unordered_map<std::string, std::string> module_global_owner_; /* name -> declaring fn */
+
+    /* ── Out-param (by-reference) extern params ──
+       Param indices whose C type is a scalar pointer (float* etc.). When a
+       variable is passed at such an index, codegen passes the address of a
+       temp slot and writes the (float-extended) result back afterwards. */
+    std::unordered_map<std::string, std::vector<int>> extern_out_params_;
+
     /* ── Runtime helper function declarations ── */
     llvm::Function* fn_drop_glue_    { nullptr };
     llvm::Function* fn_refcount_inc_ { nullptr };
@@ -229,6 +285,7 @@ private:
     llvm::Function* fn_print_float_  { nullptr };
     llvm::Function* fn_str_concat_   { nullptr };
     llvm::Function* fn_str_from_cstr_{ nullptr };
+    llvm::Function* fn_str_literal_  { nullptr };
     llvm::Function* fn_str_new_      { nullptr };
     llvm::Function* fn_str_free_     { nullptr };
     llvm::Function* fn_str_append_   { nullptr };
@@ -361,6 +418,13 @@ private:
     std::string     source_file_path_;
     llvm::Value*    source_file_ptr_   { nullptr };
 
+    /* ── DAP debugger runtime functions ── */
+    llvm::Function* fn_dap_trap_       { nullptr };
+    llvm::Function* fn_dap_enter_      { nullptr };
+    llvm::Function* fn_dap_exit_       { nullptr };
+    llvm::Function* fn_dap_var_        { nullptr };
+    bool            dap_enabled_       { false };
+
     /* ── DWARF debug info (DIBuilder) ── */
     llvm::DIBuilder*      dibuilder_        { nullptr };
     llvm::DICompileUnit*  debug_cu_         { nullptr };
@@ -462,6 +526,12 @@ private:
     };
     std::unordered_map<std::string, std::vector<CallbackSig>> extern_callback_sigs_;
 
+    /* Monotonic counter for per-call-site callback trampoline/global naming.
+       Callbacks passed to the same extern function at the same param index
+       must get distinct trampolines + callback globals, otherwise a second
+       registration overwrites the first (both events fire the same handler). */
+    unsigned next_cb_id_ = 0;
+
     /* C-string param info: for extern function 'name', which param indices expect C strings */
     /* When an Aurora string is passed, the data pointer is auto-extracted */
     struct ExternStringInfo {
@@ -475,6 +545,10 @@ private:
        Populated by a pre-scan before codegen and used to propagate the
        `is_closure` flag to variables that receive the return value. */
     std::unordered_set<std::string> closure_returning_fns_;
+
+    /* True when the last gen_expr call returned a closure struct (capturing lambda).
+       Checked by gen_assign to set is_closure on the receiving variable. */
+    bool last_expr_was_closure_ = false;
 
 
 
@@ -586,14 +660,16 @@ private:
     void gen_panic       (const ASTNode* node);
     void gen_debug       (const ASTNode* node);
     void gen_log         (const ASTNode* node);
+    void gen_assert      (const ASTNode* node);
     void gen_weak_ref    (const ASTNode* node);
     void gen_borrow      (const ASTNode* node);
     void gen_output      (const ASTNode* node);
     void gen_return      (const ASTNode* node);
     void gen_if          (const ASTNode* node);
     void gen_match       (const ASTNode* node);
-    llvm::Value* gen_pattern_cond (const ASTNode* pattern, llvm::Value* match_val);
-    void          gen_pattern_bind (const ASTNode* pattern, llvm::Value* match_val);
+    llvm::Value* gen_match_expr  (const ASTNode* node);
+    llvm::Value* gen_pattern_cond (const ASTNode* pattern, llvm::Value* match_val, const std::string& enum_type = "");
+    void          gen_pattern_bind (const ASTNode* pattern, llvm::Value* match_val, const std::string& enum_type = "");
     llvm::Value* ensure_i64       (llvm::Value* v);
     void gen_while       (const ASTNode* node);
     void gen_loop        (const ASTNode* node);
@@ -619,6 +695,8 @@ private:
     llvm::Value* gen_var       (const ASTNode* node);
     llvm::Value* gen_binop     (const ASTNode* node);
     llvm::Value* gen_unary     (const ASTNode* node);
+    llvm::Value* gen_conditional(const ASTNode* node);
+    llvm::Value* gen_comprehension(const ASTNode* node);
     llvm::Value* gen_call      (const ASTNode* node);
     llvm::Value* gen_index     (const ASTNode* node);
     llvm::Value* gen_move_expr (const ASTNode* node);
@@ -648,6 +726,11 @@ private:
     llvm::Value* i64(int64_t v) {
         return llvm::ConstantInt::get(i64_ty(), v, true);
     }
+
+    /* Convert a value of any scalar numeric type (i8..i64, u8..u64,
+       f32/f64, i1) to an i1 boolean for conditionals. Non-zero = true,
+       matching the typechecker's is_boolish()/is_numeric() semantics. */
+    llvm::Value* gen_truthy(llvm::Value* v, const char* name);
 
     /* Hoist aurora_str_from_cstr(literal) to entry block — avoids re-allocation
        inside loops.  Caches result per unique literal string per function. */
@@ -715,7 +798,18 @@ inline llvm::Type* ast_kind_to_abi_type(llvm::LLVMContext& ctx, AstTypeKind kind
     switch (kind) {
         case AstTypeKind::Unknown:              return fallback;
         case AstTypeKind::Int:
-        case AstTypeKind::Bool:                 return llvm::Type::getInt64Ty(ctx);
+        case AstTypeKind::I64:
+        case AstTypeKind::U64:                  return llvm::Type::getInt64Ty(ctx);
+        case AstTypeKind::I32:
+        case AstTypeKind::U32:                  return llvm::Type::getInt32Ty(ctx);
+        case AstTypeKind::I16:
+        case AstTypeKind::U16:                  return llvm::Type::getInt16Ty(ctx);
+        case AstTypeKind::I8:
+        case AstTypeKind::U8:
+        case AstTypeKind::Byte:
+        case AstTypeKind::Bool:
+        case AstTypeKind::Char:                 return llvm::Type::getInt8Ty(ctx);
+        case AstTypeKind::F32:                  return llvm::Type::getFloatTy(ctx);
         case AstTypeKind::Float:                return llvm::Type::getDoubleTy(ctx);
         case AstTypeKind::String:               return llvm::PointerType::getUnqual(ctx);
         case AstTypeKind::Void:                 return llvm::Type::getVoidTy(ctx);

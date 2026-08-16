@@ -336,6 +336,8 @@ std::string cache_get_ttl(const std::string& key, int max_age_seconds);
 void cache_put(const std::string& key, const std::string& data);
 std::string http_fetch(const std::string& url);
 std::string extract_json_source(const std::string& raw);
+bool http_download(const std::string& url, const std::string& out_path);
+bool extract_tgz(const std::string& archive, const std::string& out_dir);
 bool resolve_package(const std::string& spec, std::string& name, std::string& version, std::string& source, std::string& integrity);
 void load_registries();
 int run_cmd(const std::vector<std::string>& args);
@@ -486,6 +488,13 @@ int cmd_new(int argc, char** argv);
 /* ── Packaging (voss package) ── */
 int cmd_package(const std::string& target, const std::string& format);
 
+/* ── Mobile Publishing (voss publish-mobile) ── */
+int cmd_publish_mobile(const std::string& platform, const std::string& format);
+int generate_android_keystore(const std::string& name);
+int generate_app_icon(const std::string& out_png, int size, const std::string& label);
+int generate_splash(const std::string& out_png, int w, int h, const std::string& color);
+int patch_android_permissions(const std::string& manifest_path, const std::string& pkg_dir);
+
 /* ── Documentation Generator (voss doc) ── */
 int cmd_doc(const std::string& output_dir, bool serve);
 
@@ -524,3 +533,16 @@ bool resolve_github_package(const std::string& user, const std::string& repo, co
 std::vector<std::string> github_list_tags(const std::string& user, const std::string& repo);
 int cmd_install_github(const std::string& spec);
 int cmd_publish_github(const std::string& user, const std::string& repo, const std::string& version);
+
+/* ── Registry Source abstraction (Phase 41.1) ── */
+struct RegistrySource {
+    virtual ~RegistrySource() = default;
+    virtual std::string name() const = 0;
+    virtual std::string resolve(const std::string& pkg, const std::string& ver) = 0;
+    virtual bool publish(const std::string& pkg, const std::string& version,
+                         const std::string& archive_path,
+                         const std::string& voss_json) = 0;
+    virtual bool is_authenticated() const { return false; }
+    virtual std::string auth_info() const { return "no auth"; }
+};
+RegistrySource* create_registry_source(const std::string& spec);

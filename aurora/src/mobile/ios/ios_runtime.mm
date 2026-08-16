@@ -44,6 +44,31 @@ static void update_screen_size() {
 @interface AuroraViewController : UIViewController
 @end
 
+/* ── 37.3 root widget + touch → widget-tree dispatch parity ── */
+static void* g_ios_root_widget = nullptr;
+
+extern "C" void aurora_ios_widgets_set_root_view(void* view);
+extern "C" int  mw_handle_touch(void* widget, float x, float y, int action);
+
+/* 37.3 — set the root widget for touch dispatch (called by the renderer) */
+extern "C" void aurora_ios_set_root_widget(void* w) {
+    g_ios_root_widget = w;
+}
+
+static void dispatch_touch(int phase, float x, float y) {
+    if (!g_ios_root_widget) return;
+    /* iOS phase → MW action:
+       0 began → DOWN(0), 1 moved → MOVE(2), 3 ended → UP(1),
+       4 cancelled → CANCEL(3) */
+    int action = -1;
+    if (phase == 0) action = 0;      /* MW_TOUCH_DOWN */
+    else if (phase == 1) action = 2; /* MW_TOUCH_MOVE */
+    else if (phase == 3) action = 1; /* MW_TOUCH_UP */
+    else if (phase == 4) action = 3; /* MW_TOUCH_CANCEL */
+    if (action >= 0)
+        mw_handle_touch(g_ios_root_widget, x, y, action);
+}
+
 @implementation AuroraViewController
 
 - (void)viewDidLoad {
@@ -67,6 +92,7 @@ static void update_screen_size() {
         at.prev_x = at.x; at.prev_y = at.y;
         at.timestamp = t.timestamp;
         g_touches.push_back(at);
+        dispatch_touch(0, (float)pt.x, (float)pt.y);
     }
 }
 
@@ -82,6 +108,7 @@ static void update_screen_size() {
         at.prev_x = (float)prev.x; at.prev_y = (float)prev.y;
         at.timestamp = t.timestamp;
         g_touches.push_back(at);
+        dispatch_touch(1, (float)pt.x, (float)pt.y);
     }
 }
 
@@ -96,6 +123,7 @@ static void update_screen_size() {
         at.prev_x = at.x; at.prev_y = at.y;
         at.timestamp = t.timestamp;
         g_touches.push_back(at);
+        dispatch_touch(3, (float)pt.x, (float)pt.y);
     }
 }
 
@@ -110,11 +138,25 @@ static void update_screen_size() {
         at.prev_x = at.x; at.prev_y = at.y;
         at.timestamp = t.timestamp;
         g_touches.push_back(at);
+        dispatch_touch(4, (float)pt.x, (float)pt.y);
     }
 }
 
 - (BOOL)prefersStatusBarHidden { return NO; }
 - (BOOL)shouldAutorotate { return YES; }
+
+/* 37.3 — propagate the real device safe-area insets (notch / home
+   indicator) into the widget tree so rendering clears them. */
+- (void)viewSafeAreaInsetsDidChange {
+    [super viewSafeAreaInsetsDidChange];
+    if (!g_ios_root_widget) return;
+    UIEdgeInsets insets = self.view.safeAreaInsets;
+    extern void mw_set_safe_area(void* widget, float top, float bottom,
+                                 float left, float right);
+    mw_set_safe_area(g_ios_root_widget,
+                     (float)insets.top, (float)insets.bottom,
+                     (float)insets.left, (float)insets.right);
+}
 
 @end
 

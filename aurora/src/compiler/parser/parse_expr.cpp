@@ -16,6 +16,45 @@
     throw std::runtime_error(format_error_with_hint(line, col, msg, hint));
 }
 
+/* ── desugar_partial: replace f(a, _, c, _) with lambda(p0, p1) { f(a, p0, c, p1) } ── */
+static ASTNode::Ptr desugar_partial(ASTNode::Ptr call, int src_ln) {
+    if (!call || call->type != NodeType::Call) return call;
+    int partials = 0;
+    {
+        const ASTNode* a = call->args.get();
+        while (a) {
+            if (a->type == NodeType::Var && a->value == "_") partials++;
+            a = a->next.get();
+        }
+    }
+    if (partials == 0) return std::move(call);
+    static int pcounter = 0;
+    std::string lname = "__partial_" + std::to_string(++pcounter);
+    auto lambda = make_node(NodeType::Lambda, lname, src_ln);
+    auto* call_raw = call.get();
+    int pidx = 0;
+    ASTNode* prev = nullptr;
+    ASTNode* ptail = nullptr;
+    ASTNode* cur_arg = call_raw->args.get();
+    while (cur_arg) {
+        ASTNode* next_arg = cur_arg->next.get();
+        if (cur_arg->type == NodeType::Var && cur_arg->value == "_") {
+            std::string pname = "__p" + std::to_string(pidx++);
+            auto param = make_node(NodeType::Var, pname, src_ln);
+            ASTNode* rp = param.get();
+            if (!lambda->args) { lambda->args = std::move(param); ptail = rp; }
+            else               { ptail->next = std::move(param); ptail = rp; }
+            cur_arg->value = pname;
+        }
+        prev = cur_arg;
+        cur_arg = next_arg;
+    }
+    auto ret = make_node(NodeType::Return, "", src_ln);
+    ret->left = std::move(call);
+    lambda->body = std::move(ret);
+    return lambda;
+}
+
 /* ════════════════════════════════════════════════════════════
    Helper: parse trailing chains (.field, .method(), [idx], ())
    ════════════════════════════════════════════════════════════
@@ -73,6 +112,7 @@ ASTNode::Ptr Parser::parse_trailing_chains(ASTNode::Ptr base,
                 }
                 if (idx < cnt) idx++;
                 else throw_missing_close(src_ln, 0, ')', "method call");
+                call = desugar_partial(std::move(call), src_ln);
                 base = std::move(call);
                 continue;
             }
@@ -143,11 +183,48 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
         return inner;
     }
 
-    /* array literal */
+    /* array literal or comprehension */
     if (t.is_operator('[')) {
+        int open_ln = t.line;
         idx++;
-        auto arr  = make_node(NodeType::Array, "");
+        /* Empty array literal: [] */
+        if (idx < cnt && toks[idx].is_operator(']')) {
+            idx++;
+            return make_node(NodeType::Array, "", open_ln);
+        }
+        /* Peek: after first expression, check if comprehension */
+        int sav = idx;
+        auto first = parse_expr(toks, sav);
+        if (sav < cnt && toks[sav].is_keyword("for")) {
+            /* ── Comprehension: [expr for var in iterable (if cond)] ── */
+            idx = sav;
+            auto comp = make_node(NodeType::Comprehension, "", open_ln);
+            comp->body = std::move(first);  /* mapping expression */
+            idx++; /* skip 'for' */
+            if (idx >= cnt || !(toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
+                throw std::runtime_error("Line " + std::to_string(open_ln) + ": expected loop variable after 'for' in comprehension");
+            comp->args = make_node(NodeType::Var, toks[idx].value, open_ln);  /* loop var */
+            idx++;
+            if (idx >= cnt || !toks[idx].is_keyword("in"))
+                throw std::runtime_error("Line " + std::to_string(open_ln) + ": expected 'in' after loop variable in comprehension");
+            idx++;
+            auto iter = parse_expr(toks, idx);  /* iterable */
+            /* Store iterable: use the Call wrapper so it's a sub-expression */
+            comp->left = std::move(iter);
+            /* Optional filter: [expr for var in iter if cond] */
+            if (idx < cnt && toks[idx].is_keyword("if")) {
+                idx++;
+                comp->orelse = parse_expr(toks, idx);
+            }
+            if (idx >= cnt || !toks[idx].is_operator(']'))
+                throw std::runtime_error("Line " + std::to_string(open_ln) + ": missing ']' to close comprehension");
+            idx++;
+            return comp;
+        }
+        /* Regular array literal: [elem, elem, ...] */
+        auto arr  = make_node(NodeType::Array, "", open_ln);
         ASTNode* tail = nullptr;
+        if (!arr->args) { arr->args = std::move(first); tail = arr->args.get(); }
         while (idx < cnt && !toks[idx].is_operator(']')) {
             if (toks[idx].is_operator(',')) { idx++; continue; }
             auto elem = parse_expr(toks, idx);
@@ -301,7 +378,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
         int src_ln = t.line;
         idx++;
 
-        static int ilambda_counter = 0;
+        static int ilambda_counter{0};
         std::string lname = "__ilambda_" + std::to_string(++ilambda_counter);
 
         auto stmt = make_node(NodeType::Lambda, lname, src_ln);
@@ -334,6 +411,88 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
         return stmt;
     }
 
+    /* ── Match expression: match(expr) { case pat => val, ... } ── */
+    if (t.is_keyword("match")) {
+        int src_ln = t.line; idx++;
+        bool has_paren = (idx < cnt && toks[idx].is_operator('('));
+        if (has_paren) idx++;
+        auto match_val = parse_expr(toks, idx);
+        if (has_paren) {
+            if (idx >= cnt || !toks[idx].is_operator(')'))
+                throw std::runtime_error("Line " + std::to_string(src_ln) + ": missing ')' after match expression");
+            idx++;
+        }
+        if (idx >= cnt || !toks[idx].is_operator('{'))
+            throw std::runtime_error("Line " + std::to_string(src_ln) + ": expected '{' after match expression");
+        idx++;
+        auto stmt = make_node(NodeType::Match, "", src_ln);
+        stmt->left = std::move(match_val);
+        ASTNode::Ptr* slot = &stmt->args;
+        bool seen_default = false;
+        while (idx < cnt && !toks[idx].is_operator('}')) {
+            if (toks[idx].is_operator(',') || toks[idx].is_operator(';')) { idx++; continue; }
+            if (seen_default)
+                throw std::runtime_error("Line " + std::to_string(src_ln) + ": case after default");
+            if (toks[idx].is_keyword("case")) {
+                int cidx = idx + 1;
+                ASTNode::Ptr pattern = nullptr;
+                if (cidx < cnt) {
+                    if (toks[cidx].is_operator('[') || toks[cidx].is_identifier() || toks[cidx].is(TokenKind::Keyword) || toks[cidx].is_number()) {
+                        /* Use the statement match's pattern parsing */
+                        pattern = parse_pattern_from_tokens(toks, cidx, src_ln);
+                    }
+                }
+                std::string case_val = (pattern && pattern->type == NodeType::Num) ? pattern->value : "";
+                auto case_node = make_node(NodeType::Case, case_val, src_ln);
+                if (pattern) case_node->args = std::move(pattern);
+                /* Guard clause */
+                if (cidx < cnt && toks[cidx].is_keyword("if")) {
+                    cidx++;
+                    case_node->left = parse_expr(toks, cidx);
+                }
+                /* OR patterns */
+                ASTNode* pat_tail = pattern.get();
+                while (cidx < cnt && toks[cidx].is_operator('|')) {
+                    cidx++;
+                    auto next_pat = parse_pattern_from_tokens(toks, cidx, src_ln);
+                    if (next_pat) {
+                        if (pat_tail) { pat_tail->next = std::move(next_pat); pat_tail = pat_tail->next.get(); }
+                        else { pattern = std::move(next_pat); pat_tail = pattern.get(); }
+                    }
+                }
+                /* Expect => or : */
+                if (cidx < cnt && toks[cidx].is_operator('=') && cidx + 1 < cnt && toks[cidx + 1].is_operator('>'))
+                    cidx += 2;
+                else if (cidx < cnt && toks[cidx].is_operator(':'))
+                    cidx++;
+                else
+                    throw std::runtime_error("Line " + std::to_string(src_ln) + ": expected '=>' or ':' after case pattern");
+                case_node->body = parse_expr(toks, cidx);
+                ASTNode* raw = case_node.get();
+                *slot = std::move(case_node);
+                slot = &raw->next;
+                idx = cidx;
+            } else if (toks[idx].is_keyword("default")) {
+                int didx = idx + 1;
+                if (didx < cnt && toks[didx].is_operator('=') && didx + 1 < cnt && toks[didx + 1].is_operator('>'))
+                    didx += 2;
+                else if (didx < cnt && toks[didx].is_operator(':'))
+                    didx++;
+                else
+                    throw std::runtime_error("Line " + std::to_string(src_ln) + ": expected '=>' or ':' after default");
+                auto def_node = make_node(NodeType::Case, "default", src_ln);
+                def_node->body = parse_expr(toks, didx);
+                *slot = std::move(def_node);
+                seen_default = true;
+                idx = didx;
+            } else {
+                break;
+            }
+        }
+        if (idx < cnt && toks[idx].is_operator('}')) idx++;
+        return stmt;
+    }
+
     /* identifier: call / index / attribute / plain var */
     if (t.is(TokenKind::Identifier) || t.is(TokenKind::Keyword)) {
         std::string name = t.value;
@@ -358,6 +517,8 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
                 msg << "Line " << src_ln << ": missing ')' in call to '" << name << "'";
                 throw std::runtime_error(msg.str());
             }
+            /* Partial application: f(a, _, c, _) → lambda(p0, p1) { f(a, p0, c, p1) } */
+            call = desugar_partial(std::move(call), src_ln);
             /* Handle trailing chains on call result (e.g., foo().bar) */
             return parse_trailing_chains(std::move(call), toks, idx, cnt);
         }
@@ -406,6 +567,7 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
                         if (idx < cnt) idx++;
                         else throw_missing_close(src_ln, 0, ')', "generic call");
                     }
+                    call = desugar_partial(std::move(call), src_ln);
                     return parse_trailing_chains(std::move(call), toks, idx, cnt);
                 }
             }
@@ -479,6 +641,8 @@ ASTNode::Ptr Parser::parse_factor(const std::vector<Token>& toks, int& idx) {
                     msg << "Line " << src_ln << ": missing ')' in method call '" << name << "." << field << "'";
                     throw std::runtime_error(msg.str());
                 }
+                /* Partial application for method calls */
+                call = desugar_partial(std::move(call), src_ln);
                 /* Handle trailing chains (e.g., obj.method().field) */
                 return parse_trailing_chains(std::move(call), toks, idx, cnt);
             }
@@ -525,7 +689,7 @@ ASTNode::Ptr Parser::parse_term(const std::vector<Token>& toks, int& idx) {
     int  cnt  = static_cast<int>(toks.size());
     while (idx < cnt && toks[idx].is(TokenKind::Operator)) {
         const std::string& v = toks[idx].value;
-        if (v != "*" && v != "/" && v != "//" && v != "%" && v != "**") break;
+        if (v != "*" && v != "/" && v != "//" && v != "%" && v != "**" && v != "<<" && v != ">>") break;
         auto op  = make_node(NodeType::BinOp, v, toks[idx].line);
         idx++;
         op->left = std::move(left);
@@ -606,9 +770,13 @@ ASTNode::Ptr Parser::parse_cmp(const std::vector<Token>& toks, int& idx) {
         }
     }
 
-    /* Keyword operators: equals, and, or (left-associative, allow chaining) */
-    while (idx < cnt && toks[idx].is(TokenKind::Keyword)) {
-        const std::string& kw = toks[idx].value;
+    /* Symbol logical operators: &&, || (same precedence as and/or) */
+    while (idx < cnt && (toks[idx].is(TokenKind::Keyword) ||
+                         (toks[idx].is(TokenKind::Operator) &&
+                          (toks[idx].value == "&&" || toks[idx].value == "||")))) {
+        const std::string& raw = toks[idx].value;
+        /* Map && → "and", || → "or" for uniform handling */
+        std::string kw = (raw == "&&") ? "and" : (raw == "||") ? "or" : raw;
         if (kw == "equals") {
             auto node  = make_node(NodeType::BinOp, "==", toks[idx].line);
             idx++;
@@ -636,5 +804,17 @@ ASTNode::Ptr Parser::parse_cmp(const std::vector<Token>& toks, int& idx) {
 }
 
 ASTNode::Ptr Parser::parse_expr(const std::vector<Token>& toks, int& idx) {
-    return parse_cmp(toks, idx);
+    auto left = parse_cmp(toks, idx);
+    int  cnt  = static_cast<int>(toks.size());
+    if (idx < cnt && toks[idx].is_operator("?")) {
+        auto tern = make_node(NodeType::Conditional, "", toks[idx].line);
+        tern->left = std::move(left);
+        idx++;
+        tern->body = parse_expr(toks, idx);
+        if (idx < cnt && toks[idx].is_operator(":")) idx++;
+        else throw std::runtime_error("Line " + std::to_string(toks[0].line) + ": ternary expects ':' after then-expression");
+        tern->orelse = parse_expr(toks, idx);
+        return tern;
+    }
+    return left;
 }

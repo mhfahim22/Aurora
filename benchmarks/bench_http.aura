@@ -1,0 +1,20 @@
+# Aurora HTTP Performance Benchmark (Phase 38.2)
+# Measures requests/sec + latency p99 for a JSON endpoint served by the
+# Phase 31 web DSL runtime (the real, supported HTTP path).
+#
+# Build (standalone server):
+#   aurorac --build benchmarks/bench_http.aura -o benchmarks/bench_http.exe
+#   .\benchmarks\bench_http.exe
+# Then load test with hey/wrk against http://localhost:8080/hello
+# (server block name is an identifier; port defaults to 8080).
+
+import "server"
+
+server bench
+    route "GET" "/hello"
+        response.json("{\"hello\":\"world\",\"n\":1,\"ok\":true}")
+
+    route "GET" "/text"
+        response.html("hello")
+
+output("Aurora HTTP Benchmark (Phase 38.2) started on :8080")

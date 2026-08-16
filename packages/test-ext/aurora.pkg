@@ -1,0 +1,8 @@
+name: aurora/test-ext
+version: 1.0.0
+author: Community
+description: Extended assertion and benchmark helpers
+entry: src/testext.auf
+dependencies:
+permissions:
+

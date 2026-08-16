@@ -1,0 +1,8 @@
+name: aurora/std-datetime
+version: 1.0.0
+author: Aurora Core Team
+description: Date/time types and formatting for Aurora
+entry: src/datetime.auf
+dependencies:
+permissions:
+

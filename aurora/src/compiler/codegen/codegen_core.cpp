@@ -43,9 +43,24 @@ void Codegen::init_debug_info() {
 llvm::DIType* Codegen::get_debug_type(AstTypeKind kind) {
     if (!dibuilder_) return nullptr;
     switch (kind) {
+        case AstTypeKind::I8:
+        case AstTypeKind::U8:
+        case AstTypeKind::Byte:
+        case AstTypeKind::Char:
+            return dibuilder_->createBasicType("i8", 8, llvm::dwarf::DW_ATE_signed);
+        case AstTypeKind::I16:
+        case AstTypeKind::U16:
+            return dibuilder_->createBasicType("i16", 16, llvm::dwarf::DW_ATE_signed);
+        case AstTypeKind::I32:
+        case AstTypeKind::U32:
+            return dibuilder_->createBasicType("i32", 32, llvm::dwarf::DW_ATE_signed);
         case AstTypeKind::Int:
+        case AstTypeKind::I64:
+        case AstTypeKind::U64:
         case AstTypeKind::Bool:
             return dibuilder_->createBasicType("int", 64, llvm::dwarf::DW_ATE_signed);
+        case AstTypeKind::F32:
+            return dibuilder_->createBasicType("float", 32, llvm::dwarf::DW_ATE_float);
         case AstTypeKind::Float:
             return dibuilder_->createBasicType("float", 64, llvm::dwarf::DW_ATE_float);
         case AstTypeKind::String:
@@ -65,6 +80,12 @@ void Codegen::emit_coverage_trace(int line) {
     builder_->CreateCall(fn_coverage_trace_, {source_file_ptr_, i64(line)});
 }
 
+/* ── DAP debugger: emit a line trap at a statement boundary ── */
+void Codegen::emit_dap_trap(int line) {
+    if (!dap_enabled_ || !cur_fn_ || !fn_dap_trap_) return;
+    builder_->CreateCall(fn_dap_trap_, { i64(line) });
+}
+
 /* ════════════════════════════════════════════════════════════
    Main entry point
    ════════════════════════════════════════════════════════════ */
@@ -78,8 +99,10 @@ void Codegen::generate(const ASTNode* root) {
     ensure_llvm_init();
 
     /* Step 0 — set target info for LLVM optimization */
-    auto triple_str = llvm::sys::getProcessTriple();
-    module_->setTargetTriple(triple_str);
+    /* getProcessTriple() returns std::string or llvm::Triple depending on
+       the LLVM version — normalize to std::string for setTargetTriple. */
+    auto triple_str = llvm::Triple(llvm::sys::getProcessTriple()).str();
+    llvm_set_module_triple(module_.get(), triple_str);
     module_->setDataLayout(llvm_target_data_layout(triple_str));
 
     /* Step 0a — initialize DWARF debug info */
@@ -152,6 +175,7 @@ void Codegen::generate(const ASTNode* root) {
     }
     auto* entry_bb = llvm::BasicBlock::Create(ctx_, "entry", cur_fn_);
     builder_->SetInsertPoint(entry_bb);
+    function_stack_.push_back(entry_name);
 
     /* Create DISubprogram for the entry function (debug info) */
     if (dibuilder_ && debug_file_) {
@@ -267,6 +291,7 @@ void Codegen::generate(const ASTNode* root) {
     /* Step 10 — finalize DWARF debug info (must be after all codegen) */
     if (dibuilder_)
         dibuilder_->finalize();
+    function_stack_.pop_back();
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -450,6 +475,15 @@ void Codegen::declare_var(const std::string& name,
     scopes_.back().vars[name] = VarRecord{ alloca_ptr, state };
     scopes_.back().vars[name].type_kind = type_kind;
 
+    /* Module-global vars (GlobalVariable-backed) are kept in a persistent
+       registry so nested functions can resolve captured outer variables
+       even though their lexical parent scope was moved out of scopes_. */
+    if (llvm::dyn_cast<llvm::GlobalVariable>(alloca_ptr)) {
+        module_globals_[name]      = VarRecord{ alloca_ptr, state };
+        module_globals_[name].type_kind = type_kind;
+        module_global_owner_[name] = function_stack_.empty() ? "" : function_stack_.back();
+    }
+
     /* Emit llvm.dbg.declare for user-visible variables */
     if (dibuilder_ && debug_cur_fn_ && !name.empty() && name[0] != '_' && type_kind != AstTypeKind::Unknown) {
         if (auto* AI = llvm::dyn_cast<llvm::AllocaInst>(alloca_ptr)) {
@@ -473,6 +507,19 @@ VarRecord* Codegen::lookup_var(const std::string& name) {
     for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; i--) {
         auto* r = scopes_[i].find(name);
         if (r) return r;
+    }
+    /* Fall back to the module-global registry: resolve a captured outer
+       variable only when it was declared by the current function or one
+       of its lexical ancestors (or at module scope). This lets nested
+       functions / callbacks share outer variables while keeping sibling
+       functions' same-named locals independent. */
+    auto it = module_globals_.find(name);
+    if (it != module_globals_.end()) {
+        const std::string& owner = module_global_owner_[name];
+        if (owner.empty()) return &it->second;
+        for (const auto& fn : function_stack_) {
+            if (fn == owner) return &it->second;
+        }
     }
     return nullptr;
 }
@@ -548,11 +595,29 @@ bool Codegen::safe_ret(llvm::Value* value) {
     return true;
 }
 
+/* Convert a scalar value to an i1 boolean condition.
+   Non-zero (or non-null) is true — matches is_numeric()/is_boolish(). */
+llvm::Value* Codegen::gen_truthy(llvm::Value* v, const char* name) {
+    if (!v) return i64(0);
+    llvm::Type* ty = v->getType();
+    if (ty->isIntegerTy(1)) return v;
+    if (ty->isIntegerTy())
+        return builder_->CreateICmpNE(v, llvm::ConstantInt::get(ty, 0, true), name);
+    if (ty->isFloatingPointTy())
+        return builder_->CreateFCmpUNE(v, llvm::ConstantFP::get(ty, 0.0), name);
+    if (ty->isPointerTy())
+        return builder_->CreateIsNotNull(v, name);
+    /* Fallback: any non-empty value counts as true */
+    return i64(1);
+}
+
 /* ════════════════════════════════════════════════════════════
    Block / Statement dispatcher
    ════════════════════════════════════════════════════════════ */
 void Codegen::gen_block(const ASTNode* node) {
     while (node) {
+        if (dap_enabled_ && node->src_line > 0 && cur_fn_)
+            emit_dap_trap(node->src_line);
         if (dibuilder_ && node->src_line > 0 && debug_cur_fn_)
             builder_->SetCurrentDebugLocation(
                 llvm::DILocation::get(ctx_, node->src_line, node->src_col, debug_cur_fn_));
@@ -811,7 +876,7 @@ void Codegen::gen_stmt(const ASTNode* node) {
                 if (node->left && http_resp_body_) {
                     llvm::Value* body = gen_expr(node->left.get());
                     if (body->getType() != i8ptr_ty())
-                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                        body = builder_->CreateIntToPtr(body, i8ptr_ty(), "body_ptr");
                     if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
                     builder_->CreateCall(http_resp_body_, { resp, body });
                 }
@@ -820,7 +885,7 @@ void Codegen::gen_stmt(const ASTNode* node) {
                 if (node->args && http_set_json_) {
                     llvm::Value* body = gen_expr(node->args.get());
                     if (body->getType() != i8ptr_ty())
-                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                        body = builder_->CreateIntToPtr(body, i8ptr_ty(), "body_ptr");
                     if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
                     builder_->CreateCall(http_set_json_, { resp, body });
                 }
@@ -831,7 +896,18 @@ void Codegen::gen_stmt(const ASTNode* node) {
                     builder_->CreateCall(http_resp_ct_, { resp, ct });
                     llvm::Value* body = gen_expr(node->args.get());
                     if (body->getType() != i8ptr_ty())
-                        body = builder_->CreateBitCast(body, i8ptr_ty());
+                        body = builder_->CreateIntToPtr(body, i8ptr_ty(), "body_ptr");
+                    if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
+                    builder_->CreateCall(http_resp_body_, { resp, body });
+                }
+            } else if (method == "css") {
+                /* response.css(body) */
+                if (node->args && http_resp_ct_ && http_resp_body_) {
+                    llvm::Value* ct = builder_->CreateGlobalStringPtr("text/css", "css_ct");
+                    builder_->CreateCall(http_resp_ct_, { resp, ct });
+                    llvm::Value* body = gen_expr(node->args.get());
+                    if (body->getType() != i8ptr_ty())
+                        body = builder_->CreateIntToPtr(body, i8ptr_ty(), "body_ptr");
                     if (str_to_c) body = builder_->CreateCall(str_to_c, { body }, "cstr");
                     builder_->CreateCall(http_resp_body_, { resp, body });
                 }
@@ -847,7 +923,7 @@ void Codegen::gen_stmt(const ASTNode* node) {
                 if (node->args) {
                     llvm::Value* url = gen_expr(node->args.get());
                     if (url->getType() != i8ptr_ty())
-                        url = builder_->CreateBitCast(url, i8ptr_ty());
+                        url = builder_->CreateIntToPtr(url, i8ptr_ty(), "url_ptr");
                     if (str_to_c) url = builder_->CreateCall(str_to_c, { url }, "cstr");
                     llvm::Value* code_val = llvm::ConstantInt::get(i64_ty(), 302);
                     if (node->args->next)
@@ -856,33 +932,23 @@ void Codegen::gen_stmt(const ASTNode* node) {
                     if (fn) builder_->CreateCall(fn, { resp, url, code_val });
                 }
             } else if (method == "cookie") {
-                /* response.cookie(name, value, ttl) */
+                /* response.cookie(name, value, ttl)
+                   Runtime helper builds "name=value; Path=/; Max-Age=ttl" safely
+                   and adds the Set-Cookie header. Pass raw C strings. */
                 if (node->args && node->args->next) {
                     llvm::Value* name = gen_expr(node->args.get());
                     if (name->getType() != i8ptr_ty())
-                        name = builder_->CreateBitCast(name, i8ptr_ty());
+                        name = builder_->CreateIntToPtr(name, i8ptr_ty(), "name_ptr");
                     if (str_to_c) name = builder_->CreateCall(str_to_c, { name }, "cstr");
                     llvm::Value* value = gen_expr(node->args->next.get());
                     if (value->getType() != i8ptr_ty())
-                        value = builder_->CreateBitCast(value, i8ptr_ty());
+                        value = builder_->CreateIntToPtr(value, i8ptr_ty(), "value_ptr");
                     if (str_to_c) value = builder_->CreateCall(str_to_c, { value }, "cstr");
-                    auto* fn = module_->getFunction("aurora_http_response_set_header");
-                    if (fn) {
-                        /* Build Set-Cookie header value: name=value */
-                        std::vector<llvm::Value*> indices = {
-                            llvm::ConstantInt::get(i64_ty(), 0),
-                            llvm::ConstantInt::get(i64_ty(), 0)
-                        };
-                        llvm::Value* eq = builder_->CreateGlobalStringPtr("=", "eq_str");
-                        llvm::Function* strcat_fn = module_->getFunction("aurora_str_concat");
-                        if (strcat_fn) {
-                            llvm::Value* cookie_val = builder_->CreateCall(strcat_fn, { name, eq }, "cookie_prefix");
-                            cookie_val = builder_->CreateCall(strcat_fn, { cookie_val, value }, "cookie_full");
-                            builder_->CreateCall(fn, { resp,
-                                builder_->CreateGlobalStringPtr("Set-Cookie", "setcookie_name"),
-                                cookie_val });
-                        }
-                    }
+                    llvm::Value* ttl = llvm::ConstantInt::get(i64_ty(), 0);
+                    if (node->args->next->next)
+                        ttl = gen_expr(node->args->next->next.get());
+                    auto* fn = module_->getFunction("aurora_http_response_set_cookie");
+                    if (fn) builder_->CreateCall(fn, { resp, name, value, ttl });
                 }
             }
             break;
@@ -1066,6 +1132,7 @@ void Codegen::gen_stmt(const ASTNode* node) {
         case NodeType::Panic:         gen_panic(node);        break;
         case NodeType::Debug:         gen_debug(node);        break;
         case NodeType::Log:           gen_log(node);          break;
+        case NodeType::Assert:        gen_assert(node);       break;
         case NodeType::Yield:         gen_yield(node);        break;
         case NodeType::ExternFn:      gen_extern_fn(node);    break;
         case NodeType::ExternStruct:  gen_extern_struct(node); break;

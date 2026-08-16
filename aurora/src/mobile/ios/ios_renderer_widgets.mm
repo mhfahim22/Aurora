@@ -19,6 +19,22 @@ static UIColor* rgba_to_uicolor(float r, float g, float b, float a) {
     return [UIColor colorWithRed:r green:g blue:b alpha:a];
 }
 
+/* ── 37.3 Dark-mode palette resolution ──
+   Roles: 0=surface, 1=surface-alt, 2=primary text, 3=border, 4=track.
+   Widgets with explicit bg_color / text_color keep them; these roles
+   supply the defaults so light and dark render identically on device. */
+static UIColor* theme_color(MwWidget* w, int role) {
+    int dark = w->dark_mode == MW_THEME_DARK;
+    switch (role) {
+        case 0: return dark ? [UIColor colorWithWhite:0.11 alpha:1.0] : [UIColor whiteColor];
+        case 1: return dark ? [UIColor colorWithWhite:0.17 alpha:1.0] : [UIColor colorWithWhite:0.96 alpha:1.0];
+        case 2: return dark ? [UIColor colorWithWhite:0.92 alpha:1.0] : [UIColor blackColor];
+        case 3: return dark ? [UIColor colorWithWhite:0.33 alpha:1.0] : [UIColor colorWithWhite:0.71 alpha:1.0];
+        case 4: return dark ? [UIColor colorWithWhite:0.35 alpha:1.0] : [UIColor colorWithWhite:0.78 alpha:1.0];
+        default: return dark ? [UIColor colorWithWhite:0.11 alpha:1.0] : [UIColor whiteColor];
+    }
+}
+
 /* ── Tag-based widget lookup ── */
 static NSMutableDictionary* g_widget_map = nil;
 
@@ -36,10 +52,10 @@ static void map_widget_to_view(NSMutableDictionary* map, MwWidget* w, UIView* v)
 }
 
 /* ── Update an existing view from widget state ── */
-static void update_view_for_widget(UIView* view, MwWidget* w) {
+static void update_view_for_widget(UIView* view, MwWidget* w, CGFloat safe_dx, CGFloat safe_dy) {
     if (!view || !w) return;
 
-    view.frame = CGRectMake(w->x, w->y, w->w, w->h);
+    view.frame = CGRectMake(w->x + safe_dx, w->y + safe_dy, w->w, w->h);
     view.hidden = !w->visible;
     view.userInteractionEnabled = w->enabled ? YES : NO;
 
@@ -154,7 +170,7 @@ static UIView* create_view_for_widget(MwWidget* w) {
             UIView* cb = [[UIView alloc] init];
             cb.frame = CGRectMake(w->x, w->y, w->w, w->h);
             cb.layer.borderWidth = 1.5;
-            cb.layer.borderColor = [UIColor colorWithWhite:0.5 alpha:1.0].CGColor;
+            cb.layer.borderColor = theme_color(w, 3).CGColor;
             cb.layer.cornerRadius = 4;
             cb.clipsToBounds = YES;
             if (w->value > 0) {
@@ -177,7 +193,7 @@ static UIView* create_view_for_widget(MwWidget* w) {
             UIView* rb = [[UIView alloc] init];
             rb.frame = CGRectMake(w->x, w->y, w->w, w->h);
             rb.layer.borderWidth = 1.5;
-            rb.layer.borderColor = [UIColor colorWithWhite:0.5 alpha:1.0].CGColor;
+            rb.layer.borderColor = theme_color(w, 3).CGColor;
             rb.layer.cornerRadius = w->h / 2;
             rb.clipsToBounds = YES;
             if (w->value > 0) {
@@ -196,7 +212,7 @@ static UIView* create_view_for_widget(MwWidget* w) {
             pv.frame = CGRectMake(w->x, w->y, w->w, w->h);
             pv.progressViewStyle = UIProgressViewStyleDefault;
             pv.progress = (w->value > 0) ? w->value / 100.0f : 0.0f;
-            pv.trackTintColor = [UIColor colorWithWhite:0.8 alpha:1.0];
+            pv.trackTintColor = theme_color(w, 4);
             pv.progressTintColor = [UIColor colorWithRed:0.3 green:0.6 blue:1.0 alpha:1.0];
             return pv;
         }
@@ -266,7 +282,7 @@ static UIView* create_view_for_widget(MwWidget* w) {
             /* Custom UIView as modal overlay */
             UIView* dlg = [[UIView alloc] init];
             dlg.frame = CGRectMake(w->x, w->y, w->w, w->h);
-            dlg.backgroundColor = [UIColor colorWithWhite:1.0 alpha:1.0];
+            dlg.backgroundColor = theme_color(w, 0);
             dlg.layer.cornerRadius = 12;
             dlg.clipsToBounds = YES;
             dlg.layer.shadowColor = [UIColor blackColor].CGColor;
@@ -278,7 +294,7 @@ static UIView* create_view_for_widget(MwWidget* w) {
                 UILabel* titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 16, w->w - 32, 24)];
                 titleLabel.text = [NSString stringWithUTF8String:w->text];
                 titleLabel.font = [UIFont boldSystemFontOfSize:w->font_size + 4];
-                titleLabel.textColor = [UIColor blackColor];
+                titleLabel.textColor = theme_color(w, 2);
                 [dlg addSubview:titleLabel];
             }
             return dlg;
@@ -287,7 +303,7 @@ static UIView* create_view_for_widget(MwWidget* w) {
         case MW_BOTTOM_SHEET: {
             UIView* sheet = [[UIView alloc] init];
             sheet.frame = CGRectMake(w->x, w->y, w->w, w->h);
-            sheet.backgroundColor = [UIColor whiteColor];
+            sheet.backgroundColor = theme_color(w, 0);
             sheet.layer.cornerRadius = 16;
             sheet.clipsToBounds = YES;
             sheet.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
@@ -408,6 +424,11 @@ void aurora_ios_widgets_render_tree(void* root) {
     if (!root || !g_root_view) return;
     MwWidget* root_w = (MwWidget*)root;
 
+    /* 37.3 — register the root widget so native touch events dispatch
+       into mw_handle_touch (gesture recognition → callbacks) */
+    extern void aurora_ios_set_root_widget(void* w);
+    aurora_ios_set_root_widget(root_w);
+
     /* Initialize maps on first call */
     if (!g_widget_map) {
         g_widget_map = [NSMutableDictionary dictionary];
@@ -415,6 +436,19 @@ void aurora_ios_widgets_render_tree(void* root) {
         g_slider_targets = [NSMutableDictionary dictionary];
         g_switch_targets = [NSMutableDictionary dictionary];
         g_textfield_delegates = [NSMutableDictionary dictionary];
+    }
+
+    /* 37.3 — reserve the root's safe-area insets (left, top) so content
+       clears the notch / status bar exactly like on device. */
+    CGFloat safe_dx = root_w->safe_area[2];
+    CGFloat safe_dy = root_w->safe_area[0];
+
+    /* 37.3 — drive native dark/light appearance from the widget theme */
+    if (@available(iOS 13.0, *)) {
+        UIUserInterfaceStyle style = root_w->dark_mode == MW_THEME_DARK
+            ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight;
+        if (g_root_view.overrideUserInterfaceStyle != style)
+            g_root_view.overrideUserInterfaceStyle = style;
     }
 
     /* Walk widget tree and create/update views */
@@ -431,7 +465,7 @@ void aurora_ios_widgets_render_tree(void* root) {
             [parent addSubview:view];
         }
 
-        update_view_for_widget(view, w);
+        update_view_for_widget(view, w, safe_dx, safe_dy);
 
         /* Attach event handlers for interactive widgets (only on creation) */
         if (is_new) {

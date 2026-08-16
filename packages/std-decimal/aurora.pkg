@@ -1,0 +1,8 @@
+name: aurora/std-decimal
+version: 1.0.0
+author: Aurora Core Team
+description: Arbitrary-precision decimal arithmetic for Aurora
+entry: src/decimal.auf
+dependencies:
+permissions:
+

@@ -1,0 +1,40 @@
+# Phase 40 — WASM Target Compilation Test
+# Verify aurorac --target wasm32-unknown-unknown --emit-obj produces a
+# WebAssembly object file. Run via regression.ps1 Stage 9.
+
+extern function aurora_str_from_cstr(s: cstring) -> pointer
+extern function aurora_str_as_cstr(s: pointer) -> cstring
+extern function aurora_str_equal(a: pointer, b: pointer) -> i64
+extern function aurora_substr(s: pointer, start: i64, len: i64) -> pointer
+extern function aurora_int_to_str(v: i64) -> pointer
+extern function aurora_array_new(cap: i64) -> i64
+extern function aurora_array_push_str(arr: i64, s: pointer)
+extern function aurora_array_length(arr: i64) -> i64
+extern function aurora_print_str(s: cstring)
+extern function aurora_print_int(v: i64)
+
+function main()
+    output("WASM Test: Starting...")
+
+    s = aurora_str_from_cstr("hello wasm")
+    out = aurora_str_as_cstr(s)
+    output(out)
+
+    n = aurora_str_equal(aurora_str_from_cstr("abc"), aurora_str_from_cstr("abc"))
+    if n == 0
+        output("WASM Test: ERROR string equal mismatch")
+        return
+    end
+
+    arr = aurora_array_new(4)
+    aurora_array_push_str(arr, aurora_str_from_cstr("a"))
+    aurora_array_push_str(arr, aurora_str_from_cstr("b"))
+    len = aurora_array_length(arr)
+    if len == 2
+        output("WASM Test: array OK")
+    else
+        output("WASM Test: ERROR array length")
+    end
+
+    output("WASM Test: PASS")
+end

@@ -1,0 +1,25 @@
+extern function aurora_gui_init() -> int
+extern function aurora_gui_window_new(title: str, w: int, h: int) -> int
+extern function aurora_gui_webview_new(parent: int, x: int, y: int, w: int, h: int) -> int
+extern function aurora_gui_webview_navigate(wv: int, url: str)
+extern function aurora_gui_webview_go_back(wv: int)
+extern function aurora_gui_webview_go_forward(wv: int)
+extern function aurora_gui_webview_reload(wv: int)
+
+function main()
+    output("WebView Win Test: Starting...")
+    ret = aurora_gui_init()
+    if ret >= 0
+        output("init OK")
+    end
+    win = aurora_gui_window_new("WebView Test", 800, 600)
+    if win >= 0
+        wv = aurora_gui_webview_new(win, 0, 0, 800, 600)
+        if wv >= 0
+            aurora_gui_webview_navigate(wv, "https://www.example.com")
+            aurora_gui_webview_reload(wv)
+            output("WebView created and navigated")
+        end
+    end
+    output("WebView Win Test: PASS")
+end

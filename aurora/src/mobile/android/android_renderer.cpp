@@ -103,6 +103,22 @@ static int rgba_to_argb(float r, float g, float b, float a) {
     return (ia << 24) | (ir << 16) | (ig << 8) | ib;
 }
 
+/* ── 37.3 Dark-mode palette resolution ──
+   Roles: 0=surface, 1=surface-alt, 2=primary text, 3=border, 4=track.
+   Widgets with explicit bg_color / text_color keep them; these roles
+   supply the defaults so light and dark render identically on device. */
+static int theme_color(MwWidget* w, int role) {
+    int dark = w->dark_mode == MW_THEME_DARK;
+    switch (role) {
+        case 0: return dark ? 0xFF1C1C1E : 0xFFFFFFFF; /* surface */
+        case 1: return dark ? 0xFF2C2C2E : 0xFFF5F5F5; /* surface-alt */
+        case 2: return dark ? 0xFFEBEBF0 : 0xFF000000; /* primary text */
+        case 3: return dark ? 0xFF545458 : 0xFFB4B4B4; /* border */
+        case 4: return dark ? 0xFF5A5A5E : 0xFFC8C8C8; /* track */
+        default: return dark ? 0xFF1C1C1E : 0xFFFFFFFF;
+    }
+}
+
 static void set_paint_color(JNIEnv* env, jobject paint, float r, float g, float b, float a) {
     int argb = rgba_to_argb(r, g, b, a);
     env->CallVoidMethod(paint, g_paint_set_color, argb);
@@ -110,6 +126,15 @@ static void set_paint_color(JNIEnv* env, jobject paint, float r, float g, float 
 
 static void set_paint_style(JNIEnv* env, jobject paint, int style) {
     /* style: 0=fill, 1=stroke, 2=fill_and_stroke */
+}
+
+/* Apply a theme palette role to the paint (37.3 dark mode parity) */
+static void set_paint_theme_color(JNIEnv* env, jobject paint, MwWidget* w, int role, float a) {
+    int argb = theme_color(w, role);
+    float r = ((argb >> 16) & 0xFF) / 255.0f;
+    float g = ((argb >> 8) & 0xFF) / 255.0f;
+    float b = (argb & 0xFF) / 255.0f;
+    set_paint_color(env, paint, r, g, b, a);
 }
 
 static void draw_text_centered(JNIEnv* env, jobject canvas, jobject paint,
@@ -194,10 +219,10 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
 
         case MW_INPUT: {
             /* Draw input background */
-            set_paint_color(env, paint, 1, 1, 1, alpha);
+            set_paint_theme_color(env, paint, w, 0, alpha);
             env->CallVoidMethod(canvas, g_draw_rect, abs_x, abs_y, abs_x + w->w, abs_y + w->h, paint);
             /* Draw border */
-            set_paint_color(env, paint, 0.7f, 0.7f, 0.7f, alpha);
+            set_paint_theme_color(env, paint, w, 3, alpha);
             float bw = 1.0f;
             env->CallVoidMethod(canvas, g_draw_rect, abs_x, abs_y, abs_x + w->w, abs_y + bw, paint);
             env->CallVoidMethod(canvas, g_draw_rect, abs_x, abs_y + w->h - bw, abs_x + w->w, abs_y + w->h, paint);
@@ -205,7 +230,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             env->CallVoidMethod(canvas, g_draw_rect, abs_x + w->w - bw, abs_y, abs_x + w->w, abs_y + w->h, paint);
             /* Draw text */
             if (w->text && w->text[0]) {
-                set_paint_color(env, paint, 0, 0, 0, alpha);
+                set_paint_theme_color(env, paint, w, 2, alpha);
                 env->CallVoidMethod(paint, g_paint_set_text_size, w->font_size);
                 jstring jtext = env->NewStringUTF(w->text);
                 env->CallVoidMethod(canvas, g_draw_text, jtext, abs_x + 4, abs_y + w->h / 2 + w->font_size / 3, paint);
@@ -228,10 +253,10 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
                 }
                 env->DeleteLocalRef(jpath);
             } else {
-                /* Placeholder: gray rect */
-                set_paint_color(env, paint, 0.8f, 0.8f, 0.8f, alpha);
+                /* Placeholder: theme surface rect */
+                set_paint_theme_color(env, paint, w, 1, alpha);
                 env->CallVoidMethod(canvas, g_draw_rect, abs_x, abs_y, abs_x + w->w, abs_y + w->h, paint);
-                set_paint_color(env, paint, 0.5f, 0.5f, 0.5f, alpha);
+                set_paint_theme_color(env, paint, w, 3, alpha);
                 env->CallVoidMethod(canvas, g_draw_line, abs_x, abs_y, abs_x + w->w, abs_y + w->h, paint);
                 env->CallVoidMethod(canvas, g_draw_line, abs_x + w->w, abs_y, abs_x, abs_y + w->h, paint);
             }
@@ -247,14 +272,14 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
                 if (i % 2 == 1)
                     env->CallVoidMethod(canvas, g_draw_rect, abs_x, ry, abs_x + w->w, ry + row_h, paint);
                 if (w->items[i]) {
-                    set_paint_color(env, paint, 0, 0, 0, alpha);
+                    set_paint_theme_color(env, paint, w, 2, alpha);
                     env->CallVoidMethod(paint, g_paint_set_text_size, 14);
                     jstring jitem = env->NewStringUTF(w->items[i]);
                     env->CallVoidMethod(canvas, g_draw_text, jitem, abs_x + 8, ry + row_h / 2 + 5, paint);
                     env->DeleteLocalRef(jitem);
                 }
                 /* Divider line */
-                set_paint_color(env, paint, 0.8f, 0.8f, 0.8f, alpha);
+                set_paint_theme_color(env, paint, w, 3, alpha);
                 env->CallVoidMethod(canvas, g_draw_line, abs_x, ry + row_h, abs_x + w->w, ry + row_h, paint);
             }
             break;
@@ -265,7 +290,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             int cols = (w->selected_index > 0) ? w->selected_index : 2;
             if (cols < 1) cols = 1;
             float cell_w = w->w / cols;
-            set_paint_color(env, paint, 0.8f, 0.8f, 0.8f, alpha);
+            set_paint_theme_color(env, paint, w, 3, alpha);
             for (int c = 1; c < cols; c++) {
                 float gx = abs_x + c * cell_w;
                 env->CallVoidMethod(canvas, g_draw_line, gx, abs_y, gx, abs_y + w->h, paint);
@@ -291,7 +316,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
                 if (visible_ratio < 1.0f) {
                     float scrollbar_h = w->h * visible_ratio;
                     float scrollbar_y = abs_y + (w->scroll_y / (content_h - w->h)) * (w->h - scrollbar_h);
-                    set_paint_color(env, paint, 0.5f, 0.5f, 0.5f, 0.5f * alpha);
+                    set_paint_theme_color(env, paint, w, 4, 0.5f * alpha);
                     float sb_x = abs_x + w->w - 6;
                     env->CallVoidMethod(canvas, g_draw_round_rect,
                         sb_x, scrollbar_y, sb_x + 4, scrollbar_y + scrollbar_h, 2, 2, paint);
@@ -303,7 +328,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
         case MW_SLIDER: {
             /* Track */
             float track_y = abs_y + w->h / 2 - 2;
-            set_paint_color(env, paint, 0.7f, 0.7f, 0.7f, alpha);
+            set_paint_theme_color(env, paint, w, 4, alpha);
             env->CallVoidMethod(canvas, g_draw_round_rect,
                 abs_x, track_y, abs_x + w->w, track_y + 4, 2, 2, paint);
             /* Filled portion */
@@ -349,7 +374,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             float box_x = abs_x;
             float box_y = abs_y + (w->h - box_size) / 2;
             /* Box border */
-            set_paint_color(env, paint, 0.5f, 0.5f, 0.5f, alpha);
+            set_paint_theme_color(env, paint, w, 3, alpha);
             env->CallVoidMethod(canvas, g_draw_round_rect,
                 box_x, box_y, box_x + box_size, box_y + box_size, 3, 3, paint);
             /* Filled if checked */
@@ -380,7 +405,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             float r_x = abs_x + r_size / 2;
             float r_y = abs_y + w->h / 2;
             /* Outer circle */
-            set_paint_color(env, paint, 0.5f, 0.5f, 0.5f, alpha);
+            set_paint_theme_color(env, paint, w, 3, alpha);
             env->CallVoidMethod(canvas, g_draw_circle, r_x, r_y, r_size / 2, paint);
             /* Filled if selected */
             set_paint_color(env, paint, 1, 1, 1, alpha);
@@ -428,12 +453,12 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             float dlg_h = w->h > 0 ? w->h : 200;
             float dlg_x = abs_x;
             float dlg_y = abs_y;
-            set_paint_color(env, paint, 1, 1, 1, alpha);
+            set_paint_theme_color(env, paint, w, 0, alpha);
             env->CallVoidMethod(canvas, g_draw_round_rect,
                 dlg_x, dlg_y, dlg_x + dlg_w, dlg_y + dlg_h, 12, 12, paint);
             /* Title */
             if (w->text && w->text[0]) {
-                set_paint_color(env, paint, 0, 0, 0, alpha);
+                set_paint_theme_color(env, paint, w, 2, alpha);
                 env->CallVoidMethod(paint, g_paint_set_text_size, w->font_size + 4);
                 jstring jtitle = env->NewStringUTF(w->text);
                 env->CallVoidMethod(canvas, g_draw_text, jtitle, dlg_x + 16, dlg_y + 32, paint);
@@ -464,7 +489,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             set_paint_color(env, paint, 0, 0, 0, 0.3f * alpha);
             env->CallVoidMethod(canvas, g_draw_rect,
                 offset_x, offset_y, offset_x + 10000, offset_y + 10000, paint);
-            set_paint_color(env, paint, 1, 1, 1, alpha);
+            set_paint_theme_color(env, paint, w, 0, alpha);
             int top_r = 16;
             env->CallVoidMethod(canvas, g_draw_round_rect,
                 abs_x, abs_y, abs_x + w->w, abs_y + w->h, top_r, top_r, paint);
@@ -492,13 +517,13 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             int tab_count = w->item_count > 0 ? w->item_count : 1;
             float tab_w = w->w / tab_count;
             /* Background */
-            set_paint_color(env, paint, 0.95f, 0.95f, 0.95f, alpha);
+            set_paint_theme_color(env, paint, w, 1, alpha);
             env->CallVoidMethod(canvas, g_draw_rect, abs_x, abs_y, abs_x + w->w, abs_y + w->h, paint);
             /* Divider */
-            set_paint_color(env, paint, 0.8f, 0.8f, 0.8f, alpha);
+            set_paint_theme_color(env, paint, w, 3, alpha);
             env->CallVoidMethod(canvas, g_draw_line, abs_x, abs_y, abs_x + w->w, abs_y, paint);
             /* Tabs */
-            set_paint_color(env, paint, 0, 0, 0, alpha);
+            set_paint_theme_color(env, paint, w, 2, alpha);
             env->CallVoidMethod(paint, g_paint_set_text_size, 12);
             for (int i = 0; i < tab_count; i++) {
                 float tx = abs_x + i * tab_w + tab_w / 2;
@@ -513,7 +538,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
                     env->CallVoidMethod(canvas, g_draw_rect,
                         abs_x + i * tab_w + 8, abs_y + w->h - 3,
                         abs_x + (i + 1) * tab_w - 8, abs_y + w->h, paint);
-                    set_paint_color(env, paint, 0, 0, 0, alpha);
+                    set_paint_theme_color(env, paint, w, 2, alpha);
                 }
             }
             break;
@@ -524,7 +549,7 @@ static void render_widget_android(MwWidget* w, JNIEnv* env, jobject canvas, jobj
             set_paint_color(env, paint, 0, 0, 0, 0.3f * alpha);
             env->CallVoidMethod(canvas, g_draw_rect,
                 offset_x, offset_y, offset_x + 10000, offset_y + 10000, paint);
-            set_paint_color(env, paint, 1, 1, 1, alpha);
+            set_paint_theme_color(env, paint, w, 0, alpha);
             env->CallVoidMethod(canvas, g_draw_rect, abs_x, abs_y, abs_x + w->w, abs_y + w->h, paint);
             break;
         }
@@ -552,7 +577,11 @@ void aurora_android_render_mw(JNIEnv* env, jobject canvas, void* root_widget) {
     jobject paint = env->NewObject(paint_class, paint_init);
 
     if (paint) {
-        render_widget_android((MwWidget*)root_widget, env, canvas, paint, 0, 0, 1.0f);
+        /* 37.3 — reserve the root's safe-area insets (left, top) so content
+           clears the status bar / notch exactly like on device. */
+        MwWidget* root = (MwWidget*)root_widget;
+        render_widget_android(root, env, canvas, paint,
+            root->safe_area[2], root->safe_area[0], 1.0f);
         env->DeleteLocalRef(paint);
     }
 }

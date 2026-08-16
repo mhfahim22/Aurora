@@ -33,6 +33,7 @@ struct TLSConn {
     int64_t sock;
     bool handshakeDone;
     SecPkgContext_StreamSizes sizes;
+    char alpn_proto[16];  /* negotiated ALPN protocol (e.g. "h2") */
     /* recv buffers for decryption */
     uint8_t* recvBuf;
     int recvBufCap;
@@ -223,6 +224,62 @@ void aurora_tls_ctx_free(AuroraTLSContext* ctx) {
 }
 
 /* ── Perform TLS handshake (server side) ── */
+/* ApplicationProtocol ALPN buffer — mirrors Schannel's wire layout:
+   offset 0 : ULONG status (0 = advertise/negotiation, 2 = negotiated)
+   offset 4 : ULONG ext    (1 = ALPN)
+   offset 8 : ULONG size   (length of the protocol data)
+   offset 12: protocol data (length-prefixed names or negotiated result) */
+#ifndef SECPKG_ATTR_APPLICATION_PROTOCOL
+#define SECPKG_ATTR_APPLICATION_PROTOCOL 87
+#endif
+#define ALPN_STATUS_ADVERTISE 0
+#define ALPN_EXT_ALPN         1
+#define ALPN_STATUS_NEGOTIATED 2
+
+struct AlpnQueryBuffer {
+    ULONG status;
+    ULONG ext;
+    ULONG size;
+    unsigned char data[256];
+};
+
+/* ── Advertise HTTP/2 (h2) via ALPN during Schannel handshake ── */
+/* Called after the first AcceptSecurityContext round. The server lists the
+   protocols it supports; the client picks one. */
+static void schannel_set_alpn(CtxtHandle* hCtxt) {
+    unsigned char protos[] = { 2, 'h', '2', 8, 'h', 't', 't', 'p', '/', '1', '.', '1' };
+    size_t total = offsetof(AlpnQueryBuffer, data) + sizeof(protos);
+    AlpnQueryBuffer* pb = (AlpnQueryBuffer*)calloc(1, total);
+    if (!pb) return;
+    pb->status = ALPN_STATUS_ADVERTISE;
+    pb->ext = ALPN_EXT_ALPN;
+    pb->size = (ULONG)sizeof(protos);
+    memcpy(pb->data, protos, sizeof(protos));
+    SECURITY_STATUS st = SetContextAttributesA(hCtxt,
+        SECPKG_ATTR_APPLICATION_PROTOCOL, pb, (ULONG)total);
+    if (st != SEC_E_OK)
+        printf("[tls] ALPN advertisement failed: 0x%08x\n", (unsigned)st);
+    else
+        printf("[tls] ALPN advertised: h2, http/1.1\n");
+    free(pb);
+}
+
+/* ── Query the negotiated ALPN protocol after handshake ── */
+static void schannel_query_alpn(TLSConn* conn) {
+    AlpnQueryBuffer pb;
+    memset(&pb, 0, sizeof(pb));
+    SECURITY_STATUS st = QueryContextAttributesA(&conn->hCtxt,
+        SECPKG_ATTR_APPLICATION_PROTOCOL, &pb);
+    conn->alpn_proto[0] = '\0';
+    if (st != SEC_E_OK || pb.status != ALPN_STATUS_NEGOTIATED)
+        return; /* no ALPN negotiated — fall back to HTTP/1.1 */
+    ULONG n = pb.size;
+    if (n > 15) n = 15;
+    memcpy(conn->alpn_proto, pb.data, (size_t)n);
+    conn->alpn_proto[n] = '\0';
+    printf("[tls] ALPN negotiated: %s\n", conn->alpn_proto);
+}
+
 static int do_server_handshake(TLSConn* conn) {
     SecBufferDesc outBuffDesc, inBuffDesc;
     SecBuffer outSecBuf, inSecBuf[2];
@@ -235,6 +292,7 @@ static int do_server_handshake(TLSConn* conn) {
                     ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT |
                     ASC_REQ_CONFIDENTIALITY | ASC_REQ_ALLOCATE_MEMORY;
     DWORD dwAttr;
+    int alpn_advertised = 0;
 
     /* Read client hello */
     cbIoBuffer = 0;
@@ -313,10 +371,18 @@ static int do_server_handshake(TLSConn* conn) {
             conn->handshakeDone = true;
             /* Query stream sizes */
             QueryContextAttributesA(&conn->hCtxt, SECPKG_ATTR_STREAM_SIZES, &conn->sizes);
+            /* Query negotiated ALPN protocol */
+            schannel_query_alpn(conn);
             printf("[tls] handshake complete (stream sizes: hdr=%lu, tra=%lu, max=%lu, buf=%lu)\n",
                    conn->sizes.cbHeader, conn->sizes.cbTrailer,
                    conn->sizes.cbMaximumMessage, conn->sizes.cBuffers);
         } else if (status == SEC_I_CONTINUE_NEEDED) {
+            /* Advertise ALPN once after the first round so Schannel includes
+               it in its ServerHello extension */
+            if (!alpn_advertised) {
+                schannel_set_alpn(&conn->hCtxt);
+                alpn_advertised = 1;
+            }
             /* More rounds needed, read next token */
             cbIoBuffer = 0;
         } else {
@@ -337,6 +403,7 @@ int64_t aurora_tls_accept(int64_t sock, AuroraTLSContext* ctx) {
     conn->hCred = &ctx->hCred;
     conn->sock = sock;
     conn->handshakeDone = false;
+    conn->alpn_proto[0] = '\0';
     conn->recvBuf = nullptr;
     conn->recvBufCap = 0;
     conn->recvOffset = 0;
@@ -554,6 +621,10 @@ void aurora_tls_close(int64_t tls_conn) {
 #include <sys/socket.h>
 #include <unistd.h>
 
+/* ALPN callback signature (OpenSSL 1.1+): returns SSL_TLSEXT_ERR_OK (0) */
+typedef int (*alpn_select_cb_t)(void*, const unsigned char**, unsigned char*,
+                                const unsigned char*, unsigned int, void*);
+
 /* Dynamic loading for OpenSSL */
 struct OpenSSLFuncs {
     void* libssl;
@@ -571,7 +642,33 @@ struct OpenSSLFuncs {
     int   (*SSL_CTX_use_PrivateKey_file)(void*, const char*, int);
     void* (*SSL_CTX_get0_param)(void*);
     int   (*X509_VERIFY_PARAM_set_flags)(void*, unsigned long);
+    int   (*SSL_CTX_set_alpn_select_cb)(void*, alpn_select_cb_t, void*);
+    int   (*SSL_select_next_proto)(unsigned char**, unsigned char*,
+                                   const unsigned char*, unsigned int,
+                                   const unsigned char*, unsigned int);
+    int   (*SSL_get0_alpn_selected)(void*, const unsigned char**, unsigned int*);
 };
+
+/* ALPN select callback: choose h2 if the client offers it, else http/1.1 */
+static const unsigned char g_server_alpn[] = { 2, 'h', '2', 8, 'h', 't', 't', 'p', '/', '1', '.', '1' };
+
+static int aurora_alpn_select_cb(void* ssl, const unsigned char** out,
+                                 unsigned char* outlen,
+                                 const unsigned char* in, unsigned int inlen,
+                                 void* arg) {
+    OpenSSLFuncs* funcs = (OpenSSLFuncs*)arg;
+    unsigned char* chosen = nullptr;
+    unsigned char chosen_len = 0;
+    if (funcs->SSL_select_next_proto(&chosen, &chosen_len, in, inlen,
+                                     g_server_alpn, (unsigned int)sizeof(g_server_alpn)) != 0) {
+        /* No overlap — return no_application_protocol */
+        (void)ssl; (void)out; (void)outlen;
+        return -1; /* SSL_TLSEXT_ERR_NOACK fallback to http/1.1 */
+    }
+    *out = chosen;
+    *outlen = chosen_len;
+    return 0; /* SSL_TLSEXT_ERR_OK */
+}
 
 struct AuroraTLSContext {
     void* ssl_ctx;
@@ -582,6 +679,7 @@ struct TLSConn {
     void* ssl;
     int64_t sock;
     OpenSSLFuncs* funcs;
+    char alpn_proto[16];  /* negotiated ALPN protocol (e.g. "h2") */
 };
 
 extern "C" {
@@ -631,6 +729,13 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
     LOAD(CTX_get0_param);
 #undef LOAD
 
+    /* Load ALPN functions (optional — graceful degradation if absent) */
+    ctx->ssl.SSL_CTX_set_alpn_select_cb =
+        (decltype(ctx->ssl.SSL_CTX_set_alpn_select_cb))dlsym(ctx->ssl.libssl, "SSL_CTX_set_alpn_select_cb");
+    ctx->ssl.SSL_select_next_proto =
+        (decltype(ctx->ssl.SSL_select_next_proto))dlsym(ctx->ssl.libssl, "SSL_select_next_proto");
+    ctx->ssl.SSL_get0_alpn_selected =
+        (decltype(ctx->ssl.SSL_get0_alpn_selected))dlsym(ctx->ssl.libssl, "SSL_get0_alpn_selected");
     /* Load X509_VERIFY_PARAM_set_flags from libcrypto */
     ctx->ssl.X509_VERIFY_PARAM_set_flags =
         (decltype(ctx->ssl.X509_VERIFY_PARAM_set_flags))dlsym(
@@ -662,6 +767,14 @@ AuroraTLSContext* aurora_tls_server_ctx_new(const char* cert_path, const char* k
             ctx->ssl.X509_VERIFY_PARAM_set_flags(param, 0x4 | 0x8);
             printf("[tls] CRL checking enabled\n");
         }
+    }
+
+    /* ——— Install ALPN select callback ——— */
+    if (ctx->ssl.SSL_CTX_set_alpn_select_cb && ctx->ssl.SSL_select_next_proto) {
+        ctx->ssl.SSL_CTX_set_alpn_select_cb(ctx->ssl_ctx, aurora_alpn_select_cb, &ctx->ssl);
+        printf("[tls] ALPN configured: h2, http/1.1\n");
+    } else {
+        printf("[tls] warning: OpenSSL ALPN symbols not found, HTTP/2-over-TLS unavailable\n");
     }
 
     if (cert_path && key_path) {
@@ -710,6 +823,7 @@ int64_t aurora_tls_accept(int64_t sock, AuroraTLSContext* ctx) {
     if (!conn) return -1;
     conn->sock = sock;
     conn->funcs = &ctx->ssl;
+    conn->alpn_proto[0] = '\0';
     conn->ssl = ctx->ssl.SSL_new(ctx->ssl_ctx);
     if (!conn->ssl) { free(conn); return -1; }
     ctx->ssl.SSL_set_fd(conn->ssl, (int)sock);
@@ -717,6 +831,18 @@ int64_t aurora_tls_accept(int64_t sock, AuroraTLSContext* ctx) {
         ctx->ssl.SSL_free(conn->ssl);
         free(conn);
         return -1;
+    }
+    /* Query negotiated ALPN (h2 / http/1.1) */
+    if (ctx->ssl.SSL_get0_alpn_selected) {
+        const unsigned char* proto = nullptr;
+        unsigned int proto_len = 0;
+        ctx->ssl.SSL_get0_alpn_selected(conn->ssl, &proto, &proto_len);
+        if (proto && proto_len > 0) {
+            if (proto_len > 15) proto_len = 15;
+            memcpy(conn->alpn_proto, proto, proto_len);
+            conn->alpn_proto[proto_len] = '\0';
+            printf("[tls] ALPN negotiated: %s\n", conn->alpn_proto);
+        }
     }
     return (int64_t)(intptr_t)conn;
 }
@@ -749,5 +875,14 @@ void aurora_tls_close(int64_t tls_conn) {
 }
 
 #endif /* _WIN32 */
+
+/* ── Query the negotiated ALPN protocol for this TLS connection ── */
+/* Returns the protocol string ("h2", "http/1.1") or "" if not negotiated. */
+/* The returned pointer is owned by the connection and valid until close. */
+const char* aurora_tls_get_alpn(int64_t tls_conn) {
+    TLSConn* conn = (TLSConn*)(intptr_t)tls_conn;
+    if (!conn) return "";
+    return conn->alpn_proto;
+}
 
 } /* extern "C" */

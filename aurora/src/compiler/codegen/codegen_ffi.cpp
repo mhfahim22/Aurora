@@ -4,6 +4,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <iostream>
+#include <cstdlib>
 
 llvm::Type* Codegen::extern_type_to_llvm(const std::string& type_name) {
     if (type_name == "int" || type_name == "i64" || type_name == "Int" || type_name == "u64")
@@ -26,6 +27,19 @@ llvm::Type* Codegen::extern_type_to_llvm(const std::string& type_name) {
         return llvm::Type::getInt8Ty(ctx_); /* C99 _Bool is 1 byte on all platforms */
     if (type_name == "void" || type_name == "Void")
         return llvm::Type::getVoidTy(ctx_);
+    /* Fixed-size array: [elem_type; size] */
+    if (!type_name.empty() && type_name[0] == '[' && type_name.back() == ']') {
+        auto semi = type_name.find(';');
+        if (semi != std::string::npos) {
+            std::string elem = type_name.substr(1, semi - 1);
+            std::string ssize = type_name.substr(semi + 1, type_name.size() - semi - 2);
+            int arr_size = std::atoi(ssize.c_str());
+            if (arr_size > 0) {
+                llvm::Type* elem_ty = extern_type_to_llvm(elem);
+                return llvm::ArrayType::get(elem_ty, static_cast<unsigned>(arr_size));
+            }
+        }
+    }
     /* Check for registered struct types */
     if (global_type_registry().has_struct(type_name))
         return codegen_get_struct_type(ctx_, type_name);
@@ -89,7 +103,8 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
             {
                 auto pk = get_annotation_kind(param);
                 if (pk != AstTypeKind::Unknown) {
-                    if (pk == AstTypeKind::Struct && !param->type_annotation.type_name.empty())
+                    if ((pk == AstTypeKind::Struct || pk == AstTypeKind::FixedArray) &&
+                        !param->type_annotation.type_name.empty())
                         ptype_name = param->type_annotation.type_name;
                     else
                         ptype_name = ast_type_kind_name(pk);
@@ -117,7 +132,8 @@ void Codegen::gen_extern_fn(const ASTNode* node) {
     {
         auto rk = get_annotation_kind(node);
         if (rk != AstTypeKind::Unknown) {
-            if (rk == AstTypeKind::Struct && !node->type_annotation.type_name.empty())
+            if ((rk == AstTypeKind::Struct || rk == AstTypeKind::FixedArray) &&
+                !node->type_annotation.type_name.empty())
                 ret_type_name = node->type_annotation.type_name;
             else
                 ret_type_name = ast_type_kind_name(rk);

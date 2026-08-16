@@ -1,0 +1,124 @@
+## Aurora Standard Library — DateTime, Duration, TimeZone
+## Usage:  import "datetime"
+##
+## Full-featured date/time handling with parsing, formatting,
+## arithmetic, timezone, and duration support.
+##
+## Examples:
+##   import "datetime"
+##   dt = datetime_now()
+##   output(datetime_to_str(dt, "%Y-%m-%d %H:%M:%S"))
+##   dur = duration_from_hours(24)
+##   tomorrow = datetime_add(dt, dur)
+## ════════════════════════════════════════════════════════════
+
+import "stdlib"
+
+## ── Core date/time functions ──
+extern function aurora_datetime_now() -> pointer
+extern function aurora_datetime_from_stamp(stamp: i64) -> pointer
+extern function aurora_datetime_to_stamp(dt: pointer) -> i64
+extern function aurora_datetime_from_str(s: cstring, fmt: cstring) -> pointer
+extern function aurora_datetime_to_str(dt: pointer, fmt: cstring) -> cstring
+extern function aurora_datetime_free(dt: pointer)
+
+extern function aurora_datetime_year(dt: pointer) -> i32
+extern function aurora_datetime_month(dt: pointer) -> i32
+extern function aurora_datetime_day(dt: pointer) -> i32
+extern function aurora_datetime_hour(dt: pointer) -> i32
+extern function aurora_datetime_minute(dt: pointer) -> i32
+extern function aurora_datetime_second(dt: pointer) -> i32
+extern function aurora_datetime_weekday(dt: pointer) -> i32
+
+extern function aurora_datetime_add(dt: pointer, dur: pointer) -> pointer
+extern function aurora_datetime_diff(a: pointer, b: pointer) -> pointer
+extern function aurora_datetime_compare(a: pointer, b: pointer) -> i32
+
+extern function aurora_duration_from_seconds(s: i64) -> pointer
+extern function aurora_duration_from_millis(ms: i64) -> pointer
+extern function aurora_duration_from_micros(us: i64) -> pointer
+extern function aurora_duration_to_seconds(dur: pointer) -> i64
+extern function aurora_duration_to_millis(dur: pointer) -> i64
+extern function aurora_duration_to_micros(dur: pointer) -> i64
+extern function aurora_duration_free(dur: pointer)
+
+extern function aurora_timezone_local() -> pointer
+extern function aurora_timezone_utc() -> pointer
+extern function aurora_timezone_name(tz: pointer) -> cstring
+extern function aurora_timezone_offset(tz: pointer) -> i32
+extern function aurora_timezone_free(tz: pointer)
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Create datetime ──
+function datetime_now():
+    return aurora_datetime_now()
+end
+
+function datetime_from_stamp(stamp):
+    return aurora_datetime_from_stamp(stamp)
+end
+
+function datetime_to_stamp(dt):
+    return aurora_datetime_to_stamp(dt)
+end
+
+function datetime_from_str(s, fmt):
+    return aurora_datetime_from_str(s, fmt)
+end
+
+function datetime_to_str(dt, fmt):
+    return aurora_datetime_to_str(dt, fmt)
+end
+
+function datetime_free(dt):
+    aurora_datetime_free(dt)
+end
+
+## ── Component getters ──
+function datetime_year(dt):      return aurora_datetime_year(dt) end
+function datetime_month(dt):     return aurora_datetime_month(dt) end
+function datetime_day(dt):       return aurora_datetime_day(dt) end
+function datetime_hour(dt):      return aurora_datetime_hour(dt) end
+function datetime_minute(dt):    return aurora_datetime_minute(dt) end
+function datetime_second(dt):    return aurora_datetime_second(dt) end
+function datetime_weekday(dt):   return aurora_datetime_weekday(dt) end
+
+## ── Arithmetic ──
+function datetime_add(dt, dur):
+    return aurora_datetime_add(dt, dur)
+end
+
+function datetime_diff(a, b):
+    return aurora_datetime_diff(a, b)
+end
+
+function datetime_compare(a, b):
+    return aurora_datetime_compare(a, b)
+end
+
+## ── Duration constructors ──
+function duration_from_seconds(s):   return aurora_duration_from_seconds(s) end
+function duration_from_millis(ms):   return aurora_duration_from_millis(ms) end
+function duration_from_micros(us):   return aurora_duration_from_micros(us) end
+function duration_from_hours(h):     return aurora_duration_from_seconds(h * 3600) end
+function duration_from_days(d):      return aurora_duration_from_seconds(d * 86400) end
+
+## ── Duration accessors ──
+function duration_to_seconds(dur):   return aurora_duration_to_seconds(dur) end
+function duration_to_millis(dur):    return aurora_duration_to_millis(dur) end
+function duration_to_micros(dur):    return aurora_duration_to_micros(dur) end
+function duration_free(dur):
+    aurora_duration_free(dur)
+end
+
+## ── TimeZone ──
+function timezone_local():      return aurora_timezone_local() end
+function timezone_utc():        return aurora_timezone_utc() end
+function timezone_name(tz):     return aurora_timezone_name(tz) end
+function timezone_offset(tz):   return aurora_timezone_offset(tz) end
+function timezone_free(tz):
+    aurora_timezone_free(tz)
+end

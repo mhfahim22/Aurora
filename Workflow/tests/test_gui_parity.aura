@@ -1,0 +1,178 @@
+# 39.5 Cross-Platform GUI Parity — same UI, equivalent results on all 3 platforms.
+# Compile-only in headless CI; JIT-runs on a desktop with a windowing session.
+# Exercise every widget category that must behave identically on Windows,
+# Linux X11 and macOS: window, layout, label, button, textbox, slider,
+# switch, checkbox, radio, progress, combobox, dropdown, listbox, tab,
+# scroll, canvas, treeview.
+
+extern function aurora_gui_window_new(title: cstring, width: int, height: int) -> pointer
+extern function aurora_gui_window_destroy(win: pointer)
+extern function aurora_gui_window_set_title(win: pointer, title: cstring)
+extern function aurora_gui_window_get_width(win: pointer) -> int
+extern function aurora_gui_window_get_height(win: pointer) -> int
+extern function aurora_gui_window_set_min_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_max_size(win: pointer, w: int, h: int)
+extern function aurora_gui_window_set_resizable(win: pointer, resizable: int)
+extern function aurora_gui_move(w: pointer, x: int, y: int, width: int, height: int)
+extern function aurora_gui_get_visible(w: pointer) -> int
+extern function aurora_gui_get_enabled(w: pointer) -> int
+extern function aurora_gui_label_new(window: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_button_new(window: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_button_set_text(btn: pointer, text: cstring)
+extern function aurora_gui_text_set_text(w: pointer, text: cstring)
+extern function aurora_gui_textbox_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_textbox_set_text(tb: pointer, text: cstring)
+extern function aurora_gui_slider_new(window: pointer, x: int, y: int, w: int, h: int, min: int, max: int) -> pointer
+extern function aurora_gui_slider_get_value(sl: pointer) -> int
+extern function aurora_gui_slider_set_value(sl: pointer, value: int)
+extern function aurora_gui_checkbox_new(window: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_checkbox_is_checked(cb: pointer) -> int
+extern function aurora_gui_checkbox_set_checked(cb: pointer, checked: int)
+extern function aurora_gui_switch_new(window: pointer, text: cstring, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_switch_is_on(sw: pointer) -> int
+extern function aurora_gui_radiobutton_new(window: pointer, text: cstring, x: int, y: int, w: int, h: int, gid: int) -> pointer
+extern function aurora_gui_radiobutton_is_checked(rb: pointer) -> int
+extern function aurora_gui_radiobutton_set_checked(rb: pointer, checked: int)
+extern function aurora_gui_progressbar_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_progressbar_get_value(pb: pointer) -> int
+extern function aurora_gui_progressbar_set_value(pb: pointer, value: int)
+extern function aurora_gui_combobox_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_combobox_add_item(cb: pointer, text: cstring)
+extern function aurora_gui_combobox_count(cb: pointer) -> int
+extern function aurora_gui_dropdown_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_dropdown_add_item(dd: pointer, text: cstring)
+extern function aurora_gui_dropdown_count(dd: pointer) -> int
+extern function aurora_gui_listbox_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_listbox_add_item(lb: pointer, text: cstring)
+extern function aurora_gui_listbox_count(lb: pointer) -> int
+extern function aurora_gui_tabview_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_tabview_add_page(tab: pointer, title: cstring) -> pointer
+extern function aurora_gui_tabview_page_count(tab: pointer) -> int
+extern function aurora_gui_scrollview_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_treeview_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_treeview_clear(tv: pointer)
+extern function aurora_gui_webview_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_media_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+extern function aurora_gui_map_new(window: pointer, x: int, y: int, w: int, h: int) -> pointer
+
+function main()
+    output("parity: start")
+    win = aurora_gui_window_new("Parity", 720, 560)
+    if win == null
+        output("  note: window_new null (headless)")
+        return
+    end
+
+    aurora_gui_window_set_title(win, "Parity Test")
+    w = aurora_gui_window_get_width(win)
+    h = aurora_gui_window_get_height(win)
+    if w < 0
+        output("FAIL: width < 0")
+        return
+    end
+    if h < 0
+        output("FAIL: height < 0")
+        return
+    end
+    aurora_gui_window_set_min_size(win, 200, 150)
+    aurora_gui_window_set_max_size(win, 1600, 1200)
+    aurora_gui_window_set_resizable(win, 1)
+
+    lbl = aurora_gui_label_new(win, "Parity Label", 10, 10, 200, 24)
+    if lbl == null
+        output("FAIL: label null")
+        return
+    end
+
+    btn = aurora_gui_button_new(win, "Parity Button", 10, 44, 150, 28)
+    aurora_gui_button_set_text(btn, "Start")
+    aurora_gui_move(btn, 10, 44, 160, 30)
+
+    tb = aurora_gui_textbox_new(win, 10, 84, 200, 28)
+    aurora_gui_textbox_set_text(tb, "Parity Input")
+
+    sl = aurora_gui_slider_new(win, 10, 124, 200, 24, 0, 100)
+    aurora_gui_slider_set_value(sl, 50)
+    sv = aurora_gui_slider_get_value(sl)
+    output("  slider = " + sv)
+
+    cb = aurora_gui_checkbox_new(win, "Enable", 10, 160, 120, 22)
+    aurora_gui_checkbox_set_checked(cb, 1)
+    ck = aurora_gui_checkbox_is_checked(cb)
+    output("  checkbox checked = " + ck)
+
+    sw = aurora_gui_switch_new(win, "Wi-Fi", 140, 160, 100, 22)
+    son = aurora_gui_switch_is_on(sw)
+    output("  switch on = " + son)
+
+    rb = aurora_gui_radiobutton_new(win, "Option A", 10, 192, 120, 22, 1)
+    aurora_gui_radiobutton_set_checked(rb, 1)
+    rok = aurora_gui_radiobutton_is_checked(rb)
+    output("  radio checked = " + rok)
+
+    pb = aurora_gui_progressbar_new(win, 10, 224, 200, 20)
+    aurora_gui_progressbar_set_value(pb, 40)
+    pv = aurora_gui_progressbar_get_value(pb)
+    output("  progress = " + pv)
+
+    combo = aurora_gui_combobox_new(win, 10, 256, 200, 24)
+    aurora_gui_combobox_add_item(combo, "One")
+    aurora_gui_combobox_add_item(combo, "Two")
+    cn = aurora_gui_combobox_count(combo)
+    output("  combobox items = " + cn)
+
+    dd = aurora_gui_dropdown_new(win, 10, 292, 200, 24)
+    aurora_gui_dropdown_add_item(dd, "AA")
+    aurora_gui_dropdown_add_item(dd, "BB")
+    dn = aurora_gui_dropdown_count(dd)
+    output("  dropdown items = " + dn)
+
+    lb = aurora_gui_listbox_new(win, 10, 328, 200, 60)
+    aurora_gui_listbox_add_item(lb, "x")
+    aurora_gui_listbox_add_item(lb, "y")
+    ln = aurora_gui_listbox_count(lb)
+    output("  listbox items = " + ln)
+
+    tab = aurora_gui_tabview_new(win, 230, 10, 420, 200)
+    page1 = aurora_gui_tabview_add_page(tab, "Page 1")
+    page2 = aurora_gui_tabview_add_page(tab, "Page 2")
+    tpn = aurora_gui_tabview_page_count(tab)
+    output("  tab pages = " + tpn)
+    if page1 == null
+        output("FAIL: page1 null")
+        return
+    end
+    if page2 == null
+        output("FAIL: page2 null")
+        return
+    end
+
+    sv2 = aurora_gui_scrollview_new(win, 230, 220, 420, 120)
+    if sv2 == null
+        output("FAIL: scrollview null")
+        return
+    end
+
+    tv = aurora_gui_treeview_new(win, 230, 350, 200, 160)
+    aurora_gui_treeview_clear(tv)
+
+    web = aurora_gui_webview_new(win, 440, 350, 200, 160)
+    media = aurora_gui_media_new(win, 650, 350, 1, 1)
+    mapw = aurora_gui_map_new(win, 650, 400, 1, 1)
+    if web != null
+        output("  webview created")
+    end
+    if media != null
+        output("  media created")
+    end
+    if mapw != null
+        output("  map created")
+    end
+
+    v1 = aurora_gui_get_visible(win)
+    e1 = aurora_gui_get_enabled(win)
+    output("  window visible = " + v1 + " enabled = " + e1)
+
+    aurora_gui_window_destroy(win)
+    output("parity: PASS")
+end

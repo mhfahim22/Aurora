@@ -436,6 +436,7 @@ void OwnershipAnalyzer::walk(const ASTNode* node) {
     case NodeType::FunctionType:
     case NodeType::Throw:
     case NodeType::Delete:
+    case NodeType::Assert:
         break;
 
     default:

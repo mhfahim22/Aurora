@@ -13,6 +13,15 @@ Testing/
 crash/
 CMakeFiles/
 .aurora_cache/
+aurorac_build.log
+
+# ── WASM build output ──
+out/wasm/
+
+# ── Android/iOS build artifacts ──
+packages/android/.gradle/
+packages/android/app/build/
+packages/android/.idea/
 
 # ── Rust target directories (2GB rebuildable artifacts) ──
 packages/bridges/cargo/*/target/

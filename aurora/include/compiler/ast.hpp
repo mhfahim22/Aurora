@@ -165,6 +165,9 @@ enum class NodeType {
     Panic,        /* panic — halt execution */
     Debug,        /* debug — debug output */
     Log,          /* log   — log output */
+    Assert,       /* assert condition [, message] — runtime assertion */
+    Conditional,  /* cond ? then_expr : else_expr — ternary conditional */
+    Comprehension,  /* [expr for var in iterable if cond] — list comprehension */
 };
 
 /* ════════════════════════════════════════════════════════════
@@ -218,6 +221,10 @@ struct ASTNode {
     /* OOP abstraction flags */
     bool is_abstract { false };
     bool is_final    { false };
+    bool is_virtual  { false };
+    bool is_override { false };
+    /* Whether this StructDecl is a native union (union Name { fields }) */
+    bool is_union    { false };
 
     /* Lambda capture variables */
     std::vector<std::string> captures;

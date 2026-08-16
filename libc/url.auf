@@ -1,0 +1,100 @@
+## Aurora Standard Library — URL Parsing & Building
+## Usage:  import "url"
+##
+## Full URL parsing, component extraction, building, and
+## percent-encoding/decoding.
+##
+## Examples:
+##   import "url"
+##   u = url_parse("https://user:pass@example.com:8080/path?q=1#frag")
+##   output(url_scheme(u))    # "https"
+##   output(url_host(u))      # "example.com"
+##   output(url_port(u))      # "8080"
+## ════════════════════════════════════════════════════════════
+
+import "stdlib"
+
+## ── Core URL functions ──
+extern function aurora_str_from_cstr(str: cstring) -> str
+extern function aurora_url_parse(str: cstring) -> pointer
+extern function aurora_url_free(url: pointer)
+
+extern function aurora_url_scheme(url: pointer) -> cstring
+extern function aurora_url_host(url: pointer) -> cstring
+extern function aurora_url_port(url: pointer) -> i32
+extern function aurora_url_path(url: pointer) -> cstring
+extern function aurora_url_query(url: pointer) -> cstring
+extern function aurora_url_fragment(url: pointer) -> cstring
+extern function aurora_url_userinfo(url: pointer) -> cstring
+
+extern function aurora_url_build(scheme: cstring, host: cstring, port: i32, path: cstring, query: cstring, fragment: cstring) -> cstring
+
+extern function aurora_url_encode(input: cstring, out: cstring, out_size: i32) -> i32
+extern function aurora_url_decode(input: cstring, out: cstring, out_size: i32) -> i32
+
+## ════════════════════════════════════════════════════════════
+## Aurora-level convenience wrappers
+## ════════════════════════════════════════════════════════════
+
+## ── Parse a URL string into components ──
+function url_parse(str):
+    return aurora_url_parse(str)
+end
+
+function url_free(url):
+    aurora_url_free(url)
+end
+
+## ── Component getters ──
+function url_scheme(url):
+    return aurora_url_scheme(url)
+end
+function url_host(url):
+    return aurora_url_host(url)
+end
+function url_port(url):
+    return aurora_url_port(url)
+end
+function url_path(url):
+    return aurora_url_path(url)
+end
+function url_query(url):
+    return aurora_url_query(url)
+end
+function url_fragment(url):
+    return aurora_url_fragment(url)
+end
+function url_userinfo(url):
+    return aurora_url_userinfo(url)
+end
+
+## ── Build a URL from components ──
+function url_build(scheme, host, port, path, query, fragment):
+    return aurora_url_build(scheme, host, port, path, query, fragment)
+end
+
+## ── Percent-encode a string ──
+function url_encode(input):
+    buf = malloc(4096)
+    n = aurora_url_encode(input, buf, 4096)
+    if n <= 0
+        free(buf)
+        return ""
+    end
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
+end
+
+## ── Percent-decode a string ──
+function url_decode(input):
+    buf = malloc(4096)
+    n = aurora_url_decode(input, buf, 4096)
+    if n <= 0
+        free(buf)
+        return ""
+    end
+    result = aurora_str_from_cstr(buf)
+    free(buf)
+    return result
+end

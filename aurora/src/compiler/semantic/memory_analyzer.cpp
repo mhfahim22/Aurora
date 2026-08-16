@@ -306,6 +306,7 @@ void MemoryAnalyzer::walk(const ASTNode* node) {
     case NodeType::Delete:
     case NodeType::IndexAssign:
     case NodeType::Attribute:
+    case NodeType::Assert:
         break;
 
     default:

@@ -234,6 +234,7 @@ void AstToIr::walk(const ASTNode* node) {
     case NodeType::FunctionType:
     case NodeType::Block:
     case NodeType::Yield:
+    case NodeType::Assert:
         break;
 
     default:

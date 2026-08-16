@@ -370,16 +370,213 @@ int aurora_sec_pbkdf2(const char* password, const unsigned char* salt, int salt_
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Certificate APIs (stub-based file loading)
+   Certificate APIs — real X.509 PEM/DER parsing
+   (DER ASN.1 scanner: OID extraction, validity dates, fingerprint)
    ═══════════════════════════════════════════════════════════════ */
 
 struct SecCert {
     std::string path;
-    std::string subject;
-    std::string issuer;
-    std::string valid_from;
-    std::string valid_to;
+    std::string subject;      // CN=... extracted
+    std::string issuer;       // CN=... extracted
+    std::string serial;       // hex serial number
+    std::string valid_from;   // notBefore
+    std::string valid_to;     // notAfter
+    std::string fingerprint;  // SHA-256 of DER
+    long long not_before_utc; // epoch seconds
+    long long not_after_utc;  // epoch seconds
+    std::vector<unsigned char> der; // raw DER bytes
 };
+
+/* ── minimal ASN.1 DER reader ── */
+namespace {
+struct Asn1 {
+    const unsigned char* p;
+    int n;
+    int pos;
+    Asn1(const unsigned char* d, int len) : p(d), n(len), pos(0) {}
+    bool read_tag(unsigned char& tag) {
+        if (pos >= n) return false;
+        tag = p[pos++];
+        return true;
+    }
+    bool read_len(int& len) {
+        if (pos >= n) return false;
+        unsigned char b = p[pos++];
+        if ((b & 0x80) == 0) { len = b; return true; }
+        int count = b & 0x7f;
+        if (count > 3 || pos + count > n) return false;
+        len = 0;
+        for (int i = 0; i < count; i++) len = (len << 8) | p[pos++];
+        return true;
+    }
+    bool read_tlv(unsigned char want_tag, std::vector<unsigned char>& out) {
+        unsigned char tag;
+        if (!read_tag(tag)) return false;
+        if (tag != want_tag) return false;
+        int len;
+        if (!read_len(len)) return false;
+        if (pos + len > n) return false;
+        out.assign(p + pos, p + pos + len);
+        pos += len;
+        return true;
+    }
+    bool read_oid(std::string& out) {
+        std::vector<unsigned char> raw;
+        if (!read_tlv(0x06, raw) || raw.empty()) return false;
+        out.clear();
+        if (raw[0] < 40) out = "0." + std::to_string(raw[0]);
+        else if (raw[0] < 80) out = "1." + std::to_string(raw[0] - 40);
+        else out = "2." + std::to_string(raw[0] - 80);
+        unsigned long long val = 0;
+        for (size_t i = 1; i < raw.size(); i++) {
+            val = (val << 7) | (raw[i] & 0x7f);
+            if (!(raw[i] & 0x80)) { out += "." + std::to_string(val); val = 0; }
+        }
+        return true;
+    }
+    bool read_utf8(std::string& out) {
+        /* accept UTF8String(0x0c), PrintableString(0x13), IA5String(0x16) */
+        unsigned char tag;
+        int len;
+        if (!read_tag(tag)) return false;
+        if (!read_len(len)) return false;
+        if (tag != 0x0c && tag != 0x13 && tag != 0x16) return false;
+        if (pos + len > n) return false;
+        out.assign((const char*)p + pos, len);
+        pos += len;
+        return true;
+    }
+    bool read_time(std::string& out, long long& epoch) {
+        unsigned char tag;
+        int len;
+        if (!read_tag(tag)) return false;
+        if (!read_len(len)) return false;
+        if (tag != 0x17 && tag != 0x18) return false; /* UTCTime / GeneralizedTime */
+        if (pos + len > n) return false;
+        std::string s((const char*)p + pos, len);
+        pos += len;
+        out = s;
+        /* Parse YYMMDDHHMMSS[Z|+hhmm] for UTCTime (2-digit year) or YYYYMMDD... */
+        epoch = 0;
+        int year = 0, mon = 0, day = 0, hour = 0, min = 0, sec = 0;
+        if (tag == 0x17 && s.size() >= 12) {
+            year = (s[0]-'0')*10 + (s[1]-'0');
+            year = (year < 70) ? 2000 + year : 1900 + year;
+            mon  = (s[2]-'0')*10 + (s[3]-'0');
+            day  = (s[4]-'0')*10 + (s[5]-'0');
+            hour = (s[6]-'0')*10 + (s[7]-'0');
+            min  = (s[8]-'0')*10 + (s[9]-'0');
+            sec  = (s[10]-'0')*10 + (s[11]-'0');
+        } else if (tag == 0x18 && s.size() >= 14) {
+            year = 0;
+            for (int i = 0; i < 4; i++) year = year*10 + (s[i]-'0');
+            mon  = (s[4]-'0')*10 + (s[5]-'0');
+            day  = (s[6]-'0')*10 + (s[7]-'0');
+            hour = (s[8]-'0')*10 + (s[9]-'0');
+            min  = (s[10]-'0')*10 + (s[11]-'0');
+            sec  = (s[12]-'0')*10 + (s[13]-'0');
+        }
+        /* days-from-civil (Howard Hinnant) */
+        int y = year - (mon <= 2);
+        const int era = (y >= 0 ? y : y - 399) / 400;
+        const unsigned yoe = (unsigned)(y - era * 400);
+        const unsigned doy = (153 * (mon + (mon > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+        const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        long long days = era * 146097LL + (long long)doe - 719468LL;
+        epoch = days * 86400LL + hour * 3600LL + min * 60LL + sec;
+        return true;
+    }
+    bool read_bytes(std::vector<unsigned char>& out) {
+        return read_tlv(0x04, out); /* OCTET STRING */
+    }
+};
+
+/* Extract CN=... from an RDNSequence */
+static std::string extract_cn(const std::vector<unsigned char>& name_der) {
+    Asn1 a(name_der.data(), (int)name_der.size());
+    std::vector<unsigned char> seq;
+    if (!a.read_tlv(0x30, seq)) return "";
+    Asn1 b(seq.data(), (int)seq.size());
+    /* iterate over SETs */
+    while (b.pos < b.n) {
+        std::vector<unsigned char> set;
+        if (!b.read_tlv(0x31, set)) break;
+        Asn1 c(set.data(), (int)set.size());
+        while (c.pos < c.n) {
+            std::vector<unsigned char> attr;
+            if (!c.read_tlv(0x30, attr)) break;
+            Asn1 d(attr.data(), (int)attr.size());
+            std::string oid;
+            if (!d.read_oid(oid)) continue;
+            std::string val;
+            if (!d.read_utf8(val)) continue;
+            if (oid == "2.5.4.3") return val; /* commonName */
+        }
+    }
+    return "";
+}
+
+static bool parse_der_cert(SecCert* cert) {
+    Asn1 a(cert->der.data(), (int)cert->der.size());
+    std::vector<unsigned char> tbs;
+    if (!a.read_tlv(0x30, tbs)) return false; /* Certificate SEQUENCE */
+    Asn1 b(tbs.data(), (int)tbs.size());
+    /* version [0] EXPLICIT (optional) */
+    if (b.pos < b.n && b.p[b.pos] == 0xa0) {
+        unsigned char tag; int len;
+        b.read_tag(tag); b.read_len(len);
+        b.pos += len;
+    }
+    std::vector<unsigned char> serial;
+    if (!b.read_tlv(0x02, serial)) return false;
+    cert->serial.clear();
+    for (size_t i = 0; i < serial.size(); i++) {
+        char hx[3];
+        sprintf(hx, "%02x", serial[i]);
+        cert->serial += hx;
+    }
+    /* signature algorithm OID */
+    std::string sig_alg;
+    if (!b.read_oid(sig_alg)) return false;
+    /* issuer Name */
+    std::vector<unsigned char> issuer;
+    if (!b.read_tlv(0x30, issuer)) return false;
+    cert->issuer = extract_cn(issuer);
+    if (cert->issuer.empty()) cert->issuer = "unknown";
+    /* validity */
+    std::vector<unsigned char> validity;
+    if (!b.read_tlv(0x30, validity)) return false;
+    Asn1 v(validity.data(), (int)validity.size());
+    if (!v.read_time(cert->valid_from, cert->not_before_utc)) return false;
+    if (!v.read_time(cert->valid_to, cert->not_after_utc)) return false;
+    /* subject Name */
+    std::vector<unsigned char> subject;
+    if (!b.read_tlv(0x30, subject)) return false;
+    cert->subject = extract_cn(subject);
+    if (cert->subject.empty()) cert->subject = "unknown";
+    return true;
+}
+} // namespace
+
+static char* extract_pem_der(const char* content, size_t size,
+                             std::vector<unsigned char>& der) {
+    /* Find "-----BEGIN CERTIFICATE-----" ... "-----END CERTIFICATE-----" */
+    const char* begin = strstr(content, "-----BEGIN CERTIFICATE-----");
+    if (!begin) return nullptr;
+    const char* end = strstr(begin, "-----END CERTIFICATE-----");
+    if (!end) return nullptr;
+    /* base64 body between markers */
+    std::string b64(begin + 27, end - (begin + 27));
+    std::string clean;
+    for (size_t i = 0; i < b64.size(); i++)
+        if (b64[i] != '\n' && b64[i] != '\r' &&
+            b64[i] != ' ' && b64[i] != '\t') clean += b64[i];
+    der.resize(clean.size());
+    int der_len = aurora_base64_decode(clean.c_str(), der.data(), der.size());
+    if (der_len <= 0) return nullptr;
+    der.resize(der_len);
+    return (char*)begin;
+}
 
 void* aurora_sec_cert_load(const char* path) {
     if (!path) return nullptr;
@@ -388,21 +585,37 @@ void* aurora_sec_cert_load(const char* path) {
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
+    if (size <= 0) { fclose(f); return nullptr; }
 
     std::vector<char> data(size + 1);
-    fread(data.data(), 1, size, f);
+    if (fread(data.data(), 1, size, f) != (size_t)size) { fclose(f); return nullptr; }
     fclose(f);
     data[size] = '\0';
 
     SecCert* cert = new SecCert();
     cert->path = path;
 
-    /* Basic PEM parsing for info extraction */
-    std::string content(data.data(), size);
-    cert->subject = path;
-    cert->issuer = path;
-    cert->valid_from = "now";
-    cert->valid_to = "forever";
+    std::vector<unsigned char> der;
+    if (!extract_pem_der(data.data(), size, der)) {
+        /* fallback: treat entire file as raw DER */
+        der.assign((unsigned char*)data.data(), (unsigned char*)data.data() + size);
+    }
+    cert->der = der;
+
+    if (!parse_der_cert(cert)) {
+        /* Not a valid X.509 cert — still keep basic info */
+        cert->subject = path;
+        cert->issuer = path;
+        cert->valid_from = "n/a";
+        cert->valid_to = "n/a";
+        cert->fingerprint = "invalid";
+        return cert;
+    }
+
+    /* SHA-256 fingerprint */
+    unsigned char hash[32];
+    aurora_sha256(der.data(), der.size(), hash);
+    cert->fingerprint = to_hex(hash, 32);
 
     return cert;
 }
@@ -411,14 +624,41 @@ char* aurora_sec_cert_info(void* cert_ptr) {
     if (!cert_ptr) return nullptr;
     SecCert* cert = (SecCert*)cert_ptr;
     std::string info = "Path: " + cert->path + "\n";
+    info += "Subject: " + cert->subject + "\n";
+    info += "Issuer: " + cert->issuer + "\n";
+    info += "Serial: " + cert->serial + "\n";
+    info += "Valid From: " + cert->valid_from + "\n";
+    info += "Valid To: " + cert->valid_to + "\n";
+    info += "SHA-256 Fingerprint: " + cert->fingerprint + "\n";
     return strdup_c(info.c_str());
 }
 
 int aurora_sec_cert_verify(void* cert_ptr, const char* ca_path) {
     if (!cert_ptr || !ca_path) return 0;
-    (void)cert_ptr; (void)ca_path;
-    /* Basic verification: file exists */
-    return 1;
+    SecCert* cert = (SecCert*)cert_ptr;
+    if (cert->fingerprint == "invalid") return 0;
+
+    /* 1. Certificate must be within validity window (UTC) */
+    time_t now = time(nullptr);
+    if (now < cert->not_before_utc || now > cert->not_after_utc) return 0;
+
+    /* 2. CA cert must exist and be loadable */
+    FILE* f = fopen(ca_path, "rb");
+    if (!f) return 0;
+    fclose(f);
+
+    /* 3. Certificate must be self-signed OR signed by the CA.
+          Heuristic: if subject == issuer it's self-signed; treat as valid
+          if it also has a non-empty fingerprint. Otherwise require the CA
+          cert's subject to match this cert's issuer. */
+    if (cert->subject == cert->issuer) return 1;
+
+    void* ca = aurora_sec_cert_load(ca_path);
+    if (!ca) return 0;
+    SecCert* ca_cert = (SecCert*)ca;
+    int result = (ca_cert->subject == cert->issuer) ? 1 : 0;
+    aurora_sec_cert_free(ca);
+    return result;
 }
 
 void aurora_sec_cert_free(void* cert_ptr) {

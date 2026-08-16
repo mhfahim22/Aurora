@@ -19,6 +19,7 @@ void               aurora_rate_limiter_free(AuroraRateLimiter* rl);
 int                aurora_rate_limiter_allow(AuroraRateLimiter* rl, const char* key);
 int                aurora_rate_limiter_remaining(AuroraRateLimiter* rl, const char* key);
 void               aurora_rate_limiter_reset(AuroraRateLimiter* rl, const char* key);
+void               aurora_rate_limiter_set_redis(AuroraRateLimiter* rl, const char* url);
 
 /* ═══════════════════════════════════════════════════════════════
    API Gateway

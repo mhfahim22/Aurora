@@ -117,6 +117,18 @@ static llvm::Type* field_llvm_type(llvm::LLVMContext& ctx, const ClassFieldInfo&
     switch (f.type_kind) {
         case AstTypeKind::String:  return llvm::PointerType::getUnqual(ctx);
         case AstTypeKind::Float:   return llvm::Type::getDoubleTy(ctx);
+        case AstTypeKind::F32:     return llvm::Type::getFloatTy(ctx);
+        case AstTypeKind::Bool:
+        case AstTypeKind::I8:
+        case AstTypeKind::U8:
+        case AstTypeKind::Byte:
+        case AstTypeKind::Char:    return llvm::Type::getInt8Ty(ctx);
+        case AstTypeKind::I16:
+        case AstTypeKind::U16:     return llvm::Type::getInt16Ty(ctx);
+        case AstTypeKind::I32:
+        case AstTypeKind::U32:     return llvm::Type::getInt32Ty(ctx);
+        case AstTypeKind::I64:
+        case AstTypeKind::U64:     return llvm::Type::getInt64Ty(ctx);
         default:                   return llvm::Type::getInt64Ty(ctx);
     }
 }

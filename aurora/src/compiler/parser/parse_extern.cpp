@@ -13,9 +13,25 @@ static void parse_extern_fields(const std::vector<Token>& ftoks, ASTNode* stmt, 
         fi++;
         if (fi < static_cast<int>(ftoks.size()) && ftoks[fi].is_operator(':')) {
             fi++;
-            if (fi < static_cast<int>(ftoks.size()) && (ftoks[fi].is_identifier() || ftoks[fi].is(TokenKind::Keyword))) {
-                field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
-                fi++;
+            if (fi < static_cast<int>(ftoks.size())) {
+                if (ftoks[fi].is_operator('[')) {
+                    fi++;
+                    std::string fixed_type = "[";
+                    while (fi < static_cast<int>(ftoks.size()) && !ftoks[fi].is_operator(']')) {
+                        fixed_type += ftoks[fi].value;
+                        fi++;
+                    }
+                    if (fi < static_cast<int>(ftoks.size()) && ftoks[fi].is_operator(']')) {
+                        fixed_type += "]";
+                        fi++;
+                    } else {
+                        throw std::runtime_error("Line " + std::to_string(ln) + ": unclosed '[' in fixed array type");
+                    }
+                    field->right = make_node(NodeType::Var, fixed_type, ln);
+                } else if (ftoks[fi].is_identifier() || ftoks[fi].is(TokenKind::Keyword)) {
+                    field->right = make_node(NodeType::Var, ftoks[fi].value, ln);
+                    fi++;
+                }
             }
         }
         ASTNode* raw = field.get();
@@ -214,7 +230,21 @@ ASTNode::Ptr Parser::parse_extern() {
                 /* optional : type  — can be simple type or callback(params) -> ret */
                 if (idx < cnt && toks[idx].is_operator(':')) {
                     idx++;
-                    if (idx < cnt && toks[idx].is_keyword("callback")) {
+                    if (idx < cnt && toks[idx].is_operator('[')) {
+                        idx++;
+                        std::string fixed_type = "[";
+                        while (idx < cnt && !toks[idx].is_operator(']')) {
+                            fixed_type += toks[idx].value;
+                            idx++;
+                        }
+                        if (idx < cnt && toks[idx].is_operator(']')) {
+                            fixed_type += "]";
+                            idx++;
+                        } else {
+                            throw std::runtime_error("Line " + std::to_string(ln) + ": unclosed '[' in fixed array param type");
+                        }
+                        param->right = make_node(NodeType::Var, fixed_type, ln);
+                    } else if (idx < cnt && toks[idx].is_keyword("callback")) {
                         /* callback(param_types...) -> return_type */
                         auto fn_type = make_node(NodeType::FunctionType, "", ln);
                         idx++; /* skip 'callback' */
@@ -259,7 +289,21 @@ ASTNode::Ptr Parser::parse_extern() {
         /* Parse optional -> return_type */
         if (idx < cnt && toks[idx].is_operator("->")) {
             idx++;
-            if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
+            if (idx < cnt && toks[idx].is_operator('[')) {
+                idx++;
+                std::string fixed_type = "[";
+                while (idx < cnt && !toks[idx].is_operator(']')) {
+                    fixed_type += toks[idx].value;
+                    idx++;
+                }
+                if (idx < cnt && toks[idx].is_operator(']')) {
+                    fixed_type += "]";
+                    idx++;
+                } else {
+                    throw std::runtime_error("Line " + std::to_string(ln) + ": unclosed '[' in fixed array return type");
+                }
+                stmt->left = make_node(NodeType::Var, fixed_type, ln);
+            } else if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword)))
                 stmt->left = make_node(NodeType::Var, toks[idx].value, ln);
             idx++;
         } else {

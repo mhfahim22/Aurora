@@ -1,0 +1,18 @@
+extern function aurora_print_str(s: str)
+extern function aurora_print_int(v: int)  
+
+function   add   (a,b)
+    return a+b
+end
+
+function calculateTotal(x)
+   total = x*2+1
+   unused_var = 99
+    return total
+end
+
+function main()  
+    result=add(3,4)
+    aurora_print_int(result)
+    unknown_func(5)    
+end

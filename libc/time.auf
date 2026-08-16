@@ -11,6 +11,8 @@
 ##   sleep_ms(1000)                 # sleep 1s
 ## ════════════════════════════════════════════════════════════
 
+import "stdlib"
+
 ## ── Core time functions ──
 extern function aurora_time() -> i64
 extern function aurora_time_ns() -> i64
@@ -39,7 +41,7 @@ function sleep_ms(ms):
 end
 
 ## ── Sleep for N seconds ──
-function sleep(secs):
+function sleep_secs(secs):
     aurora_sleep(secs * 1000)
 end
 
@@ -54,7 +56,7 @@ end
 ##   "%S"  — second (00-59)
 ##   "%Y-%m-%d" — ISO date
 function time_format(t, fmt):
-    buf = cstring_repeat(256)
+    buf = malloc(256)
     n = aurora_time_format(t, fmt, buf, 256)
     if n <= 0
         return ""

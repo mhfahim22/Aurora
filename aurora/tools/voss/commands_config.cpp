@@ -160,6 +160,34 @@ int cmd_publish() {
     for (auto& reg : g_registries) {
         if (reg.url.find("example.com") != std::string::npos) continue;
         std::cout << "publishing to " << reg.name << " (" << reg.url << ")...\n";
+        if (reg.url.find("http://") == 0 || reg.url.find("https://") == 0 ||
+            reg.url.find("github:") == 0 || reg.url.find("gh:") == 0) {
+            RegistrySource* source = create_registry_source(reg.url);
+            if (source) {
+                std::string voss_json;
+                {
+                    std::ostringstream ss;
+                    ss << "{\"name\": \"" << info.name << "\", \"version\": \"" << info.version
+                       << "\", \"entry\": \"" << info.entry << "\"";
+                    if (!info.description.empty()) ss << ", \"description\": \"" << info.description << "\"";
+                    if (!info.author.empty()) ss << ", \"author\": \"" << info.author << "\"";
+                    if (!info.dependencies.empty()) {
+                        ss << ", \"dependencies\": [";
+                        for (size_t i = 0; i < info.dependencies.size(); i++) {
+                            if (i > 0) ss << ", ";
+                            ss << "\"" << info.dependencies[i] << "\"";
+                        }
+                        ss << "]";
+                    }
+                    ss << "}";
+                    voss_json = ss.str();
+                }
+                bool ok = source->publish(info.name, info.version, archive, voss_json);
+                delete source;
+                published = ok;
+                break;
+            }
+        }
         published = true;
         break;
     }
@@ -178,7 +206,7 @@ int cmd_publish() {
         std::cerr << "  or publish locally: the package is staged at " << pd << "\n";
         return 1;
     }
-    return 0;
+    return published ? 0 : 1;
 }
 
 int cmd_publish_github(const std::string& user, const std::string& repo, const std::string& version) {

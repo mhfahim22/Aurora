@@ -1,0 +1,8 @@
+name: aurora/std-regex
+version: 1.0.0
+author: Aurora Core Team
+description: Regular expression engine for Aurora
+entry: src/regex.auf
+dependencies:
+permissions:
+

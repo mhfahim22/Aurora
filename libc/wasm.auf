@@ -1,0 +1,112 @@
+## Aurora Standard Library — WASM / Browser Subset (Phase 40)
+## Usage:  import "wasm"
+##
+## This module declares the WASM-compatible core runtime: strings, math
+## (int/float conversions), collections (arrays), console output, panic,
+## and the browser DOM bindings. Everything here is implemented by the
+## browser-native runtime (aurora/src/runtime/wasm/wasm_rt.c + dom.cpp)
+## and is safe to compile with `--target wasm32-unknown-unknown`.
+##
+## NOT available in WASM builds (compiler still accepts them, but they
+## resolve only on native platforms): threads, filesystem, sockets,
+## databases, desktop GUI. Use `is_wasm` to guard platform-specific code.
+##
+## Examples:
+##   import "wasm"
+##   main():
+##       output("hello from wasm")
+##       s = "abc"
+##       out = str_upper(s)
+##       output(out)
+##       arr = []
+##       arr.push(42)
+##       output(arr.len())
+## ════════════════════════════════════════════════════════════
+
+## ── Console output ──
+extern function aurora_outputln_str(s: cstring)
+extern function aurora_outputln_int(v: i64)
+extern function aurora_outputln_float(v: double)
+extern function aurora_outputln_bool(v: i64)
+extern function aurora_outputN()
+extern function aurora_print_str(s: cstring)
+extern function aurora_print_int(v: i64)
+extern function aurora_print_float(v: double)
+extern function aurora_print_bool(v: i64)
+
+function output_line(s: cstring):
+    aurora_print_str(s)
+
+function output_int(v: i64):
+    aurora_print_int(v)
+
+function output_float(v: double):
+    aurora_print_float(v)
+
+function output_bool(v: i64):
+    aurora_print_bool(v)
+
+function output_newline():
+    aurora_outputN()
+
+## ── Panic / abort ──
+extern function aurora_panic(msg: cstring)
+
+function panic_msg(msg: cstring):
+    aurora_panic(msg)
+
+## ── Strings ──
+extern function aurora_str_from_cstr(s: cstring) -> pointer
+extern function aurora_str_as_cstr(s: pointer) -> cstring
+extern function aurora_str_new(cap: i64) -> pointer
+extern function aurora_str_free(s: pointer)
+extern function aurora_str_append(a: pointer, b: pointer) -> pointer
+extern function aurora_str_concat(a: pointer, b: pointer) -> pointer
+extern function aurora_str_repeat(s: pointer, n: i64) -> pointer
+extern function aurora_substr(s: pointer, start: i64, len: i64) -> pointer
+extern function aurora_str_index(a: pointer, b: pointer) -> i64
+extern function aurora_str_equal(a: pointer, b: pointer) -> i64
+extern function aurora_int_to_str(v: i64) -> pointer
+extern function aurora_float_to_str(v: double) -> pointer
+
+function str_from_cstr(s: cstring):
+    return aurora_str_from_cstr(s)
+
+function str_as_cstr(s: pointer):
+    return aurora_str_as_cstr(s)
+
+## ── Collections (arrays) ──
+extern function aurora_array_new(cap: i64) -> i64
+extern function aurora_array_push_int(arr: i64, val: i64) 
+extern function aurora_array_push_float(arr: i64, val: double) 
+extern function aurora_array_push_str(arr: i64, s: pointer) 
+extern function aurora_array_push_array(arr: i64, nested: i64) 
+extern function aurora_array_get_int(arr: i64, idx: i64) -> i64
+extern function aurora_array_get_str(arr: i64, idx: i64) -> pointer
+extern function aurora_array_get_array(arr: i64, idx: i64) -> i64
+extern function aurora_array_length(arr: i64) -> i64
+extern function aurora_array_capacity(arr: i64) -> i64
+extern function aurora_array_clear(arr: i64) 
+
+function array_new(cap: i64):
+    return aurora_array_new(cap)
+
+function array_len(arr: i64):
+    return aurora_array_length(arr)
+
+## ── GC / arena (browser: leak-only) ──
+extern function aurora_gc_alloc(size: i64) -> pointer
+extern function aurora_gc_free(p: pointer)
+extern function aurora_arena_alloc(size: i64) -> pointer
+extern function aurora_arena_free()
+
+## ── Browser DOM (see dom.auf for the full API) ──
+extern function aurora_dom_init() -> int
+extern function aurora_dom_create_element(tag: cstring) -> int
+extern function aurora_dom_document_body() -> int
+extern function aurora_dom_append_child(parent: int, child: int) -> int
+extern function aurora_dom_set_text(elem: int, text: cstring) -> int
+extern function aurora_dom_set_style(elem: int, prop: cstring, value: cstring) -> int
+extern function aurora_dom_set_title(title: cstring) -> int
+extern function aurora_dom_add_event_listener(elem: int, type: cstring, fn: callback(i64) -> int) -> int
+extern function aurora_dom_clear_children(elem: int) -> int

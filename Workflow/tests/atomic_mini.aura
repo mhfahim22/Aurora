@@ -1,0 +1,13 @@
+import "thread"
+extern function aurora_atomic_create(i: i64)
+extern function aurora_atomic_store(h: i64, v: i64)
+extern function aurora_atomic_load(h: i64)
+function main()
+    h = aurora_atomic_create(0)
+    output("atomic created")
+    aurora_atomic_store(h, 42)
+    output("atomic stored")
+    v = aurora_atomic_load(h)
+    output("atomic loaded v=" + v)
+end
+

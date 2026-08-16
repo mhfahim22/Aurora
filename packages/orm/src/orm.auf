@@ -1,0 +1,26 @@
+## aurora/orm - Object-relational mapping helpers
+
+extern function aurora_db_open(path: cstring) -> pointer
+extern function aurora_db_close(db: pointer) -> int
+extern function aurora_db_query(db: pointer, sql: cstring) -> pointer
+extern function aurora_db_exec(db: pointer, sql: cstring) -> int
+
+function orm_open(path: cstring):
+    return aurora_db_open(path)
+end
+
+function orm_close(db: pointer):
+    return aurora_db_close(db)
+end
+
+function orm_query(db: pointer, sql: cstring):
+    return aurora_db_query(db, sql)
+end
+
+function orm_exec(db: pointer, sql: cstring):
+    return aurora_db_exec(db, sql)
+end
+
+function main():
+    output("aurora/orm seed ready")
+end

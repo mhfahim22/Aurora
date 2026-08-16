@@ -1,0 +1,128 @@
+# Phase 37.3 — Mobile Gesture / Safe-Area / Dark-Mode Test
+# Verify gesture tuning, safe area insets, and theme/dark-mode parity
+
+function main()
+    output("Mobile Gesture Test: Starting...")
+
+    # ── Create a container + button ──
+    root = mw_create(3)
+    if root == null
+        output("FAIL: mw_create(MW_COLUMN) returned null")
+        return
+    end
+    mw_set_pos(root, 0.0, 0.0)
+    mw_set_size(root, 400.0, 600.0)
+
+    btn = mw_create(0)
+    if btn == null
+        output("FAIL: mw_create(MW_BUTTON) returned null")
+        return
+    end
+    mw_set_pos(btn, 10.0, 10.0)
+    mw_set_size(btn, 100.0, 36.0)
+    mw_set_text(btn, "Tap Me")
+    mw_add_child(root, btn)
+
+    # ── Gesture tuning ──
+    mw_set_long_press_ms(btn, 400)
+    mw_set_swipe_threshold(btn, 40.0)
+    output("mw_set_long_press_ms/swipe_threshold: OK")
+
+    # ── Touch state before any input ──
+    st = mw_get_touch_state(btn)
+    if st != 0
+        output("FAIL: touch state expected 0 before touch")
+        return
+    end
+    output("mw_get_touch_state initial: OK")
+
+    # Touch down -> pressed state
+    mw_handle_touch(root, 50.0, 25.0, 0)
+    st2 = mw_get_touch_state(btn)
+    if st2 != 1
+        output("FAIL: touch state expected 1 after down")
+        return
+    end
+    output("mw_get_touch_state pressed: OK")
+
+    # Touch up -> back to none
+    mw_handle_touch(root, 50.0, 25.0, 1)
+    st3 = mw_get_touch_state(btn)
+    if st3 != 0
+        output("FAIL: touch state expected 0 after up")
+        return
+    end
+    output("mw_get_touch_state released: OK")
+
+    # ── Safe area ──
+    mw_set_safe_area(btn, 44.0, 34.0, 0.0, 0.0)
+    top = 0.0
+    bottom = 0.0
+    left = 0.0
+    right = 0.0
+    mw_get_safe_area(btn, top, bottom, left, right)
+    if top != 44.0
+        output("FAIL: safe area top expected 44.0")
+        return
+    end
+    if bottom != 34.0
+        output("FAIL: safe area bottom expected 34.0")
+        return
+    end
+    if left != 0.0
+        output("FAIL: safe area left expected 0.0")
+        return
+    end
+    if right != 0.0
+        output("FAIL: safe area right expected 0.0")
+        return
+    end
+    output("mw_set_safe_area/mw_get_safe_area: OK")
+
+    # ── Theme / Dark Mode ──
+    th = mw_get_theme(btn)
+    if th != 0
+        output("FAIL: default theme expected light (0)")
+        return
+    end
+    dark = mw_is_dark_mode(btn)
+    if dark != 0
+        output("FAIL: default dark mode expected off")
+        return
+    end
+
+    mw_set_dark_mode(btn, 1)
+    dark2 = mw_is_dark_mode(btn)
+    if dark2 != 1
+        output("FAIL: dark mode expected on after set")
+        return
+    end
+    th2 = mw_get_theme(btn)
+    if th2 != 1
+        output("FAIL: theme expected dark (1) after set_dark_mode")
+        return
+    end
+    output("mw_set_dark_mode/mw_is_dark_mode/mw_get_theme: OK")
+
+    mw_set_theme(btn, 0)
+    th3 = mw_get_theme(btn)
+    if th3 != 0
+        output("FAIL: theme expected light (0) after set_theme")
+        return
+    end
+    dark3 = mw_is_dark_mode(btn)
+    if dark3 != 0
+        output("FAIL: dark mode expected off after set_theme(light)")
+        return
+    end
+    output("mw_set_theme: OK")
+
+    # ── Render with theme applied (no HDC -> no-op) ──
+    mw_render(root)
+    output("mw_render with dark mode: OK")
+
+    # ── Cleanup ──
+    mw_destroy(btn)
+    mw_destroy(root)
+    output("Mobile Gesture Test: All PASS")
+end

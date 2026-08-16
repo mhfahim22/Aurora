@@ -1,0 +1,94 @@
+## Input Validation Tests (Phase 38.4)
+## SQL injection / XSS / path-traversal payloads must be rejected
+
+extern function aurora_app_sec_init() -> int
+extern function aurora_app_sec_declare_permission(perm: str) -> int
+extern function aurora_app_sec_check_permission(perm: str) -> int
+extern function aurora_app_sec_validate_path(path: str) -> int
+extern function aurora_app_sec_sanitize_input(input: str, out: ptr, out_size: int) -> int
+
+function main()
+    output("=== Input Validation Tests ===")
+
+    aurora_app_sec_init()
+    output("  sec init: ok")
+
+    ## 1. SQL injection payload (with ; statement terminator) rejected by path validator
+    sqli = "1'; DROP TABLE users;--"
+    if aurora_app_sec_validate_path(sqli) != 0
+        output("  FAIL: SQLi accepted")
+        return
+    end
+    output("  SQLi blocked: pass")
+
+    ## 2. XSS script tag sanitized via sanitize_input
+    xss1 = "<script>alert(1)</script>"
+    cham = ""
+    aurora_app_sec_sanitize_input(xss1, cham, 40)
+    if cham == xss1
+        output("  FAIL: XSS not sanitized")
+        return
+    end
+    output("  XSS script sanitized: pass")
+
+    ## 3. XSS angle-bracket img payload sanitized
+    xss2 = "<img src=x onerror=alert(1)>"
+    cham2 = ""
+    aurora_app_sec_sanitize_input(xss2, cham2, 40)
+    if cham2 == xss2
+        output("  FAIL: XSS tag not sanitized")
+        return
+    end
+    output("  XSS tag sanitized: pass")
+
+    ## 4. Path traversal rejected
+    trav1 = "../../etc/passwd"
+    if aurora_app_sec_validate_path(trav1) != 0
+        output("  FAIL: traversal allowed")
+        return
+    end
+    trav2 = "../.."
+    if aurora_app_sec_validate_path(trav2) != 0
+        output("  FAIL: traversal allowed")
+        return
+    end
+    output("  path traversal blocked: pass")
+
+    ## 5. Normal relative path allowed
+    if aurora_app_sec_validate_path("docs/readme.md") == 0
+        output("  FAIL: valid relative path rejected")
+        return
+    end
+    output("  valid relative path: pass")
+
+    ## 6. Normal absolute path allowed
+    if aurora_app_sec_validate_path("C:\\work\\file.txt") == 0
+        output("  FAIL: valid absolute path rejected")
+        return
+    end
+    output("  valid absolute path: pass")
+
+    ## 7. Ampersand encoded by sanitize_input
+    amp = "a&b"
+    cham3 = ""
+    aurora_app_sec_sanitize_input(amp, cham3, 40)
+    if cham3 == amp
+        output("  FAIL: ampersand not sanitized")
+        return
+    end
+    output("  ampersand sanitized: pass")
+
+    ## 8. Permission workflow
+    aurora_app_sec_declare_permission("network")
+    if aurora_app_sec_check_permission("network") != 1
+        output("  FAIL: network permission not granted")
+        return
+    end
+    if aurora_app_sec_check_permission("filesystem") != 0
+        output("  FAIL: undeclared permission granted")
+        return
+    end
+    output("  permissions: pass")
+
+    output("=== Input Validation Tests PASS ===")
+end

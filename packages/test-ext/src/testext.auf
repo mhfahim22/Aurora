@@ -1,0 +1,40 @@
+## aurora/test-ext - Extended test helpers
+
+function tex_assert_true(cond: int, label: cstring):
+    if cond == 0:
+        output("FAIL: ")
+        output(label)
+        output("\n")
+        return 0
+    end
+    output("PASS: ")
+    output(label)
+    output("\n")
+    return 1
+end
+
+function tex_assert_eq(a: int, b: int, label: cstring):
+    if a != b:
+        output("FAIL: ")
+        output(label)
+        output("\n")
+        return 0
+    end
+    output("PASS: ")
+    output(label)
+    output("\n")
+    return 1
+end
+
+function tex_bench(label: cstring, iterations: int):
+    output("bench: ")
+    output(label)
+    output(" (")
+    output(iterations)
+    output(" iterations)\n")
+    return 0
+end
+
+function main():
+    output("aurora/test-ext seed ready")
+end

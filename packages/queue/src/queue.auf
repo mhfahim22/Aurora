@@ -1,0 +1,31 @@
+## aurora/queue - Job queue helpers
+
+extern function aurora_alloc(size: int) -> pointer
+extern function aurora_mem_write(ptr: pointer, offset: int, value: int) -> int
+extern function aurora_mem_read(ptr: pointer, offset: int) -> int
+
+function queue_new():
+    return aurora_alloc(1024)
+end
+
+function queue_push(q: pointer, job: cstring):
+    count = aurora_mem_read(q, 0)
+    aurora_mem_write(q, 0, count + 1)
+    return count + 1
+end
+
+function queue_pop(q: pointer):
+    count = aurora_mem_read(q, 0)
+    if count > 0:
+        aurora_mem_write(q, 0, count - 1)
+    end
+    return count
+end
+
+function queue_size(q: pointer):
+    return aurora_mem_read(q, 0)
+end
+
+function main():
+    output("aurora/queue seed ready")
+end

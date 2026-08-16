@@ -10,6 +10,7 @@
 #include "compiler/aurora_optimizer.hpp"
 #include "compiler/package_and_doc.hpp"
 #include "compiler/build_system.hpp"
+#include "compiler/repl.hpp"
 #include "compiler/ir/ast_to_ir.hpp"
 #include "compiler/ir/ir_lowering.hpp"
 #include "compiler/ir/ir_optimizer.hpp"
@@ -136,32 +137,6 @@ struct CompilerTimer {
 
 static CompilerTimer g_timer;
 
-/* ── Check if a trimmed line ends with a block-starting colon ── */
-static bool line_needs_continuation(const std::string& line) {
-    std::string s = line;
-    size_t start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return false;
-    if (start > 0) s = s.substr(start);
-    size_t end = s.find_last_not_of(" \t\r\n");
-    if (end != std::string::npos) s = s.substr(0, end + 1);
-    if (s.empty()) return false;
-    if (s.back() == ':') return true;
-
-    bool in_str = false;
-    int parens = 0, brackets = 0, braces = 0;
-    for (char c : s) {
-        if (c == '"') { in_str = !in_str; continue; }
-        if (in_str) continue;
-        if (c == '(') parens++;
-        else if (c == ')') parens--;
-        else if (c == '[') brackets++;
-        else if (c == ']') brackets--;
-        else if (c == '{') braces++;
-        else if (c == '}') braces--;
-    }
-    return parens > 0 || brackets > 0 || braces > 0;
-}
-
 /* ── Print usage to stderr ── */
 static void print_usage() {
     std::cerr << "Usage: aurora <source.aura> [options]\n";
@@ -180,7 +155,7 @@ static void print_usage() {
     std::cerr << "  -o <file>       Output path (.obj or .exe)\n";
     std::cerr << "  -l <lib>        Library to link against (e.g. -l user32)\n";
     std::cerr << "  -L <path>       Library search path\n";
-    std::cerr << "  --run           JIT-execute main function (default: on)\n";
+    std::cerr << "  --run           JIT-execute main function (default: off — writes .ll file)\n";
     std::cerr << "  -O0/-O1/-O2/-O3  Optimization level (default: -O3)\n";
     std::cerr << "  -Os             Optimize for size\n";
     std::cerr << "  -Oz             Aggressively optimize for size\n";
@@ -634,7 +609,8 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
                                          const std::string& exe_dir,
                                          std::vector<std::string>& resolving,
                                          std::unordered_set<std::string>& resolving_fast,
-                                         std::vector<std::string>* collected_files = nullptr) {
+                                         std::vector<std::string>* collected_files = nullptr,
+                                         bool strict_indent = false) {
     if (!root) return nullptr;
 
     std::vector<ASTNode::Ptr> nodes;
@@ -695,7 +671,7 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
             std::string src = read_file(found);
             Lexer lexer;
             auto lines = lexer.lex(src);
-            Parser parser(lines);
+            Parser parser(lines, strict_indent);
             auto imported = parser.parse();
 
             if (parser.had_error()) {
@@ -708,7 +684,7 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
                 continue;
             }
 
-            imported = resolve_imports_impl(std::move(imported), source_dir, exe_dir, resolving, resolving_fast, collected_files);
+            imported = resolve_imports_impl(std::move(imported), source_dir, exe_dir, resolving, resolving_fast, collected_files, strict_indent);
 
             resolving.pop_back();
             resolving_fast.erase(norm_path);
@@ -741,7 +717,8 @@ static ASTNode::Ptr resolve_imports_impl(ASTNode::Ptr root, const std::string& s
 /* ── Resolve imports in AST (public, with cycle detection) ── */
 static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source_path,
                                     const std::string& source_dir, const std::string& exe_dir,
-                                    std::vector<std::string>* collected_files = nullptr) {
+                                    std::vector<std::string>* collected_files = nullptr,
+                                    bool strict_indent = false) {
     std::vector<std::string> resolving;
     std::unordered_set<std::string> resolving_fast;
 
@@ -750,7 +727,7 @@ static ASTNode::Ptr resolve_imports(ASTNode::Ptr root, const std::string& source
     resolving.push_back(src_norm);
     resolving_fast.insert(src_norm);
 
-    return resolve_imports_impl(std::move(root), source_dir, exe_dir, resolving, resolving_fast, collected_files);
+    return resolve_imports_impl(std::move(root), source_dir, exe_dir, resolving, resolving_fast, collected_files, strict_indent);
 }
 
 /* ── Emit object file using LLVM TargetMachine ── */
@@ -760,13 +737,29 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
 
-    std::string target_triple = cross_target.empty()
-        ? llvm::sys::getProcessTriple()
+    std::string target_triple_str = cross_target.empty()
+        ? llvm::Triple(llvm::sys::getProcessTriple()).str()
         : cross_target;
-    module->setTargetTriple(target_triple);
+
+    /* For cross-compilation targets not initialized by InitializeNativeTarget
+       (e.g. WebAssembly/wasm32), initialize the specific backend(s) so
+       TargetRegistry::lookupTarget succeeds. */
+    if (!cross_target.empty()) {
+        llvm::Triple ct(cross_target);
+        if (ct.getArch() == llvm::Triple::wasm32 ||
+            ct.getArch() == llvm::Triple::wasm64) {
+            LLVMInitializeWebAssemblyTargetInfo();
+            LLVMInitializeWebAssemblyTarget();
+            LLVMInitializeWebAssemblyTargetMC();
+            LLVMInitializeWebAssemblyAsmPrinter();
+            LLVMInitializeWebAssemblyAsmParser();
+        }
+    }
+
+    llvm_set_module_triple(module, target_triple_str);
 
     std::string error;
-    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple, error);
+    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple_str, error);
     if (!target) {
         std::cerr << "aurora: " << error << "\n";
         return false;
@@ -794,12 +787,16 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
         return true;
     }
 
-    /* Detect native CPU and features */
-    std::string cpu = llvm::sys::getHostCPUName().str();
+    /* Detect native CPU and features (host CPU flags are invalid for
+       cross-compilation targets like wasm32, which use "generic"). */
+    std::string cpu = "generic";
     std::string features_str;
+    if (cross_target.empty()) {
+        cpu = llvm::sys::getHostCPUName().str();
+    }
 #if LLVM_VERSION_MAJOR >= 19
     auto host_features = llvm::sys::getHostCPUFeatures();
-    if (!host_features.empty()) {
+    if (cross_target.empty() && !host_features.empty()) {
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
             features_str += f.second ? "+" : "-";
@@ -808,7 +805,7 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
     }
 #else
     llvm::StringMap<bool, llvm::MallocAllocator> host_features;
-    if (llvm::sys::getHostCPUFeatures(host_features)) {
+    if (cross_target.empty() && llvm::sys::getHostCPUFeatures(host_features)) {
         for (const auto& f : host_features) {
             if (!features_str.empty()) features_str += ",";
             features_str += f.second ? "+" : "-";
@@ -818,7 +815,7 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
 #endif
 
     auto* target_machine = target->createTargetMachine(
-        target_triple, cpu, features_str, options, llvm::Reloc::PIC_);
+        target_triple_str, cpu, features_str, options, llvm::Reloc::PIC_);
 
     if (!target_machine) {
         std::cerr << "aurora: could not create target machine\n";
@@ -1334,7 +1331,7 @@ int main(int argc, char** argv) {
     std::string output_path;                /* -o <file> */
     std::vector<std::string> link_libs;     /* -l <lib> */
     std::vector<std::string> lib_paths;     /* -L <path> */
-    bool run_jit = true;
+    bool run_jit = false;              /* default: write .ll file; --run enables JIT */
     bool show_memory_report = false;
     bool show_lifetime_report = false;
     bool show_ownership_report = false;
@@ -1355,14 +1352,16 @@ int main(int argc, char** argv) {
     bool package_mode = false;
     std::vector<std::string> package_args;
     std::string source_path;
-    int opt_level = 2;             /* -O flag: 0-3, default 2 */
+    int opt_level = 0;             /* -O flag: 0-3, default 0 (safe for large imports) */
     bool opt_size = false;         /* -Os: optimize for size */
     bool opt_size_aggressive = false; /* -Oz: aggressively optimize for size */
     bool fast_math = false;        /* -ffast-math: enable unsafe FP optimizations */
     bool use_lto = false;          /* -flto: enable link-time optimization */
     bool enable_coverage = false;  /* --coverage: enable code coverage tracing */
     bool enable_debug = false;     /* --debug / -g: enable DWARF debug info */
+    bool enable_dap = false;       /* --dap: enable DAP debugger line traps */
     bool incremental = false;      /* --incremental: skip compilation if unchanged */
+    bool strict_indent = false;    /* --strict-indent: only indentation-based blocks allowed */
     int jobs = 1;                  /* --jobs N: parallel compilation threads */
     std::string target_triple;     /* --target triple: cross-compilation target */
 
@@ -1376,6 +1375,7 @@ auto compute_flags_hash = [&]() -> std::string {
        << ",lto=" << use_lto
        << ",coverage=" << enable_coverage
        << ",debug=" << enable_debug
+       << ",dap=" << enable_dap
        << ",aurora_ir=" << use_aurora_ir
        << ",optimized_codegen=" << use_optimized_codegen
        << ",emit_ir=" << emit_ir
@@ -1488,9 +1488,11 @@ auto get_output_path = [&]() -> std::string {
         else if (arg == "--coverage") enable_coverage = true;
         else if (arg == "--incremental") incremental = true;
         else if (arg == "--debug" || arg == "-g") enable_debug = true;
+        else if (arg == "--dap") enable_dap = true;
         else if (arg == "--verbose" || arg == "-v") verbose = true;
         else if (arg == "--timing")   show_timing = true;
         else if (arg == "--run")      run_jit = true;
+        else if (arg == "--strict-indent") strict_indent = true;
         else if (arg == "--jobs" && i + 1 < argc) {
             jobs = std::max(1, atoi(argv[++i]));
         }
@@ -1504,7 +1506,7 @@ auto get_output_path = [&]() -> std::string {
         else if (arg == "--version") {} /* already handled */
     }
 
-    /* If emitting to file, don't JIT-run by default */
+    /* If emitting to stdout/file, keep JIT off */
     if (emit_obj || emit_ir || build_mode) run_jit = false;
     if (build_mode) {
         emit_obj = true;
@@ -1539,145 +1541,13 @@ auto get_output_path = [&]() -> std::string {
 
     /* ── REPL Mode ── */
     if (repl_mode) {
-        bool term = color_enabled(stdout);
-        std::cout << (term ? "\x1b[1m" : "") << "Aurora "
-                  << (term ? "\x1b[32m" : "") << "REPL" << (term ? "\x1b[0m" : "") << " v"
-                  << AURORA_VERSION << " (exit with :q or Ctrl+C)\n";
-
-        /* Helper: detect user's indentation from first non-empty line */
-        auto detect_indent = [](const std::string& raw) -> int {
-            size_t pos = 0;
-            while (pos < raw.size()) {
-                size_t nl = raw.find('\n', pos);
-                std::string l = raw.substr(pos, nl - pos);
-                if (!l.empty() && l.find_first_not_of(" \t\r") != std::string::npos) {
-                    size_t first_nonws = l.find_first_not_of(" \t");
-                    if (first_nonws != std::string::npos && first_nonws > 0)
-                        return (int)first_nonws;
-                    return 0;
-                }
-                if (nl == std::string::npos) break;
-                pos = nl + 1;
-            }
-            return 2;
-        };
-
-        /* Helper: indent each non-blank line by the detected amount */
-        auto indent_body = [](const std::string& raw, int indent) -> std::string {
-            std::string indent_str(static_cast<size_t>(indent), ' ');
-            std::string out;
-            size_t pos = 0;
-            while (pos < raw.size()) {
-                size_t nl = raw.find('\n', pos);
-                std::string l = raw.substr(pos, nl - pos);
-                if (!l.empty() && l.find_first_not_of(" \t\r") != std::string::npos)
-                    out += indent_str + l + "\n";
-                else
-                    out += "\n";
-                if (nl == std::string::npos) break;
-                pos = nl + 1;
-            }
-            return out;
-        };
-
-        /* Helper: compile and JIT-run a complete snippet */
-        auto exec_repl = [&](const std::string& code) {
-            int user_indent = detect_indent(code);
-            std::string indent_str(static_cast<size_t>(user_indent), ' ');
-            std::string wrapped =
-                "function main():\n" +
-                indent_body(code, user_indent) +
-                indent_str + "return 0\n";
-
-            try {
-                Lexer lexer;
-                auto lines = lexer.lex(wrapped);
-
-                Parser parser(lines);
-                ASTNode::Ptr ast = parser.parse();
-
-                if (parser.had_error()) {
-                    for (const auto& err : parser.errors())
-                        std::cerr << "\n" << err;
-                    std::cerr << "\n";
-                    return;
-                }
-
-                MemoryAnalyzer memory_analyzer;
-                memory_analyzer.analyse(ast.get());
-                memory_analyzer.apply_to_ast(ast.get());
-
-                if (memory_analyzer.has_errors()) {
-                    std::cerr << "REPL: compilation errors\n";
-                    return;
-                }
-
-                auto ctx = std::make_unique<llvm::LLVMContext>();
-                auto module = std::make_unique<llvm::Module>("aurora_repl", *ctx);
-                auto builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
-                Codegen codegen(*ctx, module, builder);
-                codegen.set_source_file(source_path);
-                codegen.set_coverage_enabled(enable_coverage);
-                std::unique_ptr<llvm::DIBuilder> debug_builder;
-                if (enable_debug && !source_path.empty()) {
-                    debug_builder = std::make_unique<llvm::DIBuilder>(*module);
-                    codegen.set_debug_builder(debug_builder.get());
-                    codegen.set_debug_enabled(true);
-                }
-                codegen.generate(ast.get());
-
-                int exit_code = jit_execute_main(std::move(ctx), std::move(module));
-                if (exit_code != 0 && exit_code != -1)
-                    std::cout << "exit: " << exit_code << "\n";
-
-            } catch (const std::exception& e) {
-                std::cerr << "REPL error: " << e.what() << "\n";
-            }
-        };
-
-        std::string buffer;
-        bool continuation = false;
-
-        while (true) {
-            std::cout << (continuation ? "> " : ">> ") << std::flush;
-
-            std::string line;
-            if (!std::getline(std::cin, line)) {
-                std::cout << "\n";
-                break;
-            }
-
-            if (line == "exit" || line == ":q") break;
-
-            if (!continuation) {
-                if (line.empty()) continue;
-
-                if (line == ":paste") {
-                    std::string paste_buf, pline;
-                    while (std::getline(std::cin, pline) && !pline.empty())
-                        paste_buf += pline + "\n";
-                    if (!paste_buf.empty()) exec_repl(paste_buf);
-                    continue;
-                }
-
-                if (line_needs_continuation(line)) {
-                    buffer = line + "\n";
-                    continuation = true;
-                    continue;
-                }
-
-                exec_repl(line);
-            } else {
-                if (line.empty()) {
-                    exec_repl(buffer);
-                    buffer.clear();
-                    continuation = false;
-                    continue;
-                }
-                buffer += line + "\n";
-            }
-        }
-        return 0;
+        ReplOptions ropts;
+        ropts.source_path       = source_path;
+        ropts.strict_indent     = strict_indent;
+        ropts.enable_debug      = enable_debug;
+        ropts.enable_dap        = enable_dap;
+        ropts.enable_coverage   = enable_coverage;
+        return run_repl(ropts);
     }
 
     if (source_path.empty() && !repl_mode) {
@@ -1747,7 +1617,7 @@ auto get_output_path = [&]() -> std::string {
         /* ── Stage 2: Parse ── */
         g_timer.start("Parse");
         if (verbose) std::cerr << "STAGE2: Parse\n" << std::flush;
-        Parser parser(lines);
+        Parser parser(lines, strict_indent);
         ASTNode::Ptr ast = parser.parse();
         g_timer.stop();
 
@@ -1765,7 +1635,7 @@ auto get_output_path = [&]() -> std::string {
         {
             auto sep = source_path.find_last_of("/\\");
             std::string source_dir = (sep == std::string::npos) ? "." : source_path.substr(0, sep);
-            ast = resolve_imports(std::move(ast), source_path, source_dir, exe_dir, &source_files);
+            ast = resolve_imports(std::move(ast), source_path, source_dir, exe_dir, &source_files, strict_indent);
         }
         g_timer.stop();
 
@@ -1931,6 +1801,7 @@ auto get_output_path = [&]() -> std::string {
             Codegen codegen(*ctx, module, builder);
             codegen.set_source_file(source_path);
             codegen.set_coverage_enabled(enable_coverage);
+            codegen.set_dap_enabled(enable_dap);
             std::unique_ptr<llvm::DIBuilder> debug_builder;
             if (enable_debug && !source_path.empty()) {
                 debug_builder = std::make_unique<llvm::DIBuilder>(*module);
@@ -1995,10 +1866,12 @@ auto get_output_path = [&]() -> std::string {
             }
 #endif
             if (verbose) std::cerr << "STAGE6: features=" << features_str << "\n" << std::flush;
-            module->setTargetTriple(target_triple.empty()
-                ? llvm::sys::getProcessTriple()
-                : target_triple);
-            if (verbose) std::cerr << "STAGE6: triple=" << module->getTargetTriple() << "\n" << std::flush;
+            {   std::string tp = target_triple.empty()
+                    ? llvm::Triple(llvm::sys::getProcessTriple()).str()
+                    : target_triple;
+                llvm_set_module_triple(module.get(), tp);
+                if (verbose) std::cerr << "STAGE6: triple=" << tp << "\n" << std::flush;
+            }
 
             if (verbose) std::cerr << "STAGE6: creating managers\n" << std::flush;
             llvm::LoopAnalysisManager LAM;

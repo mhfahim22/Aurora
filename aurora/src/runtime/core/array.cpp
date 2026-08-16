@@ -332,6 +332,13 @@ void aurora_array_free(int64_t arr_ptr) {
 AuroraStr* aurora_str_concat(AuroraStr* a, AuroraStr* b) {
     if (!a) return b ? aurora_str_from_cstr(b->ptr) : aurora_str_new(0);
     if (!b) return a;
+    if (a->shared) {
+        AuroraStr* clone = aurora_str_from_cstr(a->ptr);
+        if (!clone) return a;
+        aurora_str_append(clone, b);
+        aurora_str_free(b);
+        return clone;
+    }
     aurora_str_append(a, b);
     aurora_str_free(b);
     return a;

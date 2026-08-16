@@ -10,10 +10,11 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
     static const std::unordered_set<std::string> kw = {
         /* values */
         "true", "false", "null",
+        "Ok", "Err", "Some", "None",
 
         /* control flow */
         "if", "elseif", "else",
-        "while", "for", "loop", "repeat", "until",
+        "while", "for", "loop", "until",
         "break", "continue", "skip",
         "match", "case", "default", "switch",
 
@@ -33,7 +34,7 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
 
         /* OOP */
         "private", "public", "protected",
-        "static", "final", "abstract",
+        "static", "final", "abstract", "virtual", "override",
         "interface", "extends", "implements", "enum",
 
         /* memory */
@@ -50,9 +51,10 @@ inline const std::unordered_set<std::string>& aurora_keywords() {
         "type", "struct", "union",
         "list", "map", "set", "array", "tuple",
         "vector", "stack", "queue", "json",
+        "Result", "Option",
 
         /* I/O */
-        "output", "debug", "log",
+        "output", "debug", "log", "assert",
 
         /* attributes */
         "performance", "inline", "noinline", "constexpr",

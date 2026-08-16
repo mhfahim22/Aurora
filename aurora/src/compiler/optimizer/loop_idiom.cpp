@@ -208,13 +208,12 @@ static void replace_post_loop_loads(llvm::Value* slot,
                                     llvm::BasicBlock* body) {
     if (!slot) return;
 
-    /* Find the function containing this slot */
-    llvm::Function* F = nullptr;
-    if (auto* I = llvm::dyn_cast<llvm::Instruction>(slot))
-        F = I->getFunction();
-    else if (auto* G = llvm::dyn_cast<llvm::GlobalValue>(slot))
-        F = G->getParent() ? &G->getParent()->getFunctionList().front() : nullptr;
-
+    /* Find the function containing this loop: the exit block's parent
+       is always correct (all loop blocks live in the same function).
+       The previous fallback for GlobalValue slots grabbed the module's
+       first function, which silently skipped replacement of loads in
+       the real function containing the loop. */
+    llvm::Function* F = exit_block ? exit_block->getParent() : nullptr;
     if (!F) return;
 
     for (auto& bb : *F) {

@@ -49,9 +49,9 @@ namespace fs = std::filesystem;
 
 llvm::TargetMachine* create_target_machine(llvm::Module* module, const BuildConfig& cfg) {
     std::string triple = cfg.target_triple.empty()
-        ? llvm::sys::getProcessTriple()
+        ? llvm::Triple(llvm::sys::getProcessTriple()).str()
         : cfg.target_triple;
-    module->setTargetTriple(triple);
+    llvm_set_module_triple(module, triple);
 
     std::string error;
     const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple, error);
@@ -203,6 +203,7 @@ BuildResult build_source(const std::string& source_file, const BuildConfig& cfg)
             Codegen codegen(*ctx, module, builder);
             codegen.set_source_file(source_file);
             codegen.set_coverage_enabled(cfg.enable_coverage);
+            codegen.set_dap_enabled(cfg.enable_dap);
             std::unique_ptr<llvm::DIBuilder> debug_builder;
             if (cfg.enable_debug && !source_file.empty()) {
                 debug_builder = std::make_unique<llvm::DIBuilder>(*module);

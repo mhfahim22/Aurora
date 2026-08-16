@@ -250,6 +250,30 @@ void aurora_gui_window_set_resizable(AuroraWidget w, int r) {
                         : (NSWindowStyleMaskTitled|NSWindowStyleMaskClosable)];
 }
 
+int aurora_gui_window_set_dark_mode(AuroraWidget w, int enable) {
+    NSWindow* win = (NSWindow*)view_for_id((int)(intptr_t)w);
+    if (win) {
+        win.appearance = enable
+            ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]
+            : [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+    }
+    return 0;
+}
+
+int aurora_gui_window_set_effect(AuroraWidget w, int effect) {
+    /* NSVisualEffectView backdrop: 1=mica-equivalent (underWindow),
+       2=acrylic-equivalent (behindWindow). */
+    NSWindow* win = (NSWindow*)view_for_id((int)(intptr_t)w);
+    if (!win) return 0;
+    NSVisualEffectView* fx = [[NSVisualEffectView alloc] initWithFrame:win.contentView.bounds];
+    fx.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    fx.material = (effect == 2) ? NSVisualEffectMaterialHUDWindow : NSVisualEffectMaterialUnderWindowBackground;
+    fx.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    fx.state = NSVisualEffectStateActive;
+    [win.contentView addSubview:fx positioned:NSWindowBelow relativeTo:nil];
+    return 0;
+}
+
 /* ════════════════════════════════════════════════════════════
    Common
    ════════════════════════════════════════════════════════════ */

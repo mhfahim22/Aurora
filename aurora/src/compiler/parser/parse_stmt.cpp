@@ -3,7 +3,7 @@
 #include <sstream>
 
 /* Forward declaration for pattern parsing */
-static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln);
+ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln);
 
 /* ── Helper: parse attributed function definition ──
    Handles common pattern: @attribute function name(params): body (brace or indent).
@@ -69,10 +69,11 @@ ASTNode::Ptr Parser::parse_stmt() {
         return parse_class();
     }
 
-    /* ── Member modifiers (private/public/protected/static/final/abstract) ── */
+    /* ── Member modifiers (private/public/protected/static/final/abstract/virtual/override) ── */
     if (cnt > 1 && (t0.is_keyword("private") || t0.is_keyword("public") ||
                     t0.is_keyword("protected") || t0.is_keyword("static") ||
-                    t0.is_keyword("final") || t0.is_keyword("abstract"))) {
+                    t0.is_keyword("final") || t0.is_keyword("abstract") ||
+                    t0.is_keyword("virtual") || t0.is_keyword("override"))) {
         std::string mod = t0.value;
 
         /* modifier function name(...):  — method with modifier */
@@ -88,6 +89,10 @@ ASTNode::Ptr Parser::parse_stmt() {
                     stmt->is_abstract = true;
                 if (mod == "final")
                     stmt->is_final = true;
+                if (mod == "virtual")
+                    stmt->is_virtual = true;
+                if (mod == "override")
+                    stmt->is_override = true;
                 idx++;
                 if (idx < cnt && toks[idx].is_operator('(')) {
                     idx++;
@@ -730,6 +735,11 @@ ASTNode::Ptr Parser::parse_stmt() {
                     if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                         p->right = make_node(NodeType::Var, toks[idx].value, ln);
                         idx++;
+                        /* Check for nullable suffix: `Int?` */
+                        if (idx < cnt && toks[idx].is_operator('?')) {
+                            const_cast<ASTNode*>(p.get())->type_annotation.is_nullable = true;
+                            idx++;
+                        }
                     }
                 }
                 ASTNode* raw = p.get();
@@ -745,6 +755,11 @@ ASTNode::Ptr Parser::parse_stmt() {
             if (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
                 stmt->left = make_node(NodeType::Var, toks[idx].value, ln);
                 idx++;
+                /* Check for nullable return: `: Int?` */
+                if (idx < cnt && toks[idx].is_operator('?')) {
+                    const_cast<ASTNode*>(stmt.get())->type_annotation.is_nullable = true;
+                    idx++;
+                }
             }
         }
 
@@ -924,6 +939,10 @@ ASTNode::Ptr Parser::parse_stmt() {
     /* ── struct ── */
     if (t0.is_keyword("struct"))
         return parse_struct();
+
+    /* ── union ── */
+    if (t0.is_keyword("union"))
+        return parse_union();
 
     /* ── enum ── */
     if (t0.is_keyword("enum"))
@@ -1107,10 +1126,6 @@ ASTNode::Ptr Parser::parse_stmt() {
                         }
                     }
                 }
-                if (cidx < static_cast<int>(ctoks.size()) && ctoks[cidx].is_operator(':')) cidx++;
-                require_token_end(ctoks, cidx, "case value");
-                advance();
-
                 std::string case_val = "";
                 if (pattern && pattern->type == NodeType::Num) {
                     case_val = pattern->value;
@@ -1119,6 +1134,30 @@ ASTNode::Ptr Parser::parse_stmt() {
                 if (pattern) {
                     case_node->args = std::move(pattern);
                 }
+                /* ── Guard clause: case x if cond: ── */
+                if (cidx < static_cast<int>(ctoks.size()) && ctoks[cidx].is_keyword("if")) {
+                    cidx++;
+                    case_node->left = parse_expr(ctoks, cidx);
+                }
+                /* ── OR patterns: case 1 | 2 | 3: ── */
+                ASTNode* pat_tail = pattern.get();
+                while (cidx < static_cast<int>(ctoks.size()) && ctoks[cidx].is_operator('|')) {
+                    cidx++;
+                    auto next_pat = parse_pattern_from_tokens(ctoks, cidx, cln);
+                    if (next_pat) {
+                        if (pat_tail) {
+                            pat_tail->next = std::move(next_pat);
+                            pat_tail = pat_tail->next.get();
+                        } else {
+                            pattern = std::move(next_pat);
+                            pat_tail = pattern.get();
+                        }
+                    }
+                }
+                if (cidx < static_cast<int>(ctoks.size()) && ctoks[cidx].is_operator(':')) cidx++;
+                require_token_end(ctoks, cidx, "case value");
+                advance();
+
                 case_node->body = parse_block(ci_case);
                 ASTNode* raw = case_node.get();
                 *slot = std::move(case_node);
@@ -1188,7 +1227,7 @@ ASTNode::Ptr Parser::parse_stmt() {
     }
 
     /* ── repeat ... until cond ── */
-    if (t0.is_keyword("repeat")) {
+    if (t0.value == "repeat" && (t0.is_identifier() || t0.is(TokenKind::Keyword))) {
         int idx = 1;
         if (idx < cnt && toks[idx].is_operator(':')) idx++;
         require_token_end(toks, idx, "repeat");
@@ -1487,7 +1526,9 @@ ASTNode::Ptr Parser::parse_stmt() {
         return stmt;
     }
 
-    /* ── compound assignment: x += expr, x -= expr, x *= expr, x /= expr ── */
+    /* ── compound assignment: x += expr, x -= expr, x *= expr, x /= expr,
+       x %= expr, x &= expr, x |= expr, x ^= expr, x <<= expr, x >>= expr,
+       x **= expr ── */
     if (t0.is(TokenKind::Identifier) && cnt > 3 && toks[1].is(TokenKind::Operator)) {
         const std::string& op1 = toks[1].value;
         std::string binop = "";
@@ -1500,6 +1541,20 @@ ASTNode::Ptr Parser::parse_stmt() {
             binop = "*"; idx = 3;
         } else if (op1 == "/" && toks[2].is_operator('=')) {
             binop = "/"; idx = 3;
+        } else if (op1 == "%" && toks[2].is_operator('=')) {
+            binop = "%"; idx = 3;
+        } else if (op1 == "&" && toks[2].is_operator('=')) {
+            binop = "&"; idx = 3;
+        } else if (op1 == "|" && toks[2].is_operator('=')) {
+            binop = "|"; idx = 3;
+        } else if (op1 == "^" && toks[2].is_operator('=')) {
+            binop = "^"; idx = 3;
+        } else if (op1 == "<<" && toks[2].is_operator('=')) {
+            binop = "<<"; idx = 3;
+        } else if (op1 == ">>" && toks[2].is_operator('=')) {
+            binop = ">>"; idx = 3;
+        } else if (op1 == "**" && toks[2].is_operator('=')) {
+            binop = "**"; idx = 3;
         }
 
         if (!binop.empty()) {
@@ -1514,6 +1569,33 @@ ASTNode::Ptr Parser::parse_stmt() {
             advance();
             return stmt;
         }
+    }
+
+    /* ── destructuring assignment: a, b = expr ── */
+    if (t0.is(TokenKind::Identifier) && cnt > 3 && toks[1].is_operator(',')) {
+        auto stmt = make_node(NodeType::Assign, "__destructure__", ln);
+        int idx = 0;
+        /* Parse LHS var list: a, b, ... */
+        while (idx < cnt && (toks[idx].is_identifier() || toks[idx].is(TokenKind::Keyword))) {
+            auto lhs_var = make_node(NodeType::Var, toks[idx].value, ln);
+            idx++;
+            ASTNode* raw = lhs_var.get();
+            if (!stmt->args) { stmt->args = std::move(lhs_var); }
+            else {
+                ASTNode* tail = stmt->args.get();
+                while (tail->next) tail = tail->next.get();
+                tail->next = std::move(lhs_var);
+            }
+            if (idx < cnt && toks[idx].is_operator(',')) { idx++; continue; }
+            break;
+        }
+        /* = expr */
+        if (idx < cnt && toks[idx].is_operator('=')) idx++;
+        else throw std::runtime_error("Line " + std::to_string(ln) + ": destructuring assignment expects '='");
+        stmt->right = parse_expr(toks, idx);
+        require_token_end(toks, idx, "destructuring assignment");
+        advance();
+        return stmt;
     }
 
     /* ── assignment: name = expr ── */
@@ -1690,6 +1772,20 @@ ASTNode::Ptr Parser::parse_stmt() {
         return stmt;
     }
 
+    /* ── assert condition [, "message"] — runtime assertion ── */
+    if (t0.is_keyword("assert")) {
+        auto stmt = make_node(NodeType::Assert, "", ln);
+        int idx = 1;
+        if (idx < cnt) stmt->left = parse_expr(toks, idx);
+        if (idx < cnt && toks[idx].is_operator(',')) {
+            idx++;
+            stmt->right = parse_expr(toks, idx);
+        }
+        require_token_end(toks, idx, "assert statement");
+        advance();
+        return stmt;
+    }
+
     /* ── pass (no-op) ── */
     if (t0.is_keyword("pass")) {
         advance();
@@ -1720,7 +1816,7 @@ ASTNode::Ptr Parser::parse_stmt() {
         Name(...)    → NodeType::Call (struct pattern with field patterns in args)
         [...]        → NodeType::Array (array pattern with element patterns in args)
       Updates idx to point past the pattern.                                      ── */
-static ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln) {
+ASTNode::Ptr parse_pattern_from_tokens(const std::vector<Token>& toks, int& idx, int ln) {
     if (idx >= static_cast<int>(toks.size())) return nullptr;
 
     const Token& t = toks[idx];

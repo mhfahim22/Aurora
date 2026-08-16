@@ -1,0 +1,308 @@
+# ═══════════════════════════════════════════════════════════════
+#  Aurora Blog Engine — Flagship Web App
+#  Posts · Comments · Auth · Admin · RSS · File Upload · Pagination
+#  Built against the real libc/server.auf runtime (Phase 31 DSL).
+# ═══════════════════════════════════════════════════════════════
+import "server"
+import "json"
+import "fs"
+import "crypto"
+import "uuid"
+import "time"
+import "url"
+
+# ── Runtime backing (C exports resolved by aurorac's JIT) ──
+extern function aurora_jwt_encode(payload: str, secret: str) -> str
+extern function aurora_jwt_decode(token: str, secret: str) -> str
+extern function aurora_uuid_v4() -> pointer
+extern function aurora_uuid_to_string(uuid: pointer) -> cstring
+extern function aurora_time() -> i64
+extern function aurora_int_to_str(v: i64) -> str
+
+secret = "aurora-super-secret-key-2026"
+posts_file = "blog_data/posts.json"
+comments_file = "blog_data/comments.json"
+users_file = "blog_data/users.json"
+
+# ── Storage helpers ──
+function store_load(path: str): str
+    if exists(path)
+        return read_file(path)
+    end
+    return "[]"
+end
+
+function store_save(path: str, content: str)
+    write_file(path, content)
+end
+
+# ── JSON helpers (via libc/json.auf) ──
+function post_count(json_text: str): i64
+    arr = json_parse(json_text)
+    count = json_array_len(arr)
+    json_free(arr)
+    return count
+end
+
+function post_at(json_text: str, idx: i64): str
+    arr = json_parse(json_text)
+    item = json_array_get(arr, idx)
+    json_free(arr)
+    return json_serialize(item)
+end
+
+# ── Auth ──
+function make_token(username: str): str
+    payload = "{\"sub\":\"" + username + "\",\"iat\":" + str(aurora_time()) + "}"
+    return aurora_jwt_encode(payload, secret)
+end
+
+function verify_token(token: str): i64
+    if token == ""
+        return 0
+    end
+    decoded = aurora_jwt_decode(token, secret)
+    if decoded == ""
+        return 0
+    end
+    return 1
+end
+
+# ── HTML layout ──
+function html_layout(title: str, body: str): str
+    h = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+    h = h + "<title>" + title + "</title>"
+    h = h + "<style>body{font-family:Segoe UI,Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#222}"
+    h = h + "h1{color:#2563eb}a{color:#2563eb;text-decoration:none}nav a{margin-right:12px}"
+    h = h + ".post{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px}"
+    h = h + ".btn{display:inline-block;background:#2563eb;color:#fff !important;padding:8px 16px;border-radius:6px}"
+    h = h + "input,textarea{width:100%;padding:8px;margin:6px 0;border:1px solid #d1d5db;border-radius:6px}"
+    h = h + "form{display:inline}</style></head><body>"
+    h = h + "<nav><a href=\"/\">Home</a><a href=\"/posts\">Posts</a>"
+    h = h + "<a href=\"/login\">Login</a><a href=\"/register\">Register</a>"
+    h = h + "<a href=\"/rss.xml\">RSS</a></nav><hr>"
+    h = h + body
+    h = h + "<hr><footer><p>Aurora Blog Engine — built with Aurora Lang</p></footer>"
+    h = h + "</body></html>"
+    return h
+end
+
+function render_posts(items: str): str
+    body = ""
+    count = post_count(items)
+    i = 0
+    while i < count
+        item = post_at(items, i)
+        j = json_parse(item)
+        title = json_get_str(j, "title")
+        excerpt = json_get_str(j, "excerpt")
+        pid = json_get_str(j, "id")
+        author = json_get_str(j, "author")
+        body = body + "<div class=\"post\"><h2><a href=\"/post/" + pid + "\">" + title + "</a></h2>"
+        body = body + "<p>" + excerpt + "</p><small>by " + author + "</small></div>"
+        json_free(j)
+        i = i + 1
+    end
+    return body
+end
+
+function find_post(posts: str, pid: str): str
+    count = post_count(posts)
+    i = 0
+    while i < count
+        item = post_at(posts, i)
+        j = json_parse(item)
+        id = json_get_str(j, "id")
+        if id == pid
+            json_free(j)
+            return item
+        end
+        json_free(j)
+        i = i + 1
+    end
+    return "{}"
+end
+
+function append_json_array(arr_json: str, new_item: str): str
+    if arr_json == "[]"
+        return "[" + new_item + "]"
+    end
+    return substr(arr_json, 0, len(arr_json) - 1) + "," + new_item + "]"
+end
+
+# ── Routes ──
+
+# Ensure the data directory exists before any store_save/store_load (fopen fails silently otherwise)
+if not is_dir("blog_data")
+    mkdir("blog_data")
+end
+
+server app
+    cors
+    template "layout" "<html><body>{{content}}</body></html>"
+
+    route "GET" "/"
+        posts = store_load(posts_file)
+        body = "<h1>Welcome to Aurora Blog</h1>"
+        body = body + "<p>The flagship web-app proof of concept, built entirely in Aurora.</p>"
+        body = body + "<a class=\"btn\" href=\"/posts\">Read Posts</a>"
+        body = body + "<h2>Latest Posts</h2>" + render_posts(posts)
+        response.html(html_layout("Aurora Blog", body))
+
+    route "GET" "/posts"
+        posts = store_load(posts_file)
+        page_str = request.query.page
+        page = 1
+        if page_str != ""
+            page = int(page_str)
+        end
+        body = "<h1>All Posts</h1>"
+        body = body + render_posts(posts)
+        body = body + "<p><a href=\"/posts?page=" + str(page + 1) + "\">Next</a>"
+        body = body + "</p><p><a class=\"btn\" href=\"/new-post\">Write Post</a></p>"
+        response.html(html_layout("Posts — Aurora Blog", body))
+
+    route "GET" "/post/:id"
+        pid = request.params.id
+        posts = store_load(posts_file)
+        post_json = find_post(posts, pid)
+        if post_json == "{}"
+            response.status(404)
+            response.html(html_layout("Not Found", "<h1>404 — Post not found</h1>"))
+        else
+            j = json_parse(post_json)
+            title = json_get_str(j, "title")
+            content = json_get_str(j, "content")
+            author = json_get_str(j, "author")
+            json_free(j)
+            body = "<article><h1>" + title + "</h1><small>by " + author + "</small>"
+            body = body + "<p>" + content + "</p></article>"
+            body = body + "<p><a class=\"btn\" href=\"/post/" + pid + "/comment\">Add Comment</a></p>"
+            response.html(html_layout(title + " — Aurora Blog", body))
+        end
+
+    route "POST" "/post/:id/comment"
+        pid = request.params.id
+        text = request.form.text
+        name = request.form.name
+        if name == ""
+            name = "Anonymous"
+        end
+        comments = store_load(comments_file)
+        newc = "{\"post_id\":\"" + pid + "\",\"name\":\"" + name + "\",\"text\":\"" + text + "\"}"
+        comments = append_json_array(comments, newc)
+        store_save(comments_file, comments)
+        response.redirect("/post/" + pid, 302)
+
+    route "GET" "/new-post"
+        token = request.cookie.aurora_session
+        if verify_token(token) == 0
+            response.redirect("/login", 302)
+        else
+            body = "<h1>New Post</h1>"
+            body = body + "<form action=\"/admin/create\" method=\"post\">"
+            body = body + "<input type=\"text\" name=\"title\" placeholder=\"Title\">"
+            body = body + "<textarea name=\"content\" placeholder=\"Content\"></textarea>"
+            body = body + "<input type=\"text\" name=\"excerpt\" placeholder=\"Excerpt\">"
+            body = body + "<input type=\"submit\" value=\"Publish\" class=\"btn\"></form>"
+            response.html(html_layout("New Post", body))
+        end
+
+    route "POST" "/admin/create"
+        token = request.cookie.aurora_session
+        if verify_token(token) == 0
+            response.redirect("/login", 302)
+        else
+            title = request.form.title
+            content = request.form.content
+            excerpt = request.form.excerpt
+            posts = store_load(posts_file)
+            uid = aurora_uuid_v4()
+            post = "{\"id\":\"" + aurora_uuid_to_string(uid) + "\",\"title\":\"" + title + "\",\"content\":\"" + content + "\",\"excerpt\":\"" + excerpt + "\",\"author\":\"admin\"}"
+            posts = append_json_array(posts, post)
+            store_save(posts_file, posts)
+            response.redirect("/posts", 302)
+        end
+
+    route "GET" "/login"
+        body = "<h1>Login</h1>"
+        body = body + "<form action=\"/auth/login\" method=\"post\">"
+        body = body + "<input type=\"text\" name=\"username\" placeholder=\"Username\">"
+        body = body + "<input type=\"password\" name=\"password\" placeholder=\"Password\">"
+        body = body + "<input type=\"submit\" value=\"Login\" class=\"btn\"></form>"
+        response.html(html_layout("Login", body))
+
+    route "GET" "/register"
+        body = "<h1>Register</h1>"
+        body = body + "<form action=\"/auth/register\" method=\"post\">"
+        body = body + "<input type=\"text\" name=\"username\" placeholder=\"Username\">"
+        body = body + "<input type=\"password\" name=\"password\" placeholder=\"Password\">"
+        body = body + "<input type=\"submit\" value=\"Register\" class=\"btn\"></form>"
+        response.html(html_layout("Register", body))
+
+    route "POST" "/auth/login"
+        username = request.form.username
+        password = request.form.password
+        users = store_load(users_file)
+        count = post_count(users)
+        found = 0
+        i = 0
+        while i < count
+            item = post_at(users, i)
+            ju = json_parse(item)
+            u = json_get_str(ju, "username")
+            p = json_get_str(ju, "password")
+            if u == username and p == sha256(password)
+                found = 1
+            end
+            json_free(ju)
+            i = i + 1
+        end
+        if found == 1
+            response.cookie("aurora_session", make_token(username), 86400)
+            response.redirect("/", 302)
+        else
+            response.status(401)
+            response.html(html_layout("Login Failed", "<h1>Bad credentials</h1><a href=\"/login\">Try again</a>"))
+        end
+
+    route "POST" "/auth/register"
+        username = request.form.username
+        password = request.form.password
+        users = store_load(users_file)
+        user = "{\"username\":\"" + username + "\",\"password\":\"" + sha256(password) + "\"}"
+        users = append_json_array(users, user)
+        store_save(users_file, users)
+        response.cookie("aurora_session", make_token(username), 86400)
+        response.redirect("/", 302)
+
+    route "GET" "/logout"
+        response.cookie("aurora_session", "", 0)
+        response.redirect("/", 302)
+
+    route "GET" "/rss.xml"
+        posts = store_load(posts_file)
+        rss = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        rss = rss + "<rss version=\"2.0\"><channel><title>Aurora Blog</title>"
+        rss = rss + "<link>http://localhost:8080</link>"
+        rss = rss + "<description>Posts from the Aurora Blog engine</description>"
+        count = post_count(posts)
+        i = 0
+        while i < count
+            item = post_at(posts, i)
+            j = json_parse(item)
+            title = json_get_str(j, "title")
+            excerpt = json_get_str(j, "excerpt")
+            pid = json_get_str(j, "id")
+            rss = rss + "<item><title>" + title + "</title>"
+            rss = rss + "<link>http://localhost:8080/post/" + pid + "</link>"
+            rss = rss + "<description>" + excerpt + "</description></item>"
+            json_free(j)
+            i = i + 1
+        end
+        rss = rss + "</channel></rss>"
+        response.html(rss)
+
+outputln("Aurora Blog Engine registered — http://localhost:8080")
+
+

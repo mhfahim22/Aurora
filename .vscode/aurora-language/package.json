@@ -2,7 +2,8 @@
   "name": "aurora-language",
   "displayName": "Aurora Language",
   "description": "Aurora language support — syntax highlighting, LSP, semantic tokens, formatting, and more",
-  "version": "2.0.0",
+  "version": "1.0.0",
+  "icon": "icon.png",
   "publisher": "aurora-lang",
   "repository": {
     "type": "git",
@@ -33,8 +34,12 @@
       {
         "id": "aurora",
         "aliases": ["Aurora", "aurora"],
-        "extensions": [".aura"],
-        "configuration": "./language-configuration.json"
+        "extensions": [".aura", ".auf"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.png",
+          "dark": "./icon.png"
+        }
       }
     ],
     "grammars": [

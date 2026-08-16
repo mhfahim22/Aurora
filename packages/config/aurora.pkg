@@ -1,0 +1,8 @@
+name: aurora/config
+version: 1.0.0
+author: Community
+description: Key/value configuration file helpers
+entry: src/config.auf
+dependencies:
+permissions:
+

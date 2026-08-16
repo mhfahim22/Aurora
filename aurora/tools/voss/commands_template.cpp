@@ -736,3 +736,436 @@ int cmd_doc(const std::string& output_dir, bool serve) {
 
     return 0;
 }
+
+/* ════════════════════════════════════════════════════════════
+   Phase 37.4 — Mobile Publishing (voss publish-mobile)
+   ════════════════════════════════════════════════════════════ */
+
+/* Minimal PNG writer (zlib deflate via raw stored blocks) — no external deps */
+static bool write_png(const std::string& path, int w, int h,
+                      const std::vector<uint8_t>& rgba /* w*h*4 */) {
+    auto crc_table = [](uint32_t& poly, uint32_t* table) {
+        for (uint32_t n = 0; n < 256; n++) {
+            uint32_t c = n;
+            for (int k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >> 1)) : (c >> 1);
+            table[n] = c;
+        }
+        poly = 0xFFFFFFFFUL;
+    };
+    struct Chunk {
+        uint32_t len;
+        char type[4];
+        std::vector<uint8_t> data;
+        uint32_t crc = 0;
+    };
+    std::vector<Chunk> chunks;
+    uint32_t png_poly; uint32_t png_table[256];
+    crc_table(png_poly, png_table);
+    auto crc_update = [&](uint32_t crc, const uint8_t* data, size_t len) {
+        crc ^= 0xFFFFFFFFUL;
+        for (size_t i = 0; i < len; i++) crc = png_table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
+        return crc ^ 0xFFFFFFFFUL;
+    };
+    auto make_chunk = [&](const char* type, const std::vector<uint8_t>& data) {
+        Chunk c;
+        c.len = (uint32_t)data.size();
+        memcpy(c.type, type, 4);
+        c.data = data;
+        uint32_t crc = 0xFFFFFFFFUL;
+        for (int i = 0; i < 4; i++) crc = png_table[(crc ^ (uint8_t)type[i]) & 0xFF] ^ (crc >> 8);
+        for (size_t i = 0; i < data.size(); i++) crc = png_table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
+        c.crc = crc ^ 0xFFFFFFFFUL;
+        return c;
+    };
+    /* IHDR */
+    std::vector<uint8_t> ihdr;
+    auto push32 = [&](uint32_t v) { ihdr.push_back((uint8_t)(v >> 24)); ihdr.push_back((uint8_t)(v >> 16)); ihdr.push_back((uint8_t)(v >> 8)); ihdr.push_back((uint8_t)v); };
+    push32((uint32_t)w); push32((uint32_t)h);
+    ihdr.push_back(8); /* bit depth */
+    ihdr.push_back(6); /* color type RGBA */
+    ihdr.push_back(0); ihdr.push_back(0); ihdr.push_back(0);
+    chunks.push_back(make_chunk("IHDR", ihdr));
+    /* IDAT — deflate raw stored blocks (RFC 1951) */
+    std::vector<uint8_t> raw;
+    for (int y = 0; y < h; y++) {
+        raw.push_back(0); /* filter: none */
+        for (int x = 0; x < w; x++) {
+            size_t i = ((size_t)y * w + x) * 4;
+            raw.push_back(rgba[i]); raw.push_back(rgba[i + 1]); raw.push_back(rgba[i + 2]); raw.push_back(rgba[i + 3]);
+        }
+    }
+    std::vector<uint8_t> idat;
+    size_t pos = 0;
+    uint16_t block_id = 0;
+    while (pos < raw.size()) {
+        size_t remaining = raw.size() - pos;
+        size_t chunk_len = remaining < 65535 ? remaining : 65535;
+        uint8_t hdr_byte = (pos + chunk_len >= raw.size()) ? 0x01 : 0x00;
+        idat.push_back(hdr_byte);
+        uint16_t len_l = (uint16_t)(chunk_len & 0xFFFF);
+        uint16_t len_n = (uint16_t)(~len_l);
+        idat.push_back((uint8_t)(len_l & 0xFF)); idat.push_back((uint8_t)(len_l >> 8));
+        idat.push_back((uint8_t)(len_n & 0xFF)); idat.push_back((uint8_t)(len_n >> 8));
+        for (size_t i = 0; i < chunk_len; i++) idat.push_back(raw[pos + i]);
+        pos += chunk_len;
+        block_id++;
+    }
+    if (raw.empty()) { idat.push_back(0x01); idat.push_back(0); idat.push_back(0); idat.push_back(0xFF); idat.push_back(0xFF); }
+    chunks.push_back(make_chunk("IDAT", idat));
+    /* IEND */
+    chunks.push_back(make_chunk("IEND", {}));
+
+    std::ofstream f(path, std::ios::binary);
+    if (!f) return false;
+    const uint8_t sig[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    f.write((const char*)sig, 8);
+    for (auto& c : chunks) {
+        uint8_t lenb[4] = { (uint8_t)(c.len >> 24), (uint8_t)(c.len >> 16), (uint8_t)(c.len >> 8), (uint8_t)c.len };
+        f.write((const char*)lenb, 4);
+        f.write(c.type, 4);
+        if (!c.data.empty()) f.write((const char*)c.data.data(), c.data.size());
+        uint8_t crcb[4] = { (uint8_t)(c.crc >> 24), (uint8_t)(c.crc >> 16), (uint8_t)(c.crc >> 8), (uint8_t)c.crc };
+        f.write((const char*)crcb, 4);
+    }
+    return true;
+}
+
+int generate_app_icon(const std::string& out_png, int size, const std::string& label) {
+    int S = size;
+    std::vector<uint8_t> px((size_t)S * S * 4, 0);
+    /* Aurora brand gradient background (top-left → bottom-right) */
+    auto grad = [](int x, int y, int s) -> uint32_t {
+        double t = (double)(x + y) / (2.0 * s);
+        int r = (int)(0x4A + t * (0x9B - 0x4A));
+        int g = (int)(0x90 + t * (0x30 - 0x90));
+        int b = (int)(0xD9 + t * (0xFF - 0xD9));
+        return 0xFF000000 | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+    };
+    /* Rounded-rect mask */
+    auto in_round = [&](int x, int y) -> bool {
+        double cx = (double)S / 2.0, cy = (double)S / 2.0;
+        double rad = (double)S * 0.22;
+        double rx = (double)S / 2.0 - rad, ry = (double)S / 2.0 - rad;
+        if (x >= rx && x <= cx + rx && y >= ry && y <= cy + ry) return true;
+        double dx = 0, dy = 0;
+        if (x < rx) dx = rx - x; else if (x > cx + rx) dx = x - (cx + rx);
+        if (y < ry) dy = ry - y; else if (y > cy + ry) dy = y - (cy + ry);
+        return (dx * dx + dy * dy) <= rad * rad;
+    };
+    /* Diamond "A" shape */
+    auto in_a = [&](int x, int y) -> bool {
+        double cx = (double)S * 0.5, base = (double)S * 0.78;
+        double top = (double)S * 0.22;
+        double cur = base - (double)y;              /* width at row y (from center) */
+        double half = (cur / (base - top)) * ((double)S * 0.28);
+        if (y < top || y > base) return false;
+        return fabs((double)x - cx) <= half;
+    };
+    auto in_bar = [&](int x, int y) -> bool {
+        double y0 = (double)S * 0.56, y1 = (double)S * 0.66;
+        if (y < y0 || y > y1) return false;
+        return fabs((double)x - (double)S * 0.5) <= (double)S * 0.20;
+    };
+    for (int y = 0; y < S; y++) {
+        for (int x = 0; x < S; x++) {
+            size_t i = ((size_t)y * S + x) * 4;
+            if (!in_round(x, y)) continue;
+            uint32_t c = grad(x, y, S);
+            /* Light inner glow ring */
+            double dx = (double)x - (double)S / 2.0, dy = (double)y - (double)S / 2.0;
+            double dist = sqrt(dx * dx + dy * dy);
+            double maxd = (double)S / 2.0 * 0.98;
+            double ring = 1.0 - (dist / maxd);
+            int r = (int)(((c >> 16) & 0xFF) + ring * 14);
+            int g = (int)(((c >> 8) & 0xFF) + ring * 14);
+            int b = (int)((c & 0xFF) + ring * 20);
+            if (r > 255) r = 255; if (g > 255) g = 255; if (b > 255) b = 255;
+            px[i] = (uint8_t)r; px[i + 1] = (uint8_t)g; px[i + 2] = (uint8_t)b; px[i + 3] = 255;
+        }
+    }
+    /* White "A" glyph */
+    for (int y = 0; y < S; y++) {
+        for (int x = 0; x < S; x++) {
+            size_t i = ((size_t)y * S + x) * 4;
+            if (in_a(x, y) || in_bar(x, y)) {
+                px[i] = 255; px[i + 1] = 255; px[i + 2] = 255; px[i + 3] = 255;
+            }
+        }
+    }
+    /* Bottom label bar (app name initial letters) */
+    if (!label.empty()) {
+        for (int y = (int)(S * 0.84); y < (int)(S * 0.98); y++) {
+            for (int x = 0; x < S; x++) {
+                size_t i = ((size_t)y * S + x) * 4;
+                if (px[i + 3] == 0) continue;
+                px[i] = 240; px[i + 1] = 244; px[i + 2] = 248; px[i + 3] = 255;
+            }
+        }
+    }
+    bool ok = write_png(out_png, S, S, px);
+    std::cout << (ok ? "generated icon: " : "error writing icon: ") << out_png
+              << " (" << S << "x" << S << ")\n";
+    return ok ? 0 : 1;
+}
+
+int generate_splash(const std::string& out_png, int w, int h, const std::string& color) {
+    std::vector<uint8_t> px((size_t)w * h * 4, 0);
+    uint8_t cr = 0x4A, cg = 0x90, cb = 0xD9;
+    if (!color.empty() && color.size() >= 6) {
+        auto hexv = [](char c) -> uint8_t {
+            if (c >= '0' && c <= '9') return (uint8_t)(c - '0');
+            if (c >= 'a' && c <= 'f') return (uint8_t)(c - 'a' + 10);
+            if (c >= 'A' && c <= 'F') return (uint8_t)(c - 'A' + 10);
+            return 0;
+        };
+        cr = (uint8_t)((hexv(color[0]) << 4) | hexv(color[1]));
+        cg = (uint8_t)((hexv(color[2]) << 4) | hexv(color[3]));
+        cb = (uint8_t)((hexv(color[4]) << 4) | hexv(color[5]));
+    }
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            size_t i = ((size_t)y * w + x) * 4;
+            double t = (double)(x + y) / (double)(w + h);
+            px[i] = (uint8_t)(cr + t * (0x9B - cr) * 0.35);
+            px[i + 1] = (uint8_t)(cg + t * (0x30 - cg) * 0.35);
+            px[i + 2] = (uint8_t)(cb + t * (0xFF - cb) * 0.35);
+            px[i + 3] = 255;
+        }
+    }
+    /* Centered white "A" (simple) — logo placeholder */
+    int cx0 = w / 2 - w / 10;
+    int cy_top = h / 2 - h / 6;
+    int cy_base = h / 2 + h / 6;
+    for (int y = cy_top; y < cy_base; y++) {
+        double t = (double)(y - cy_top) / (double)(cy_base - cy_top);
+        int half = (int)((double)w / 20.0 * (1.0 - t * 0.4));
+        for (int x = cx0 - half; x < cx0 + half; x++) {
+            if (x < 0 || x >= w) continue;
+            size_t i = ((size_t)y * w + x) * 4;
+            px[i] = 255; px[i + 1] = 255; px[i + 2] = 255; px[i + 3] = 255;
+        }
+    }
+    bool ok = write_png(out_png, w, h, px);
+    std::cout << (ok ? "generated splash: " : "error writing splash: ") << out_png
+              << " (" << w << "x" << h << ")\n";
+    return ok ? 0 : 1;
+}
+
+int generate_android_keystore(const std::string& name) {
+    if (!fs::exists("keystore.properties")) {
+        std::cout << "no keystore.properties found — generating signing key...\n";
+        /* Generate a random alias + password */
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<int> dist(0, 61);
+        const char* chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        auto rand_str = [&](int len) {
+            std::string s;
+            for (int i = 0; i < len; i++) s += chars[dist(gen)];
+            return s;
+        };
+        std::string alias = name.empty() ? "aurora" : name;
+        std::string pass = rand_str(16);
+        std::string store = "aurora-release.jks";
+#ifdef _WIN32
+        std::string keytool = "keytool";
+#else
+        std::string keytool = "keytool";
+#endif
+        std::string cmd = keytool + " -genkeypair -v -keystore " + store +
+                          " -alias " + alias +
+                          " -keyalg RSA -keysize 2048 -validity 10000" +
+                          " -storepass " + pass + " -keypass " + pass +
+                          " -dname \"CN=Aurora App, OU=Dev, O=Aurora, L=City, ST=State, C=US\"";
+        int rc = system(cmd.c_str());
+        if (rc != 0) {
+            std::cerr << "error: keytool failed (is JDK installed and on PATH?)\n";
+            return 1;
+        }
+        /* Write keystore.properties */
+        std::ofstream kp("keystore.properties");
+        kp << "storeFile=" << store << "\n";
+        kp << "storePassword=" << pass << "\n";
+        kp << "keyAlias=" << alias << "\n";
+        kp << "keyPassword=" << pass << "\n";
+        kp.close();
+        std::cout << "keystore generated: " << store << " (see keystore.properties)\n";
+    } else {
+        std::cout << "keystore.properties already present — keeping existing signing config\n";
+    }
+    return 0;
+}
+
+int patch_android_permissions(const std::string& manifest_path, const std::string& pkg_dir) {
+    PackageInfo pkg = read_manifest("aurora.pkg");
+    if (pkg.permissions.empty()) {
+        std::cout << "no permissions requested in aurora.pkg\n";
+        return 0;
+    }
+    std::string manifest = read_file_str(manifest_path);
+    if (manifest.empty()) {
+        std::cerr << "warning: could not read manifest " << manifest_path << "\n";
+        return 0;
+    }
+    std::set<std::string> known = {
+        "INTERNET", "CAMERA", "RECORD_AUDIO", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION",
+        "VIBRATE", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "BLUETOOTH",
+        "READ_CONTACTS", "WRITE_CONTACTS", "READ_CALENDAR", "WRITE_CALENDAR", "NFC",
+        "SYSTEM_ALERT_WINDOW", "WAKE_LOCK", "FOREGROUND_SERVICE", "POST_NOTIFICATIONS"
+    };
+    bool changed = false;
+    std::string perm_elt;
+    for (auto& perm : pkg.permissions) {
+        std::string upper = perm;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        std::string android_perm;
+        if (known.count(upper)) android_perm = "android.permission." + upper;
+        else if (upper.find(".") != std::string::npos) android_perm = upper; /* full-qualified */
+        else continue; /* unknown — skip silently */
+        std::string line = "    <uses-permission android:name=\"" + android_perm + "\"/>\n";
+        if (manifest.find(android_perm) == std::string::npos) {
+            perm_elt += line;
+            changed = true;
+        }
+    }
+    if (changed) {
+        /* Insert after <manifest ...> opening tag */
+        size_t caret = manifest.find('>');
+        if (caret != std::string::npos) {
+            size_t nl = manifest.find('\n', caret);
+            if (nl != std::string::npos) manifest.insert(nl + 1, perm_elt);
+            std::ofstream f(manifest_path);
+            f << manifest;
+            f.close();
+            std::cout << "patched permissions into " << manifest_path << "\n";
+        }
+    } else {
+        std::cout << "permissions already present or none applicable\n";
+    }
+    return 0;
+}
+
+int cmd_publish_mobile(const std::string& platform, const std::string& format) {
+    if (!fs::exists("aurora.pkg")) {
+        std::cerr << "error: aurora.pkg not found (run from project root)\n"; return 1;
+    }
+    PackageInfo pkg = read_manifest("aurora.pkg");
+    std::string entry = pkg.entry.empty() ? "main.aura" : pkg.entry;
+    std::string safe_name = pkg.name;
+    std::replace(safe_name.begin(), safe_name.end(), ' ', '_');
+
+    if (platform == "android") {
+        std::cout << "══ Publishing " << pkg.name << " for Android ══\n";
+
+        /* 1. Generate signing keystore if absent */
+        int kc = generate_android_keystore(pkg.name);
+        if (kc != 0) return kc;
+
+        /* 2. Generate mipmap icons (all densities) */
+        std::vector<std::pair<int, std::string>> icons = {
+            {48, "mipmap-mdpi/ic_launcher.png"},
+            {72, "mipmap-hdpi/ic_launcher.png"},
+            {96, "mipmap-xhdpi/ic_launcher.png"},
+            {144, "mipmap-xxhdpi/ic_launcher.png"},
+            {192, "mipmap-xxxhdpi/ic_launcher.png"}
+        };
+        for (auto& ic : icons) {
+            std::string dir = "app/src/main/res/" + ic.second.substr(0, ic.second.find('/'));
+            fs::create_directories(dir);
+            int rc = generate_app_icon("app/src/main/res/" + ic.second, ic.first, pkg.name);
+            if (rc != 0) return rc;
+        }
+        /* Adaptive icon foreground (432x432) */
+        fs::create_directories("app/src/main/res/mipmap-anydpi-v26");
+        int arc = generate_app_icon("app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png", 432, "");
+        if (arc != 0) return arc;
+
+        /* 3. Generate splash screen (portrait 1080x1920) */
+        fs::create_directories("app/src/main/res/drawable");
+        int src = generate_splash("app/src/main/res/drawable/splash.png", 1080, 1920, "");
+        if (src != 0) return src;
+
+        /* 4. Patch permissions in AndroidManifest.xml */
+        patch_android_permissions("app/src/main/AndroidManifest.xml", "app");
+
+        /* 5. Compile the .aura entry to a shared library for Android */
+        std::string target_arch = "arm64-v8a";
+        std::string jni_dir = "app/src/main/jniLibs/arm64-v8a";
+        fs::create_directories(jni_dir);
+        std::cout << "compiling " << entry << " for aarch64-linux-android...\n";
+        std::string cc = "aurorac " + entry + " -o " + jni_dir + "/libaurora_app.so --shared --target aarch64-linux-android";
+        int crc = system(cc.c_str());
+        if (crc != 0) {
+            std::cerr << "warning: aurorac cross-compile failed (exit " << crc << "). "
+                         "Ensure the Android NDK toolchain is installed.\n";
+        }
+
+        /* 6. Invoke Gradle to build APK/AAB */
+        std::string task = (format == "aab") ? "bundleRelease" : "assembleRelease";
+        std::cout << "building Android " << format << " via Gradle...\n";
+        std::string gc = "gradle " + task;
+        int grc = system(gc.c_str());
+        if (grc == 0) {
+            std::string ext = (format == "aab") ? "aab" : "apk";
+            std::string ap = "app/build/outputs/" + std::string(format == "aab" ? "bundle/release" : "apk/release") + "/app-release." + ext;
+            std::cout << "✅ Android " << format << " built: " << ap << "\n";
+            std::cout << "   Upload to Google Play Console → App release → Production track.\n";
+        } else {
+            std::cerr << "error: Gradle build failed (exit " << grc << "). "
+                         "Ensure Android SDK + Gradle are installed.\n";
+            return grc;
+        }
+        return 0;
+    } else if (platform == "ios") {
+        std::cout << "══ Publishing " << pkg.name << " for iOS ══\n";
+        (void)format;
+
+        /* 1. Generate app icon set using iconutil (macOS) or fallback ANG format dirs */
+        int icon_size = 1024;
+        std::string icon_dir = "iOS/Assets.xcassets/AppIcon.appiconset";
+        fs::create_directories(icon_dir);
+        int rc = generate_app_icon(icon_dir + "/AppIcon-1024.png", icon_size, pkg.name);
+        if (rc != 0) return rc;
+
+        /* 2. Generate splash (storyboard background) */
+        std::string splash_dir = "iOS/Assets.xcassets/LaunchScreen.imageset";
+        fs::create_directories(splash_dir);
+        int src = generate_splash(splash_dir + "/LaunchScreen.png", 1284, 2778, "");
+        if (src != 0) return src;
+
+        /* 3. Compile static lib for arm64-apple-ios */
+        std::cout << "compiling " << entry << " for arm64-apple-ios...\n";
+        std::string cc = "aurorac " + entry + " -o libaurora_app.a --static --target arm64-apple-ios";
+        int crc = system(cc.c_str());
+        if (crc != 0) {
+            std::cerr << "warning: aurorac iOS cross-compile failed (exit " << crc << "). "
+                         "Xcode + iOS SDK required.\n";
+        }
+
+        /* 4. Invoke xcodebuild (requires macOS + signing profile) */
+        std::cout << "building IPA via xcodebuild...\n";
+        std::string xc = "xcodebuild -workspace Aurora.xcworkspace -scheme Aurora -configuration Release "
+                         "-archivePath build/Aurora.xcarchive archive";
+        int xrc = system(xc.c_str());
+        if (xrc == 0) {
+            std::string ex = "xcodebuild -exportArchive -archivePath build/Aurora.xcarchive "
+                             "-exportOptionsPlist ExportOptions/app-store.plist -exportPath build/ipa";
+            int erc = system(ex.c_str());
+            if (erc == 0) {
+                std::cout << "✅ iOS IPA built: build/ipa/Aurora.ipa\n";
+                std::cout << "   Upload to App Store Connect → App Store → New version.\n";
+            } else {
+                std::cerr << "error: xcodebuild export failed (exit " << erc << "). "
+                             "Set up Distribution certificate + provisioning profile.\n";
+                return erc;
+            }
+        } else {
+            std::cerr << "error: xcodebuild archive failed (exit " << xrc << "). "
+                         "macOS + Xcode required for iOS builds.\n";
+            return xrc;
+        }
+        return 0;
+    }
+    std::cerr << "error: unknown publish-mobile platform '" << platform << "' (use: android, ios)\n";
+    return 1;
+}

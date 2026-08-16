@@ -11,7 +11,10 @@ if (-not $BuildDir) {
     $BuildDir = if ($IsWinOS) { "build/Release" } else { "build" }
 }
 $Compiler = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWinOS) { "aurorac.exe" } else { "aurorac" })
-$RuntimeLib = Join-Path (Join-Path $Root $BuildDir) $(if ($IsWinOS) { "aurora_runtime.lib" } else { "libaurora_runtime.a" })
+# Detect runtime library name (MSVC uses aurora_runtime.lib, MinGW/GCC uses libaurora_runtime.a)
+$BuildPath = Join-Path $Root $BuildDir
+$RuntimeLib = Join-Path $BuildPath "aurora_runtime.lib"
+if (-not (Test-Path $RuntimeLib)) { $RuntimeLib = Join-Path $BuildPath "libaurora_runtime.a" }
 if (-not $OptPath) {
     $OptPath = if ($IsWinOS) { "opt.exe" } else { "opt" }
 }
@@ -23,10 +26,20 @@ $global:CompileTimeout = 120  # seconds
 
 function Invoke-WithTimeout {
     param([string]$FilePath, [string[]]$ArgumentList, [int]$TimeoutSec = 120)
-    $argString = $ArgumentList -join ' '
     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
     $pinfo.FileName = $FilePath
-    $pinfo.Arguments = $argString
+    # Build the command line safely for paths that contain spaces
+    # (e.g. "D:/Aurora Lang/..."). Use ArgumentList (pwsh / .NET Core)
+    # when available; otherwise quote each argument manually (Windows
+    # PowerShell 5.1 / .NET Framework has no ArgumentList property).
+    if ($pinfo.ArgumentList) {
+        foreach ($arg in $ArgumentList) { [void]$pinfo.ArgumentList.Add($arg) }
+    } else {
+        $quoted = $ArgumentList | ForEach-Object {
+            if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '""') + '"' } else { $_ }
+        }
+        $pinfo.Arguments = $quoted -join ' '
+    }
     $pinfo.RedirectStandardOutput = $true
     $pinfo.RedirectStandardError = $false
     $pinfo.UseShellExecute = $false
@@ -253,6 +266,79 @@ foreach ($test in $webTests) {
 
     $verifyOut = & $OptPath -passes=verify -o nul $llFile.FullName 2>&1
     if ($LASTEXITCODE -ne 0) { if ($verifyOut) { $verifyOut | ForEach-Object { Write-Host "  opt: $_" } }; Test-Result $test.Desc $false; continue }
+    Test-Result $test.Desc $true
+}
+Pop-Location
+
+# Stage 8: Phase 39 GUI parity test compilation
+Write-Step "Stage 8: Phase 39 GUI parity test compilation"
+$guiTestDir = Join-Path $Root "Workflow/tests"
+$guiTests = @(
+    @{ File = "test_gui_parity.aura";     Desc = "GUI cross-platform parity" },
+    @{ File = "test_window.aura";         Desc = "GUI window" },
+    @{ File = "test_button.aura";         Desc = "GUI button" },
+    @{ File = "test_label.aura";          Desc = "GUI label" },
+    @{ File = "test_textbox.aura";        Desc = "GUI textbox" },
+    @{ File = "test_password.aura";       Desc = "GUI password" },
+    @{ File = "test_slider.aura";         Desc = "GUI slider" },
+    @{ File = "test_switch.aura";         Desc = "GUI switch" },
+    @{ File = "test_checkbox.aura";       Desc = "GUI checkbox" },
+    @{ File = "test_radio.aura";          Desc = "GUI radio" },
+    @{ File = "test_progress.aura";       Desc = "GUI progress" },
+    @{ File = "test_combobox.aura";       Desc = "GUI combobox" },
+    @{ File = "test_dropdown.aura";       Desc = "GUI dropdown" },
+    @{ File = "test_listbox.aura";        Desc = "GUI listbox" },
+    @{ File = "test_widget_common.aura";  Desc = "GUI widget common" },
+    @{ File = "test_webview.aura";        Desc = "WebView widget" },
+    @{ File = "test_media.aura";          Desc = "Media widget" },
+    @{ File = "test_map.aura";            Desc = "Map widget" }
+)
+
+Push-Location $Root
+foreach ($test in $guiTests) {
+    $src = Join-Path $guiTestDir $test.File
+    if (-not (Test-Path $src)) { Test-Result "$($test.Desc) - source not found" $false; continue }
+
+    $outDir = Join-Path $Root "output/ir"
+    if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir -ErrorAction SilentlyContinue }
+
+    try {
+        $compOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @($src, "-O0") -TimeoutSec 30
+    } catch {
+        $compOut = "[TIMEOUT] $($_.Exception.Message)"
+    }
+    if ($LASTEXITCODE -ne 0) { if ($compOut) { $compOut | ForEach-Object { Write-Host "  $_" } }; Test-Result "$($test.Desc) - compile" $false; continue }
+
+    $llFile = Get-ChildItem -Path $outDir -Filter "*.ll" | Select-Object -First 1
+    if (-not $llFile) { Test-Result "$($test.Desc) - no .ll output" $false; continue }
+
+    $verifyOut = & $OptPath -passes=verify -o nul $llFile.FullName 2>&1
+    if ($LASTEXITCODE -ne 0) { if ($verifyOut) { $verifyOut | ForEach-Object { Write-Host "  opt: $_" } }; Test-Result $test.Desc $false; continue }
+    Test-Result $test.Desc $true
+}
+Pop-Location
+
+# Stage 9: Phase 40 WASM target compilation
+Write-Step "Stage 9: Phase 40 WASM target compilation"
+$wasmTestDir = Join-Path $Root "Workflow/tests"
+$wasmTests = @(
+    @{ File = "test_wasm.aura";          Desc = "WASM --emit-obj wasm32" },
+    @{ File = "test_dom.aura";           Desc = "WASM DOM bindings" }
+)
+
+Push-Location $Root
+foreach ($test in $wasmTests) {
+    $src = Join-Path $wasmTestDir $test.File
+    if (-not (Test-Path $src)) { Test-Result "$($test.Desc) - source not found" $false; continue }
+
+    try {
+        $compOut = Invoke-WithTimeout -FilePath $Compiler -ArgumentList @($src, "-O0", "--emit-obj", "--target", "wasm32-unknown-unknown", "-o", (Join-Path $tmpDir "$( [System.IO.Path]::GetFileNameWithoutExtension($test.File) ).o")) -TimeoutSec 60
+    } catch {
+        $compOut = "[TIMEOUT] $($_.Exception.Message)"
+    }
+    if ($LASTEXITCODE -ne 0) { if ($compOut) { $compOut | ForEach-Object { Write-Host "  $_" } }; Test-Result "$($test.Desc) - wasm compile" $false; continue }
+    $objFile = Join-Path $tmpDir "$( [System.IO.Path]::GetFileNameWithoutExtension($test.File) ).o"
+    if (-not (Test-Path $objFile)) { Test-Result "$($test.Desc) - no .o output" $false; continue }
     Test-Result $test.Desc $true
 }
 Pop-Location

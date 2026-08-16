@@ -1,0 +1,8 @@
+name: aurora/std-url
+version: 1.0.0
+author: Aurora Core Team
+description: URL parsing, building and encoding for Aurora
+entry: src/url.auf
+dependencies:
+permissions:
+

@@ -1,0 +1,154 @@
+## Aurora Standard Library — JSON
+## Usage:  import "json"
+##
+## JSON value type constants:
+##   JSON_NULL    = 0
+##   JSON_NUM     = 1
+##   JSON_STR     = 2
+##   JSON_ARRAY   = 3
+##   JSON_OBJECT  = 4
+##   JSON_BOOL    = 5
+##
+## Example:
+##   import "json"
+##   val = json_parse('{"name":"Alice","age":30}')
+##   output(json_get_str(val, "name"))   # Alice
+##   output(json_get_num(val, "age"))    # 30
+##   json_free(val)
+## ════════════════════════════════════════════════════════════
+
+# ── Parsing & Serialization ──
+extern function aurora_json_parse(str: cstring) -> pointer
+extern function aurora_json_serialize(val: pointer) -> cstring
+
+# ── Type inspection ──
+extern function aurora_json_type(val: pointer) -> i32
+
+# ── Construction ──
+extern function aurora_json_new() -> pointer
+extern function aurora_json_new_num(num: f64) -> pointer
+extern function aurora_json_new_str(str: cstring) -> pointer
+extern function aurora_json_new_array() -> pointer
+extern function aurora_json_new_object() -> pointer
+
+# ── Object access ──
+extern function aurora_json_set(obj: pointer, key: cstring, num: f64)
+extern function aurora_json_set_str(obj: pointer, key: cstring, str: cstring)
+extern function aurora_json_set_obj(obj: pointer, key: cstring, val: pointer)
+extern function aurora_json_get_num(obj: pointer, key: cstring) -> f64
+extern function aurora_json_get_str(obj: pointer, key: cstring) -> cstring
+extern function aurora_json_get_obj(obj: pointer, key: cstring) -> pointer
+
+# ── Array access ──
+extern function aurora_json_array_push(arr: pointer, val: pointer)
+extern function aurora_json_array_get(arr: pointer, idx: i32) -> pointer
+extern function aurora_json_array_len(arr: pointer) -> i32
+
+# ── Cleanup ──
+extern function aurora_json_free(val: pointer)
+
+# ════════════════════════════════════════════════════════════
+# Aurora-level convenience wrappers
+# ════════════════════════════════════════════════════════════
+
+# ── Parsing & Serialization ──
+function json_parse(str):
+    return aurora_json_parse(str)
+end
+
+function json_serialize(val):
+    return aurora_json_serialize(val)
+end
+
+# ── Type checks ──
+function json_type(val):
+    return aurora_json_type(val)
+end
+
+function json_is_null(val):
+    return aurora_json_type(val) == 0
+end
+
+function json_is_num(val):
+    return aurora_json_type(val) == 1
+end
+
+function json_is_str(val):
+    return aurora_json_type(val) == 2
+end
+
+function json_is_array(val):
+    return aurora_json_type(val) == 3
+end
+
+function json_is_object(val):
+    return aurora_json_type(val) == 4
+end
+
+function json_is_bool(val):
+    return aurora_json_type(val) == 5
+end
+
+# ── Construction ──
+function json_new_null():
+    return aurora_json_new()
+end
+
+function json_new_num(n):
+    return aurora_json_new_num(n)
+end
+
+function json_new_str(s):
+    return aurora_json_new_str(s)
+end
+
+function json_new_array():
+    return aurora_json_new_array()
+end
+
+function json_new_object():
+    return aurora_json_new_object()
+end
+
+# ── Object access ──
+function json_set(obj, key, val):
+    aurora_json_set_obj(obj, key, val)
+end
+
+function json_set_num(obj, key, n):
+    aurora_json_set(obj, key, n)
+end
+
+function json_set_str(obj, key, s):
+    aurora_json_set_str(obj, key, s)
+end
+
+function json_get(obj, key):
+    return aurora_json_get_obj(obj, key)
+end
+
+function json_get_num(obj, key):
+    return aurora_json_get_num(obj, key)
+end
+
+function json_get_str(obj, key):
+    return aurora_json_get_str(obj, key)
+end
+
+# ── Array access ──
+function json_array_push(arr, val):
+    aurora_json_array_push(arr, val)
+end
+
+function json_array_get(arr, idx):
+    return aurora_json_array_get(arr, idx)
+end
+
+function json_array_len(arr):
+    return aurora_json_array_len(arr)
+end
+
+# ── Cleanup ──
+function json_free(val):
+    aurora_json_free(val)
+end

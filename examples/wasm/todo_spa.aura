@@ -1,0 +1,86 @@
+## Todo SPA — Phase 40 WASM/browser example
+## Build: scripts/build_wasm.ps1 examples/wasm/todo_spa.aura  (or build_wasm.sh)
+## Produces: out/app.wasm + out/app.js + out/index.html  (open index.html)
+
+## ── Direct extern declarations (the .auf export pattern) ──
+extern function aurora_dom_init() -> int
+extern function aurora_dom_create_element(tag: cstring) -> int
+extern function aurora_dom_document_body() -> int
+extern function aurora_dom_append_child(parent: int, child: int) -> int
+extern function aurora_dom_set_text(elem: int, text: cstring) -> int
+extern function aurora_dom_get_text(elem: int) -> cstring
+extern function aurora_dom_set_attr(elem: int, name: cstring, value: cstring) -> int
+extern function aurora_dom_set_value(elem: int, value: cstring) -> int
+extern function aurora_dom_get_value(elem: int) -> cstring
+extern function aurora_dom_add_event_listener(elem: int, type: cstring, fn: callback(i64) -> int) -> int
+extern function aurora_dom_set_style(elem: int, prop: cstring, value: cstring) -> int
+extern function aurora_dom_set_title(title: cstring) -> int
+extern function aurora_dom_clear_children(elem: int) -> int
+extern function aurora_dom_child_count(elem: int) -> int
+extern function aurora_dom_child_at(elem: int, index: int) -> int
+
+## ── String helpers ──
+extern function aurora_str_from_cstr(s: cstring) -> pointer
+extern function aurora_str_equal(a: pointer, b: pointer) -> i64
+
+## Shared widget handles (module globals — assigned in main, read by callbacks)
+todo_input = 0
+todo_list = 0
+
+function on_add_click(event: pointer):
+    text = aurora_dom_get_value(todo_input)
+    if aurora_str_equal(aurora_str_from_cstr(text), aurora_str_from_cstr("")) != 0:
+        return
+    item = aurora_dom_create_element("div")
+    aurora_dom_set_attr(item, "class", "todo-item")
+    aurora_dom_set_text(item, text)
+    aurora_dom_append_child(todo_list, item)
+    aurora_dom_set_value(todo_input, "")
+
+function on_clear_click(event: pointer):
+    aurora_dom_clear_children(todo_list)
+
+function main():
+    aurora_dom_init()
+    aurora_dom_set_title("Aurora Todo SPA")
+    body = aurora_dom_document_body()
+    aurora_dom_set_style(body, "font-family", "system-ui, sans-serif")
+    aurora_dom_set_style(body, "max-width", "480px")
+    aurora_dom_set_style(body, "margin", "40px auto")
+    aurora_dom_set_style(body, "padding", "24px")
+
+    heading = aurora_dom_create_element("h1")
+    aurora_dom_set_text(heading, "Aurora Todo")
+    aurora_dom_append_child(body, heading)
+
+    row = aurora_dom_create_element("div")
+    aurora_dom_append_child(body, row)
+
+    todo_input = aurora_dom_create_element("input")
+    aurora_dom_set_attr(todo_input, "type", "text")
+    aurora_dom_set_attr(todo_input, "placeholder", "What needs doing?")
+    aurora_dom_set_style(todo_input, "padding", "8px")
+    aurora_dom_set_style(todo_input, "width", "280px")
+    aurora_dom_append_child(row, todo_input)
+
+    add_btn = aurora_dom_create_element("button")
+    aurora_dom_set_text(add_btn, "Add")
+    aurora_dom_set_style(add_btn, "padding", "8px 16px")
+    aurora_dom_set_style(add_btn, "margin-left", "8px")
+    aurora_dom_append_child(row, add_btn)
+    aurora_dom_add_event_listener(add_btn, "click", on_add_click)
+
+    todo_list = aurora_dom_create_element("div")
+    aurora_dom_set_style(todo_list, "margin-top", "16px")
+    aurora_dom_append_child(body, todo_list)
+
+    clear_btn = aurora_dom_create_element("button")
+    aurora_dom_set_text(clear_btn, "Clear all")
+    aurora_dom_set_style(clear_btn, "margin-top", "16px")
+    aurora_dom_append_child(body, clear_btn)
+    aurora_dom_add_event_listener(clear_btn, "click", on_clear_click)
+
+    footer = aurora_dom_create_element("p")
+    aurora_dom_set_text(footer, "Rendered by Aurora WASM (Phase 40)")
+    aurora_dom_set_style(footer, "color", "#888")
+    aurora_dom_append_child(body, footer)

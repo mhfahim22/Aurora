@@ -1,0 +1,25 @@
+extern function aurora_gui_init() -> int
+extern function aurora_gui_window_new(title: str, w: int, h: int) -> int
+extern function aurora_gui_map_new(parent: int, x: int, y: int, w: int, h: int) -> int
+extern function aurora_gui_map_set_center(map: int, lat: f64, lng: f64)
+extern function aurora_gui_map_set_zoom(map: int, zoom: int)
+extern function aurora_gui_map_add_marker(map: int, lat: f64, lng: f64, label: str)
+
+function main()
+    output("Map Test: Starting...")
+    ret = aurora_gui_init()
+    if ret >= 0
+        output("init OK")
+    end
+    win = aurora_gui_window_new("Map Test", 800, 600)
+    if win >= 0
+        map = aurora_gui_map_new(win, 0, 0, 800, 600)
+        if map >= 0
+            aurora_gui_map_set_center(map, 23.8103, 90.4125)
+            aurora_gui_map_set_zoom(map, 13)
+            aurora_gui_map_add_marker(map, 23.8103, 90.4125, "Dhaka")
+            output("Map widget OK")
+        end
+    end
+    output("Map Test: PASS")
+end

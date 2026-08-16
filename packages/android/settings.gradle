@@ -1,2 +1,3 @@
-/* Aurora Android App — settings.gradle */
+/* Aurora Android App — settings.gradle (Phase 37) */
 rootProject.name = 'AuroraApp'
+include ':app'

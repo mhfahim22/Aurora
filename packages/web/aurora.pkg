@@ -1,0 +1,8 @@
+name: aurora/web
+version: 1.0.0
+author: Community
+description: High-level web framework on the Aurora HTTP server
+entry: src/web.auf
+dependencies:
+permissions:
+

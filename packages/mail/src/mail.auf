@@ -1,0 +1,11 @@
+## aurora/mail - Email helpers
+
+extern function aurora_mail_send(server: cstring, port: int, from: cstring, to: cstring, subject: cstring, body: cstring) -> int
+
+function mail_send(server: cstring, port: int, from: cstring, to: cstring, subject: cstring, body: cstring):
+    return aurora_mail_send(server, port, from, to, subject, body)
+end
+
+function main():
+    output("aurora/mail seed ready")
+end

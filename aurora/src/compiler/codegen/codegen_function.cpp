@@ -35,7 +35,7 @@ void Codegen::gen_function(const ASTNode* node) {
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
-            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm_attr_nocapture());
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;
@@ -81,6 +81,7 @@ void Codegen::gen_function(const ASTNode* node) {
 
     cur_fn_ = fn;
     builder_->SetInsertPoint(entry_bb);
+    function_stack_.push_back(node->value);
 
     /* Create fresh scope stack so module-level vars aren't 
        accidentally cleaned up by gen_return's emit_all_scope_cleanup. */
@@ -90,17 +91,35 @@ void Codegen::gen_function(const ASTNode* node) {
     if (coverage_enabled_ && node->value != "main")
         emit_coverage_trace(node->src_line);
 
+    /* DAP: trace function entry (call stack) */
+    if (dap_enabled_ && fn_dap_enter_ && node->value != "main")
+        builder_->CreateCall(fn_dap_enter_,
+            { builder_->CreateGlobalStringPtr(node->value, "dap_fn") });
+
     /* Allocate params as i64 (for arithmetic) */
     ai = 0;
-    for (auto& arg : fn->args()) {
-        auto* slot = create_entry_alloca(param_names[ai], i64_ty());
-        builder_->CreateStore(&arg, slot);
-        declare_var(param_names[ai], slot, OwnershipState::Owned, param_type_kinds[ai]);
-        ai++;
+    {
+        const ASTNode* pp = node->args.get();
+        while (pp) {
+            auto* slot = create_entry_alloca(pp->value, param_types[ai]);
+            builder_->CreateStore(fn->getArg(ai), slot);
+            declare_var(pp->value, slot, OwnershipState::Owned, pp->type_annotation.kind);
+            /* Store interface type name for dispatch */
+            if (pp->type_annotation.kind == AstTypeKind::Interface && !pp->type_annotation.type_name.empty()) {
+                auto* rec = lookup_var(pp->value);
+                if (rec) rec->interface_name = pp->type_annotation.type_name;
+            }
+            pp = pp->next.get();
+            ai++;
+        }
     }
 
     gen_block(node->body.get());
     pop_scope_and_drop();
+
+    /* DAP: trace function exit */
+    if (dap_enabled_ && fn_dap_exit_ && !current_block_terminated())
+        builder_->CreateCall(fn_dap_exit_, {});
 
     /* Default return: appropriate zero for the function's return type */
     {
@@ -119,6 +138,7 @@ void Codegen::gen_function(const ASTNode* node) {
     scopes_ = std::move(saved_scopes);
     debug_cur_fn_ = saved_fn_sp;
     cur_fn_ = saved_fn;
+    function_stack_.pop_back();
     if (saved_bb) builder_->SetInsertPoint(saved_bb);
 }
 
@@ -167,7 +187,7 @@ void Codegen::gen_generic_instance(const std::string& mangled_name,
     for (auto& arg : fn->args()) {
         arg.setName(param_names[ai]);
         if (arg.getType()->isPointerTy()) {
-            arg.addAttr(llvm::Attribute::NoCapture);
+            arg.addAttr(llvm_attr_nocapture());
             arg.addAttr(llvm::Attribute::NoAlias);
         }
         ai++;
@@ -210,6 +230,7 @@ void Codegen::gen_generic_instance(const std::string& mangled_name,
 
     cur_fn_ = fn;
     builder_->SetInsertPoint(entry_bb);
+    function_stack_.push_back(mangled_name);
     push_scope();
 
     if (coverage_enabled_)
@@ -246,6 +267,7 @@ void Codegen::gen_generic_instance(const std::string& mangled_name,
     scopes_ = std::move(saved_scopes);
     debug_cur_fn_ = saved_fn_sp;
     cur_fn_ = saved_fn;
+    function_stack_.pop_back();
     if (saved_bb) builder_->SetInsertPoint(saved_bb);
 }
 
@@ -347,12 +369,23 @@ void Codegen::gen_class_oop(const ASTNode* node) {
             param = stmt->args.get();
             while (param) {
                 if (param->value != "self" && ai != fn->arg_end()) {
-                    auto* slot = create_entry_alloca(param->value, i64_ty());
+                    llvm::Type* pty = ai->getType();
+                    auto* slot = create_entry_alloca(param->value, pty);
                     llvm::Value* val = &*ai;
-                    if (val->getType() != i64_ty())
-                        val = builder_->CreatePtrToInt(val, i64_ty(), param->value + "_unbox");
+                    if (val->getType() != pty) {
+                        if (val->getType()->isIntegerTy() && pty->isPointerTy())
+                            val = builder_->CreateIntToPtr(val, pty, param->value + "_inttoptr");
+                        else if (val->getType()->isPointerTy() && pty->isIntegerTy())
+                            val = builder_->CreatePtrToInt(val, pty, param->value + "_unbox");
+                        else
+                            val = builder_->CreateBitCast(val, pty, param->value + "_cast");
+                    }
                     builder_->CreateStore(val, slot);
                     declare_var(param->value, slot, OwnershipState::Owned, param->type_annotation.kind);
+                    if (param->type_annotation.kind == AstTypeKind::Interface && !param->type_annotation.type_name.empty()) {
+                        auto* rec = lookup_var(param->value);
+                        if (rec) rec->interface_name = param->type_annotation.type_name;
+                    }
                     ++ai;
                 }
                 param = param->next.get();
@@ -557,13 +590,13 @@ llvm::Value* Codegen::gen_expr_in_method(const ASTNode* node,
 
         /* Logical / bitwise operators */
         if (op == "and") {
-            L = builder_->CreateICmpNE(L, llvm::ConstantInt::get(L->getType(), 0));
-            R = builder_->CreateICmpNE(R, llvm::ConstantInt::get(R->getType(), 0));
+            L = gen_truthy(L, "and_l");
+            R = gen_truthy(R, "and_r");
             return builder_->CreateZExt(builder_->CreateAnd(L, R, "and"), i64_ty());
         }
         if (op == "or") {
-            L = builder_->CreateICmpNE(L, llvm::ConstantInt::get(L->getType(), 0));
-            R = builder_->CreateICmpNE(R, llvm::ConstantInt::get(R->getType(), 0));
+            L = gen_truthy(L, "or_l");
+            R = gen_truthy(R, "or_r");
             return builder_->CreateZExt(builder_->CreateOr(L, R, "or"), i64_ty());
         }
         if (op == "^" || op == "xor") {

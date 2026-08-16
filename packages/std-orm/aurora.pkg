@@ -1,0 +1,8 @@
+name: aurora/std-orm
+version: 1.0.0
+author: Aurora Core Team
+description: Object-relational mapping layer for Aurora
+entry: src/orm.auf
+dependencies:
+permissions:
+

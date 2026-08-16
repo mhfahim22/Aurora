@@ -46,6 +46,9 @@ void register_builtins(llvm::Module* module, llvm::LLVMContext& ctx,
     builtins.range = llvm::Function::Create(
         llvm::FunctionType::get(i64, { i64, i64 }, false),
         llvm::Function::ExternalLinkage, "aurora_builtin_range", module);
+    builtins.range3 = llvm::Function::Create(
+        llvm::FunctionType::get(i64, { i64, i64, i64 }, false),
+        llvm::Function::ExternalLinkage, "aurora_builtin_range3", module);
 
     /* ── I/O builtins ── */
     builtins.outputln_int = llvm::Function::Create(

@@ -7,17 +7,17 @@ extern function aurora_app_layout_node_set_direction(node: ptr, direction: int)
 extern function aurora_app_layout_node_set_justify(node: ptr, justify: int)
 extern function aurora_app_layout_node_set_align(node: ptr, align: int)
 extern function aurora_app_layout_node_set_wrap(node: ptr, wrap: int)
-extern function aurora_app_layout_node_set_gap(node: ptr, gap: double)
-extern function aurora_app_layout_node_set_size(node: ptr, w: double, h: double)
-extern function aurora_app_layout_node_set_min_size(node: ptr, w: double, h: double)
-extern function aurora_app_layout_node_set_max_size(node: ptr, w: double, h: double)
-extern function aurora_app_layout_node_set_padding(node: ptr, l: double, t: double, r: double, b: double)
-extern function aurora_app_layout_node_set_margin(node: ptr, l: double, t: double, r: double, b: double)
-extern function aurora_app_layout_calculate(root: ptr, width: double, height: double)
-extern function aurora_app_layout_node_get_x(node: ptr) -> double
-extern function aurora_app_layout_node_get_y(node: ptr) -> double
-extern function aurora_app_layout_node_get_w(node: ptr) -> double
-extern function aurora_app_layout_node_get_h(node: ptr) -> double
+extern function aurora_app_layout_node_set_gap(node: ptr, gap: f32)
+extern function aurora_app_layout_node_set_size(node: ptr, w: f32, h: f32)
+extern function aurora_app_layout_node_set_min_size(node: ptr, w: f32, h: f32)
+extern function aurora_app_layout_node_set_max_size(node: ptr, w: f32, h: f32)
+extern function aurora_app_layout_node_set_padding(node: ptr, l: f32, t: f32, r: f32, b: f32)
+extern function aurora_app_layout_node_set_margin(node: ptr, l: f32, t: f32, r: f32, b: f32)
+extern function aurora_app_layout_calculate(root: ptr, width: f32, height: f32)
+extern function aurora_app_layout_node_get_x(node: ptr) -> f32
+extern function aurora_app_layout_node_get_y(node: ptr) -> f32
+extern function aurora_app_layout_node_get_w(node: ptr) -> f32
+extern function aurora_app_layout_node_get_h(node: ptr) -> f32
 extern function aurora_app_layout_node_set_flex(node: ptr, grow: int, shrink: int, basis: int)
 
 function main()
@@ -171,3 +171,4 @@ function main()
 
     output("PASS")
 end
+

@@ -1,0 +1,65 @@
+## Browser DOM bindings — Phase 40 (WASM/browser target)
+## On native builds these resolve to no-op stubs (return -1);
+## on wasm32 they delegate to the JS glue (aurora/src/runtime/wasm/wasm_glue.js).
+## Usage: import "dom"
+
+extern function aurora_dom_init() -> int
+extern function aurora_dom_create_element(tag: cstring) -> int
+extern function aurora_dom_remove_element(elem: int) -> int
+extern function aurora_dom_document_body() -> int
+extern function aurora_dom_append_child(parent: int, child: int) -> int
+extern function aurora_dom_insert_before(parent: int, child: int, ref: int) -> int
+extern function aurora_dom_replace_child(parent: int, new_child: int, old_child: int) -> int
+
+extern function aurora_dom_set_text(elem: int, text: cstring) -> int
+extern function aurora_dom_get_text(elem: int) -> cstring
+extern function aurora_dom_set_html(elem: int, html: cstring) -> int
+extern function aurora_dom_set_attr(elem: int, name: cstring, value: cstring) -> int
+extern function aurora_dom_get_attr(elem: int, name: cstring) -> cstring
+extern function aurora_dom_set_prop(elem: int, name: cstring, value: cstring) -> int
+extern function aurora_dom_set_value(elem: int, value: cstring) -> int
+extern function aurora_dom_get_value(elem: int) -> cstring
+extern function aurora_dom_clear_children(elem: int) -> int
+
+extern function aurora_dom_set_style(elem: int, prop: cstring, value: cstring) -> int
+extern function aurora_dom_get_style(elem: int, prop: cstring) -> cstring
+extern function aurora_dom_add_class(elem: int, cls: cstring) -> int
+extern function aurora_dom_remove_class(elem: int, cls: cstring) -> int
+extern function aurora_dom_toggle_class(elem: int, cls: cstring, force: int) -> int
+extern function aurora_dom_has_class(elem: int, cls: cstring) -> int
+
+extern function aurora_dom_add_event_listener(elem: int, type: cstring, fn: callback(i64) -> int) -> int
+extern function aurora_dom_remove_event_listener(elem: int, type: cstring, fn: callback(i64) -> int) -> int
+extern function aurora_dom_dispatch_event(elem: int, type: cstring) -> int
+extern function aurora_dom_prevent_default(event: pointer) -> int
+extern function aurora_dom_event_target(event: pointer) -> int
+
+extern function aurora_dom_get_element_by_id(id: cstring) -> int
+extern function aurora_dom_query_selector(selector: cstring) -> int
+extern function aurora_dom_child_count(elem: int) -> int
+extern function aurora_dom_child_at(elem: int, index: int) -> int
+extern function aurora_dom_parent(elem: int) -> int
+
+extern function aurora_dom_window_inner_width() -> int
+extern function aurora_dom_window_inner_height() -> int
+extern function aurora_dom_set_title(title: cstring) -> int
+extern function aurora_dom_set_body_style(prop: cstring, value: cstring) -> int
+extern function aurora_dom_focus(elem: int) -> int
+
+extern function aurora_dom_set_event_cb(fn: callback(i64) -> int) 
+extern function aurora_dom_get_event_cb() -> pointer
+
+## Convenience wrapper: create element and append to body in one call.
+function dom_create_and_append(tag: cstring) -> int:
+    body = aurora_dom_document_body()
+    el = aurora_dom_create_element(tag)
+    aurora_dom_append_child(body, el)
+    return el
+
+## Convenience wrapper: set text content with a string literal.
+function dom_set_text(elem: int, text: cstring) -> int:
+    return aurora_dom_set_text(elem, text)
+
+## Convenience wrapper: add an event listener.
+function dom_on(elem: int, type: cstring, fn: callback(i64) -> int) -> int:
+    return aurora_dom_add_event_listener(elem, type, fn)

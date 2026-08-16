@@ -828,6 +828,7 @@ void OwnershipTracker::walk(const ASTNode* node) {
     case NodeType::ExternStruct:
     case NodeType::ExternUnion:
     case NodeType::FunctionType:
+    case NodeType::Assert:
         break;
 
     default:

@@ -41,11 +41,12 @@ LockData read_lockfile() {
     bool in_pkg = false;
     std::string pkg_name;
     while (std::getline(f, line)) {
+        bool indented = (!line.empty()) && (line[0] == ' ' || line[0] == '\t');
         std::string t = trim(line);
         if (t.empty() || t[0] == '#') continue;
-        if (t.rfind("version:", 0) == 0) lf.version = std::stoi(trim(t.substr(8)));
+        if (t.rfind("version:", 0) == 0 && !indented) lf.version = std::stoi(trim(t.substr(8)));
         else if (t.rfind("packages:", 0) == 0) continue;
-        else if (t[0] == ' ' || t[0] == '\t') {
+        else if (indented) {
             size_t colon = t.find(':');
             if (colon == std::string::npos) continue;
             std::string key = trim(t.substr(0, colon));
@@ -173,6 +174,38 @@ std::string extract_json_source(const std::string& raw) {
     size_t end = raw.rfind('}');
     if (end == std::string::npos || end < start) return "";
     return raw.substr(start, end - start + 1);
+}
+
+/* ── Download a file to disk (binary-safe) ── */
+bool http_download(const std::string& url, const std::string& out_path) {
+    std::string cmd;
+#ifdef _WIN32
+    cmd = "powershell -NoLogo -NoProfile -Command \"try { Invoke-WebRequest -Uri '" + url + "' -OutFile '" + out_path + "' -UseBasicParsing -TimeoutSec 120 } catch { Write-Error $_.Exception.Message; exit 1 }\" 2>nul";
+#else
+    cmd = "curl -s --max-time 120 -o '" + out_path + "' '" + url + "' 2>/dev/null || wget -q -O '" + out_path + "' --timeout=120 '" + url + "' 2>/dev/null";
+#endif
+#ifdef _WIN32
+    FILE* pipe = _popen(cmd.c_str(), "r");
+    if (pipe) _pclose(pipe);
+    return fs::exists(out_path);
+#else
+    if (system(cmd.c_str()) == 0) return fs::exists(out_path);
+    return false;
+#endif
+}
+
+/* ── Extract a .tgz archive into a directory (uses system tar) ── */
+bool extract_tgz(const std::string& archive, const std::string& out_dir) {
+    fs::create_directories(out_dir);
+    std::string cmd;
+#ifdef _WIN32
+    cmd = "tar -xzf \"" + archive + "\" -C \"" + out_dir + "\" 2>nul";
+#else
+    cmd = "tar -xzf '" + archive + "' -C '" + out_dir + "' 2>/dev/null";
+#endif
+    int rc = system(cmd.c_str());
+    /* Windows tar is available on Win10+; fall back to a loose copy check */
+    return rc == 0 || fs::exists(out_dir);
 }
 
 bool resolve_package(const std::string& spec, std::string& name, std::string& version, std::string& source, std::string& integrity) {

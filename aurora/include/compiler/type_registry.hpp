@@ -2,7 +2,9 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <stdexcept>
+#include <mutex>
 
 #include "compiler/ast/ast_type.hpp"
 
@@ -36,16 +38,24 @@ struct StructInfo {
     }
 };
 
+/* ── Enum variant field ── */
+struct EnumVariantField {
+    std::string type_name;
+    AstTypeKind type_kind{ AstTypeKind::Unknown };
+};
+
 /* ── Enum variant ── */
 struct EnumVariantInfo {
     std::string name;
     int         value{ 0 };
+    std::vector<EnumVariantField> fields;  /* associated data fields */
 };
 
 /* ── Full enum definition ── */
 struct EnumInfo {
     std::string name;
     std::vector<EnumVariantInfo> variants;
+    bool        has_data{ false };  /* true if any variant carries data */
 };
 
 /* ── Interface method signature ── */
@@ -69,59 +79,71 @@ class TypeRegistry {
 public:
     /* ── Struct ── */
     void register_struct(StructInfo info) {
+        std::lock_guard<std::mutex> lock(mtx_);
         std::string name = info.name;
         structs_[name] = std::move(info);
     }
 
     bool has_struct(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         return structs_.count(name) > 0;
     }
 
     const StructInfo* get_struct(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         auto it = structs_.find(name);
         return (it != structs_.end()) ? &it->second : nullptr;
     }
 
     /* ── Enum ── */
     void register_enum(EnumInfo info) {
+        std::lock_guard<std::mutex> lock(mtx_);
         std::string name = info.name;
         enums_[name] = std::move(info);
     }
 
     bool has_enum(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         return enums_.count(name) > 0;
     }
 
     const EnumInfo* get_enum(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         auto it = enums_.find(name);
         return (it != enums_.end()) ? &it->second : nullptr;
     }
 
     /* ── Interface ── */
     void register_interface(InterfaceInfo info) {
+        std::lock_guard<std::mutex> lock(mtx_);
         std::string name = info.name;
         interfaces_[name] = std::move(info);
     }
 
     bool has_interface(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         return interfaces_.count(name) > 0;
     }
 
     const InterfaceInfo* get_interface(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         auto it = interfaces_.find(name);
         return (it != interfaces_.end()) ? &it->second : nullptr;
     }
 
     /* ── Type alias ── */
     void register_alias(const std::string& alias, const std::string& base) {
+        std::lock_guard<std::mutex> lock(mtx_);
         type_aliases_[alias] = base;
     }
 
     bool is_alias(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         return type_aliases_.count(name) > 0;
     }
 
     std::string resolve_alias(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
         auto it = type_aliases_.find(name);
         if (it != type_aliases_.end()) return it->second;
         return name;
@@ -132,11 +154,64 @@ public:
         return has_struct(name) || has_enum(name) || has_interface(name);
     }
 
+    /* ── All types (for iteration) ── */
+    std::vector<std::string> all_structs() const {
+        std::lock_guard<std::mutex> lock(mtx_);
+        std::vector<std::string> result;
+        for (auto& [name, _] : structs_) result.push_back(name);
+        return result;
+    }
+
+    std::vector<std::string> all_enums() const {
+        std::lock_guard<std::mutex> lock(mtx_);
+        std::vector<std::string> result;
+        for (auto& [name, _] : enums_) result.push_back(name);
+        return result;
+    }
+
+    std::vector<std::string> all_types() const {
+        std::lock_guard<std::mutex> lock(mtx_);
+        std::vector<std::string> result;
+        for (auto& [name, _] : structs_) result.push_back(name);
+        for (auto& [name, _] : enums_) result.push_back(name);
+        for (auto& [name, _] : interfaces_) result.push_back(name);
+        return result;
+    }
+
+    /* ── Register built-in types ── */
+    void register_type(const std::string& name, const std::string& kind) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        builtin_types_[name] = kind;
+    }
+
+    bool has_type(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (structs_.count(name)) return true;
+        if (enums_.count(name)) return true;
+        if (interfaces_.count(name)) return true;
+        if (builtin_types_.count(name)) return true;
+        return false;
+    }
+
+    std::string resolve_builtin(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = builtin_types_.find(name);
+        if (it != builtin_types_.end()) return it->second;
+        return "";
+    }
+
+    const StructInfo* get_struct_unlocked(const std::string& name) const {
+        auto it = structs_.find(name);
+        return (it != structs_.end()) ? &it->second : nullptr;
+    }
+
 private:
+    mutable std::mutex mtx_;
     std::unordered_map<std::string, StructInfo>    structs_;
     std::unordered_map<std::string, EnumInfo>      enums_;
     std::unordered_map<std::string, InterfaceInfo> interfaces_;
     std::unordered_map<std::string, std::string>   type_aliases_;
+    std::unordered_map<std::string, std::string>   builtin_types_;
 };
 
 /* TODO: add thread-safety (mutex) if registry is accessed from multiple compilation threads.

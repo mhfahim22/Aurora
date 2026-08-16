@@ -68,6 +68,9 @@
     #define AURORA_PLATFORM_IOS     0
 #endif
 
+/* ── Desktop vs Mobile convenience ── */
+#define AURORA_PLATFORM_DESKTOP (!AURORA_PLATFORM_ANDROID && !AURORA_PLATFORM_IOS)
+
 /* ── Architecture Detection ── */
 #if defined(_M_AMD64) || defined(__x86_64__)
     #define AURORA_ARCH_X86_64 1

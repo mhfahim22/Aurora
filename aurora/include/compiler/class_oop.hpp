@@ -254,6 +254,20 @@ public:
         return result;
     }
 
+    /* Search ALL registered classes for one that implements the given interface
+       AND has a method with the given name. Returns class name or empty. */
+    std::string find_class_by_interface_method(
+            const std::string& interface_name,
+            const std::string& method_name) const {
+        for (auto& [name, cls] : classes_) {
+            if (class_implements_interface(name, interface_name)) {
+                if (find_method(name, method_name))
+                    return name;
+            }
+        }
+        return "";
+    }
+
     const std::unordered_map<std::string, ClassInfo>& all() const {
         return classes_;
     }

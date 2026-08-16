@@ -1,0 +1,26 @@
+## aurora/log - Structured logging
+
+function log_info(message: cstring):
+    output("[info] ")
+    output(message)
+    output("\n")
+    return 0
+end
+
+function log_warn(message: cstring):
+    output("[warn] ")
+    output(message)
+    output("\n")
+    return 0
+end
+
+function log_error(message: cstring):
+    output("[error] ")
+    output(message)
+    output("\n")
+    return 0
+end
+
+function main():
+    output("aurora/log seed ready")
+end

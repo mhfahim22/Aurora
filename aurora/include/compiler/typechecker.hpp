@@ -35,6 +35,13 @@ enum class AuroraType {
 
     /* Generic type parameter (unknown at analysis time, resolved at instantiation) */
     Generic,
+
+    /* Integer/float subtypes (Phase 7 type-system fix) */
+    I8, I16, I32, I64,
+    U8, U16, U32, U64,
+    F32,
+    Byte,
+    Char,
 };
 
 struct TypeInfo {
@@ -75,6 +82,17 @@ inline const char* aurora_type_name(AuroraType t) {
         case AuroraType::Json:    return "json";
         case AuroraType::Pointer: return "pointer";
         case AuroraType::Generic: return "generic";
+        case AuroraType::I8:    return "i8";
+        case AuroraType::I16:   return "i16";
+        case AuroraType::I32:   return "i32";
+        case AuroraType::I64:   return "i64";
+        case AuroraType::U8:    return "u8";
+        case AuroraType::U16:   return "u16";
+        case AuroraType::U32:   return "u32";
+        case AuroraType::U64:   return "u64";
+        case AuroraType::F32:   return "f32";
+        case AuroraType::Byte:  return "byte";
+        case AuroraType::Char:  return "char";
     }
     return "unknown";
 }
@@ -104,6 +122,17 @@ inline AstTypeKind to_ast_type_kind(AuroraType t) {
         case AuroraType::Queue:    return AstTypeKind::Queue;
         case AuroraType::Json:     return AstTypeKind::Json;
         case AuroraType::Generic:  return AstTypeKind::Unknown;
+        case AuroraType::I8:    return AstTypeKind::I8;
+        case AuroraType::I16:   return AstTypeKind::I16;
+        case AuroraType::I32:   return AstTypeKind::I32;
+        case AuroraType::I64:   return AstTypeKind::I64;
+        case AuroraType::U8:    return AstTypeKind::U8;
+        case AuroraType::U16:   return AstTypeKind::U16;
+        case AuroraType::U32:   return AstTypeKind::U32;
+        case AuroraType::U64:   return AstTypeKind::U64;
+        case AuroraType::F32:   return AstTypeKind::F32;
+        case AuroraType::Byte:  return AstTypeKind::Byte;
+        case AuroraType::Char:  return AstTypeKind::Char;
     }
     return AstTypeKind::Unknown;
 }
@@ -170,6 +199,9 @@ public:
     /* Instantiate a generic struct: create concrete struct type with mangled name */
     std::string instantiate_generic_struct(const std::string& struct_name, const ASTNode* template_args);
 
+    /* Register an ExternFn node (used by import rescan) */
+    void register_extern_fn(const ASTNode* node);
+
 private:
     std::vector<std::unordered_map<std::string, AuroraType>> scopes_; /* TODO: add variable shadowing diagnostic (future) */
     std::unordered_map<std::string, AstTypeKind> var_element_types_;  /* H2 Phase E-1: element kind per variable */
@@ -220,6 +252,7 @@ private:
     AuroraType infer_call(const ASTNode* node);
 
     /* Phase 1 type system helpers */
+    void register_builtin_types();
     void register_type_alias(const ASTNode* node);
     void register_enum(const ASTNode* node);
     void register_interface(const ASTNode* node);
@@ -234,7 +267,7 @@ private:
     bool is_numeric(AuroraType type) const;
     bool is_boolish(AuroraType type) const;
     AuroraType common_numeric(AuroraType left, AuroraType right, int line) const;
-    void expect_assignable(AuroraType target, AuroraType value, int line) const;
+    void expect_assignable(AuroraType target, AuroraType value, int line, bool target_nullable = false) const;
 
     /* Lambda capture tracking */
     std::unordered_set<std::string> var_refs_;

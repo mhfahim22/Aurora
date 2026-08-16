@@ -51,7 +51,7 @@ extern function aurora_hex_encode(data: cstring, len: i64) -> cstring
 ## ════════════════════════════════════════════════════════════
 
 ## ── SHA-256 hash (returns hex string) ──
-function sha256(data):
+function sha256(data: str): str
     buf = malloc(32)
     aurora_sha256(data, len(data), buf)
     result = aurora_hex_encode(buf, 32)
@@ -63,7 +63,7 @@ function sha256(data):
 end
 
 ## ── HMAC-SHA256 (returns hex string) ──
-function hmac_sha256(key, data):
+function hmac_sha256(key: str, data: str): str
     buf = malloc(32)
     aurora_hmac_sha256(key, len(key), data, len(data), buf)
     result = aurora_hex_encode(buf, 32)

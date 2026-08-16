@@ -1,20 +1,50 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "MinGW-UCRT64",
             "includePath": [
-                "${workspaceFolder}/**",
-                "${env.LLVM_HOME}\\include"
+                "${workspaceFolder}/aurora/include",
+                "${workspaceFolder}/aurora/third_party",
+                "${workspaceFolder}/third_party",
+                "${workspaceFolder}/deps",
+                "${workspaceFolder}/packages/android",
+                "${workspaceFolder}/packages/android/app/src/main/cpp",
+                "C:/msys64/ucrt64/include",
+                "C:/msys64/ucrt64/include/c++/15.2.0",
+                "C:/msys64/ucrt64/include/c++/15.2.0/backward",
+                "C:/msys64/ucrt64/include/c++/15.2.0/x86_64-w64-mingw32",
+                "C:/msys64/ucrt64/lib/gcc/x86_64-w64-mingw32/15.2.0/include",
+                "C:/msys64/ucrt64/lib/gcc/x86_64-w64-mingw32/15.2.0/include-fixed",
+                "C:/LLVM/include",
+                "${env:LOCALAPPDATA}/Android/Sdk/platforms/android-35",
+                "C:/Program Files/Java/jdk-24/include",
+                "C:/Program Files/Java/jdk-24/include/win32"
             ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/aurora/include",
+                    "${workspaceFolder}/packages/android",
+                    "C:/Program Files/Java/jdk-24/include",
+                    "C:/Program Files/Java/jdk-24/include/win32",
+                    "C:/msys64/ucrt64/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            },
             "defines": [
                 "_DEBUG",
                 "UNICODE",
-                "_UNICODE"
+                "_UNICODE",
+                "_WIN32",
+                "WIN32",
+                "WINNT",
+                "AURORA_PLATFORM_WINDOWS=1",
+                "__ANDROID__=1",
+                "ANDROID=1"
             ],
-            "compilerPath": "cl.exe",
-            "cStandard": "c23",
+            "compilerPath": "C:/msys64/ucrt64/bin/g++.exe",
+            "cStandard": "c17",
             "cppStandard": "c++23",
-            "intelliSenseMode": "msvc-x64"
+            "intelliSenseMode": "windows-gcc-x64"
         }
     ],
     "version": 4

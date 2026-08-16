@@ -1,0 +1,8 @@
+name: aurora/std-http
+version: 1.0.0
+author: Aurora Core Team
+description: HTTP server framework for Aurora
+entry: src/server.auf
+dependencies:
+permissions:
+

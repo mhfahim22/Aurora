@@ -14,6 +14,31 @@
 
 /* ── x = expr ── */
 void Codegen::gen_assign(const ASTNode* node) {
+    /* Destructuring assignment: a, b, ... = expr */
+    if (node->value == "__destructure__") {
+        if (!node->right || !node->args) return;
+        llvm::Value* rhs = gen_expr(node->right.get());
+        if (rhs->getType()->isIntegerTy())
+            rhs = builder_->CreateIntToPtr(rhs, i8ptr_ty(), "tuple_ptr");
+        int idx = 0;
+        const ASTNode* lhs = node->args.get();
+        while (lhs) {
+            std::string vname = lhs->value;
+            llvm::Value* elem_ptr = builder_->CreateGEP(i8_ty(), rhs, i64(idx * 8), vname + "_ptr");
+            llvm::Value* elem_val = builder_->CreateLoad(i64_ty(), elem_ptr, vname + "_val");
+            VarRecord* rec = lookup_var(vname);
+            if (!rec) {
+                llvm::AllocaInst* alloca = create_entry_alloca(vname, i64_ty());
+                declare_var(vname, alloca, OwnershipState::Owned);
+                rec = lookup_var(vname);
+            }
+            if (rec && rec->alloca_ptr)
+                builder_->CreateStore(elem_val, rec->alloca_ptr);
+            idx++;
+            lhs = lhs->next.get();
+        }
+        return;
+    }
     if (!node->left || !node->right) return;
 
     /* obj.field = expr — OOP field write */
@@ -141,20 +166,51 @@ void Codegen::gen_assign(const ASTNode* node) {
                     store_val = builder_->CreatePtrToInt(store_val, gv_ty, name + "_gv_int");
                 else if (store_val->getType()->isIntegerTy() && gv_ty->isPointerTy())
                     store_val = builder_->CreateIntToPtr(store_val, gv_ty, name + "_gv_ptr");
+                else if (store_val->getType()->isDoubleTy() && gv_ty->isIntegerTy())
+                    store_val = builder_->CreateBitCast(store_val, gv_ty, name + "_gv_bits");
             }
             builder_->CreateStore(store_val, gv);
         } else {
             auto* alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(slot_ptr);
             llvm::Type* slot_ty = alloca_inst ? alloca_inst->getAllocatedType() : i64_ty();
             if (slot_ty != val->getType()) {
-                auto* new_slot = create_entry_alloca(name + "_r", val->getType());
-                builder_->CreateStore(val, new_slot);
-                rec->alloca_ptr = new_slot;
+                /* Arena/GC heap slots are i64 boxes holding a ptrtoint'd
+                   pointer (see gen_allocation_for_var / gen_var). Store the
+                   pointer back into the SAME slot so loop-carried reads
+                   observe the update. Creating a fresh `_r` alloca here
+                   orphaned the loop body's load, which kept reading the
+                   original slot (e.g. `s = s + "a"` in a loop never
+                   accumulated). */
+                if (!alloca_inst && slot_ty->isIntegerTy(64) && val->getType()->isPointerTy()) {
+                    llvm::Value* int_val = builder_->CreatePtrToInt(val, slot_ty, name + "_slot_int");
+                    builder_->CreateStore(int_val, slot_ptr);
+                } else if (!alloca_inst && slot_ty->isIntegerTy(64) && val->getType()->isDoubleTy()) {
+                    llvm::Value* int_val = builder_->CreateBitCast(val, slot_ty, name + "_slot_bits");
+                    builder_->CreateStore(int_val, slot_ptr);
+                } else {
+                    auto* new_slot = create_entry_alloca(name + "_r", val->getType());
+                    builder_->CreateStore(val, new_slot);
+                    rec->alloca_ptr = new_slot;
+                }
             } else {
                 builder_->CreateStore(val, rec->alloca_ptr);
             }
         }
         rec->type_kind = assign_kind;
+    }
+
+    /* DAP: track scalar local variable value for debugger display */
+    if (dap_enabled_ && fn_dap_var_ && rec && (val->getType()->isIntegerTy() ||
+                                               val->getType()->isFloatingPointTy())) {
+        auto* name_cstr = builder_->CreateGlobalStringPtr(name, "dap_varname");
+        llvm::Value* dap_val = val;
+        if (val->getType()->isIntegerTy() && val->getType()->getPrimitiveSizeInBits() < 64)
+            dap_val = builder_->CreateSExt(val, i64_ty(), name + "_sext");
+        if (val->getType()->isFloatingPointTy())
+            dap_val = builder_->CreateFPToUI(val, i64_ty(), name + "_dapfptou");
+        llvm::Value* dap_double = builder_->CreateSIToFP(dap_val,
+            llvm::Type::getDoubleTy(ctx_), name + "_dapfp");
+        builder_->CreateCall(fn_dap_var_, { name_cstr, dap_double });
     }
 
     /* Closure-returning function calls: propagate is_closure to receiver */
@@ -163,9 +219,27 @@ void Codegen::gen_assign(const ASTNode* node) {
             rec->is_closure = true;
     }
 
+    /* Expression lambda with captures: propagate is_closure to receiver */
+    if (node->right && node->right->type == NodeType::Lambda && !node->right->captures.empty())
+        rec->is_closure = true;
+    if (last_expr_was_closure_) {
+        rec->is_closure = true;
+        last_expr_was_closure_ = false;
+    }
+
     /* Track struct type for struct literal variables */
     if (node->right && node->right->type == NodeType::StructLiteral)
         rec->struct_type = node->right->value;
+
+    /* Track enum type for enum data constructor calls */
+    if (node->right && node->right->type == NodeType::Call) {
+        auto dot_pos = node->right->value.find('.');
+        if (dot_pos != std::string::npos && dot_pos > 0) {
+            std::string candidate_enum = node->right->value.substr(0, dot_pos);
+            if (global_type_registry().has_enum(candidate_enum))
+                rec->struct_type = candidate_enum;
+        }
+    }
 
     /* Track struct type for generic struct construction: Box[Int](42) */
     if (node->right && node->right->type == NodeType::Call && node->right->template_args) {
@@ -429,9 +503,23 @@ void Codegen::gen_return(const ASTNode* node) {
             else
                 val = builder_->CreateZExt(val, ret_ty, "ret_zext");
         }
-        else if (val->getType()->isIntegerTy() && ret_ty->isFloatingPointTy())
-            val = builder_->CreateSIToFP(val, ret_ty, "ret_itof");
-        else if (val->getType()->isFloatingPointTy() && ret_ty->isIntegerTy())
+        else if (val->getType()->isIntegerTy() && ret_ty->isFloatingPointTy()) {
+            /* Aurora encodes doubles internally as i64 bit-patterns (gen_call
+               unboxes a double return with bitcast to i64). If the return
+               expression is float-typed, the i64 is a bit-pattern — bitcast it
+               back — otherwise it is a genuine integer — SIToFP it. */
+            AstTypeKind lk = node->left ? get_annotation_kind(node->left.get())
+                                        : AstTypeKind::Unknown;
+            if (lk == AstTypeKind::Float || lk == AstTypeKind::F32) {
+                auto* dbl = llvm::Type::getDoubleTy(ctx_);
+                llvm::Value* as_double = builder_->CreateBitCast(val, dbl, "ret_unbox_fp");
+                val = ret_ty->isDoubleTy()
+                    ? as_double
+                    : builder_->CreateFPTrunc(as_double, ret_ty, "ret_fptrunc");
+            } else {
+                val = builder_->CreateSIToFP(val, ret_ty, "ret_itof");
+            }
+        } else if (val->getType()->isFloatingPointTy() && ret_ty->isIntegerTy())
             val = builder_->CreateFPToSI(val, ret_ty, "ret_ftoi");
     }
     safe_ret(val);
@@ -447,7 +535,7 @@ llvm::Value* Codegen::ensure_i64(llvm::Value* v) {
 }
 
 /* Generate condition for a pattern against match_val. Returns i1. */
-llvm::Value* Codegen::gen_pattern_cond(const ASTNode* pattern, llvm::Value* match_val) {
+llvm::Value* Codegen::gen_pattern_cond(const ASTNode* pattern, llvm::Value* match_val, const std::string& enum_type) {
     switch (pattern->type) {
         case NodeType::Num: {
             llvm::Value* lit = i64(std::stoll(pattern->value));
@@ -457,8 +545,41 @@ llvm::Value* Codegen::gen_pattern_cond(const ASTNode* pattern, llvm::Value* matc
         case NodeType::Var:
             return builder_->getInt1(true);
         case NodeType::Call: {
-            const std::string& struct_name = pattern->value;
-            llvm::StructType* st = codegen_get_struct_type(ctx_, struct_name);
+            const std::string& pat_name = pattern->value;
+            /* Check if this is an enum variant pattern */
+            std::string enum_name = enum_type;
+            const EnumInfo* einfo = (!enum_name.empty()) ? global_type_registry().get_enum(enum_name) : nullptr;
+            if (einfo && einfo->has_data) {
+                /* Find matching variant to get discriminant value */
+                for (auto& v : einfo->variants) {
+                    if (v.name == pat_name) {
+                        /* Unbox match_val from i64 back to struct pointer */
+                        llvm::StructType* enum_ty = codegen_get_enum_type(ctx_, enum_name);
+                        llvm::Value* ptr = builder_->CreateIntToPtr(match_val, llvm::PointerType::get(enum_ty, 0), "enum_ptr");
+                        /* Load discriminant */
+                        llvm::Value* disc_ptr = builder_->CreateStructGEP(enum_ty, ptr, 0);
+                        llvm::Value* disc = builder_->CreateLoad(i64_ty(), disc_ptr, "enum_disc");
+                        /* Check discriminant matches this variant */
+                        llvm::Value* cond = builder_->CreateICmpEQ(disc, i64(v.value), "enum_disc_cmp");
+                        /* Check sub-patterns against data fields */
+                        const ASTNode* fp = pattern->args.get();
+                        unsigned fi = 0;
+                        while (fp && fi < v.fields.size()) {
+                            llvm::Value* data_ptr = builder_->CreateStructGEP(enum_ty, ptr, 1);
+                            llvm::Value* elem_ptr = builder_->CreateGEP(
+                                llvm::ArrayType::get(llvm::Type::getInt64Ty(ctx_), v.fields.size()),
+                                data_ptr, { i64(0), i64(fi) }, "enum_field");
+                            llvm::Value* fval = builder_->CreateLoad(i64_ty(), elem_ptr, "enum_fv");
+                            cond = builder_->CreateAnd(cond, gen_pattern_cond(fp, fval, enum_name), "pat_and");
+                            fi++;
+                            fp = fp->next.get();
+                        }
+                        return cond;
+                    }
+                }
+            }
+            /* Fallback: struct pattern */
+            llvm::StructType* st = codegen_get_struct_type(ctx_, pat_name);
             if (!st) return builder_->getInt1(true);
             llvm::Value* sp = builder_->CreateBitCast(
                 match_val, llvm::PointerType::get(st, 0), "pat_st");
@@ -470,7 +591,7 @@ llvm::Value* Codegen::gen_pattern_cond(const ASTNode* pattern, llvm::Value* matc
                 llvm::Type* fty = st->getElementType(fi);
                 llvm::Value* fval = builder_->CreateLoad(fty, fptr, "pat_fv");
                 fval = ensure_i64(fval);
-                cond = builder_->CreateAnd(cond, gen_pattern_cond(fp, fval), "pat_and");
+                cond = builder_->CreateAnd(cond, gen_pattern_cond(fp, fval, ""), "pat_and");
                 fi++;
                 fp = fp->next.get();
             }
@@ -498,7 +619,7 @@ llvm::Value* Codegen::gen_pattern_cond(const ASTNode* pattern, llvm::Value* matc
 }
 
 /* Bind variables from a matched pattern. Creates variables in the current scope. */
-void Codegen::gen_pattern_bind(const ASTNode* pattern, llvm::Value* match_val) {
+void Codegen::gen_pattern_bind(const ASTNode* pattern, llvm::Value* match_val, const std::string& enum_type) {
     switch (pattern->type) {
         case NodeType::Var:
             if (pattern->value != "_") {
@@ -509,8 +630,34 @@ void Codegen::gen_pattern_bind(const ASTNode* pattern, llvm::Value* match_val) {
             }
             break;
         case NodeType::Call: {
-            const std::string& struct_name = pattern->value;
-            llvm::StructType* st = codegen_get_struct_type(ctx_, struct_name);
+            const std::string& pat_name = pattern->value;
+            /* Check if this is an enum variant pattern */
+            std::string enum_name = enum_type;
+            const EnumInfo* einfo = (!enum_name.empty()) ? global_type_registry().get_enum(enum_name) : nullptr;
+            if (einfo && einfo->has_data) {
+                for (auto& v : einfo->variants) {
+                    if (v.name == pat_name) {
+                        llvm::StructType* enum_ty = codegen_get_enum_type(ctx_, enum_name);
+                        llvm::Value* ptr = builder_->CreateIntToPtr(match_val, llvm::PointerType::get(enum_ty, 0), "enum_ptr_bind");
+                        const ASTNode* fp = pattern->args.get();
+                        unsigned fi = 0;
+                        while (fp && fi < v.fields.size()) {
+                            llvm::Value* data_ptr = builder_->CreateStructGEP(enum_ty, ptr, 1);
+                            llvm::Value* elem_ptr = builder_->CreateGEP(
+                                llvm::ArrayType::get(llvm::Type::getInt64Ty(ctx_), v.fields.size()),
+                                data_ptr, { i64(0), i64(fi) }, "enum_field_bind");
+                            llvm::Value* fval = builder_->CreateLoad(i64_ty(), elem_ptr, "enum_fv_bind");
+                            gen_pattern_bind(fp, fval, enum_name);
+                            fi++;
+                            fp = fp->next.get();
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+            /* Fallback: struct pattern */
+            llvm::StructType* st = codegen_get_struct_type(ctx_, pat_name);
             if (!st) break;
             llvm::Value* sp = builder_->CreateBitCast(
                 match_val, llvm::PointerType::get(st, 0), "pat_st_bind");
@@ -521,7 +668,7 @@ void Codegen::gen_pattern_bind(const ASTNode* pattern, llvm::Value* match_val) {
                 llvm::Type* fty = st->getElementType(fi);
                 llvm::Value* fval = builder_->CreateLoad(fty, fptr, "pat_fv_bind");
                 fval = ensure_i64(fval);
-                gen_pattern_bind(fp, fval);
+                gen_pattern_bind(fp, fval, "");
                 fi++;
                 fp = fp->next.get();
             }
@@ -548,6 +695,28 @@ void Codegen::gen_pattern_bind(const ASTNode* pattern, llvm::Value* match_val) {
 void Codegen::gen_match(const ASTNode* node) {
     llvm::Value* match_val = gen_expr(node->left.get());
 
+    /* Determine if match value is an enum with data */
+    std::string match_enum_type;
+    {
+        auto mk = get_annotation_kind(node->left.get());
+        if (mk == AstTypeKind::Enum) {
+            match_enum_type = node->left->type_annotation.type_name;
+            if (match_enum_type.empty()) {
+                /* Try lookup from variable */
+                if (node->left->type == NodeType::Var) {
+                    VarRecord* rec = lookup_var(node->left->value);
+                    if (rec) match_enum_type = rec->struct_type;
+                }
+            }
+        }
+    }
+    /* Also check if match_val is a Var with struct_type that is an enum */
+    if (match_enum_type.empty() && node->left->type == NodeType::Var) {
+        VarRecord* rec = lookup_var(node->left->value);
+        if (rec && !rec->struct_type.empty() && global_type_registry().has_enum(rec->struct_type))
+            match_enum_type = rec->struct_type;
+    }
+
     auto* end_bb = llvm::BasicBlock::Create(ctx_, "match_end", cur_fn_);
 
     const ASTNode* case_node = node->args.get();
@@ -562,7 +731,24 @@ void Codegen::gen_match(const ASTNode* node) {
 
         if (case_node->args) {
             const ASTNode* pattern = case_node->args.get();
-            llvm::Value* cond = gen_pattern_cond(pattern, match_val);
+            llvm::Value* cond = gen_pattern_cond(pattern, match_val, match_enum_type);
+
+            /* ── OR patterns: case 1 | 2 | 3: ── chain via pattern->next */
+            {
+                const ASTNode* or_pat = pattern->next.get();
+                while (or_pat) {
+                    llvm::Value* or_cond = gen_pattern_cond(or_pat, match_val, match_enum_type);
+                    cond = builder_->CreateOr(cond, or_cond, "or_pat");
+                    or_pat = or_pat->next.get();
+                }
+            }
+
+            /* ── Guard clause: case x if guard_cond: ── */
+            if (case_node->left) {
+                llvm::Value* guard = gen_expr(case_node->left.get());
+                llvm::Value* guard_bool = builder_->CreateICmpNE(guard, i64(0), "guard");
+                cond = builder_->CreateAnd(cond, guard_bool, "pat_guard");
+            }
 
             auto* case_bb = llvm::BasicBlock::Create(ctx_, "match_case", cur_fn_);
             auto* next_bb = llvm::BasicBlock::Create(ctx_, "match_next", cur_fn_);
@@ -571,7 +757,7 @@ void Codegen::gen_match(const ASTNode* node) {
 
             builder_->SetInsertPoint(case_bb);
             push_scope();
-            gen_pattern_bind(pattern, match_val);
+            gen_pattern_bind(pattern, match_val, match_enum_type);
             gen_block(case_node->body.get());
             pop_scope_and_drop();
             safe_br(end_bb);
@@ -606,7 +792,7 @@ void Codegen::gen_match(const ASTNode* node) {
 void Codegen::gen_if(const ASTNode* node) {
     llvm::Value* cond = gen_expr(node->left.get());
     /* Treat non-zero as true */
-    llvm::Value* cond_bool = builder_->CreateICmpNE(cond, i64(0), "if_cond");
+    llvm::Value* cond_bool = gen_truthy(cond, "if_cond");
 
     auto* then_bb  = llvm::BasicBlock::Create(ctx_, "then",  cur_fn_);
     auto* merge_bb = llvm::BasicBlock::Create(ctx_, "merge", cur_fn_);
@@ -653,7 +839,7 @@ void Codegen::gen_while(const ASTNode* node) {
     /* condition */
     builder_->SetInsertPoint(cond_bb);
     llvm::Value* cond      = gen_expr(node->left.get());
-    llvm::Value* cond_bool = builder_->CreateICmpNE(cond, i64(0), "while_cond_b");
+    llvm::Value* cond_bool = gen_truthy(cond, "while_cond_b");
     builder_->CreateCondBr(cond_bool, body_bb, exit_bb);
 
     /* body — no new scope, variables visible outside loop */
@@ -695,7 +881,7 @@ void Codegen::gen_repeat(const ASTNode* node) {
     gen_block(node->body.get());
 
     llvm::Value* cond      = gen_expr(node->left.get());
-    llvm::Value* cond_bool = builder_->CreateICmpNE(cond, i64(0), "repeat_cond");
+    llvm::Value* cond_bool = gen_truthy(cond, "repeat_cond");
     builder_->CreateCondBr(cond_bool, exit_bb, body_bb);
 
     builder_->SetInsertPoint(exit_bb);
@@ -713,6 +899,7 @@ void Codegen::gen_for(const ASTNode* node) {
     bool is_range_iter = false;
     llvm::Value* arr_ptr_val = nullptr;
     llvm::Value* range_start_val = nullptr;
+    llvm::Value* step_val = nullptr;
 
     /* H3 Phase B: annotation-first array detection for for-in */
     auto for_lk = get_annotation_kind(node->left.get());
@@ -733,16 +920,37 @@ void Codegen::gen_for(const ASTNode* node) {
     if (!limit && node->left && node->left->type == NodeType::Call && node->left->value == "range" && node->left->args) {
         llvm::Value* arg1 = gen_expr(node->left->args.get());
         llvm::Value* arg2 = nullptr;
-        if (node->left->args->next)
+        llvm::Value* arg3 = nullptr;
+        if (node->left->args->next) {
             arg2 = gen_expr(node->left->args->next.get());
-        if (arg2) {
+            if (node->left->args->next->next)
+                arg3 = gen_expr(node->left->args->next->next.get());
+        }
+        if (arg3) {
+            /* range(start, end, step) → limit = ceil((end - start) / step), val = start + i * step */
+            range_start_val = arg1;
+            llvm::Value* span = builder_->CreateSub(arg2, arg1, "range_span");
+            llvm::Value* abs_step = builder_->CreateSelect(
+                builder_->CreateICmpSGT(arg3, i64(0)), arg3,
+                builder_->CreateNeg(arg3, "neg_step"), "abs_step");
+            llvm::Value* abs_span = builder_->CreateSelect(
+                builder_->CreateICmpSGT(span, i64(0)), span,
+                builder_->CreateNeg(span, "neg_span"), "abs_span");
+            llvm::Value* div = builder_->CreateUDiv(abs_span, abs_step, "range_div");
+            llvm::Value* rem = builder_->CreateURem(abs_span, abs_step, "range_rem");
+            llvm::Value* corr = builder_->CreateICmpNE(rem, i64(0));
+            limit = builder_->CreateSelect(corr, builder_->CreateAdd(div, i64(1)), div, "range_limit");
+            step_val = arg3;
+        } else if (arg2) {
             /* range(start, end) → limit = end - start, val = start + i */
             range_start_val = arg1;
             limit = builder_->CreateSub(arg2, arg1, "range_limit");
+            step_val = llvm::ConstantInt::get(i64_ty(), 1);
         } else {
             /* range(n) → limit = n, val = i */
             range_start_val = llvm::ConstantInt::get(i64_ty(), 0);
             limit = arg1;
+            step_val = llvm::ConstantInt::get(i64_ty(), 1);
         }
         is_range_iter = true;
     }
@@ -777,8 +985,10 @@ void Codegen::gen_for(const ASTNode* node) {
     push_scope();
 
     if (is_range_iter) {
-        /* Range iteration: x = start + i — no array needed */
-        llvm::Value* val = builder_->CreateAdd(range_start_val, cur_idx, node->value + "_range_val");
+        /* Range iteration: x = start + i * step — no array needed */
+        llvm::Value* step_offset = step_val ? builder_->CreateMul(cur_idx, step_val, node->value + "_step_offset")
+                                            : cur_idx;
+        llvm::Value* val = builder_->CreateAdd(range_start_val, step_offset, node->value + "_range_val");
         builder_->CreateStore(val, loop_var_slot);
     } else if (is_array_iter && arr_ptr_val) {
         /* Array iteration: x = arr[i] — load element by index */
@@ -939,10 +1149,17 @@ void Codegen::gen_lambda(const ASTNode* node) {
     /* Allocate params (skip env if capturing) */
     int param_start = has_captures ? 1 : 0;
     for (int i = param_start; i < static_cast<int>(param_names.size()); i++) {
-        auto* slot = create_entry_alloca(param_names[i], i64_ty());
+        llvm::Type* pty = (i < static_cast<int>(param_types.size())) ? param_types[i] : i64_ty();
+        auto* slot = create_entry_alloca(param_names[i], pty);
         llvm::Value* val = fn->getArg(i);
-        if (val->getType() != i64_ty())
-            val = builder_->CreatePtrToInt(val, i64_ty(), param_names[i] + "_unbox");
+        if (val->getType() != pty) {
+            if (val->getType()->isIntegerTy() && pty->isPointerTy())
+                val = builder_->CreateIntToPtr(val, pty, param_names[i] + "_inttoptr");
+            else if (val->getType()->isPointerTy() && pty->isIntegerTy())
+                val = builder_->CreatePtrToInt(val, pty, param_names[i] + "_unbox");
+            else
+                val = builder_->CreateBitCast(val, pty, param_names[i] + "_cast");
+        }
         builder_->CreateStore(val, slot);
         declare_var(param_names[i], slot, OwnershipState::Owned);
     }
@@ -1351,6 +1568,35 @@ void Codegen::gen_log(const ASTNode* node) {
     }
 }
 
+/* ── assert condition [, "message"] — runtime assertion ── */
+void Codegen::gen_assert(const ASTNode* node) {
+    auto* fn_panic = module_->getFunction("aurora_panic");
+    if (!fn_panic || !node->left) return;
+
+    llvm::Value* cond = gen_expr(node->left.get());
+    if (!cond) return;
+
+    auto* assert_ok  = llvm::BasicBlock::Create(ctx_, "assert_ok", cur_fn_);
+    auto* assert_fail = llvm::BasicBlock::Create(ctx_, "assert_fail", cur_fn_);
+
+    llvm::Value* is_zero = builder_->CreateICmpEQ(cond, i64(0), "assert_cond");
+    builder_->CreateCondBr(is_zero, assert_fail, assert_ok);
+
+    builder_->SetInsertPoint(assert_fail);
+    llvm::Value* msg = i64(0);
+    if (node->right) {
+        msg = gen_expr(node->right.get());
+        if (msg && !msg->getType()->isPointerTy())
+            msg = builder_->CreateIntToPtr(msg, i8ptr_ty(), "assert_msg");
+    }
+    if (!msg)
+        msg = llvm::ConstantPointerNull::get(i8ptr_ty());
+    builder_->CreateCall(fn_panic, { msg });
+    builder_->CreateBr(assert_ok);
+
+    builder_->SetInsertPoint(assert_ok);
+}
+
 /* ════════════════════════════════════════════════════════════
    Domain-specific Codegen — Game Engine
    ════════════════════════════════════════════════════════════ */
@@ -1576,7 +1822,7 @@ void Codegen::gen_server(const ASTNode* node) {
                 if (child->left) {
                     method_str = gen_expr(child->left.get());
                     if (method_str->getType() != i8ptr_ty())
-                        method_str = builder_->CreateBitCast(method_str, i8ptr_ty());
+                        method_str = builder_->CreateIntToPtr(method_str, i8ptr_ty(), "method_ptr");
                     /* Convert AuroraStr* to const char* */
                     llvm::Function* str_to_c = module_->getFunction("aurora_str_as_cstr");
                     if (str_to_c)
