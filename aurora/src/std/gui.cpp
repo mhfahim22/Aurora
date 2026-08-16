@@ -588,6 +588,11 @@ int aurora_gui_listbox_get_selected(AuroraWidget w) {
 int aurora_gui_listbox_count(AuroraWidget w) {
     GuiWidget* gw = (GuiWidget*)w; return gw ? (int)gw->items.size() : 0;
 }
+const char* aurora_gui_listbox_get_item(AuroraWidget w, int i) {
+    GuiWidget* gw = (GuiWidget*)w;
+    if (gw && i >= 0 && i < (int)gw->items.size()) return gw->items[i].c_str();
+    return nullptr;
+}
 
 /* ── TreeView ── */
 /* In-memory tree data model (same structure as the macOS backend). */

@@ -346,7 +346,8 @@ if(APPLE)
         "-framework Cocoa"
         "-framework WebKit"
         "-framework AVKit"
-        "-framework AVFoundation")
+        "-framework AVFoundation"
+        "-framework CoreMedia")
     set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
         COMPILE_FLAGS "-x objective-c++")
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")

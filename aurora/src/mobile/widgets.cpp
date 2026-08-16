@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <cmath>
 #include <chrono>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
 /* Current time in milliseconds (wall clock) for gesture dwell detection. */
 static double now_ms_double(void) {
@@ -558,15 +561,20 @@ void mw_get_scroll_pos(void* widget, float* x, float* y) {
    ════════════════════════════════════════════════════════════ */
 
 #if defined(__ANDROID__)
-/* Android render is called from JNI (Java → aurora_android_render_mw);
+/* Android render is called from JNI (Java ─ aurora_android_render_mw);
    mw_render can be invoked from C/C++ if a JNIEnv is cached */
 void mw_render(void* widget) {
     (void)widget;
 }
-#elif defined(__APPLE__)
+#elif defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 extern void aurora_ios_widgets_render(void* widget);
 void mw_render(void* widget) {
     aurora_ios_widgets_render(widget);
+}
+#elif defined(__APPLE__)
+/* macOS desktop: the mobile widget renderer is not compiled here (it is iOS-only). */
+void mw_render(void* widget) {
+    (void)widget;
 }
 #else
 /* Desktop — use the desktop emulator renderer */

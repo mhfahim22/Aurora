@@ -262,21 +262,6 @@ int aurora_ui_win32_init(const char* title, int width, int height) {
     return 0;
 }
 
-/* ── Public window chrome controls (Phase 39.4) ── */
-int aurora_gui_window_set_dark_mode(void* widget, int enable) {
-    (void)widget;
-    g_dark_mode = enable ? 1 : 0;
-    ui_apply_dark_mode(g_main_hwnd);
-    return 0;
-}
-
-int aurora_gui_window_set_effect(void* widget, int effect) {
-    (void)widget;
-    g_window_effect = effect;
-    ui_apply_window_effect(g_main_hwnd);
-    return 0;
-}
-
 /* ── Create native control ── */
 int aurora_ui_win32_create_control(AuroraComponent* comp) {
     if (!comp || !g_main_hwnd) return -1;
@@ -515,6 +500,18 @@ int aurora_gui_window_get_height(AuroraWidget widget) { (void)widget; return g_w
 void aurora_gui_window_set_min_size(AuroraWidget widget, int w, int h) { (void)widget;(void)w;(void)h; }
 void aurora_gui_window_set_max_size(AuroraWidget widget, int w, int h) { (void)widget;(void)w;(void)h; }
 void aurora_gui_window_set_resizable(AuroraWidget widget, int resizable) { (void)widget;(void)resizable; }
+int aurora_gui_window_set_dark_mode(AuroraWidget widget, int enable) {
+    (void)widget;
+    g_dark_mode = enable ? 1 : 0;
+    ui_apply_dark_mode(g_main_hwnd);
+    return 0;
+}
+int aurora_gui_window_set_effect(AuroraWidget widget, int effect) {
+    (void)widget;
+    g_window_effect = effect;
+    ui_apply_window_effect(g_main_hwnd);
+    return 0;
+}
 
 /* ── Generic ── */
 void aurora_gui_set_callback(AuroraWidget widget, AuroraEventCallback cb) { GuiWidget* w = (GuiWidget*)widget; if (w) w->callback = cb; }

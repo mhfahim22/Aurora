@@ -171,6 +171,8 @@ AURORA_EXPORT int          aurora_gui_window_set_effect(AuroraWidget win, int ef
 AURORA_EXPORT int          aurora_gui_app_init(void);
 AURORA_EXPORT void         aurora_gui_app_run(void);
 AURORA_EXPORT void         aurora_gui_app_quit(void);
+AURORA_EXPORT void         aurora_gui_run(void);
+AURORA_EXPORT void         aurora_gui_quit(void);
 
 /* ════════════════════════════════════════════════════════════
    Generic widget operations
