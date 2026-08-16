@@ -50,6 +50,18 @@ static Atom g_wm_delete_msg;
 static bool g_running = false;
 static int g_win_width = 800, g_win_height = 600;
 
+/* ── TreeView data model ── */
+struct TreeNode {
+    int id;
+    int parent_id;
+    std::string text;
+    int expanded;
+};
+static std::map<int, std::vector<TreeNode>> g_tree_nodes;
+static std::map<int, int> g_tree_next_node_id;
+static std::map<int, std::map<int, int>> g_tree_node_index;
+static std::map<int, int> g_tree_selected;
+
 static GuiWidget* widget_new(int type, GuiWidget* parent) {
     GuiWidget* w = new GuiWidget();
     w->id = g_next_id++; w->type = type;
@@ -99,7 +111,7 @@ static void draw_treeview(GuiWidget* w) {
         int sel = g_tree_selected[wid];
         if (sel != 0 && node.id == sel) {
             /* Draw selection underline. */
-            int tw = XTextWidth(w->gc, label.c_str(), (int)label.size());
+            int tw = (int)label.size() * 8;
             XDrawLine(g_display, w->xwindow, w->gc, 4, y + 2, 4 + tw, y + 2);
         }
         y += 14;
@@ -579,16 +591,6 @@ int aurora_gui_listbox_count(AuroraWidget w) {
 
 /* ── TreeView ── */
 /* In-memory tree data model (same structure as the macOS backend). */
-struct TreeNode {
-    int id;
-    int parent_id;
-    std::string text;
-    int expanded;
-};
-static std::map<int, std::vector<TreeNode>> g_tree_nodes;
-static std::map<int, int> g_tree_next_node_id;
-static std::map<int, std::map<int, int>> g_tree_node_index;
-static std::map<int, int> g_tree_selected;
 
 static TreeNode* tree_find_node(int wid, int node_id) {
     auto it = g_tree_node_index.find(wid);

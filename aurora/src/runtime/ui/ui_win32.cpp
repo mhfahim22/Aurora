@@ -8,6 +8,9 @@
 #include <commdlg.h>
 #include <shellapi.h>
 #include <dwmapi.h>
+#ifndef interface
+#define interface struct
+#endif
 #include <uiautomation.h>
 #include <uiautomationclient.h>
 #pragma comment(lib, "comctl32.lib")

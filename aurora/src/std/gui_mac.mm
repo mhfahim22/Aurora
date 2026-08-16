@@ -1613,8 +1613,29 @@ void aurora_gui_media_pause(AuroraWidget m) {
 
 void aurora_gui_media_stop(AuroraWidget m) {
     AVPlayerView* pv = (AVPlayerView*)view_for_id((int)(intptr_t)m);
-    [[pv player] seekToTime:kCMTimeZero];
+    [[pv player] seekToTime:CMTimeMake(0, 1)];
     [[pv player] pause];
+}
+
+void aurora_gui_media_open(AuroraWidget m, const char* src) {
+    AVPlayerView* pv = (AVPlayerView*)view_for_id((int)(intptr_t)m);
+    AVPlayer* player = [AVPlayer playerWithURL:[NSURL URLWithString:to_ns(src)]];
+    [pv setPlayer:player];
+}
+
+void aurora_gui_media_set_volume(AuroraWidget m, float vol) {
+    AVPlayerView* pv = (AVPlayerView*)view_for_id((int)(intptr_t)m);
+    [[pv player] setVolume:vol];
+}
+
+void aurora_gui_media_set_looping(AuroraWidget m, int loop) {
+    AVPlayerView* pv = (AVPlayerView*)view_for_id((int)(intptr_t)m);
+    [[pv player] setActionAtItemEnd:loop ? AVPlayerActionAtItemEndPause : AVPlayerActionAtItemEndAdvance];
+}
+
+int aurora_gui_media_is_playing(AuroraWidget m) {
+    AVPlayerView* pv = (AVPlayerView*)view_for_id((int)(intptr_t)m);
+    return ([[pv player] rate] > 0.0f) ? 1 : 0;
 }
 
 void aurora_gui_media_load(AuroraWidget m, const char* src) {

@@ -236,6 +236,24 @@ jobs:
         echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
         echo "/usr/lib/llvm-19/bin" >> $GITHUB_PATH
 
+    - name: Remove conflicting LLVM cmake files
+      run: |
+        for llvmdir in /usr/lib/llvm-*; do
+          [ -d "$llvmdir" ] || continue
+          ver="${llvmdir#/usr/lib/llvm-}"
+          if [ "$ver" != "19" ]; then
+            sudo rm -rf "$llvmdir/lib/cmake/clang" 2>/dev/null || true
+          fi
+        done
+        for cmakedir in /usr/lib/cmake/clang-*; do
+          [ -d "$cmakedir" ] || continue
+          ver="${cmakedir#/usr/lib/cmake/clang-}"
+          if [ "$ver" != "19" ]; then
+            sudo rm -rf "$cmakedir" 2>/dev/null || true
+          fi
+        done
+        sudo rm -rf /usr/lib/llvm-19/lib/cmake/clang 2>/dev/null || true
+
     - name: Configure CMake
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR="$LLVM_DIR"

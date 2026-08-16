@@ -13,6 +13,12 @@ file(READ "${RUNTIME_EXPORTS_HPP}" CONTENTS)
 # Extract all symbol names from /EXPORT: lines
 string(REGEX MATCHALL "/EXPORT:([a-zA-Z0-9_]+)" MATCHED_EXPORTS "${CONTENTS}")
 
+# Windows-only backend symbols (ui_win32.cpp) are not compiled on other
+# platforms, so they must not be force-referenced by the generated array.
+if(NOT WIN32)
+    list(FILTER MATCHED_EXPORTS EXCLUDE REGEX "^/EXPORT:aurora_ui_win32_")
+endif()
+
 set(GENERATED_CONTENT "// Auto-generated linker include directives\n")
 set(GENERATED_CONTENT "${GENERATED_CONTENT}// Generated from: ${RUNTIME_EXPORTS_HPP}\n\n")
 
