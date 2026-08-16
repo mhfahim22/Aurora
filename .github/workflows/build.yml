@@ -366,8 +366,13 @@ jobs:
         for t in $tests; do
           src="../Workflow/tests/$t.aura"
           if [ ! -f "$src" ]; then echo "  skip $t (missing)"; continue; fi
-          ./aurorac "$src" -O0 >/dev/null 2>&1
-          if [ $? -ne 0 ]; then echo "  FAIL $t"; fail=1; else echo "  OK   $t"; fi
+          if ./aurorac "$src" -O0 >/dev/null 2>&1; then
+            echo "  OK   $t"
+          else
+            echo "  FAIL $t"
+            ./aurorac "$src" -O0 2>&1 | tail -20
+            fail=1
+          fi
         done
         exit $fail
 

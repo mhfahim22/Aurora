@@ -2,8 +2,8 @@
 # Run with: aurorac --run test_mac_gui.aura
 # Tests widget lifecycle on macOS Cocoa backend
 
-extern function aurora_gui_app_init(): int
-extern function aurora_gui_window_new(title: str, width: int, height: int): int
+extern function aurora_gui_app_init() -> int
+extern function aurora_gui_window_new(title: str, width: int, height: int) -> int
 
 function main()
     output("macOS GUI Test: Starting...")

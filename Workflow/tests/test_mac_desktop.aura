@@ -1,8 +1,8 @@
 # Phase 35.2 — macOS Desktop Integration Tests
 # Run with: aurorac --run test_mac_desktop.aura
 
-extern function aurora_gui_clipboard_set_text(s: str): int
-extern function aurora_gui_clipboard_get_text(): str
+extern function aurora_gui_clipboard_set_text(s: str) -> int
+extern function aurora_gui_clipboard_get_text() -> str
 
 function main()
     output("macOS Desktop Test: Starting...")
