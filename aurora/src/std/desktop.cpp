@@ -1,6 +1,8 @@
 #include "std/desktop.hpp"
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #ifdef __linux__
 #include <X11/Xlib.h>

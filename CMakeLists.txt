@@ -158,9 +158,16 @@ set(AURORA_LLVM_COMPONENTS
 
 # WebAssembly backend for the WASM/browser target (Phase 40). Pulls in the
 # WebAssembly codegen + asm parser so `aurorac --target wasm32` can emit
-# WebAssembly object files.
-if(NOT AURORA_NO_WASM)
+# WebAssembly object files. Only enabled when the linked LLVM actually ships
+# the WebAssembly target (CI prebuilt LLVMs omit it → otherwise
+# llvm_map_components_to_libnames errors with "omitted target").
+set(AURORA_HAS_WASM OFF)
+if(LLVM_AVAILABLE_LIBS AND "LLVMWebAssemblyCodeGen" IN_LIST LLVM_AVAILABLE_LIBS)
+    set(AURORA_HAS_WASM ON)
+endif()
+if(AURORA_HAS_WASM AND NOT AURORA_NO_WASM)
     list(APPEND AURORA_LLVM_COMPONENTS WebAssembly WebAssemblyAsmParser)
+    target_compile_definitions(aurorac PRIVATE AURORA_HAS_WASM=1)
 endif()
 
 # Conditionally add ASM parser for the host architecture

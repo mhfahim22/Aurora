@@ -232,7 +232,7 @@ jobs:
     - name: Setup LLVM (host tools for aurorac)
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y llvm-19-dev lld-19 libclang-19-dev liblld-19-dev 2>/dev/null || true
+        sudo apt-get install -y llvm-19-dev lld-19 libclang-19-dev liblld-19-dev libcurl4-openssl-dev 2>/dev/null || true
         echo "LLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm" >> $GITHUB_ENV
         echo "/usr/lib/llvm-19/bin" >> $GITHUB_PATH
 

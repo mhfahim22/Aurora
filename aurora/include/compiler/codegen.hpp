@@ -27,12 +27,12 @@
 /* ════════════════════════════════════════════════════════════
     Cross-version setTargetTriple
     ════════════════════════════════════════════════════════════
-    LLVM 19 changed Module::setTargetTriple to take a standalone
-    llvm::Triple by value.  Older LLVM (≤ 18) takes a StringRef
+    LLVM 21 changed Module::setTargetTriple to take a standalone
+    llvm::Triple by value.  Older LLVM (≤ 20) takes a StringRef
     where Triple merely derives from StringRef.  This helper
     compiles against both API generations. */
 inline void llvm_set_module_triple(llvm::Module* mod, const std::string& triple) {
-#if LLVM_VERSION_MAJOR >= 19
+#if LLVM_VERSION_MAJOR >= 21
     mod->setTargetTriple(llvm::Triple(triple));
 #else
     mod->setTargetTriple(triple);

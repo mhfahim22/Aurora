@@ -748,11 +748,17 @@ static bool emit_object_file(llvm::Module* module, const std::string& obj_path,
         llvm::Triple ct(cross_target);
         if (ct.getArch() == llvm::Triple::wasm32 ||
             ct.getArch() == llvm::Triple::wasm64) {
+#ifdef AURORA_HAS_WASM
             LLVMInitializeWebAssemblyTargetInfo();
             LLVMInitializeWebAssemblyTarget();
             LLVMInitializeWebAssemblyTargetMC();
             LLVMInitializeWebAssemblyAsmPrinter();
             LLVMInitializeWebAssemblyAsmParser();
+#else
+            std::cerr << "aurora: this LLVM build has no WebAssembly target; "
+                         "--target wasm32/64 unavailable\n";
+            return false;
+#endif
         }
     }
 
