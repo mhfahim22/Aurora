@@ -366,6 +366,8 @@ if(APPLE)
         "-framework CoreMedia")
     set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
         COMPILE_FLAGS "-x objective-c++")
+    set_source_files_properties(aurora/src/std/audio.cpp PROPERTIES LANGUAGE CXX
+        COMPILE_FLAGS "-x objective-c++")
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         target_sources(aurora_runtime PRIVATE
             aurora/src/mobile/ios/ios_runtime.mm

@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 
+#if defined(__ANDROID__)
+#undef __linux__
+#endif
 #ifdef __linux__
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
