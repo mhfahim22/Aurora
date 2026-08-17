@@ -541,7 +541,7 @@ endif()
 # ═══════════════════════════════════════════════════════════════
 if(MSVC)
     set_source_files_properties(aurora/src/runtime/std/collections.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2 /fp:fast")
-elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU") AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU") AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|X86|x86|i686")
     set_source_files_properties(aurora/src/runtime/std/collections.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma -ffast-math")
 endif()
 

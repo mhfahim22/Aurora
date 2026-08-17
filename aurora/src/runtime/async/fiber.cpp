@@ -30,6 +30,12 @@
   #endif
   #include <ucontext.h>
   static constexpr size_t kFiberStackSize = 64 * 1024;  /* 64 KB */
+#elif defined(__ANDROID__)
+  /* Android bionic removed getcontext/makecontext/swapcontext (API 21+).
+     Fibers fall back to synchronous execution: the function runs inline on
+     the calling thread when resumed, so yield() becomes a no-op. */
+  #include <ucontext.h>
+  static constexpr size_t kFiberStackSize = 64 * 1024;  /* 64 KB */
 #else
   #include <ucontext.h>
   static constexpr size_t kFiberStackSize = 64 * 1024;  /* 64 KB */
@@ -61,6 +67,18 @@ static void WINAPI fiber_entry(void* param) {
     /* Return to whoever resumed this fiber */
     if (fiber->os_return)
         SwitchToFiber(fiber->os_return);
+}
+#elif defined(__ANDROID__)
+/* Android: no context switching — the fiber function runs inline on the
+   calling thread via aurora_fiber_resume(). */
+static void fiber_entry(void) {
+    AuroraFiber* fiber = tls_creating_fiber;
+    tls_creating_fiber = nullptr;
+    if (!fiber) return;
+    tls_current_fiber = fiber;
+    fiber->state = 1;                       /* running */
+    fiber->result = fiber->func(fiber->arg);
+    fiber->state = 3;                       /* done */
 }
 #else
 static void fiber_entry(void) {
@@ -114,6 +132,11 @@ AuroraFiber* aurora_fiber_create(void* (*func)(void*), void* arg) {
        because SwitchToFiber is symmetric – whoever calls SwitchToFiber becomes
        the "current" fibre, and yielding returns to tls_main_fiber. */
     fiber->os_return = tls_main_fiber;
+#elif defined(__ANDROID__)
+    /* Android: synchronous fallback — no OS context, no stack needed. */
+    fiber->os_handle = nullptr;
+    fiber->os_return = nullptr;
+    fiber->stack_mem = nullptr;
 #else
     /* Allocate stack for the fibre */
     void* stack = std::malloc(kFiberStackSize);
@@ -154,6 +177,8 @@ void aurora_fiber_destroy(AuroraFiber* fiber) {
 #if defined(_WIN32)
     if (fiber->os_handle)
         DeleteFiber(fiber->os_handle);
+#elif defined(__ANDROID__)
+    /* Nothing to free — synchronous fallback allocates no OS resources. */
 #else
     if (fiber->stack_mem)
         std::free(fiber->stack_mem);
@@ -178,6 +203,9 @@ void aurora_fiber_yield(void) {
        someone calls SwitchToFiber(cur->os_handle) we will resume here. */
     tls_current_fiber = nullptr;
     SwitchToFiber(cur->os_return);
+#elif defined(__ANDROID__)
+    /* Android: synchronous fallback — nothing to switch to. */
+    (void)cur;
 #else
     ucontext_t* cur_ctx  = static_cast<ucontext_t*>(cur->os_handle);
     ucontext_t* ret_ctx  = static_cast<ucontext_t*>(cur->os_return);
@@ -204,6 +232,13 @@ void aurora_fiber_resume(AuroraFiber* fiber) {
     fiber->state = 1;                     /* running */
     SwitchToFiber(fiber->os_handle);
     /* When we get back here the fibre either yielded or completed */
+    tls_current_fiber = prev;
+#elif defined(__ANDROID__)
+    /* Android: synchronous fallback — run the function inline. */
+    tls_current_fiber = fiber;
+    fiber->state = 1;                     /* running */
+    fiber->result = fiber->func(fiber->arg);
+    fiber->state = 3;                     /* done */
     tls_current_fiber = prev;
 #else
     /* Lazily allocate the return context */
