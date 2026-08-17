@@ -95,14 +95,16 @@ int aurora_updater_check(void) {
 #if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
     (void)url;
     return 0;
-#elif defined(_WIN32)
-    char cmd[4096];
-    snprintf(cmd, sizeof(cmd), "curl -s \"%s\" 2>nul", url.c_str());
-    FILE* pipe = popen(cmd, "r");
 #else
-    std::string cmd = "curl -s \"" + url + "\" 2>/dev/null";
-    FILE* pipe = popen(cmd.c_str(), "r");
+    std::string cmd;
+#if defined(_WIN32)
+    char cmdbuf[4096];
+    snprintf(cmdbuf, sizeof(cmdbuf), "curl -s \"%s\" 2>nul", url.c_str());
+    cmd = cmdbuf;
+#else
+    cmd = "curl -s \"" + url + "\" 2>/dev/null";
 #endif
+    FILE* pipe = popen(cmd.c_str(), "r");
     if (pipe) {
         char buf[4096];
         size_t n;
@@ -128,6 +130,7 @@ int aurora_updater_check(void) {
     }
 
     return g_updater.update_available;
+#endif
 }
 
 const char* aurora_updater_get_latest_version(void) {
@@ -152,19 +155,22 @@ int aurora_updater_download(void) {
 #if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
     g_updater.downloading = 0;
     return 0;
-#elif defined(_WIN32)
+#else
+    int ret;
+#if defined(_WIN32)
     out_path += ".exe";
     char cmd[8192];
     snprintf(cmd, sizeof(cmd), "curl -L -o \"%s\" \"%s\" 2>nul", out_path.c_str(), g_updater.download_url);
-    int ret = system(cmd);
+    ret = system(cmd);
 #else
     out_path += ".AppImage";
     std::string cmd = "curl -L -o \"" + out_path + "\" \"" + std::string(g_updater.download_url) + "\" 2>/dev/null";
-    int ret = system(cmd.c_str());
+    ret = system(cmd.c_str());
 #endif
     g_updater.download_progress_val = (ret == 0) ? 100 : 0;
     g_updater.downloading = 0;
     return (ret == 0) ? 1 : 0;
+#endif
 }
 
 int aurora_updater_download_progress(void) {
