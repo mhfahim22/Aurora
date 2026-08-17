@@ -35,16 +35,24 @@ if [ ! -f "$APK" ]; then
     exit 1
 fi
 
-# Start emulator
-echo "==> Starting emulator (AVD: ${AVD_NAME})..."
-"${EMULATOR}" -avd "${AVD_NAME}" -no-window -no-audio -no-boot-anim &
-EMU_PID=$!
+# Reuse an already-running device (e.g. CI emulator runner) if present.
+EMU_PID=""
+if "${ADB}" devices | grep -qE "^\S+\s+device(\s|$)"; then
+    echo "==> Reusing already-running device..."
+    "${ADB}" shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 2; done' || true
+    echo "    Device booted."
+else
+    # Start emulator
+    echo "==> Starting emulator (AVD: ${AVD_NAME})..."
+    "${EMULATOR}" -avd "${AVD_NAME}" -no-window -no-audio -no-boot-anim &
+    EMU_PID=$!
 
-# Wait for boot
-echo "==> Waiting for device..."
-"${ADB}" wait-for-device
-"${ADB}" shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 2; done'
-echo "    Device booted."
+    # Wait for boot
+    echo "==> Waiting for device..."
+    "${ADB}" wait-for-device
+    "${ADB}" shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 2; done'
+    echo "    Device booted."
+fi
 
 # Install APK
 echo "==> Installing APK..."
@@ -60,7 +68,9 @@ sleep "${TIMEOUT}"
 "${ADB}" logcat -d -s Aurora:V | grep "CROSS_TEST" || echo "    (no cross-test output in logcat)"
 
 # Cleanup
-echo "==> Stopping emulator..."
-kill "${EMU_PID}" 2>/dev/null || true
+if [ -n "${EMU_PID}" ]; then
+    echo "==> Stopping emulator..."
+    kill "${EMU_PID}" 2>/dev/null || true
+fi
 
 echo "==> Android emulator validation complete."
