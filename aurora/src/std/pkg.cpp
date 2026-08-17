@@ -1,5 +1,6 @@
 #include "std/pkg.hpp"
 #include "std/json.hpp"
+#include "common/platform.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -57,9 +58,13 @@ static const char* get_home_dir() {
     static char buf[1024];
     const char* home = getenv("HOME");
     if (home) return home;
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    return "/tmp";
+#else
     struct passwd* pw = getpwuid(getuid());
     if (pw && pw->pw_dir) return pw->pw_dir;
     return "/tmp";
+#endif
 #endif
 }
 
@@ -122,6 +127,10 @@ static int write_file_str(const std::string& path, const std::string& data) {
 }
 
 static int voss_shell(const char* fmt, ...) {
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)fmt;
+    return -1;
+#else
     char cmd[8192];
     va_list ap;
     va_start(ap, fmt);
@@ -133,9 +142,14 @@ static int voss_shell(const char* fmt, ...) {
     char buf[256];
     while (fgets(buf, sizeof(buf), pipe)) { }
     return pclose(pipe);
+#endif
 }
 
 static std::string voss_capture(const char* fmt, ...) {
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)fmt;
+    return "";
+#else
     char cmd[8192];
     va_list ap;
     va_start(ap, fmt);
@@ -151,6 +165,7 @@ static std::string voss_capture(const char* fmt, ...) {
         result.append(buf, n);
     pclose(pipe);
     return result;
+#endif
 }
 
 /* ── Package Management (6) ── */
@@ -525,9 +540,12 @@ int aurora_pkg_cache_list(char*** out_names, int* out_count) {
 
 void aurora_pkg_cache_clear(void) {
     ensure_paths();
-#ifdef _WIN32
+#if defined(_WIN32)
     std::string cmd = "rmdir /s /q \"" + g_cache_dir + "\" 2>nul";
     (void)system(cmd.c_str());
+    mkdir_p(g_cache_dir);
+#elif defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)remove(g_cache_dir.c_str());
     mkdir_p(g_cache_dir);
 #else
     std::string cmd = "rm -rf \"" + g_cache_dir + "\" 2>/dev/null";

@@ -5,7 +5,7 @@
 #if defined(_WIN32)
   #include "../../include/std/gui.hpp"
   /* Windows implementation provided by ui_win32.cpp */
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
 
 #include "../../include/std/gui.hpp"
 #include <cstdlib>
