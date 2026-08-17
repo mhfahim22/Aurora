@@ -56,16 +56,31 @@ if(WIN32 AND NOT MSVC)
     set(Clang_DIR "C:/msys64/ucrt64/lib/cmake/clang" CACHE PATH "Clang installation directory" FORCE)
     find_package(ZLIB QUIET)
 endif()
-find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-
-include_directories(${LLVM_INCLUDE_DIRS})
-add_definitions(${LLVM_DEFINITIONS})
+# Find LLVM ────────────────────────────────────────────────────────
+# Mobile cross-compiles only build aurora_runtime (which never uses
+# LLVM); the host LLVM config may reference zstd/zlib targets that the
+# NDK/iOS SDK cannot resolve, so skip it entirely for those targets.
+if(ANDROID OR IOS)
+    set(LLVM_FOUND OFF)
+    message(STATUS "Mobile cross-compile: LLVM not required (runtime-only build)")
+else()
+    find_package(LLVM CONFIG)
+    if(LLVM_FOUND)
+        message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+        include_directories(${LLVM_INCLUDE_DIRS})
+        add_definitions(${LLVM_DEFINITIONS})
+    else()
+        message(STATUS "LLVM not found - compiler and tool targets will be skipped (runtime-only build)")
+    endif()
+endif()
 
 # ── Global include path ───────────────────────────────────────
 include_directories(${CMAKE_SOURCE_DIR}/aurora/include)
 
 # ── Compiler (aurorac) ────────────────────────────────────────
+# Only built when LLVM is available (skipped on mobile cross-compiles,
+# which build aurora_runtime only).
+if(LLVM_FOUND)
 add_executable(aurorac
     aurora/src/compiler/main.cpp
     aurora/src/compiler/lexer/lexer.cpp
@@ -194,6 +209,7 @@ endif()
 if(UNIX)
     target_link_options(aurorac PRIVATE -rdynamic)
 endif()
+endif() # LLVM_FOUND
 
 # ═══════════════════════════════════════════════════════════════
 # Static Runtime library
@@ -444,6 +460,7 @@ if(AURORA_RUNTIME_LTO)
 endif()
 
 # ── Link runtime to compiler ────────────────
+if(TARGET aurorac)
 target_link_libraries(aurorac PRIVATE aurora_runtime)
 # MinGW: export runtime symbols for ORC JIT DynamicLibrarySearchGenerator
 if(WIN32 AND NOT MSVC)
@@ -464,6 +481,7 @@ if(WIN32 AND NOT MSVC)
     target_link_libraries(aurorac PRIVATE "${AURORA_DEF_FILE}")
     add_dependencies(aurorac aurora_exports_def)
 endif()
+endif() # TARGET aurorac
 
 # ═══════════════════════════════════════════════════════════════
 # Optional: CUDA support
@@ -941,6 +959,10 @@ target_include_directories(bench_bridge PRIVATE ${CMAKE_SOURCE_DIR}/aurora/inclu
 # (test targets from aurora/tests/* removed — test files cleaned up)
 
 # ── Install targets ──
+# Mobile cross-compiles (iOS/Android) only build aurora_runtime; the
+# desktop CLI targets do not exist there and iOS executables become
+# bundles, so skip the install rules on mobile.
+if(NOT IOS AND NOT ANDROID)
 install(TARGETS aurorac RUNTIME DESTINATION bin)
 install(TARGETS aurora_runtime ARCHIVE DESTINATION lib)
 install(TARGETS voss RUNTIME DESTINATION bin)
@@ -956,4 +978,5 @@ endif()
 if(TARGET aurora_cppwrap)
     install(TARGETS aurora_cppwrap RUNTIME DESTINATION bin)
 endif()
+endif() # NOT IOS AND NOT ANDROID
 
