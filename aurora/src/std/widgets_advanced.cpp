@@ -93,7 +93,7 @@ void* aurora_advanced_table_new(void* parent, int x, int y, int w, int h)
 #else
     void* t = mw_create(MW_TABLE);
     if (parent) mw_add_child(parent, t);
-    mw_set_pos(t, (float)x); mw_set_size(t, (float)w, (float)h);
+    mw_set_pos(t, (float)x, (float)y); mw_set_size(t, (float)w, (float)h);
     return t;
 #endif
 }
@@ -151,7 +151,7 @@ void* aurora_advanced_treeview_new(void* parent, int x, int y, int w, int h)
 #else
     void* tv = mw_create(MW_TREEVIEW);
     if (parent) mw_add_child(parent, tv);
-    mw_set_pos(tv, (float)x); mw_set_size(tv, (float)w, (float)h);
+    mw_set_pos(tv, (float)x, (float)y); mw_set_size(tv, (float)w, (float)h);
     return tv;
 #endif
 }
@@ -220,7 +220,7 @@ void* aurora_advanced_webview_new(void* parent, int x, int y, int w, int h)
 #else
     void* wv = mw_create(MW_WEBVIEW);
     if (parent) mw_add_child(parent, wv);
-    mw_set_pos(wv, (float)x); mw_set_size(wv, (float)w, (float)h);
+    mw_set_pos(wv, (float)x, (float)y); mw_set_size(wv, (float)w, (float)h);
     return wv;
 #endif
 }
@@ -275,7 +275,7 @@ void* aurora_advanced_media_new(void* parent, int x, int y, int w, int h)
 #else
     void* mw = mw_create(MW_MEDIA);
     if (parent) mw_add_child(parent, mw);
-    mw_set_pos(mw, (float)x); mw_set_size(mw, (float)w, (float)h);
+    mw_set_pos(mw, (float)x, (float)y); mw_set_size(mw, (float)w, (float)h);
     return mw;
 #endif
 }
@@ -347,7 +347,7 @@ void* aurora_advanced_map_new(void* parent, int x, int y, int w, int h)
 #else
     void* mp = mw_create(MW_MAP);
     if (parent) mw_add_child(parent, mp);
-    mw_set_pos(mp, (float)x); mw_set_size(mp, (float)w, (float)h);
+    mw_set_pos(mp, (float)x, (float)y); mw_set_size(mp, (float)w, (float)h);
     return mp;
 #endif
 }
