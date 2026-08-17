@@ -22,14 +22,13 @@ SDK=iphonesimulator bash "${SCRIPT_DIR}/build_ios.sh" || {
 # Create simulator if needed
 echo "==> Checking simulator device..."
 # Pick the most recent available iPhone device type and runtime dynamically
-DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -oE 'com\.apple\.iPhone[^ ]*' | sort -V | tail -n1) || true
+DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -oE 'com\.apple\.iphonesimulator\.iPhone[^ )]*' | sort -V | tail -n1) || true
 RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9-]+' | sort -V | tail -n1) || true
 SIM_NAME="AuroraSim-$(basename "${RUNTIME_ID}")"
 
 if [ -z "${DEVICE_TYPE}" ] || [ -z "${RUNTIME_ID}" ]; then
     echo "WARNING: No iOS simulator runtime or device type available."
     echo "  Skipping simulator install/launch (compile validation already passed)."
-    xcrun simctl shutdown "${DEVICE_UDID}" 2>/dev/null || true
     echo "==> iOS simulator validation complete (skipped)."
     exit 0
 fi
