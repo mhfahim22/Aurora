@@ -357,15 +357,6 @@ endif()
 set_source_files_properties(aurora/src/runtime/backend/miniz.c PROPERTIES COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
 set_source_files_properties(aurora/src/runtime/backend/miniz_tdef.c PROPERTIES COMPILE_DEFINITIONS "MINIZ_NO_STDIO;MINIZ_NO_TIME;MINIZ_NO_ARCHIVE_APIS;MINIZ_NO_ZLIB_APIS")
 if(APPLE)
-    target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
-    target_link_libraries(aurora_runtime PRIVATE
-        "-framework Cocoa"
-        "-framework WebKit"
-        "-framework AVKit"
-        "-framework AVFoundation"
-        "-framework CoreMedia")
-    set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
-        COMPILE_FLAGS "-x objective-c++")
     set_source_files_properties(aurora/src/std/audio.cpp PROPERTIES LANGUAGE CXX
         COMPILE_FLAGS "-x objective-c++")
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -374,6 +365,16 @@ if(APPLE)
             aurora/src/mobile/ios/ios_renderer.mm
             aurora/src/mobile/ios/ios_renderer_widgets.mm)
         target_link_libraries(aurora_runtime PRIVATE "-framework UIKit" "-framework Metal")
+    else()
+        target_sources(aurora_runtime PRIVATE aurora/src/std/gui_mac.mm)
+        target_link_libraries(aurora_runtime PRIVATE
+            "-framework Cocoa"
+            "-framework WebKit"
+            "-framework AVKit"
+            "-framework AVFoundation"
+            "-framework CoreMedia")
+        set_source_files_properties(aurora/src/std/gui_mac.mm PROPERTIES LANGUAGE CXX
+            COMPILE_FLAGS "-x objective-c++")
     endif()
 else()
     target_sources(aurora_runtime PRIVATE aurora/src/std/gui.cpp

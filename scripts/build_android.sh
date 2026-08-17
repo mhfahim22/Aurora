@@ -57,7 +57,7 @@ echo "==> Native runtime built: $(find "${BUILD_DIR}" -name 'libaurora_runtime.a
 # Build Gradle APK
 echo "==> Building APK via Gradle..."
 cd "${PROJECT_DIR}/packages/android"
-./gradlew assembleDebug --parallel -j"${JOBS}" 2>&1 || {
+./gradlew assembleDebug --parallel 2>&1 || {
     echo "WARNING: Gradle build failed (may need Android SDK)."
     echo "  Manual: cd packages/android && ./gradlew assembleDebug"
 }

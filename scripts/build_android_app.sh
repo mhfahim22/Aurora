@@ -226,17 +226,17 @@ fi
 echo "==> Building ${BUILD_MODE} APK..."
 cd "${BUILD_DIR}"
 if [ "${BUILD_MODE}" = "release" ]; then
-    ./gradlew assembleRelease --parallel -j"${JOBS}" 2>&1 || {
+    ./gradlew assembleRelease --parallel 2>&1 || {
         echo "WARNING: Release build failed (likely missing signing keystore)."
         echo "  Falling back to debug APK..."
-        ./gradlew assembleDebug --parallel -j"${JOBS}" 2>&1 || {
+        ./gradlew assembleDebug --parallel 2>&1 || {
             echo "ERROR: Gradle build failed."
             echo "  Manual: cd ${BUILD_DIR} && ./gradlew assembleDebug"
             exit 1
         }
     }
 else
-    ./gradlew assembleDebug --parallel -j"${JOBS}" 2>&1 || {
+    ./gradlew assembleDebug --parallel 2>&1 || {
         echo "ERROR: Gradle build failed."
         echo "  Manual: cd ${BUILD_DIR} && ./gradlew assembleDebug"
         exit 1

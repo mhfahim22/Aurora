@@ -46,8 +46,8 @@ cmake -S "${PROJECT_DIR}" -B "${BUILD_DIR}" \
     -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_OSX_SYSROOT="${SYSROOT}" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_COMPILER="$(xcrun --sdk "${SYSROOT}" --find clang)" \
+    -DCMAKE_CXX_COMPILER="$(xcrun --sdk "${SYSROOT}" --find clang++)" \
     -DLLVM_DIR="${LLVM_DIR}"
 
 cmake --build "${BUILD_DIR}" --config "${CONFIG}" -j"${JOBS}" \
