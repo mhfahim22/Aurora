@@ -538,9 +538,14 @@ AuroraStr* builtin_env(const void* name_a) {
 }
 
 int64_t builtin_run(const void* cmd_a) {
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)cmd_a;
+    return -1; /* system() is unavailable on iOS */
+#else
     const char* cmd = aurora_str_ptr(cmd_a);
     if (!cmd) return -1;
     return (int64_t)system(cmd);
+#endif
 }
 
 void builtin_exit(int64_t code) {

@@ -29,6 +29,11 @@ static int capture_backtrace(void** frames, int max_depth) {
     }
     return (int)s_RtlCaptureStackBackTrace(1, max_depth, frames, nullptr);
 }
+#elif defined(__ANDROID__)
+static int capture_backtrace(void** frames, int max_depth) {
+    (void)frames; (void)max_depth;
+    return 0; /* Android NDK has no portable backtrace() */
+}
 #else
 #include <execinfo.h>
 static int capture_backtrace(void** frames, int max_depth) {

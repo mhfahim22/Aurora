@@ -134,6 +134,9 @@ void aurora_install_crash_handler(void) {
 int aurora_capture_stack(void** frames, int max_frames) {
 #ifdef _WIN32
     return CaptureStackBackTrace(0, max_frames, frames, NULL);
+#elif defined(__ANDROID__)
+    (void)frames; (void)max_frames;
+    return 0; /* Android NDK has no portable backtrace() */
 #else
     return backtrace(frames, max_frames);
 #endif
