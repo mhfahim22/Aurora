@@ -1,5 +1,6 @@
 #include "std/updater.hpp"
 #include "std/json.hpp"
+#include "common/platform.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -91,7 +92,10 @@ int aurora_updater_check(void) {
 
     /* Attempt HTTP GET via platform tools */
     std::string response;
-#ifdef _WIN32
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)url;
+    return 0;
+#elif defined(_WIN32)
     char cmd[4096];
     snprintf(cmd, sizeof(cmd), "curl -s \"%s\" 2>nul", url.c_str());
     FILE* pipe = popen(cmd, "r");
@@ -145,7 +149,10 @@ int aurora_updater_download(void) {
     std::string out_path = g_updater.app_name;
     out_path += "_update";
 
-#ifdef _WIN32
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    g_updater.downloading = 0;
+    return 0;
+#elif defined(_WIN32)
     out_path += ".exe";
     char cmd[8192];
     snprintf(cmd, sizeof(cmd), "curl -L -o \"%s\" \"%s\" 2>nul", out_path.c_str(), g_updater.download_url);

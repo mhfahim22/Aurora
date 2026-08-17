@@ -1,6 +1,7 @@
 #include "std/theme_store.hpp"
 #include "std/app.hpp"
 #include "std/json.hpp"
+#include "common/platform.hpp"
 #include <cstdarg>
 #include <cstdlib>
 #include <cstring>
@@ -40,9 +41,13 @@ static const char* get_home_dir() {
     static char buf[1024];
     const char* home = getenv("HOME");
     if (home) return home;
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    return "/tmp";
+#else
     struct passwd* pw = getpwuid(getuid());
     if (pw && pw->pw_dir) return pw->pw_dir;
     return "/tmp";
+#endif
 #endif
 }
 
@@ -90,6 +95,10 @@ static int write_file_str(const std::string& path, const std::string& data) {
 }
 
 static std::string voss_capture(const char* fmt, ...) {
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)fmt;
+    return "";
+#else
     char cmd[8192];
     va_list ap;
     va_start(ap, fmt);
@@ -104,6 +113,7 @@ static std::string voss_capture(const char* fmt, ...) {
         result.append(buf, n);
     pclose(pipe);
     return result;
+#endif
 }
 
 /* ── Theme Store Functions ── */

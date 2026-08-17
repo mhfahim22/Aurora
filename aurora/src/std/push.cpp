@@ -1,5 +1,6 @@
 #include "std/push.hpp"
 #include "std/json.hpp"
+#include "common/platform.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -106,7 +107,11 @@ int aurora_push_send_local(const char* title, const char* body, int delay_ms) {
 #else
     /* Use notify-send on Linux */
     std::string cmd = "notify-send \"" + std::string(title) + "\" \"" + std::string(body) + "\"";
+#if defined(AURORA_PLATFORM_IOS) && AURORA_PLATFORM_IOS
+    (void)cmd;
+#else
     system(cmd.c_str());
+#endif
 #endif
     (void)delay_ms;
     return 1;
