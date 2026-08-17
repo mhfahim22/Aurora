@@ -25,6 +25,23 @@ static void* make_widget(AuroraWidget parent, int gui_type,
 #elif AURORA_PLATFORM_ANDROID || AURORA_PLATFORM_IOS
 #  include "mobile/widgets.hpp"
 
+/* App widget type codes (mirror gui.hpp so the mobile backend can use the
+   same AURORA_WIDGET_* constants without pulling in the desktop GUI header). */
+#define AURORA_WIDGET_WINDOW       1
+#define AURORA_WIDGET_BUTTON       2
+#define AURORA_WIDGET_LABEL        3
+#define AURORA_WIDGET_TEXTBOX      4
+#define AURORA_WIDGET_LISTBOX      5
+#define AURORA_WIDGET_CHECKBOX     7
+#define AURORA_WIDGET_SLIDER       9
+#define AURORA_WIDGET_PROGRESSBAR  10
+#define AURORA_WIDGET_COMBOBOX     11
+#define AURORA_WIDGET_IMAGE        18
+#define AURORA_WIDGET_SWITCH       23
+#define AURORA_WIDGET_ROW          26
+#define AURORA_WIDGET_COLUMN       27
+#define AURORA_WIDGET_GRID         29
+
 /* Map desktop widget types to mobile MwWidget types */
 static int map_widget_type(int app_type)
 {
