@@ -30,8 +30,14 @@ typedef std::ptrdiff_t GLintptr;
 typedef unsigned int   GLbitfield;
 #else
 #include <dlfcn.h>
-#if defined(__APPLE__)
+#if defined(__ANDROID__)
+#include <GLES3/gl3.h>
+#elif defined(__APPLE__)
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+#include <OpenGLES/ES3/gl.h>
+#else
 #include <OpenGL/gl3.h>
+#endif
 #else
 #include <GL/gl.h>
 #endif
